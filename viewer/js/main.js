@@ -509,6 +509,11 @@ function renderChecklist() {
   $('checklist-tab').textContent = `Parts · ${total}`;
 }
 
+// Narrow screens get the bottom-sheet layout (matches the CSS breakpoint): the
+// parts list defaults to minimized and the parts/identify sheets are mutually
+// exclusive so they never overlap at the bottom.
+const isMobile = () => matchMedia('(max-width: 560px)').matches;
+
 // BOM widget: expanded on the checklist step and the final step, minimized to
 // a side tab everywhere else — the user can toggle it on any step.
 function setChecklist(open) {
@@ -584,7 +589,7 @@ function goTo(i, { animate = true } = {}) {
   }
   if (isOutro) {
     $('step-counter').textContent = 'Thanks for building';
-    setChecklist(true); // the finale shows the full parts list with export options
+    setChecklist(!isMobile()); // desktop finale shows the full list; mobile keeps it one tap away (less clutter)
     $('btn-prev').disabled = false;
     $('btn-next').disabled = true;
     animToken++;
@@ -601,7 +606,7 @@ function goTo(i, { animate = true } = {}) {
   $('step-num').classList.toggle('hidden', !numbered);
   $('step-num').textContent = numbered ? stepIdx : '';
   $('step-counter').textContent = numbered ? `Step ${stepIdx} / ${manifest.steps.length - 1}` : 'Intro';
-  setChecklist(!!step.checklist || stepIdx === manifest.steps.length - 1);
+  setChecklist((!!step.checklist || stepIdx === manifest.steps.length - 1) && !isMobile());
   $('btn-prev').disabled = false;
   $('btn-next').disabled = cur === PAGES.length - 1;
   if (animate) playStep(stepIdx);
@@ -616,7 +621,7 @@ $('btn-prev').onclick = () => goTo(cur - 1, { animate: false });
 $('btn-next').onclick = () => goTo(cur + 1);
 $('btn-replay').onclick = () => goTo(cur);
 $('btn-start').onclick = () => goTo(1); // cover → intro, camera pans + de-zooms
-$('checklist-tab').onclick = () => setChecklist(true);
+$('checklist-tab').onclick = () => { if (isMobile()) setSelected(null); setChecklist(true); };
 $('checklist-close').onclick = () => setChecklist(false);
 let tapHintDismissed = false;
 $('tap-hint-x').onclick = () => { tapHintDismissed = true; $('tap-hint').classList.add('hidden'); };
@@ -675,6 +680,7 @@ function setSelected(id) {
   $('filament-menu').classList.add('hidden');
   const card = $('identify-card');
   if (!id) { card.classList.add('hidden'); $('pointer-line').classList.add('hidden'); return; }
+  if (isMobile()) setChecklist(false); // mobile: parts list & identify sheet are mutually exclusive
   const inst = instances.get(id);
   inst.group.traverse(o => { if (o.isMesh) o.material = materialFor(inst.cfg.node, true); });
   selAnchor = new THREE.Box3().setFromObject(inst.group).getCenter(new THREE.Vector3()).sub(inst.group.position);
