@@ -1,0 +1,342 @@
+{
+  "title": "GEN2 Table Top Kit · 185 · 3W",
+  "collection": "185",
+  "pitch": { "x": 88, "y": 56 },
+
+  "colors": {
+    "Case": "#56575c",
+    "Drawer": "#ff8a40",
+    "CoverL": "#c96a2e",
+    "CoverU": "#ff8a40",
+    "FootrailL": "#1f6ea6",
+    "FootrailU": "#2f9be0",
+    "Foot": "#2e3238",
+    "QuickLock": "#2f9be0",
+    "Faceplate": "#7c7e84",
+    "Handle": "#d9b36c",
+    "Stopper": "#1f6ea6",
+    "MagnetClip": "#e2641b",
+    "Magnet": "#c9ccd2"
+  },
+
+  "_links": "URLs mirrored from the planner's verified LINK_OVERRIDES (js/data.js) — planner stays the source of truth; update both together.",
+
+  "parts": [
+    { "node": "FR-L_185-2W",               "label": "Footrail Lower 185-2W",      "type": "FootrailL",  "qty": 1,
+      "links": { "p": "https://www.printables.com/model/1118906-gen2-table-top-kit-v2-185-standard", "t": "https://thangs.com/designer/Jerrari/3d-model/GEN2%20Table%20Top%20Kit%20V2%20-%20185-1231757" } },
+    { "node": "FR-L_185-1W",               "label": "Footrail Lower 185-1W",      "type": "FootrailL",  "qty": 1,
+      "links": { "p": "https://www.printables.com/model/1118906-gen2-table-top-kit-v2-185-standard", "t": "https://thangs.com/designer/Jerrari/3d-model/GEN2%20Table%20Top%20Kit%20V2%20-%20185-1231757" } },
+    { "node": "FR-U_185-2W",               "label": "Footrail Upper 185-2W",      "type": "FootrailU",  "qty": 1,
+      "links": { "p": "https://www.printables.com/model/1118906-gen2-table-top-kit-v2-185-standard", "t": "https://thangs.com/designer/Jerrari/3d-model/GEN2%20Table%20Top%20Kit%20V2%20-%20185-1231757" } },
+    { "node": "FR-U_185-1W",               "label": "Footrail Upper 185-1W",      "type": "FootrailU",  "qty": 1,
+      "links": { "p": "https://www.printables.com/model/1118906-gen2-table-top-kit-v2-185-standard", "t": "https://thangs.com/designer/Jerrari/3d-model/GEN2%20Table%20Top%20Kit%20V2%20-%20185-1231757" } },
+    { "node": "Tabletop-Kit-Foot",         "label": "Tabletop Kit Foot",          "type": "Foot",      "qty": 8,
+      "links": { "p": "https://www.printables.com/model/1118906-gen2-table-top-kit-v2-185-standard", "t": "https://thangs.com/designer/Jerrari/3d-model/GEN2%20Table%20Top%20Kit%20V2%20-%20185-1231757" } },
+    { "node": "185-2W-1H_Case",            "label": "Case 185-2W-1H", "img": "img/parts/Case 185-2W-1H.png",             "type": "Case",      "qty": 1,
+      "links": { "p": "https://www.printables.com/model/1658700-gen2-185-cases-all", "t": "https://thangs.com/designer/Jerrari/3d-model/GEN2%20185%20Cases%20-%20All-1535455" } },
+    { "node": "185-1W-1H_Case",            "label": "Case 185-1W-1H", "img": "img/parts/Case 185-1W-1H.png",             "type": "Case",      "qty": 4,
+      "links": { "p": "https://www.printables.com/model/1658700-gen2-185-cases-all", "t": "https://thangs.com/designer/Jerrari/3d-model/GEN2%20185%20Cases%20-%20All-1535455" } },
+    { "node": "QuickLock-L",               "label": "QuickLock L", "img": "img/parts/QuickLock.png",                "type": "QuickLock", "qty": 5,
+      "links": { "p": "https://www.printables.com/model/1012796-gen2-hardware", "t": "https://thangs.com/designer/Jerrari/3d-model/GEN2%20Hardware-1141439" } },
+    { "node": "QuickLock-R",               "label": "QuickLock R", "img": "img/parts/QuickLock.png",                "type": "QuickLock", "qty": 5,
+      "links": { "p": "https://www.printables.com/model/1012796-gen2-hardware", "t": "https://thangs.com/designer/Jerrari/3d-model/GEN2%20Hardware-1141439" } },
+    { "node": "Drawer_Stoppers_L",         "label": "Drawer Stopper L", "img": "img/parts/Drawer Stopper.png",           "type": "Stopper",   "qty": 6,
+      "links": { "p": "https://www.printables.com/model/1012796-gen2-hardware", "t": "https://thangs.com/designer/Jerrari/3d-model/GEN2%20Hardware-1141439" } },
+    { "node": "Drawer_Stoppers_R",         "label": "Drawer Stopper R", "img": "img/parts/Drawer Stopper.png",           "type": "Stopper",   "qty": 6,
+      "links": { "p": "https://www.printables.com/model/1012796-gen2-hardware", "t": "https://thangs.com/designer/Jerrari/3d-model/GEN2%20Hardware-1141439" } },
+    { "node": "CL-185-2W",                 "label": "Cover Lower 185-2W",         "type": "CoverL",     "qty": 1,
+      "links": { "p": "https://www.printables.com/model/1118906-gen2-table-top-kit-v2-185-standard", "t": "https://thangs.com/designer/Jerrari/3d-model/GEN2%20Table%20Top%20Kit%20V2%20-%20185-1231757" } },
+    { "node": "CL-185-1W",                 "label": "Cover Lower 185-1W",         "type": "CoverL",     "qty": 1,
+      "links": { "p": "https://www.printables.com/model/1118906-gen2-table-top-kit-v2-185-standard", "t": "https://thangs.com/designer/Jerrari/3d-model/GEN2%20Table%20Top%20Kit%20V2%20-%20185-1231757" } },
+    { "node": "CU-185-2W",                 "label": "Cover Upper 185-2W",         "type": "CoverU",     "qty": 1,
+      "links": { "p": "https://www.printables.com/model/1118906-gen2-table-top-kit-v2-185-standard", "t": "https://thangs.com/designer/Jerrari/3d-model/GEN2%20Table%20Top%20Kit%20V2%20-%20185-1231757" } },
+    { "node": "CU-185-1W",                 "label": "Cover Upper 185-1W",         "type": "CoverU",     "qty": 1,
+      "links": { "p": "https://www.printables.com/model/1118906-gen2-table-top-kit-v2-185-standard", "t": "https://thangs.com/designer/Jerrari/3d-model/GEN2%20Table%20Top%20Kit%20V2%20-%20185-1231757" } },
+    { "node": "DecorDrawer_185-2W-1H",     "label": "Decor Drawer 185-2W-1H", "img": "img/parts/Decor Drawer 185-2W-1H.png",     "type": "Drawer",    "qty": 1,
+      "links": { "t": "https://thangs.com/designer/Jerrari/3d-model/GEN2%20185%20Decor%20Drawers%20-%20All-1116945" } },
+    { "node": "DecorDrawer_185-1W-1H",     "label": "Decor Drawer 185-1W-1H", "img": "img/parts/Decor Drawer 185-1W-1H.png",     "type": "Drawer",    "qty": 4,
+      "links": { "t": "https://thangs.com/designer/Jerrari/3d-model/GEN2%20185%20Decor%20Drawers%20-%20All-1116945" } },
+    { "node": "Faceplate_Essential_2W-1H", "label": "Faceplate Essential 2W-1H", "img": "img/parts/Faceplate-Essential.jpg",  "type": "Faceplate", "qty": 1,
+      "links": { "p": "https://www.printables.com/model/964559-gen2-decor-faceplates-essential-series", "t": "https://thangs.com/designer/Jerrari/3d-model/GEN2%20Decor%20-%20Faceplates%20-%20Essential%20Series-1116946" } },
+    { "node": "Faceplate_Essential_1W-1H", "label": "Faceplate Essential 1W-1H", "img": "img/parts/Faceplate-Essential.jpg",  "type": "Faceplate", "qty": 4,
+      "links": { "p": "https://www.printables.com/model/964559-gen2-decor-faceplates-essential-series", "t": "https://thangs.com/designer/Jerrari/3d-model/GEN2%20Decor%20-%20Faceplates%20-%20Essential%20Series-1116946" } },
+    { "node": "Handle_Deco",               "label": "Deco Handle",                "type": "Handle",    "qty": 5,
+      "links": { "p": "https://www.printables.com/model/1044972-gen2-decor-handles-deco-series", "t": "https://thangs.com/designer/Jerrari/3d-model/GEN2%20Decor%20Handles%20-%20Deco%20Series-1159960" } },
+    { "node": "MagnetClip_10x2mm",         "label": "Magnet Clip 10×2", "img": "img/parts/Magnet Clip.png",           "type": "MagnetClip", "qty": 10,
+      "links": { "p": "https://www.printables.com/model/1012796-gen2-hardware", "t": "https://thangs.com/designer/Jerrari/3d-model/GEN2%20Hardware-1141439" } },
+    { "node": "Magnet_10x2mm",             "label": "Magnet 10×2 mm", "img": "img/parts/Magnets.png",             "type": "Magnet",    "qty": 10, "purchased": true }
+  ],
+
+  "_datums": "Same calibrated chain as tabletop-185 (see that manifest). 3W layout: columns at x -88/0/+88; frame = 2W rail (center -44) + 1W rail (center +88) side by side; feet dedup at the rail junction (left rail keeps its slots, right rail's junction slots skipped) -> 8 feet; 1W-rail slot x (local ±32.5) estimated by symmetry with the 2W rail's edge inset. Magnet clips follow Joey's multi-W rule: one clip per drawer, LEFT slot on a 2W.",
+
+  "instances": [
+    { "id": "frl2w", "node": "FR-L_185-2W", "pos": [-44, 7.65, 0], "stage": "base" },
+    { "id": "frl1w", "node": "FR-L_185-1W", "pos": [ 88, 7.65, 0], "stage": "base" },
+
+    { "id": "f1", "node": "Tabletop-Kit-Foot", "pos": [-120.48, 0, -73],    "yaw": 180, "stage": "base" },
+    { "id": "f2", "node": "Tabletop-Kit-Foot", "pos": [-120.48, 0, 81.15],  "yaw": 180, "stage": "base" },
+    { "id": "f3", "node": "Tabletop-Kit-Foot", "pos": [ -44.18, 0, -73],    "yaw": 0,   "stage": "base" },
+    { "id": "f4", "node": "Tabletop-Kit-Foot", "pos": [ -44.18, 0, 81.15],  "yaw": 0,   "stage": "base" },
+    { "id": "f5", "node": "Tabletop-Kit-Foot", "pos": [  32.65, 0, -73],    "yaw": 0,   "stage": "base" },
+    { "id": "f6", "node": "Tabletop-Kit-Foot", "pos": [  32.65, 0, 81.15],  "yaw": 0,   "stage": "base" },
+    { "id": "f7", "node": "Tabletop-Kit-Foot", "pos": [ 120.5,  0, -73],    "yaw": 0,   "stage": "base" },
+    { "id": "f8", "node": "Tabletop-Kit-Foot", "pos": [ 120.5,  0, 81.15],  "yaw": 0,   "stage": "base" },
+
+    { "id": "fru1w", "node": "FR-U_185-1W", "pos": [-88, 12.75, 0] },
+    { "id": "fru2w", "node": "FR-U_185-2W", "pos": [ 44, 12.75, 0] },
+
+    { "id": "caseA", "node": "185-2W-1H_Case", "pos": [-44, 17.65, 0], "stage": "cA" },
+    { "id": "qlAL",  "node": "QuickLock-L",    "pos": [-128.12, 53.33, 65.02], "stage": "cA" },
+    { "id": "qlAR",  "node": "QuickLock-R",    "pos": [  40.55, 53.33, 65.02], "stage": "cA" },
+    { "id": "mcA",   "node": "MagnetClip_10x2mm", "pos": [-88, 53.45, -85.7], "stage": "cA" },
+    { "id": "mgA",   "node": "Magnet_10x2mm",     "pos": [-88, 57.65, -86],   "stage": "cA" },
+
+    { "id": "caseB", "node": "185-1W-1H_Case", "pos": [88, 17.65, 0], "stage": "cB" },
+    { "id": "qlBL",  "node": "QuickLock-L",    "pos": [ 47.88, 53.33, 65.02], "stage": "cB" },
+    { "id": "qlBR",  "node": "QuickLock-R",    "pos": [128.55, 53.33, 65.02], "stage": "cB" },
+    { "id": "mcB",   "node": "MagnetClip_10x2mm", "pos": [88, 53.45, -85.7], "stage": "cB" },
+    { "id": "mgB",   "node": "Magnet_10x2mm",     "pos": [88, 57.65, -86],   "stage": "cB" },
+
+    { "id": "caseC", "node": "185-1W-1H_Case", "pos": [-88, 73.65, 0], "stage": "cC" },
+    { "id": "qlCL",  "node": "QuickLock-L",    "pos": [-128.12, 109.33, 65.02], "stage": "cC" },
+    { "id": "qlCR",  "node": "QuickLock-R",    "pos": [ -47.45, 109.33, 65.02], "stage": "cC" },
+    { "id": "mcC",   "node": "MagnetClip_10x2mm", "pos": [-88, 109.45, -85.7], "stage": "cC" },
+    { "id": "mgC",   "node": "Magnet_10x2mm",     "pos": [-88, 113.65, -86],   "stage": "cC" },
+
+    { "id": "caseD", "node": "185-1W-1H_Case", "pos": [0, 73.65, 0], "stage": "cD" },
+    { "id": "qlDL",  "node": "QuickLock-L",    "pos": [-40.12, 109.33, 65.02], "stage": "cD" },
+    { "id": "qlDR",  "node": "QuickLock-R",    "pos": [ 40.55, 109.33, 65.02], "stage": "cD" },
+    { "id": "mcD",   "node": "MagnetClip_10x2mm", "pos": [0, 109.45, -85.7], "stage": "cD" },
+    { "id": "mgD",   "node": "Magnet_10x2mm",     "pos": [0, 113.65, -86],   "stage": "cD" },
+
+    { "id": "caseE", "node": "185-1W-1H_Case", "pos": [88, 73.65, 0], "stage": "cE" },
+    { "id": "qlEL",  "node": "QuickLock-L",    "pos": [ 47.88, 109.33, 65.02], "stage": "cE" },
+    { "id": "qlER",  "node": "QuickLock-R",    "pos": [128.55, 109.33, 65.02], "stage": "cE" },
+    { "id": "mcE",   "node": "MagnetClip_10x2mm", "pos": [88, 109.45, -85.7], "stage": "cE" },
+    { "id": "mgE",   "node": "Magnet_10x2mm",     "pos": [88, 113.65, -86],   "stage": "cE" },
+
+    { "id": "st1L", "node": "Drawer_Stoppers_L", "pos": [-100.6, 71.65, 76.5] },
+    { "id": "st1R", "node": "Drawer_Stoppers_R", "pos": [ -75.6, 71.65, 76.5] },
+    { "id": "st2L", "node": "Drawer_Stoppers_L", "pos": [ -12.6, 71.65, 76.5] },
+    { "id": "st2R", "node": "Drawer_Stoppers_R", "pos": [  12.4, 71.65, 76.5] },
+    { "id": "st3L", "node": "Drawer_Stoppers_L", "pos": [  75.4, 71.65, 76.5] },
+    { "id": "st3R", "node": "Drawer_Stoppers_R", "pos": [ 100.4, 71.65, 76.5] },
+
+    { "id": "cl2w", "node": "CL-185-2W", "pos": [-44, 129.65, 0] },
+    { "id": "cl1w", "node": "CL-185-1W", "pos": [ 88, 129.65, 0] },
+
+    { "id": "st4L", "node": "Drawer_Stoppers_L", "pos": [-100.6, 127.65, 76.5] },
+    { "id": "st4R", "node": "Drawer_Stoppers_R", "pos": [ -75.6, 127.65, 76.5] },
+    { "id": "st5L", "node": "Drawer_Stoppers_L", "pos": [ -12.6, 127.65, 76.5] },
+    { "id": "st5R", "node": "Drawer_Stoppers_R", "pos": [  12.4, 127.65, 76.5] },
+    { "id": "st6L", "node": "Drawer_Stoppers_L", "pos": [  75.4, 127.65, 76.5] },
+    { "id": "st6R", "node": "Drawer_Stoppers_R", "pos": [ 100.4, 127.65, 76.5] },
+
+    { "id": "cu1w", "node": "CU-185-1W", "pos": [-88, 133.95, 0] },
+    { "id": "cu2w", "node": "CU-185-2W", "pos": [ 44, 133.95, 0] },
+
+    { "id": "drwA", "node": "DecorDrawer_185-2W-1H", "pos": [-43.84, 23.37, 5.24] },
+    { "id": "drwB", "node": "DecorDrawer_185-1W-1H", "pos": [ 88.16, 23.37, 5.24] },
+    { "id": "drwC", "node": "DecorDrawer_185-1W-1H", "pos": [-87.84, 79.37, 5.24] },
+    { "id": "drwD", "node": "DecorDrawer_185-1W-1H", "pos": [  0.16, 79.37, 5.24] },
+    { "id": "drwE", "node": "DecorDrawer_185-1W-1H", "pos": [ 88.16, 79.37, 5.24] },
+
+    { "id": "dcA", "node": "MagnetClip_10x2mm", "pos": [-87.84, 53.37, -83], "yaw": 180, "rides": "drwA" },
+    { "id": "dmA", "node": "Magnet_10x2mm",     "pos": [-87.84, 58.37, -84], "rides": "drwA" },
+    { "id": "dcB", "node": "MagnetClip_10x2mm", "pos": [ 88.16, 53.37, -83], "yaw": 180, "rides": "drwB" },
+    { "id": "dmB", "node": "Magnet_10x2mm",     "pos": [ 88.16, 58.37, -84], "rides": "drwB" },
+    { "id": "dcC", "node": "MagnetClip_10x2mm", "pos": [-87.84, 109.37, -83], "yaw": 180, "rides": "drwC" },
+    { "id": "dmC", "node": "Magnet_10x2mm",     "pos": [-87.84, 114.37, -84], "rides": "drwC" },
+    { "id": "dcD", "node": "MagnetClip_10x2mm", "pos": [  0.16, 109.37, -83], "yaw": 180, "rides": "drwD" },
+    { "id": "dmD", "node": "Magnet_10x2mm",     "pos": [  0.16, 114.37, -84], "rides": "drwD" },
+    { "id": "dcE", "node": "MagnetClip_10x2mm", "pos": [ 88.16, 109.37, -83], "yaw": 180, "rides": "drwE" },
+    { "id": "dmE", "node": "Magnet_10x2mm",     "pos": [ 88.16, 114.37, -84], "rides": "drwE" },
+
+    { "id": "fpA", "node": "Faceplate_Essential_2W-1H", "pos": [-43.53, 21.37, 95.07], "rides": "drwA" },
+    { "id": "fpB", "node": "Faceplate_Essential_1W-1H", "pos": [ 88.47, 21.37, 95.07], "rides": "drwB" },
+    { "id": "fpC", "node": "Faceplate_Essential_1W-1H", "pos": [-87.53, 77.37, 95.07], "rides": "drwC" },
+    { "id": "fpD", "node": "Faceplate_Essential_1W-1H", "pos": [  0.47, 77.37, 95.07], "rides": "drwD" },
+    { "id": "fpE", "node": "Faceplate_Essential_1W-1H", "pos": [ 88.47, 77.37, 95.07], "rides": "drwE" },
+
+    { "id": "hA", "node": "Handle_Deco", "pos": [-43.54, 43.86, 109.57], "rides": "drwA" },
+    { "id": "hB", "node": "Handle_Deco", "pos": [ 88.46, 43.86, 109.57], "rides": "drwB" },
+    { "id": "hC", "node": "Handle_Deco", "pos": [-87.54, 99.86, 109.57], "rides": "drwC" },
+    { "id": "hD", "node": "Handle_Deco", "pos": [  0.46, 99.86, 109.57], "rides": "drwD" },
+    { "id": "hE", "node": "Handle_Deco", "pos": [ 88.46, 99.86, 109.57], "rides": "drwE" }
+  ],
+
+  "stages": {
+    "base": [0, 110, 0],
+    "cA": [0, 0, -170],
+    "cB": [0, 0, -170],
+    "cC": [0, 0, -170],
+    "cD": [0, 0, -170],
+    "cE": [0, 0, -170]
+  },
+
+  "steps": [
+    {
+      "title": "Print checklist",
+      "note": "68 prints — quantities on the right. You'll also need 10× M3 screws for the handles (2 each) and 10× 10×2 mm disc magnets for the optional magnet closures (hardware store items).",
+      "camera": { "t": 28, "p": 60, "r": 1450, "target": [0, 95, 60] },
+      "checklist": true
+    },
+    {
+      "title": "Bench: lower footrails",
+      "note": "A 3W base uses a 2W and a 1W lower footrail side by side. We show them raised so you can see the foot slots on the undersides.",
+      "camera": { "t": 30, "p": 55, "r": 780, "target": [0, 115, 0] },
+      "phases": [ { "enter": [ { "id": "frl2w", "from": [0, 90, 0] }, { "id": "frl1w", "from": [0, 90, 0] } ] } ]
+    },
+    {
+      "title": "Bench: insert the eight feet",
+      "note": "Pointy end slides in first — outer feet toward the rail ends, middle feet left to right. Where the two rails meet, the slots would put feet right next to each other: install that pair on ONE rail only (we use the 2W's).",
+      "camera": { "t": 30, "p": 55, "r": 780, "target": [0, 115, 0] },
+      "phases": [
+        { "enter": [
+          { "id": "f1", "from": [ 30, 0, 0] },
+          { "id": "f3", "from": [-30, 0, 0] },
+          { "id": "f5", "from": [-30, 0, 0] },
+          { "id": "f7", "from": [-30, 0, 0] }
+        ] },
+        { "enter": [
+          { "id": "f2", "from": [ 30, 0, 0] },
+          { "id": "f4", "from": [-30, 0, 0] },
+          { "id": "f6", "from": [-30, 0, 0] },
+          { "id": "f8", "from": [-30, 0, 0] }
+        ] }
+      ]
+    },
+    {
+      "title": "Set the base down",
+      "note": "Flip the base feet-down and set it where the kit will live.",
+      "camera": { "t": 30, "p": 60, "r": 860, "target": [0, 50, 0] },
+      "phases": [ { "settle": "base" } ]
+    },
+    {
+      "title": "Upper footrails",
+      "note": "Each upper footrail slides onto its lower rail from the back, all the way forward until it stops.",
+      "camera": { "t": 30, "p": 58, "r": 800, "target": [0, 30, 0] },
+      "phases": [ { "enter": [ { "id": "fru2w", "from": [0, 0, -170] }, { "id": "fru1w", "from": [0, 0, -170] } ] } ]
+    },
+    {
+      "title": "Case 1 (2W) — QuickLocks, clip, then slide",
+      "note": "QuickLocks go in the OUTER walls only: L left, R right — one pair per case, whatever its width. Optional magnet closure: on a 2W the clip goes in the LEFT back-wall slot; press the magnet in back-to-front, lower the clip, then slide the case on.",
+      "camera": { "t": 30, "p": 58, "r": 800, "target": [-44, 45, 0] },
+      "phases": [
+        { "enter": [ { "id": "caseA", "from": [0, 60, 0] } ] },
+        { "enter": [ { "id": "qlAL", "from": [0, 55, 0] }, { "id": "qlAR", "from": [0, 55, 0] } ] },
+        { "enter": [ { "id": "mcA", "at": [0, 35, 0], "from": [0, 30, 0] } ] },
+        { "enter": [ { "id": "mgA", "at": [0, 35, 0], "from": [0, 0, -30] } ] },
+        { "move": [ { "id": "mcA", "by": [0, -35, 0] }, { "id": "mgA", "by": [0, -35, 0] } ] },
+        { "settle": "cA" }
+      ]
+    },
+    {
+      "title": "Case 2 — bottom right",
+      "note": "The 1W case finishes the bottom row: QuickLocks and magnet clip in, then slide it forward until it clicks.",
+      "camera": { "t": 30, "p": 58, "r": 800, "target": [88, 45, 0] },
+      "phases": [
+        { "enter": [ { "id": "caseB", "from": [0, 60, 0] } ] },
+        { "enter": [ { "id": "qlBL", "from": [0, 55, 0] }, { "id": "qlBR", "from": [0, 55, 0] } ] },
+        { "fade": [ { "id": "mcB" }, { "id": "mgB" } ] },
+        { "settle": "cB" }
+      ]
+    },
+    {
+      "title": "Case 3 — second row, left",
+      "note": "Rows always build bottom-up. QuickLocks and clip in, slide it on — then drop its two drawer stoppers. They protect the LEFT half of the 2W drawer below.",
+      "camera": { "t": 30, "p": 55, "r": 820, "target": [-88, 90, 0] },
+      "phases": [
+        { "enter": [ { "id": "caseC", "from": [0, 60, 0] } ] },
+        { "enter": [ { "id": "qlCL", "from": [0, 55, 0] }, { "id": "qlCR", "from": [0, 55, 0] } ] },
+        { "fade": [ { "id": "mcC" }, { "id": "mgC" } ] },
+        { "settle": "cC" },
+        { "enter": [ { "id": "st1L", "from": [0, 55, 0] }, { "id": "st1R", "from": [0, 55, 0] } ] }
+      ]
+    },
+    {
+      "title": "Case 4 — second row, middle",
+      "note": "Same again — this case's stoppers protect the RIGHT half of the 2W drawer below (a 2W bay has stopper slots per 1W).",
+      "camera": { "t": 30, "p": 55, "r": 820, "target": [0, 90, 0] },
+      "phases": [
+        { "enter": [ { "id": "caseD", "from": [0, 60, 0] } ] },
+        { "enter": [ { "id": "qlDL", "from": [0, 55, 0] }, { "id": "qlDR", "from": [0, 55, 0] } ] },
+        { "fade": [ { "id": "mcD" }, { "id": "mgD" } ] },
+        { "settle": "cD" },
+        { "enter": [ { "id": "st2L", "from": [0, 55, 0] }, { "id": "st2R", "from": [0, 55, 0] } ] }
+      ]
+    },
+    {
+      "title": "Case 5 — second row, right",
+      "note": "Last case: QuickLocks and clip in, slide it home, then its stoppers — protecting the 1W drawer below.",
+      "camera": { "t": 30, "p": 55, "r": 820, "target": [88, 90, 0] },
+      "phases": [
+        { "enter": [ { "id": "caseE", "from": [0, 60, 0] } ] },
+        { "enter": [ { "id": "qlEL", "from": [0, 55, 0] }, { "id": "qlER", "from": [0, 55, 0] } ] },
+        { "fade": [ { "id": "mcE" }, { "id": "mgE" } ] },
+        { "settle": "cE" },
+        { "enter": [ { "id": "st3L", "from": [0, 55, 0] }, { "id": "st3R", "from": [0, 55, 0] } ] }
+      ]
+    },
+    {
+      "title": "Lower covers",
+      "note": "The 2W and 1W lower covers slide over the top row from the back — the top row's QuickLocks lock them. Then drop the last six stoppers into the covers' slots to protect the top-row drawers.",
+      "camera": { "t": 30, "p": 52, "r": 840, "target": [0, 115, 0] },
+      "phases": [
+        { "enter": [ { "id": "cl2w", "from": [0, 0, -170] }, { "id": "cl1w", "from": [0, 0, -170] } ] },
+        { "enter": [
+          { "id": "st4L", "from": [0, 55, 0] }, { "id": "st4R", "from": [0, 55, 0] },
+          { "id": "st5L", "from": [0, 55, 0] }, { "id": "st5R", "from": [0, 55, 0] },
+          { "id": "st6L", "from": [0, 55, 0] }, { "id": "st6R", "from": [0, 55, 0] }
+        ] }
+      ]
+    },
+    {
+      "title": "Upper covers",
+      "note": "The upper covers slide in from the back, onto the lower covers' dovetails, closing over the stopper slots.",
+      "camera": { "t": 30, "p": 52, "r": 840, "target": [0, 120, 0] },
+      "phases": [ { "enter": [ { "id": "cu2w", "from": [0, 0, -170] }, { "id": "cu1w", "from": [0, 0, -170] } ] } ]
+    },
+    {
+      "title": "Drawers",
+      "note": "Before a drawer goes in: snap a magnet clip into its back-wall slot (LEFT slot on the 2W) and press in the magnet, front to back. Then slide each drawer in from the front.",
+      "camera": { "t": 12, "p": 68, "r": 900, "target": [0, 60, 60] },
+      "phases": [
+        { "enter": [ { "id": "drwA", "at": [0, 0, 190], "from": [0, 0, 60] } ] },
+        { "enter": [ { "id": "dcA", "at": [0, 35, 190], "from": [0, 30, 0], "rides": "drwA" } ] },
+        { "enter": [ { "id": "dmA", "at": [0, 35, 190], "from": [0, 0, 30], "rides": "drwA" } ] },
+        { "move": [ { "id": "dcA", "by": [0, -35, 0], "rides": "drwA" }, { "id": "dmA", "by": [0, -35, 0], "rides": "drwA" } ] },
+        { "move": [
+          { "id": "drwA", "by": [0, 0, -190] },
+          { "id": "dcA",  "by": [0, 0, -190], "rides": "drwA" },
+          { "id": "dmA",  "by": [0, 0, -190], "rides": "drwA" }
+        ] },
+        { "fade": [ { "id": "dcB" }, { "id": "dmB" }, { "id": "dcC" }, { "id": "dmC" }, { "id": "dcD" }, { "id": "dmD" }, { "id": "dcE" }, { "id": "dmE" } ] },
+        { "enter": [ { "id": "drwB", "from": [0, 0, 200] }, { "id": "drwC", "from": [0, 0, 200] }, { "id": "drwD", "from": [0, 0, 200] }, { "id": "drwE", "from": [0, 0, 200] } ] }
+      ]
+    },
+    {
+      "title": "Faceplates & handles",
+      "note": "Pop a drawer out about 40 mm, slide the faceplate DOWN onto the drawer front until it snaps, screw on the Deco handle (2× M3), then push the drawer home. Repeat for every drawer — the kit is done. Tap any part to see its name and download links.",
+      "camera": { "t": 15, "p": 66, "r": 760, "target": [-30, 70, 40] },
+      "phases": [
+        { "move": [ { "id": "drwA", "by": [0, 0, 40] }, { "id": "dcA", "by": [0, 0, 40], "rides": "drwA" }, { "id": "dmA", "by": [0, 0, 40], "rides": "drwA" } ] },
+        { "enter": [ { "id": "fpA", "at": [0, 0, 40], "from": [0, 45, 0], "rides": "drwA" } ] },
+        { "enter": [ { "id": "hA",  "at": [0, 0, 40], "from": [0, 0, 55], "rides": "drwA" } ] },
+        { "move": [
+          { "id": "drwA", "by": [0, 0, -40] },
+          { "id": "dcA",  "by": [0, 0, -40], "rides": "drwA" },
+          { "id": "dmA",  "by": [0, 0, -40], "rides": "drwA" },
+          { "id": "fpA",  "by": [0, 0, -40], "rides": "drwA" },
+          { "id": "hA",   "by": [0, 0, -40], "rides": "drwA" }
+        ] },
+        { "fade": [
+          { "id": "fpB" }, { "id": "hB" },
+          { "id": "fpC" }, { "id": "hC" },
+          { "id": "fpD" }, { "id": "hD" },
+          { "id": "fpE" }, { "id": "hE" }
+        ] }
+      ]
+    }
+  ]
+}

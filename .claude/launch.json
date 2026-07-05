@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "viewer",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "8123", "--directory", "viewer"],
+      "port": 8123
+    },
+    {
+      "name": "planner",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "8124", "--directory", "D:/Code Projects/GEN2 Planner/gen2-planner-main"],
+      "port": 8124
+    }
+  ]
+}

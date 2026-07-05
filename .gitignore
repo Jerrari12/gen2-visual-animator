@@ -1,0 +1,15 @@
+# Large local-only source assets — stay local, never pushed (see CLAUDE.md)
+Blender Files/
+GLB Library/
+
+# Python bytecode (GLB Pipeline)
+__pycache__/
+*.pyc
+
+# Local, per-user Claude Code settings
+.claude/settings.local.json
+
+# OS junk
+.DS_Store
+Thumbs.db
+desktop.ini

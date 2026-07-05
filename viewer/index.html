@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>GEN2 Assembly Instructions</title>
+<link rel="stylesheet" href="css/viewer.css">
+<script type="importmap">
+{
+  "imports": {
+    "three": "./vendor/three/three.module.js",
+    "three/addons/": "./vendor/three/addons/"
+  }
+}
+</script>
+</head>
+<body>
+  <div id="app">
+    <header id="topbar">
+      <div id="kit-title">Loading…</div>
+      <div id="step-counter"></div>
+    </header>
+
+    <div id="stage-wrap">
+      <canvas id="stage"></canvas>
+
+      <div id="note-panel">
+        <div id="step-num"></div>
+        <div class="note-body">
+          <div id="step-title"></div>
+          <div id="step-note"></div>
+        </div>
+      </div>
+
+      <svg id="pointer-line" class="hidden"><line x1="0" y1="0" x2="0" y2="0" /></svg>
+
+      <button id="checklist-tab" class="hidden" title="Show parts list">Parts</button>
+      <button id="color-toggle" class="hidden" title="Switch between instruction colors and your filament colors"></button>
+      <div id="checklist-panel" class="hidden">
+        <div class="checklist-head">
+          <span id="checklist-title">Print these parts first</span>
+          <button id="checklist-close" title="Minimize parts list">&#215;</button>
+        </div>
+        <div id="preset-bar">
+          <div class="preset-label">🎨 Filament presets</div>
+          <div id="preset-chips"></div>
+          <div id="preset-io">
+            <button id="preset-save" class="bom-btn" title="Download your current color choices as a file">Save colors</button>
+            <button id="preset-load" class="bom-btn" title="Load color choices from a file">Upload</button>
+            <input id="preset-file" type="file" accept="application/json" hidden />
+          </div>
+        </div>
+        <div id="checklist-rows"></div>
+        <div id="checklist-actions">
+          <button id="bom-copy" class="bom-btn" title="Copy the parts list to your clipboard">Copy list</button>
+          <button id="bom-csv" class="bom-btn" title="Download the parts list as a CSV spreadsheet">Download CSV</button>
+        </div>
+      </div>
+
+      <div id="identify-card" class="hidden">
+        <img id="identify-img" class="hidden" alt="" />
+        <div class="identify-body">
+          <div class="identify-name-row">
+            <button id="identify-swatch" title="Pick a filament color"></button>
+            <span id="identify-name"></span>
+          </div>
+          <div id="identify-qty"></div>
+          <div id="identify-links"></div>
+          <div id="identify-style" class="hidden">
+            <button id="style-prev" title="Previous style">&#9664;</button>
+            <span id="style-name"></span>
+            <button id="style-next" title="Next style">&#9654;</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="filament-menu" class="hidden">
+        <div class="fm-head">Filament colors <span>Panchroma&trade; PLA by Polymaker · &#9733; Joey's pick</span></div>
+        <div id="fm-grid"></div>
+        <div class="fm-foot">
+          <a id="fm-buy" href="#" target="_blank" rel="noopener">Shop Panchroma PLA &rarr;</a>
+          <button id="fm-reset">Instruction color</button>
+        </div>
+        <div class="fm-note">Some links are affiliate links &mdash; buying through them supports the project at no extra cost.</div>
+      </div>
+
+      <div id="outro-overlay" class="hidden">
+        <div class="outro-card">
+          <img id="outro-logo" src="img/jerrari-logo.svg" alt="JERRARI" onerror="this.classList.add('hidden')" />
+          <div class="outro-title">Thanks for building!</div>
+          <div class="outro-sub">The core GEN2 system is free and independent. The Club unlocks exclusive faceplate styles like EdgeLabel and Classic Pro, plus early access — and keeps new parts coming.</div>
+          <a class="outro-btn primary" href="https://www.printables.com/@Jerrari#join.@Jerrari.893" target="_blank" rel="noopener">Join the Club on Printables</a>
+          <a class="outro-btn" href="https://thangs.com/designer/Jerrari/memberships" target="_blank" rel="noopener">Join the Club on Thangs</a>
+          <div class="outro-links">
+            <a href="https://www.jerrari3d.com" target="_blank" rel="noopener">jerrari3d.com</a>
+            <a id="outro-yt" class="hidden" href="#" target="_blank" rel="noopener">YouTube</a>
+            <a id="outro-x" class="hidden" href="#" target="_blank" rel="noopener">Follow on X</a>
+          </div>
+        </div>
+      </div>
+
+      <div id="cover-overlay" class="hidden">
+        <div class="cover-right">
+          <img id="cover-logo" src="img/gen2-logo.png" alt="GEN2 QuickLock Modular System" onerror="this.classList.add('hidden')" />
+          <div class="cover-dynamic">DYNAMIC</div>
+          <div class="cover-manual">INSTRUCTION MANUAL</div>
+          <button id="btn-start">Get started</button>
+        </div>
+      </div>
+
+      <div id="tap-hint" class="hidden">
+        <span>👆 Tap any part to see its name &amp; download links — or click its color chip to try filament colors.</span>
+        <button id="tap-hint-x" title="Got it">&times;</button>
+      </div>
+
+      <div id="loading-overlay"><div class="spinner"></div><div id="loading-text">Loading parts…</div></div>
+    </div>
+
+    <footer id="controls">
+      <button id="btn-prev" title="Previous step">&#8592; Back</button>
+      <div id="step-dots"></div>
+      <button id="btn-replay" title="Replay this step">&#8635;</button>
+      <button id="btn-next" title="Next step">Next &#8594;</button>
+    </footer>
+  </div>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

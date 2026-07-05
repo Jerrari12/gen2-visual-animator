@@ -1,0 +1,127 @@
+{
+  "blender_exe": "auto",
+  "compress": true,
+  "index": "D:\\Code Projects\\GEN2 Visual Animator\\GLB Library\\parts_index.csv",
+
+  "_help": {
+    "blender_exe": "'auto' = newest C:\\Program Files\\Blender Foundation install, or $BLENDER, or a full path",
+    "select": "'prefix:TEXT' matches object names; 'collection:NAME'; or 'all'",
+    "code_regex": "extracts the planner part code from the object name; '' = use object name as-is",
+    "name_template": "GLB node + file name. {code}=regex match, {name}=raw object name",
+    "depth_mode": "center (locked default) | front | back",
+    "skip": "true = leave this job out of the run"
+  },
+
+  "jobs": [
+    {
+      "name": "185 Decor Drawers",
+      "blend": "D:\\Code Projects\\GEN2 Visual Animator\\Blender Files\\185\\GEN2 GLB Exporter - 185 Decor Drawers.blend",
+      "out": "D:\\Code Projects\\GEN2 Visual Animator\\GLB Library\\185",
+      "select": "prefix:Decor Drawer",
+      "code_regex": "185-\\d+W-\\d+H",
+      "name_template": "DecorDrawer_{code}",
+      "depth_mode": "center"
+    },
+
+    {
+      "name": "185 Cases",
+      "_note": "Objects named '185-XW-XH Case'. Seam print-bridges (islands <80 verts AND <2mm thick) are dropped at export; source .blend is untouched.",
+      "blend": "D:\\Code Projects\\GEN2 Visual Animator\\Blender Files\\185\\GEN2 GLB Exporter - 185 Cases.blend",
+      "out": "D:\\Code Projects\\GEN2 Visual Animator\\GLB Library\\185",
+      "select": "prefix:185-",
+      "code_regex": "185-\\d+W-\\d+H",
+      "name_template": "{code}_Case",
+      "depth_mode": "center",
+      "drop_islands_max_verts": 80,
+      "drop_islands_max_thick": 2.0
+    },
+
+    {
+      "name": "185 Covers + Footrails",
+      "_note": "CL/CU covers + FR-L/FR-U footrails, 185, 1W+2W. Modeled at assembly height; rebased to Y=0 per part. Clean meshes, no bridges. select:all = only these 8 meshes in the file.",
+      "blend": "D:\\Code Projects\\GEN2 Visual Animator\\Blender Files\\185\\GEN2 GLB Exporter - GEN2 Covers and Footrails.blend",
+      "out": "D:\\Code Projects\\GEN2 Visual Animator\\GLB Library\\185",
+      "select": "all",
+      "code_regex": "",
+      "name_template": "{name}",
+      "depth_mode": "center"
+    },
+
+    {
+      "name": "Quicklocks (universal hardware)",
+      "_note": "Handed L/R pair, shared across all collections. Clean single meshes, no supports to drop.",
+      "blend": "D:\\Code Projects\\GEN2 Visual Animator\\Blender Files\\Hardware\\GEN2 GLB Exporter - GEN2 QuickLocks.blend",
+      "out": "D:\\Code Projects\\GEN2 Visual Animator\\GLB Library\\Hardware",
+      "select": "prefix:QuickLock",
+      "code_regex": "",
+      "name_template": "{name}",
+      "depth_mode": "center"
+    },
+
+    {
+      "name": "Tabletop Kit Foot (hardware)",
+      "_note": "Dovetail rail on top; pointy end (+X) leads insertion. Rotate 90/180 per slot at placement time -- see GEN2-Part-Orientation-Notes.md. GLB stays canonical.",
+      "blend": "D:\\Code Projects\\GEN2 Visual Animator\\Blender Files\\Hardware\\GEN2 GLB Exporter - GEN2 Tabletop Kit Foot.blend",
+      "out": "D:\\Code Projects\\GEN2 Visual Animator\\GLB Library\\Hardware",
+      "select": "prefix:Tabletop",
+      "code_regex": "",
+      "name_template": "{name}",
+      "depth_mode": "center"
+    },
+
+    {
+      "name": "Drawer Stoppers (universal hardware)",
+      "_note": "Handed L/R pair. Clean single meshes, no supports.",
+      "blend": "D:\\Code Projects\\GEN2 Visual Animator\\Blender Files\\Hardware\\GEN2 GLB Exporter - GEN2 Drawer Stoppers.blend",
+      "out": "D:\\Code Projects\\GEN2 Visual Animator\\GLB Library\\Hardware",
+      "select": "prefix:Drawer Stopper",
+      "code_regex": "",
+      "name_template": "{name}",
+      "depth_mode": "center"
+    },
+
+    {
+      "name": "Magnet Clip (universal hardware)",
+      "_note": "Posed -90X in source (back-facing = case orientation); worker bakes the world orientation. Case=yaw0, drawer=yaw180. See GEN2-Part-Orientation-Notes.md.",
+      "blend": "D:\\Code Projects\\GEN2 Visual Animator\\Blender Files\\Hardware\\GEN2 GLB Exporter - GEN2 Magnet Clip.blend",
+      "out": "D:\\Code Projects\\GEN2 Visual Animator\\GLB Library\\Hardware",
+      "select": "prefix:Magnet",
+      "code_regex": "",
+      "name_template": "MagnetClip_10x2mm",
+      "depth_mode": "center"
+    },
+
+    {
+      "name": "Essential Faceplates (185 Decor Drawers)",
+      "_note": "Posed -90X; worker bakes orientation. Snap onto Decor Drawer fronts (1:1 by W-H). Handle screws on via 2 centered holes. regex \\d+W-\\d+ + template re-adds H, normalizing the '2W-05' source typo.",
+      "blend": "D:\\Code Projects\\GEN2 Visual Animator\\Blender Files\\Decor Faceplates\\GEN2 GLB Exporter - GEN2 Faceplates - Essential.blend",
+      "out": "D:\\Code Projects\\GEN2 Visual Animator\\GLB Library\\Faceplates\\Essential",
+      "select": "prefix:Essential",
+      "code_regex": "\\d+W-\\d+",
+      "name_template": "Faceplate_Essential_{code}H",
+      "depth_mode": "center"
+    },
+
+    {
+      "name": "Deco Handle (self-tapping)",
+      "_note": "Screws onto the faceplate front via 2 centered holes. Identity transform. Source mesh 'Deco Handle - Self-Tapping' -- other mount variants may follow as separate GLBs.",
+      "blend": "D:\\Code Projects\\GEN2 Visual Animator\\Blender Files\\Decor Faceplates\\GEN2 GLB Exporter - GEN2 Handles - Deco.blend",
+      "out": "D:\\Code Projects\\GEN2 Visual Animator\\GLB Library\\Handles\\Deco",
+      "select": "prefix:Deco",
+      "code_regex": "",
+      "name_template": "Handle_Deco",
+      "depth_mode": "center"
+    },
+
+    {
+      "name": "Wall Mount Lite brackets",
+      "_note": "3W tilt fixed in source (now flat, 264x6.9x56), so all 3 brackets export cleanly via this job. The WoodScrew is separate -- it needs decimating ~62k->1.5k tris (worker has no decimate option yet), exported manually to WallMount/. select:'Wall Mount Lite' matches the 3 brackets, not the screw.",
+      "blend": "D:\\Code Projects\\GEN2 Visual Animator\\Blender Files\\Hardware\\GEN2 GLB Exporter - GEN2 Wall Mount Brackets.blend",
+      "out": "D:\\Code Projects\\GEN2 Visual Animator\\GLB Library\\WallMount",
+      "select": "prefix:Wall Mount Lite",
+      "code_regex": "\\dW",
+      "name_template": "WallMount_Lite_{code}",
+      "depth_mode": "center"
+    }
+  ]
+}

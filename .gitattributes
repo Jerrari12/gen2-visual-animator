@@ -1,0 +1,5 @@
+# Normalize text line endings; let git auto-detect binaries (GLB, PNG, etc.)
+* text=auto
+*.glb binary
+*.png binary
+*.jpg binary
