@@ -211,9 +211,11 @@ channels, lower rows QuickLock under the row above; the first-shown case
 assembles out front via enter-`at` + a canceling move); all case steps use the
 camUp 3/4-below preset; top-row drawers skip stoppers (the rail has them built
 in). main.js `isUnderTableBuild` swaps table+grid for a horizontal `surface`
-slab (fitSurface: build + 90 mm margin, underside on the rail tops) hidden
-whenever the camera rises above its underside — the horizontal twin of the
-wall-backdrop hide — and the outro cinema hides/restores it like the wall.
+slab (fitSurface: underside on the rail tops; **front edge flush with the rail
+fronts** — desk-edge mounting, drawers/handles poke past it — 90 mm margin on
+the back/sides only) hidden whenever the camera rises above its underside —
+the horizontal twin of the wall-backdrop hide — and the outro cinema
+hides/restores it like the wall.
 **Staggered wall covers** (`build.wallStagger`): the top row is placed case-by-
 case on ONE shared `'wtop'` bench stage, then a single connected cover
 (brick-tiled `tilesLower/tilesUpper` across the FULL width, seams offset) goes
