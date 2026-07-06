@@ -25,6 +25,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # Stamp the app's own JS/CSS URLs with the commit SHA. GitHub Pages caches
+      # assets for 10 minutes (max-age=600), so without this a visitor loading
+      # right after a deploy can get NEW index.html + STALE main.js (or css) and
+      # the viewer dies at boot ("Loading parts…" forever). Versioned URLs make
+      # every deploy atomic. Local dev is untouched (stamping happens only here).
+      - name: Cache-proof asset URLs
+        run: |
+          V="${GITHUB_SHA::8}"
+          sed -i "s|css/viewer.css|css/viewer.css?v=$V|; s|js/main.js|js/main.js?v=$V|" viewer/index.html
+          sed -i "s|'./generate.js'|'./generate.js?v=$V'|" viewer/js/main.js
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
