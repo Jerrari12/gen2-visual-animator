@@ -24,7 +24,19 @@ function tween({ duration = 700, delay = 0, onUpdate, onDone }) {
     tweens.add({ t0: performance.now() + delay * f, duration: duration * f, onUpdate, done: () => { onDone?.(); resolve(); } });
   });
 }
+// pause (⏸ in the controls bar) freezes the tween clock: while paused every
+// pending tween's start time shifts forward with real time, so on resume
+// everything continues exactly where it stopped. The outro cinema runs its own
+// clock and isn't pausable (the button is disabled there).
+let paused = false, lastTick = 0;
 function stepTweens(now) {
+  if (paused) {
+    const dt = now - lastTick;
+    for (const tw of tweens) tw.t0 += dt;
+    lastTick = now;
+    return;
+  }
+  lastTick = now;
   for (const tw of [...tweens]) {
     if (now < tw.t0) continue;
     const k = Math.min(1, (now - tw.t0) / tw.duration);
@@ -670,6 +682,7 @@ $('bom-csv').onclick = downloadCsv;
 
 function goTo(i, { animate = true } = {}) {
   setSelected(null); // a highlighted part may hide or move between steps
+  setPaused(false);  // paging is an implicit resume — a frozen new step reads as broken
   $('filament-menu').classList.add('hidden');
   stopCinema();
   cur = Math.max(0, Math.min(PAGES.length - 1, i));
@@ -702,6 +715,7 @@ function goTo(i, { animate = true } = {}) {
   if (isOutro) {
     $('step-counter').textContent = 'Thanks for building';
     setCamOverride(false); // the cinema owns the camera
+    $('btn-pause').disabled = true; // the cinema runs its own clock — not pausable
     setChecklist(!isMobile()); // desktop finale shows the full list; mobile keeps it one tap away (less clutter)
     $('btn-prev').disabled = false;
     $('btn-next').disabled = true;
@@ -722,6 +736,7 @@ function goTo(i, { animate = true } = {}) {
   setChecklist((!!step.checklist || stepIdx === manifest.steps.length - 1) && !isMobile());
   $('btn-prev').disabled = false;
   $('btn-next').disabled = cur === PAGES.length - 1;
+  $('btn-pause').disabled = false;
   if (animate) playStep(stepIdx);
   else {
     animToken++;
@@ -737,6 +752,14 @@ $('btn-slow').onclick = () => {
   slowmo = !slowmo;
   $('btn-slow').classList.toggle('on', slowmo);
 };
+function setPaused(on) {
+  paused = on;
+  const b = $('btn-pause');
+  b.classList.toggle('on', on);
+  b.querySelector('i').textContent = on ? '▶' : '⏸';
+  b.querySelector('span').textContent = on ? 'Play' : 'Pause';
+}
+$('btn-pause').onclick = () => setPaused(!paused);
 // google-maps-style "re-center": drop the user override and glide back to
 // wherever the guided camera last wanted to be.
 $('btn-cam').onclick = () => { setCamOverride(false); tweenCamera(curCamPreset, 900, true); };

@@ -481,11 +481,18 @@ export function generateManifest(build) {
       if (i === ghostTopIdx) {
         // the first case shown assembles out front (QuickLocks, clip) before it
         // slides home — enter `at` the forward offset; the move cancels it, so
-        // prev/jump's computed after-state stays true.
+        // prev/jump's computed after-state stays true. The camera rises to an
+        // overhead 3/4 for the QuickLock install (looking down into the open
+        // case so BOTH outer-wall slots are visible on any size, 1W-05H..4W-2H;
+        // r scales with the case width), then glides back to the below view in
+        // its own phase BEFORE the slide-in starts.
+        const above = { t: 26, p: 36, r: Math.max(430, u.w * PITCH_X * 2.4), target: [cx, bottom + caseH / 2, UT.fwd] };
         step.phases = [
           { enter: [{ id: `case${i}`, at: [0, 0, UT.fwd], from: [0, 0, 60] }] },
+          { camera: above },                                   // rise above the bench
           { enter: [{ id: `ql${i}L`, at: [0, 0, UT.fwd], from: [0, 45, 0] }, { id: `ql${i}R`, at: [0, 0, UT.fwd], from: [0, 45, 0] }] },
           ...(mcId ? [{ enter: [{ id: mcId, at: [0, 0, UT.fwd], from: [0, 30, 0] }, { id: mgId, at: [0, 0, UT.fwd], from: [0, 0, -30] }] }] : []),
+          { camera: camUp(cx, bottom + caseH / 2, totalW, gridBottom) }, // back below before the slide
           { move: members.map(id => ({ id, by: [0, 0, -UT.fwd] })) },
         ];
         step.note = 'Fit the QuickLocks first (L left, R right)' + (mcId ? ', snap in the magnet clip,' : ',')

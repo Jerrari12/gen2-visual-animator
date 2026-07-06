@@ -75,7 +75,10 @@ tiles alternate a lighter shade (TILED_TYPES + ALT_LIGHTEN 0.16 — instance
 `alt` flag, altMaterials/altHighlightMats track the active palette, so a 2W
 next to a 1W never fuses visually; materialFor is instance-keyed for this).
 🐢 `#btn-slow` toggles slow-motion (tween() stretches all step/camera tweens
-2.5×; never the cinema). Camera override: orbiting/zooming >4 mm during a step
+2.5×; never the cinema). ⏸ `#btn-pause` freezes the tween clock (stepTweens
+shifts pending t0s while paused, so everything resumes mid-motion exactly);
+paging auto-resumes, and the outro disables it (cinema clock is separate).
+Camera override: orbiting/zooming >4 mm during a step
 sets `camOverride` — tweenCamera then only RECORDS presets (curCamPreset)
 without moving, per-phase retargets included, until 🎥 `#btn-cam` (visible only
 while overridden) glides back to the tour's latest preset; cover/outro reset
@@ -208,9 +211,11 @@ formula). Rail bottom = flatTop − 2, z-center −8 (front-aligned, 201 deep);
 table underside = flatTop + 6.9. No covers/feet/footrails; steps top-down like
 wall; EVERY case slides straight back from +Z `UT.fwd` (top row into the rail
 channels, lower rows QuickLock under the row above; the first-shown case
-assembles out front via enter-`at` + a canceling move); all case steps use the
-camUp 3/4-below preset; top-row drawers skip stoppers (the rail has them built
-in). main.js `isUnderTableBuild` swaps table+grid for a horizontal `surface`
+assembles out front via enter-`at` + a canceling move, with the camera rising
+to an overhead 3/4 for the QuickLock install — width-scaled r so both slots
+frame on any size — then a camera-only phase glides back below BEFORE the
+slide-in); all case steps use the camUp 3/4-below preset; top-row drawers skip
+stoppers (the rail has them built in). main.js `isUnderTableBuild` swaps table+grid for a horizontal `surface`
 slab (fitSurface: underside on the rail tops; **front edge flush with the rail
 fronts** — desk-edge mounting, drawers/handles poke past it — 90 mm margin on
 the back/sides only) hidden whenever the camera rises above its underside —
