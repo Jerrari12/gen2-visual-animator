@@ -103,6 +103,26 @@ highlights the part, draws a thin pointer line to it, empty tap dismisses).
 Instance `rides: "<drawerId>"` marks drawer attachments (faceplate, handle,
 clip, magnet): selecting a seated drawer or anything riding it slides the whole
 set open 40 mm, deselect slides it shut. Steps show a LEGO-style number badge.
+**Build options (generated builds only, main.js 2026-07-06):** the whole scene
+is regenerate-able — `mountManifest()` (re)builds every manifest-derived thing
+and `regenerate()` re-runs `generateManifest` on the mutated `build`, lazy-
+loading new GLBs, tearing down old instance groups, preserving the step. A
+"⚙ Build options" block at the top of the parts panel (so it reuses the panel's
+mobile bottom-sheet + updates the BOM live) drives it: Drawer close None/Magnets
+(per-drawer `closure`), Drawer stoppers All/None (`build.removedStoppers` — set
+of `"<unitId>:<localCol>"` keys the generator honors in all 3 stopper spots),
+Handle ◀▶ (hot-swap, keeps the BlockBar variant across regenerates via
+`activeHandleStyle`), wall-only Top cover Per-column/Staggered (`wallStagger`),
+and Reset to original (snapshotted `originalBuild`). Selecting a **magnet
+clip/magnet** or a **stopper** shows a ✕ Remove in the identify card (generator
+stamps `owner`=drawerId / `stopperKey`); magnet → that drawer's closure none,
+stopper → drop its 1W L+R pair. **Bidirectional planner sync**: the planner
+opens the viewer WITHOUT noopener and both post `{gen2:'buildOptions', opts}`
+(closures/removedStoppers/wallStagger/handleStyle) on change; echo-guarded
+(applyingRemote + ignore-if-unchanged). Planner mirrors the model
+(`state.removedStoppers` in BUILD_FIELDS, sanitized, in share links; stopper BOM
+subtracts removed pairs). Local dev needs a hard-refresh after JS edits (module
+cache; deploys are SHA-stamped so prod is immune).
 The checklist step shows an engine-computed **exploded parts preview** (radial
 spread from assembly center + per-type pushes; riders explode with their
 drawer) — no manifest data, works for generated builds too.
