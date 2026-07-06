@@ -696,24 +696,26 @@ export function generateManifest(build) {
     const slotCol = u.w <= 2 ? 0 : 1;
     const dx = colCenter(u.col + slotCol) + 0.16;
     const hasMag = u.closure === 'magnet'; // per-drawer magnet clip only when chosen
-    inst.push({ id: `drw${i}`, node: `DecorDrawer_185-${u.w}W-${H}H`, pos: [cx + 0.16, bottom + 5.72, 5.24] });
+    // The 2H DecorDrawer model seats its body 2mm too deep (z-center 5.24 is
+    // ground-truth at 1H) — leaving a gap behind the correctly-placed faceplate.
+    // Push the 2H drawer (and its back-wall clip/magnet) forward 2mm to close it
+    // (Joey-verified 2026-07-06). Other non-1H heights are still derived (warned).
+    const drwFwd = u.hh === 4 ? 2 : 0;
+    inst.push({ id: `drw${i}`, node: `DecorDrawer_185-${u.w}W-${H}H`, pos: [cx + 0.16, bottom + 5.72, 5.24 + drwFwd] });
     if (hasMag) {
       // the clip + magnet are already counted once per magnet drawer in the case
       // loop (qty 2 covers this drawer-side clip and the case-back clip); no add.
-      inst.push({ id: `dc${i}`, node: 'MagnetClip_10x2mm', pos: [dx, bottom + 5.72 + drwH - 20, -83], yaw: 180, rides: `drw${i}`, owner: u.id });
-      inst.push({ id: `dm${i}`, node: 'Magnet_10x2mm', pos: [dx, bottom + 5.72 + drwH - 15, -84], rides: `drw${i}`, owner: u.id });
+      inst.push({ id: `dc${i}`, node: 'MagnetClip_10x2mm', pos: [dx, bottom + 5.72 + drwH - 20, -83 + drwFwd], yaw: 180, rides: `drw${i}`, owner: u.id });
+      inst.push({ id: `dm${i}`, node: 'Magnet_10x2mm', pos: [dx, bottom + 5.72 + drwH - 15, -84 + drwFwd], rides: `drw${i}`, owner: u.id });
     }
-    // faceplate depth is ground-truth at 1H (z-center 95.07, front face 97.57).
-    // Non-1H drawer models seat the faceplate 2mm proud — the faceplate + its
-    // handle (one screwed-together assembly) shift back 2mm together (Joey-
-    // verified 2026-07-06). Recalibrate exactly against a multi-height reference.
-    const fpZ = u.hh === 2 ? 95.07 : 93.07;
-    const fpFrontZ = u.hh === 2 ? 97.57 : 95.57;
-    inst.push({ id: `fp${i}`, node: `Faceplate_Essential_${u.w}W-${H}H`, pos: [cx + 0.47, bottom + 3.72, fpZ], rides: `drw${i}` });
+    // faceplate: ground-truth z-center 95.07, front face 97.57 (handle mounts
+    // there). Correct at every height — the faceplate does NOT move with the
+    // above drawer-body nudge (it's placed to sit flush regardless).
+    inst.push({ id: `fp${i}`, node: `Faceplate_Essential_${u.w}W-${H}H`, pos: [cx + 0.47, bottom + 3.72, 95.07], rides: `drw${i}` });
     // handle: back face against the faceplate front, vertically centered on the
     // plate — the mounting rule that holds for every style (from the Deco ground
     // truth: bottom = fp + 22.49, z-center 109.57 for h9 × d24)
-    inst.push({ id: `h${i}`, node: handleStyle.node, pos: [cx + 0.46, bottom + 3.72 + (fpH - handleStyle.h) / 2 - 0.5, fpFrontZ + handleStyle.d / 2], rides: `drw${i}` });
+    inst.push({ id: `h${i}`, node: handleStyle.node, pos: [cx + 0.46, bottom + 3.72 + (fpH - handleStyle.h) / 2 - 0.5, 97.57 + handleStyle.d / 2], rides: `drw${i}` });
     add(`DecorDrawer_185-${u.w}W-${H}H`, `Decor Drawer 185-${u.w}W-${H}H`, 'Drawer', LINKS.decor);
     add(`Faceplate_Essential_${u.w}W-${H}H`, `Faceplate Essential ${u.w}W-${H}H`, 'Faceplate', LINKS.fp);
     add(handleStyle.node, handleStyle.label, 'Handle', handleStyle.links);
