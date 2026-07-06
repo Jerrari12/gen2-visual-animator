@@ -644,7 +644,7 @@ function renderOptions() {
   box.innerHTML = '';
   if (!build) { box.classList.add('hidden'); return; } // static kits have no editable build
   box.classList.remove('hidden');
-  const title = document.createElement('div'); title.className = 'opt-title'; title.textContent = '⚙ Build options';
+  const title = document.createElement('div'); title.className = 'section-head'; title.textContent = '⚙ Build options';
   box.appendChild(title);
   const drawers = drawersInBuild();
   if (drawers.length) {
@@ -704,7 +704,8 @@ function renderChecklist() {
     row.append(chip, mid, qty);
     rows.appendChild(row);
   }
-  $('checklist-title').textContent = `Print these parts first (${total} prints)`;
+  $('checklist-title').textContent = build ? 'Your build' : 'Parts list';
+  $('parts-head').textContent = `🧩 Parts to print · ${total} print${total === 1 ? '' : 's'}`;
   $('checklist-tab').textContent = `Parts · ${total}`;
 }
 

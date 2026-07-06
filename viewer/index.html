@@ -38,12 +38,12 @@
       <button id="color-toggle" class="hidden" title="Switch between instruction colors and your filament colors"></button>
       <div id="checklist-panel" class="hidden">
         <div class="checklist-head">
-          <span id="checklist-title">Print these parts first</span>
-          <button id="checklist-close" title="Minimize parts list">&#215;</button>
+          <span id="checklist-title">Your build</span>
+          <button id="checklist-close" title="Minimize this panel">&#215;</button>
         </div>
         <div id="build-options" class="hidden"></div>
         <div id="preset-bar">
-          <div class="preset-label">🎨 Filament presets</div>
+          <div class="section-head">🎨 Filament colors</div>
           <div id="preset-chips"></div>
           <div id="preset-io">
             <button id="preset-save" class="bom-btn" title="Download your current color choices as a file">Save colors</button>
@@ -51,6 +51,7 @@
             <input id="preset-file" type="file" accept="application/json" hidden />
           </div>
         </div>
+        <div id="parts-head" class="section-head">Parts to print</div>
         <div id="checklist-rows"></div>
         <div id="checklist-actions">
           <button id="bom-copy" class="bom-btn" title="Copy the parts list to your clipboard">Copy list</button>
