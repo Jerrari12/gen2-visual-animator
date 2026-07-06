@@ -132,9 +132,14 @@ starts-exploded fast reassembly / macro detail — telephoto fov 11-17 creeping
 in on a random exterior part (DETAIL_TYPES: Handle/QuickLock/Foot/Faceplate),
 camera biased to the side the part faces; macro gets a double share in
 CINEMA_MODES and every cut re-rolls the lens (normal shots jitter fov 37-45
-with slow zoom creep); assembled scenes randomly glide a drawer open and shut;
-drifting sun + fill lights; controls disabled while it plays. Scene cuts
-snap in-flight drawers home and k-settle snaps parts exactly to basePos).
+with slow zoom creep); assembled scenes randomly glide a drawer open and shut —
+each glide rolls its own personality: 30–95% of the drawer's travel (≈ case
+depth − 20) with varied open/hold/close timings, bigger pulls taking longer;
+on UNDER-TABLE builds ~55% of the wide assembled shots (modes 0/1/3) dip below
+the horizon (pol 1.8–2.15) with the mounting slab shown — explode/macro keep
+the clean floating stage; drifting sun + fill lights; controls disabled while
+it plays. Scene cuts snap in-flight drawers home and k-settle snaps parts
+exactly to basePos).
 The outro is celebratory: room fades to night (~1.1 s), table darkens, grid
 hides, a PMREM "party room" env (emissive color panels — no .hdr file,
 offline-safe) lights the plastic, two hue-drifting point lights (decay 0)

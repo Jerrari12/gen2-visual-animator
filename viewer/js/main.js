@@ -1406,6 +1406,15 @@ function cinemaScene() {
     cinema.tV.set((Math.random() - .5), (Math.random() - .5) * 0.6, (Math.random() - .5))
       .multiplyScalar(cinema.size * 0.012);      // slight frame drift
   }
+  // under-table builds: some assembled wide shots dip below the horizon and
+  // bring the mounting slab into frame — the build lives under a surface, so
+  // show it off from underneath. Explode and macro scenes keep the clean
+  // floating stage (exploding parts would clip up through the slab).
+  if (isUnderTableBuild) {
+    const withSlab = (mode === 0 || mode === 1 || mode === 3) && Math.random() < 0.55;
+    surface.visible = withSlab;
+    if (withSlab) cinema.pol = 1.8 + Math.random() * 0.35; // ~103°–123°: under the slab, looking up
+  }
   camera.fov = cinema.fov;
   camera.updateProjectionMatrix();
   // drawer play only when the build is (or ends up) assembled
@@ -1439,28 +1448,40 @@ function updateCinema(now) {
     cinema.kDirty = false;
     for (const inst of instances.values()) inst.group.position.copy(basePos(inst, false));
   }
-  // a random drawer glides open and shut while the build sits assembled
+  // a random drawer glides open and shut while the build sits assembled.
+  // Every glide rolls its own personality: how far it opens (30–95% of the
+  // drawer's travel) and how fast it opens, how long it sits open, and how
+  // fast it closes — bigger pulls naturally take a little longer.
   if (cinema.cut > cinema.drawerAt && !cinema.drawer && cinema.k < 0.01) {
     const drawers = [...instances.values()].filter(i => typeByNode[i.cfg.node] === 'Drawer' && i.group.visible);
     if (drawers.length) {
       const carrier = drawers[Math.floor(Math.random() * drawers.length)];
-      cinema.drawer = { members: [carrier, ...[...instances.values()].filter(x => x.cfg.rides === carrier.cfg.id)], t: 0 };
+      const travel = (parseInt(manifest.collection, 10) || 185) - 20; // full pull ≈ case depth − rear engagement
+      const frac = 0.3 + Math.random() * 0.65;                       // 30%..95% open
+      cinema.drawer = {
+        members: [carrier, ...[...instances.values()].filter(x => x.cfg.rides === carrier.cfg.id)],
+        t: 0,
+        span: travel * frac,
+        tOpen: 0.6 + frac * 0.9 + Math.random() * 0.6,
+        tHold: 0.4 + Math.random() * 2.0,
+        tClose: 0.6 + frac * 0.9 + Math.random() * 0.8,
+      };
     }
     cinema.drawerAt = cinema.cut + 3.5 + Math.random() * 3; // maybe another one later
   }
   if (cinema.drawer) {
     const d = cinema.drawer;
     d.t += dt;
-    let off = 0; // 1.2 s open · 1 s hold · 1.2 s close
-    if (d.t < 1.2) off = easeSm(d.t / 1.2);
-    else if (d.t < 2.2) off = 1;
-    else if (d.t < 3.4) off = 1 - easeSm((d.t - 2.2) / 1.2);
+    let off = 0;
+    if (d.t < d.tOpen) off = easeSm(d.t / d.tOpen);
+    else if (d.t < d.tOpen + d.tHold) off = 1;
+    else if (d.t < d.tOpen + d.tHold + d.tClose) off = 1 - easeSm((d.t - d.tOpen - d.tHold) / d.tClose);
     for (const m of d.members) {
       const p = basePos(m, false);
-      p.z += 40 * off;
+      p.z += d.span * off;
       m.group.position.copy(p);
     }
-    if (d.t >= 3.4) cinema.drawer = null;
+    if (d.t >= d.tOpen + d.tHold + d.tClose) cinema.drawer = null;
   }
   const c = cinema.center.clone().add(cinema.tOff);
   camera.position.set(
