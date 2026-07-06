@@ -122,6 +122,17 @@
       "code_regex": "\\dW",
       "name_template": "WallMount_Lite_{code}",
       "depth_mode": "center"
+    },
+
+    {
+      "name": "Under-Table Rails (185)",
+      "_note": "185 under-table mount rails, 1W-4W. Posed 180X in source (female channels face down); worker bakes it. Clean single meshes, no bridges.",
+      "blend": "D:\\Code Projects\\GEN2 Visual Animator\\Blender Files\\Hardware\\GEN2 GLB Exporter - GEN2 Under-Table Rails.blend",
+      "out": "D:\\Code Projects\\GEN2 Visual Animator\\GLB Library\\UnderTable",
+      "select": "prefix:GEN2 Rails",
+      "code_regex": "185-\\dW",
+      "name_template": "UnderTableRail_{code}",
+      "depth_mode": "center"
     }
   ]
 }

@@ -161,8 +161,8 @@ Planner's "🧊 3D assembly instructions" button (bom-actions row) opens
 `INSTRUCTIONS_VIEWER_URL + "#build=" + encodeBuildHash()` — update that constant
 in planner app.js when the viewer deploys. Generated builds load parts from the
 shared pool `viewer/parts/185/` (all 185+hardware+faceplate GLBs; lazy per node).
-v1 scope: **tabletop + wall, 185 only**; classic drawers = BOM row only (no GLB);
-shelf >1H / cabinet / under-table / other lengths → graceful error overlay. Also
+v1 scope: **tabletop + wall + under-table, 185 only**; classic drawers = BOM row
+only (no GLB); shelf >1H / cabinet / other lengths → graceful error overlay. Also
 rejected: non-flat tops (mirrors the planner's columnTops() flat-top rule —
 the planner button greys out with the reason via updateInstructionsButton())
 and builds over 80 units (a step per case stops being instructions).
@@ -183,6 +183,23 @@ SPLIT into two steps ("Cover the top case" + "Hang the top case on the pegs")
 and its hang gets a ghost+zoom peg demo (engine `ghost`/`solid` + per-phase
 `camera`); other top cases are one step; lower rows just hang. Wall case steps
 use descriptive titles (no "Case N" renumber).
+**Under-table mount** (`build.mount === 'under-table'`, CALIBRATED 2026-07-06
+against `GEN2 Under-Table Rails - case to rail example.blend` — see
+GEN2-Part-Orientation-Notes.md "Under-Table Rails"): one rail course
+(`UnderTableRail_185-1/2/3/4W`, tiled biggest-first per contiguous top run)
+spans the flat top; rails screw UP into the surface (screws `rot:[90,0,0]` —
+main.js instances now accept `rot:[rx,ry,rz]`, `yaw` still works) with 2(W+1)
+screws per tile (= planner railScrews; blend independently confirmed the
+formula). Rail bottom = flatTop − 2, z-center −8 (front-aligned, 201 deep);
+table underside = flatTop + 6.9. No covers/feet/footrails; steps top-down like
+wall; EVERY case slides straight back from +Z `UT.fwd` (top row into the rail
+channels, lower rows QuickLock under the row above; the first-shown case
+assembles out front via enter-`at` + a canceling move); all case steps use the
+camUp 3/4-below preset; top-row drawers skip stoppers (the rail has them built
+in). main.js `isUnderTableBuild` swaps table+grid for a horizontal `surface`
+slab (fitSurface: build + 90 mm margin, underside on the rail tops) hidden
+whenever the camera rises above its underside — the horizontal twin of the
+wall-backdrop hide — and the outro cinema hides/restores it like the wall.
 **Staggered wall covers** (`build.wallStagger`): the top row is placed case-by-
 case on ONE shared `'wtop'` bench stage, then a single connected cover
 (brick-tiled `tilesLower/tilesUpper` across the FULL width, seams offset) goes
@@ -227,6 +244,5 @@ don't reload the page — force `location.reload()` when testing.
 ## Deferred (designed, not built)
 
 Ghost previews of upcoming parts, fx timelines (quicklock dip-and-pop, disassembly
-epilogue), wall/under-table mount grammar in the generator, classic drawer +
-case extender GLBs, non-Essential faceplate styles. PoC v2 JSX (chat artifact)
-had the fx design; notes §6 describes it.
+epilogue), classic drawer + case extender GLBs, non-Essential faceplate styles.
+PoC v2 JSX (chat artifact) had the fx design; notes §6 describes it.

@@ -127,6 +127,28 @@ placed first (screwed to the wall); the case then hangs on the screw-head pegs.
 
 ---
 
+## Under-Table Rails — `UnderTableRail_185-1W` / `_2W` / `_3W` / `_4W`
+
+**Source:** `Blender Files\Hardware\GEN2 GLB Exporter - GEN2 Under-Table Rails.blend`. Posed 180° X in source (female channels face DOWN); the pipeline bakes it, so the canonical GLB is already channels-down.
+**Size (canonical):** 88·W wide × **8.9 mm tall** × **201 mm deep** (all four widths).
+
+**Geometry / function**
+- Screws **flat to the underside of a surface** (table, desk, shelf) — it is the **stationary part**; the top row's case tops then **slide front→back into its downward-facing channels** until they stop. Lower rows hang off the row above (front→back, then QuickLock — same joint as wall lower rows).
+- The rail has **stoppers built in** for the drawers directly below it — top-row drawers need no Drawer Stopper parts.
+
+**Case → rail attachment — CALIBRATED (Joey's reference, 2026-07-06)**
+Source: `Blender Files\Training Examples\GEN2 Under-Table Rails - case to rail example.blend` — a 185-1W-1H case seated in the left slot of the 2W rail + 6 wood screws (headless Blender extraction). All values in **viewer/glTF axes** (X=width, Y=up, Z=depth, +Z = front), relative to a case column centered at Z=0 with nominal flat-top Y:
+- **Front-aligned:** the rail's front face sits flush with the case front (+92.5); its extra 16 mm (201 vs 185) runs past the case **back** → rail **z-center −8.0**.
+- **Nesting:** the rail's channels swallow the case's 3 mm-proud physical top + 2 mm → **rail bottom = flat-top − 2.0**; **rail top = table underside = flat-top + 6.9**.
+- **Screws:** stand tip-UP into the wood (viewer `rot: [90,0,0]` pitch on the canonical along-Z screw). One x-position at **each rail end inset 5 mm + every internal 88 mm seam**, × 2 depth rows (**z ≈ +80.5 front / −72.5 back**) → **2·(W+1) per rail = the planner's `railScrews(w) = 2 + 2W`** (independently confirms it). Screw center height = flat-top + 19.775 (head 3 mm up inside the rail plate, tip 28.75 into the wood).
+- **Case slide-in:** case appears out front and slides **straight back (−Z)** until the channels stop it. Approach distance is display clearance (viewer uses a full case depth + 40).
+
+**Manifest implication**
+- One rail course spans the flat TOP row (tiled biggest-first 1–4W per contiguous run), placed in the "screw the rails to the surface" pre-step with the screws rising +Y.
+- Under-table builds have **no covers, no feet, no footrails**; steps run top-down (rail row slides in first). Skip Drawer Stoppers for top-row drawers.
+
+---
+
 ## Faceplates (Essential series) — `Faceplate_Essential_<W>W-<H>H`
 
 **Source:** `Blender Files\Decor Faceplates\GEN2 GLB Exporter - GEN2 Faceplates - Essential....blend`

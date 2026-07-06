@@ -4,7 +4,7 @@
 // All placement numbers derive from the ground-truth calibration of
 // 2026-07-04 (see CLAUDE.md "Placement math"). Rules generalized from the
 // 1H ground truth are marked DERIVED; positions Joey tuned by eye are
-// marked TUNED. v1 scope: 185 collection, tabletop mount.
+// marked TUNED. Scope: 185 collection — tabletop, wall, and under-table mounts.
 
 const PITCH_X = 88, PITCH_HALF_Y = 28;        // 1W column / half-row pitch
 const ROW0_BOTTOM = 17.65;                    // bottom-row case bottom (7.65 + 10.00)
@@ -27,6 +27,26 @@ const WALL = {
   coverSlide: 60,         // cover slides onto the case back-to-front at the bench
 };
 
+// Under-table rails — CALIBRATED 2026-07-06 from Joey's case-to-rail example
+// (Blender Files\Training Examples\GEN2 Under-Table Rails - case to rail
+// example.blend, headless extraction; see GEN2-Part-Orientation-Notes.md
+// "Under-Table Rails"). The rail screws flat to the underside of a surface and
+// becomes the stationary part; the top row's case tops then slide front→back
+// into its downward-facing channels. The rail is FRONT-ALIGNED with the case
+// (201 vs 185 deep — the extra 16 mm runs past the case back) and its channels
+// swallow the case's 3 mm-proud top plus 2 mm: rail bottom = flat-top − 2.
+const UT = {
+  railH: 8.9,             // rail plate + channel height
+  railZ: -8.0,            // rail depth-center vs the case column center (front-aligned)
+  railBottom: -2.0,       // rail bottom = flatTopY − 2 (channels nest over the case top)
+  surface: 6.9,           // table underside = rail top = flatTopY + 6.9
+  screwY: 19.775,         // screw CENTER height above flatTopY (head 3 mm inside the rail plate, tip 28.75 into the wood)
+  screwFrontZ: 77.07,     // screw axis rows: z ≈ +80.5 front / −72.5 back, minus the
+  screwBackZ: -75.93,     //   3.43 mm radial offset the pitched (rot 90°X) GLB carries
+  screwInset: 5,          // outer screws 5 mm in from each rail end + one at every 88 mm seam → 2(W+1) per tile = planner railScrews(w)
+  fwd: DEPTH + 40,        // cases slide in from a full case-depth out front (same read as the wall's lowerFwd)
+};
+
 const H_LABEL = { 1: '05', 2: '1', 3: '15', 4: '2', 6: '3' };
 
 const LINKS = {
@@ -38,6 +58,7 @@ const LINKS = {
   h:     { p: 'https://www.printables.com/model/1044972-gen2-decor-handles-deco-series', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20Decor%20Handles%20-%20Deco%20Series-1159960' },
   hb:    { p: 'https://www.printables.com/model/965604-gen2-decor-handles-blockbar-series', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20Decor%20-%20Handles%20-%20BlockBar-1116949' },
   wall:  { p: 'https://www.printables.com/model/1513322-gen2-wall-mount-kit-lite-59' }, // Wall Mount Kit - Lite (all widths in one download)
+  rail:  { p: 'https://www.printables.com/model/1052357-gen2-rails-185-standard', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20RAILS%20-%20STANDARD-1163830' }, // mirrors the planner's verified "GEN2 Rails - 185" links
 };
 
 // Instruction colors are a K'nex-style identification palette: one distinct
@@ -62,6 +83,7 @@ const COLORS = {
   Magnet: '#b8bcc4',      // silver
   Bracket: '#8792a2',     // steel — wall bracket
   Screw: '#d5dae1',       // light steel — wood screw
+  Rail: '#2f7fd6',        // blue — under-table rail (footrails never coexist with it)
 };
 
 export function generateManifest(build) {
@@ -69,11 +91,13 @@ export function generateManifest(build) {
   if (!build || !Array.isArray(build.placed) || !build.placed.length)
     return { errors: ['This link has no build in it.'], warnings, manifest: null };
   const isWall = build.mount === 'wall';
+  const isUT = build.mount === 'under-table';
+  const hangs = isWall || isUT; // both hang top-down from a mounting surface
   // wallStagger = one connected staggered cover across the whole top row (built
   // and hung as a unit); false = per-column cover on each top case.
   const isStaggered = isWall && !!build.wallStagger;
-  if (build.mount !== 'tabletop' && !isWall)
-    errors.push(`"${build.mount}" mounts aren't supported yet — tabletop and wall builds for now.`);
+  if (build.mount !== 'tabletop' && !hangs)
+    errors.push(`"${build.mount}" mounts aren't supported yet — tabletop, wall, and under-table builds for now.`);
   if (build.length !== 185)
     errors.push(`The ${build.length} collection isn't in the 3D part library yet — 185 builds only for now.`);
   if (build.faceStyle && build.faceStyle !== 'essential')
@@ -98,10 +122,11 @@ export function generateManifest(build) {
   // Feet then insert into the case's underside slots and the whole stack
   // sits 10 mm lower (no FR-L/FR-U sandwich).
   const bottomUnits = units.filter(u => u.rowIdx === 0);
-  const singleBase = !isWall && bottomUnits.length === 1;
-  // wall builds hang from a top bracket course — no feet/footrail sandwich, so
-  // the bottom row sits at Y=0. Tabletop lifts onto footrails (or feet-on-case).
-  const row0 = isWall ? 0 : (singleBase ? 7.65 : ROW0_BOTTOM);
+  const singleBase = !hangs && bottomUnits.length === 1;
+  // hanging builds (wall brackets / under-table rails) have no feet/footrail
+  // sandwich, so the bottom row sits at Y=0. Tabletop lifts onto footrails
+  // (or feet-on-case).
+  const row0 = hangs ? 0 : (singleBase ? 7.65 : ROW0_BOTTOM);
 
   // handle style from the planner build (crystal not modeled yet -> Deco)
   const HANDLE_STYLES = {
@@ -121,26 +146,26 @@ export function generateManifest(build) {
     if (u.fill === 'shelf' && u.hh !== 2) errors.push('Shelves taller than 1H use case extenders that are not in the 3D library yet.');
   }
   // support check: tabletop stacks bottom-up (each column rests on a unit top);
-  // wall hangs top-down (each column hangs off a unit above). Mount flips it.
+  // hanging mounts go top-down (each column hangs off a unit above). Mount flips it.
   const topAt = (col, level) => units.some(v => v.topIdx === level && col >= v.col && col < v.col + v.w);
   const bottomAt = (col, level) => units.some(v => v.rowIdx === level && col >= v.col && col < v.col + v.w);
   for (const u of units) {
-    if (isWall ? u.topIdx === maxTop : u.rowIdx === 0) continue; // top row hangs on brackets / bottom row sits on the surface
+    if (hangs ? u.topIdx === maxTop : u.rowIdx === 0) continue; // top row hangs on brackets/rails / bottom row sits on the surface
     for (let c = u.col; c < u.col + u.w; c++)
-      if (isWall ? !bottomAt(c, u.topIdx) : !topAt(c, u.rowIdx)) {
-        errors.push(isWall
-          ? 'A unit has nothing above part of it to hang from — wall builds hang top-down.'
+      if (hangs ? !bottomAt(c, u.topIdx) : !topAt(c, u.rowIdx)) {
+        errors.push(hangs
+          ? `A unit has nothing above part of it to hang from — ${isUT ? 'under-table' : 'wall'} builds hang top-down.`
           : 'A unit is floating (nothing under part of it) — tabletop builds stack bottom-up.');
         break;
       }
   }
-  // covers need a flat top — every occupied column must reach the same height
-  // (planner columnTops() rule; holds for both tabletop covers and wall covers)
+  // the top must be flat — every occupied column must reach the same height
+  // (planner columnTops() rule; covers need it, and so do the bracket/rail courses)
   const colTop = new Map();
   for (const u of units) for (let c = u.col; c < u.col + u.w; c++)
     colTop.set(c, Math.max(colTop.get(c) || 0, u.topIdx));
   if (new Set(colTop.values()).size > 1)
-    errors.push('The covers need a flat top — every column must stack to the same height. Fix the build in the planner first.');
+    errors.push(`${isUT ? 'The rails need a flat top row against the surface' : 'The covers need a flat top'} — every column must stack to the same height. Fix the build in the planner first.`);
   // sanity cap: each unit becomes ~9 parts and its own step — beyond this the
   // instructions stop being instructions
   if (units.length > 80)
@@ -181,8 +206,41 @@ export function generateManifest(build) {
   const railX = r => (r.col + r.w / 2 - totalW / 2) * PITCH_X;
   const frlIds = [], feetIds = { back: [], front: [] };
   const bracketIds = [], screwIds = [];       // wall only
+  const utIds = [], utScrewIds = [];          // under-table only
   const flatTopY = row0 + maxTop * PITCH_HALF_Y;
-  if (isWall) {
+  if (isUT) {
+    // one rail course spans the flat top, tiled biggest-first 1–4W per contiguous
+    // top-row run (same greedy fill as the planner's railSections; a bed-limited
+    // printer may split differently — the parts are interchangeable widths).
+    const topCols = new Set();
+    units.filter(u => u.topIdx === maxTop).forEach(u => { for (let c = u.col; c < u.col + u.w; c++) topCols.add(c); });
+    const topRuns = [];
+    for (let c = 0, run = null; c <= totalW; c++) {
+      if (topCols.has(c)) { if (!run) topRuns.push(run = { c0: c, c1: c }); else run.c1 = c; }
+      else run = null;
+    }
+    for (const run of topRuns) for (let c = run.c0; c <= run.c1; ) {
+      const w = Math.min(4, run.c1 - c + 1);
+      const t = { col: c, w };
+      const id = `utr${utIds.length}`;
+      utIds.push(id);
+      inst.push({ id, node: `UnderTableRail_185-${w}W`, pos: [railX(t), flatTopY + UT.railBottom, UT.railZ] });
+      add(`UnderTableRail_185-${w}W`, `Under-Table Rail 185-${w}W`, 'Rail', LINKS.rail);
+      // screws: one x-position at each rail end (inset 5) + every internal 88 mm
+      // seam, × 2 depth rows (front/back) → 2(W+1) per tile = planner railScrews(w).
+      // Pitched 90° about X so they stand tip-up into the surface.
+      const xs = [-(44 * w - UT.screwInset)];
+      for (let i = 1; i < w; i++) xs.push(-44 * w + 88 * i);
+      xs.push(44 * w - UT.screwInset);
+      for (const lx of xs) for (const z of [UT.screwBackZ, UT.screwFrontZ]) {
+        const sid = `uts${utScrewIds.length}`;
+        utScrewIds.push(sid);
+        inst.push({ id: sid, node: 'WoodScrew', pos: [railX(t) + lx, flatTopY + UT.screwY, z], rot: [90, 0, 0] });
+        add('WoodScrew', 'Wood Screw', 'Screw', LINKS.rail, 1, true); // purchased hardware
+      }
+      c += w;
+    }
+  } else if (isWall) {
     // one bracket course spans the flat top, tiled 1/2/3W (no 4W bracket).
     // Brackets screw to the wall; the top row of cases then hangs on the pegs.
     const bracketBaseY = flatTopY - WALL.bracketH; // base flush with the top-row case base
@@ -273,10 +331,10 @@ export function generateManifest(build) {
     // Stages: tabletop non-base cases settle from behind. Wall TOP cases stage
     // at a forward bench (so the cover can be attached, and the two steps —
     // assemble, then hang — each end at a deterministic state). Wall lower rows
-    // have no stage (they slide straight in via enter+move).
-    // staggered top cases share one bench stage ('wtop') so the whole row hangs
-    // together; per-column top cases each get their own.
-    const st = isWall ? (isTop ? (isStaggered ? 'wtop' : `w${i}`) : null) : (isBase ? 'base' : `c${i}`);
+    // and ALL under-table cases have no stage (they slide straight in via
+    // enter+move). Staggered top cases share one bench stage ('wtop') so the
+    // whole row hangs together; per-column top cases each get their own.
+    const st = hangs ? (isWall && isTop ? (isStaggered ? 'wtop' : `w${i}`) : null) : (isBase ? 'base' : `c${i}`);
     if (st && !isBase) stages[st] = isWall ? [0, WALL.drop, WALL.benchFwd] : [0, 0, -170];
     const stg = st ? { stage: st } : {};
     inst.push({ id: `case${i}`, node: caseNode, pos: [cx, bottom, 0], ...stg });
@@ -311,10 +369,11 @@ export function generateManifest(build) {
     const step = {
       title: isBase ? `Bench: bottom case — ${u.w}W-${H}H` : `Case ${i + 1} — ${u.w}W-${H}H`,
       note: null,
-      // wall lower rows are viewed from a 3/4-below angle so you can see them
-      // slide up under the row above; everything else is the standard preset.
+      // wall lower rows — and every under-table case — are viewed from a
+      // 3/4-below angle so you can watch them slide in under the surface/row
+      // above; everything else is the standard preset.
       camera: isBase ? cam(cx, 125, totalW, gridBottom)
-        : (isWall && !isTop) ? camUp(cx, bottom + caseH / 2, totalW, gridBottom)
+        : (isUT || (isWall && !isTop)) ? camUp(cx, bottom + caseH / 2, totalW, gridBottom)
         : cam(cx, bottom + caseH / 2, totalW, gridBottom),
       _stoppers: [], // stoppers hosted by THIS case's floor (filled below)
     };
@@ -414,6 +473,32 @@ export function generateManifest(build) {
       step.phases = [...bench, { camera: base, move: back.move }, drop, land]; // …pan to the wall as it hangs
       step.note = benchNote + ' Then hang it: push it straight back onto the pegs and drop 16 mm to lock.';
       if (mcId && firstClipDemo === null) firstClipDemo = i;
+    } else if (isUT) {
+      // under-table: EVERY case slides straight back from out front, one piece —
+      // the top row's case tops ride into the rail channels; lower rows hang
+      // under the row above (front→back, then the QuickLocks click).
+      step.title = isTop ? `Slide the case into the rails — ${u.w}W-${H}H` : `Hang case — ${u.w}W-${H}H`;
+      if (i === ghostTopIdx) {
+        // the first case shown assembles out front (QuickLocks, clip) before it
+        // slides home — enter `at` the forward offset; the move cancels it, so
+        // prev/jump's computed after-state stays true.
+        step.phases = [
+          { enter: [{ id: `case${i}`, at: [0, 0, UT.fwd], from: [0, 0, 60] }] },
+          { enter: [{ id: `ql${i}L`, at: [0, 0, UT.fwd], from: [0, 45, 0] }, { id: `ql${i}R`, at: [0, 0, UT.fwd], from: [0, 45, 0] }] },
+          ...(mcId ? [{ enter: [{ id: mcId, at: [0, 0, UT.fwd], from: [0, 30, 0] }, { id: mgId, at: [0, 0, UT.fwd], from: [0, 0, -30] }] }] : []),
+          { move: members.map(id => ({ id, by: [0, 0, -UT.fwd] })) },
+        ];
+        step.note = 'Fit the QuickLocks first (L left, R right)' + (mcId ? ', snap in the magnet clip,' : ',')
+          + ' then slide the case straight back under the surface — its top rails ride into the rail channels until it stops.';
+      } else {
+        // pre-assembled one-piece slide-in, same read as wall lower rows
+        step.phases = [{ sync: true, enter: members.map(id => ({ id, from: [0, 0, UT.fwd] })) }];
+        step.note = isTop
+          ? 'QuickLocks in, then slide the case straight back — its top rails ride into the rail channels until it stops.'
+          : 'Slide the case straight back under the row above — its top rails engage the case above and the QuickLocks click home.';
+      }
+      if (isTop && isDrawer) step.note += ' (No drawer stoppers needed up here — the rail has them built in.)';
+      if (mcId && firstClipDemo === null) { firstClipDemo = i; if (i !== ghostTopIdx) step.note += ' ' + clipText; }
     } else if (isWall) {
       // lower rows: the assembled case (with quicklocks + clip) slides straight
       // back from ~40 mm in front — no drop, so it can't clip the case above.
@@ -444,7 +529,7 @@ export function generateManifest(build) {
         step.phases.push({ fade: [{ id: mcId }, { id: mgId }] });
       }
     }
-    if (isWall) steps.push(step);
+    if (hangs) steps.push(step);
     else if (!isBase) { step.phases.push({ settle: st }); steps.push(step); }
     else baseCaseStep = step; // slots into the bench flow before the feet
     caseSteps.push(step);
@@ -510,7 +595,10 @@ export function generateManifest(build) {
   const coverStoppers = [];
   units.forEach(u => {
     if (u.fill !== 'decor' && u.fill !== 'classic') return;
-    if (isWall && u.topIdx === maxTop) return; // wall top-row drawers' stoppers are handled inline (into their CL, before the CU)
+    // wall top-row drawers' stoppers are handled inline (into their CL, before
+    // the CU); under-table top-row drawers need none at all — the rail has
+    // stoppers built in (planner note).
+    if (hangs && u.topIdx === maxTop) return;
     const sy = row0 + u.topIdx * PITCH_HALF_Y - 2;
     for (let c = u.col; c < u.col + u.w; c++) {
       const lx = colCenter(c);
@@ -545,10 +633,11 @@ export function generateManifest(build) {
 
   // covers: contiguous column runs sharing the same exposed top height. On WALL
   // builds the covers were already generated per top case (they must attach
-  // before the case hangs), so this whole section is tabletop-only.
+  // before the case hangs); under-table builds have NO covers (the rail course
+  // is the top) — so this whole section is tabletop-only.
   const topOf = c => Math.max(0, ...units.filter(v => c >= v.col && c < v.col + v.w).map(v => v.topIdx));
   const coverRuns = [];
-  for (let c = 0, run = null; !isWall && c < totalW; c++) {
+  for (let c = 0, run = null; !hangs && c < totalW; c++) {
     const t = bottomCols.size ? topOf(c) : 0;
     const occupied = units.some(v => c >= v.col && c < v.col + v.w);
     if (occupied && run && run.top === t && run.c1 === c - 1) run.c1 = c;
@@ -669,7 +758,17 @@ export function generateManifest(build) {
       camera: { ...wide, fit: undefined, r: Math.min(2200, wide.r * 1.35), target: [0, H_MM * 0.55, 50] }, checklist: true,
     },
   ];
-  if (isWall) {
+  if (isUT) {
+    preSteps.push({
+      title: utIds.length > 1 ? 'Screw the rails to the surface' : 'Screw the rail to the surface',
+      note: 'Hold each rail flat against the underside — channels facing down, the long overhang toward the back — and drive the wood screws up through the plate: one at each end and at every seam line, in the front and back rows. The rail is the stationary part; every case slides into it.',
+      camera: { ...camUp(0, flatTopY, totalW, gridBottom), fit: FIT },
+      phases: [
+        { enter: utIds.map(id => ({ id, from: [0, -70, 0] })) },      // lift the rail up against the surface
+        { enter: utScrewIds.map(id => ({ id, from: [0, -45, 0] })) }, // drive the screws up into the wood
+      ],
+    });
+  } else if (isWall) {
     preSteps.push({
       title: bracketIds.length > 1 ? 'Mount the wall brackets' : 'Mount the wall bracket',
       note: `Screw the bracket${bracketIds.length > 1 ? 's' : ''} flat to the wall — 2 wood screws per 1W column. The cases hang on the protruding screw-head pegs, so drive them until the heads stand just proud of the bracket.`,
@@ -727,7 +826,7 @@ export function generateManifest(build) {
   // wall covers were already attached to the top cases (before hanging), so they
   // aren't a separate step here.
   const postSteps = [];
-  if (!isWall) {
+  if (!hangs) {
     postSteps.push({
       title: clIds.length > 1 ? 'Lower covers' : 'Lower cover',
       note: 'The lower covers slide over the top from the back — the top cases’ QuickLocks lock them.' +
@@ -755,7 +854,8 @@ export function generateManifest(build) {
       note: (anyMagnet
         ? 'Before a magnet-closure drawer goes in: snap a clip into its back-wall slot and press in the magnet, front to back. Then slide each drawer in from the front.'
         : 'Slide each drawer in from the front.'),
-      camera: { ...cam(0, H_MM * 0.45, totalW, gridBottom, FIT), t: 12, p: 68 },
+      // under-table drawers live below eye level — shoot from just under the horizon
+      camera: { ...cam(0, H_MM * 0.45, totalW, gridBottom, FIT), t: 12, p: isUT ? 97 : 68 },
       phases: [
         ...drawerPhases,
         ...(drawerFades.length ? [{ fade: drawerFades }] : []),
@@ -765,7 +865,7 @@ export function generateManifest(build) {
     postSteps.push({
       title: 'Faceplates & handles',
       note: 'Pop a drawer out about 40 mm, slide the faceplate DOWN onto the drawer front until it snaps, screw on the Deco handle (2× M3), then push the drawer home. Repeat for every drawer — the build is done. Tap any part to see its name and download links.',
-      camera: { ...cam(0, H_MM * 0.5, totalW, gridBottom, FIT), t: 15, p: 66 },
+      camera: { ...cam(0, H_MM * 0.5, totalW, gridBottom, FIT), t: 15, p: isUT ? 99 : 66 },
       phases: [
         ...fpDemo,
         ...(fpFades.length ? [{ fade: fpFades }] : []),
@@ -773,14 +873,14 @@ export function generateManifest(build) {
     });
   }
 
-  // wall builds assemble top-down (top row onto the brackets first); the case
-  // steps are generated bottom-up, so reverse them (wall steps have their own
-  // descriptive titles). Tabletop keeps its bottom-up "Case N" order. Staggered
-  // wall: the top row (place each case → cover the row → hang the row) leads,
-  // then the lower rows reversed.
+  // hanging builds assemble top-down (top row onto the brackets/rails first);
+  // the case steps are generated bottom-up, so reverse them (their steps have
+  // their own descriptive titles). Tabletop keeps its bottom-up "Case N" order.
+  // Staggered wall: the top row (place each case → cover the row → hang the
+  // row) leads, then the lower rows reversed.
   const caseStepOrder = isStaggered
     ? [...topPlacements, stagCoverStep, stagHang, ...[...steps].reverse()]
-    : isWall ? [...steps].reverse() : steps;
+    : hangs ? [...steps].reverse() : steps;
   const manifest = {
     title: `${funName} · GEN2 Custom · 185`,
     collection: '185',

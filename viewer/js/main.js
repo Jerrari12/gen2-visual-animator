@@ -73,6 +73,17 @@ wall.visible = false;
 scene.add(wall);
 scene.add(grid);
 
+// mounting-surface slab for under-table builds: the horizontal twin of the wall
+// backdrop — the rails screw UP into it and the build hangs below. Sized to the
+// build by fitSurface(); hidden whenever the camera rises above its underside so
+// the rails/case tops stay inspectable (same rule as the wall's behind-hide).
+const surface = new THREE.Mesh(
+  new THREE.BoxGeometry(6000, 25, 4000),
+  new THREE.MeshStandardMaterial({ color: 0xd9cfc0, roughness: 0.9 })
+);
+surface.visible = false;
+scene.add(surface);
+
 function resize() {
   const w = canvas.clientWidth, h = canvas.clientHeight;
   if (canvas.width !== w || canvas.height !== h) {
@@ -123,6 +134,15 @@ if (isWallBuild) {
   scene.background = new THREE.Color(0xd7d4ce); // slightly deeper than the wall, for depth
   controls.maxPolarAngle = Math.PI * 0.85;      // allow a 3/4 view from below (watch rows hang up under the row above)
 }
+// under-table builds hang below a surface slab — no floor table/grid (they'd
+// read as a second surface), and the camera lives mostly below the horizon.
+const isUnderTableBuild = manifest.mount === 'under-table';
+if (isUnderTableBuild) {
+  table.visible = false;
+  grid.visible = false;
+  surface.visible = true;
+  controls.maxPolarAngle = Math.PI * 0.85;      // the whole build is viewed from a 3/4-below angle
+}
 
 const loader = new GLTFLoader();
 loader.setMeshoptDecoder(MeshoptDecoder);
@@ -149,7 +169,10 @@ const instances = new Map(); // id -> { cfg, group, staged }
 for (const cfg of manifest.instances) {
   const group = new THREE.Group();
   group.add(templates[cfg.node].clone(true));
-  group.rotation.y = THREE.MathUtils.degToRad(cfg.yaw || 0);
+  // yaw (about Y) covers most parts; rot = [rx,ry,rz] degrees adds pitch/roll
+  // for the few that need it (under-table screws stand UP into the surface)
+  const rot = cfg.rot || [0, cfg.yaw || 0, 0];
+  group.rotation.set(THREE.MathUtils.degToRad(rot[0]), THREE.MathUtils.degToRad(rot[1]), THREE.MathUtils.degToRad(rot[2]));
   group.visible = false;
   group.userData.instanceId = cfg.id;
   scene.add(group);
@@ -181,6 +204,30 @@ function fitWall() {
   wall.position.set(ctr.x, ctr.y, box.min.z - 2); // just behind the case backs / bracket
 }
 fitWall();
+
+// size the surface slab to the assembled build + margin, its underside resting
+// on the rail tops (the screws poke INTO the wood — excluded from sizing, same
+// as the wall excludes its screw tips).
+let surfaceUnderY = 0;
+function fitSurface() {
+  if (!isUnderTableBuild) return;
+  const box = new THREE.Box3(), one = new THREE.Box3();
+  for (const inst of instances.values()) {
+    if (inst.cfg.node.startsWith('WoodScrew')) continue;
+    inst.group.position.copy(basePos(inst, false));
+    inst.group.updateMatrixWorld(true);
+    one.setFromObject(inst.group);
+    if (!one.isEmpty()) box.union(one);
+  }
+  if (box.isEmpty()) return;
+  const size = box.getSize(new THREE.Vector3()), ctr = box.getCenter(new THREE.Vector3());
+  const margin = 90;
+  surfaceUnderY = box.max.y;
+  surface.geometry.dispose();
+  surface.geometry = new THREE.BoxGeometry(size.x + margin * 2, 25, size.z + margin * 2);
+  surface.position.set(ctr.x, surfaceUnderY + 12.5, ctr.z);
+}
+fitSurface();
 
 // build bounding sphere, for aspect-aware "fit to view" camera framing (so
 // whole-build shots fill the frame on any aspect, not just tall/square ones)
@@ -1177,6 +1224,7 @@ function startCinema() {
   sun.color.set(0xffe0b3); // warm golden sun for the finale
   grid.visible = false;
   wall.visible = false;    // clean cinema stage, even for wall builds
+  surface.visible = false; // …and under-table builds
   confettiInit();
   scene.add(confetti.mesh);
 }
@@ -1194,8 +1242,9 @@ function stopCinema() {
   hemi.intensity = 1.1;
   scene.background.copy(party.bgDay);
   table.material.color.copy(party.tableDay);
-  grid.visible = !isWallBuild; // wall builds never show the floor grid
+  grid.visible = !isWallBuild && !isUnderTableBuild; // hanging builds never show the floor grid
   wall.visible = isWallBuild;
+  surface.visible = isUnderTableBuild;
   scene.environment = null;
   scene.environmentIntensity = 1;
   scene.remove(party.rig);
@@ -1380,6 +1429,9 @@ renderer.setAnimationLoop(now => {
   // the wall is a backdrop, not part of the model — drop it out of the way when
   // the camera orbits behind it, so you can inspect the pegs/case backs freely.
   if (isWallBuild && !cinema.on) wall.visible = camera.position.z > wall.position.z;
+  // same rule for the under-table surface: hide it when the camera rises above
+  // its underside, so the rails/screw layout can be inspected from the top.
+  if (isUnderTableBuild && !cinema.on) surface.visible = camera.position.y < surfaceUnderY;
   updatePointerLine();
   renderer.render(scene, camera);
 });
