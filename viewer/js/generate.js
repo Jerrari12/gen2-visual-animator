@@ -93,6 +93,11 @@ export function generateManifest(build) {
   const isWall = build.mount === 'wall';
   const isUT = build.mount === 'under-table';
   const hangs = isWall || isUT; // both hang top-down from a mounting surface
+  // stoppers the user has removed (viewer options menu / per-part remove). Key
+  // = "<plannerUnitId>:<localColumn>" — one key drops the L+R pair for one 1W of
+  // a drawer. Shared verbatim with the planner so removals round-trip.
+  const removedStoppers = new Set(build.removedStoppers || []);
+  const stopperOff = (u, c) => removedStoppers.has(`${u.id}:${c - u.col}`);
   // wallStagger = one connected staggered cover across the whole top row (built
   // and hung as a unit); false = per-column cover on each top case.
   const isStaggered = isWall && !!build.wallStagger;
@@ -421,6 +426,7 @@ export function generateManifest(build) {
       // generic stopper loop skips top-row drawers)
       const stopIds = [];
       if (isDrawer) for (let c = u.col; c < u.col + u.w; c++) {
+        if (stopperOff(u, c)) continue; // user removed this 1W's stopper pair
         const lx = colCenter(c), idL = `tst${i}c${c}L`, idR = `tst${i}c${c}R`;
         inst.push({ id: idL, node: 'Drawer_Stoppers_L', pos: [lx - 12.6, flatTopY - 2, 76.5], ...stg });
         inst.push({ id: idR, node: 'Drawer_Stoppers_R', pos: [lx + 12.4, flatTopY - 2, 76.5], ...stg });
@@ -560,6 +566,7 @@ export function generateManifest(build) {
     // stoppers into the CL for each top-row drawer column (before the CU caps them)
     units.filter(u => u.topIdx === maxTop && (u.fill === 'decor' || u.fill === 'classic')).forEach(u => {
       for (let c = u.col; c < u.col + u.w; c++) {
+        if (stopperOff(u, c)) continue; // user removed this 1W's stopper pair
         const lx = colCenter(c), idL = `tst${c}L`, idR = `tst${c}R`;
         inst.push({ id: idL, node: 'Drawer_Stoppers_L', pos: [lx - 12.6, flatTopY - 2, 76.5], stage: 'wtop' });
         inst.push({ id: idR, node: 'Drawer_Stoppers_R', pos: [lx + 12.4, flatTopY - 2, 76.5], stage: 'wtop' });
@@ -608,6 +615,7 @@ export function generateManifest(build) {
     if (hangs && u.topIdx === maxTop) return;
     const sy = row0 + u.topIdx * PITCH_HALF_Y - 2;
     for (let c = u.col; c < u.col + u.w; c++) {
+      if (stopperOff(u, c)) continue; // user removed this 1W's stopper pair
       const lx = colCenter(c);
       const idL = `st${stopN}L`, idR = `st${stopN}R`;
       stopN++;
