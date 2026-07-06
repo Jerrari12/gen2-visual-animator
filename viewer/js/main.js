@@ -927,6 +927,16 @@ function setSelected(id) {
   } else {
     $('identify-style').classList.add('hidden');
   }
+  // Remove button: ONLY the optional hardware — a magnet clip/magnet (removes
+  // that drawer's magnet closure) or a drawer stopper (removes the L+R pair for
+  // that 1W). Generated builds only; never cases/drawers/rails/etc.
+  const rmType = typeByNode[inst.cfg.node];
+  const removable = build && (
+    ((rmType === 'MagnetClip' || rmType === 'Magnet') && inst.cfg.owner != null) ||
+    (rmType === 'Stopper' && inst.cfg.stopperKey));
+  const rmBtn = $('identify-remove');
+  rmBtn.classList.toggle('hidden', !removable);
+  if (removable) rmBtn.textContent = rmType === 'Stopper' ? '✕ Remove this stopper' : '✕ Remove magnet closure';
   card.classList.remove('hidden');
   // drawer-open interaction: only when the drawer is seated in its final spot
   const carrier = drawerCarrier(inst);
@@ -1222,6 +1232,21 @@ async function cycleHandleStyle(dir) {
 }
 $('style-prev').onclick = () => cycleHandleStyle(-1);
 $('style-next').onclick = () => cycleHandleStyle(1);
+// remove the selected optional part (magnet closure for its drawer, or a 1W
+// stopper pair), then regenerate + update the BOM
+$('identify-remove').onclick = async () => {
+  const inst = selectedId && instances.get(selectedId);
+  if (!inst || !build) return;
+  const type = typeByNode[inst.cfg.node];
+  if (type === 'Stopper' && inst.cfg.stopperKey) {
+    build.removedStoppers = [...new Set([...(build.removedStoppers || []), inst.cfg.stopperKey])];
+  } else if ((type === 'MagnetClip' || type === 'Magnet') && inst.cfg.owner != null) {
+    const d = build.placed.find(u => u.id === inst.cfg.owner);
+    if (d) d.closure = 'none'; else return;
+  } else return;
+  setSelected(null);
+  await regenerate();
+};
 
 canvas.addEventListener('pointerdown', e => { downXY = [e.clientX, e.clientY]; });
 canvas.addEventListener('pointerup', e => {
@@ -1689,5 +1714,5 @@ renderer.setAnimationLoop(now => {
 // dev-only hook (mirrors the planner's guarded test-hook convention): ?debug=1
 if (new URLSearchParams(location.search).get('debug')) {
   window.__GEN2_VIEWER__ = { THREE, scene, camera, controls, goTo, applyState, instances, manifest, cinema, updateCinema, cinemaScene, party, confetti, confettiPop,
-    get build() { return build; }, regenerate };
+    get build() { return build; }, regenerate, setSelected, get selectedId() { return selectedId; } };
 }

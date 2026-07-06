@@ -365,8 +365,8 @@ export function generateManifest(build) {
       const mx = colCenter(u.col + slotCol);
       const mcy = bottom + caseH - 23.2;
       mcId = `mc${i}`; mgId = `mg${i}`;
-      inst.push({ id: mcId, node: 'MagnetClip_10x2mm', pos: [mx, mcy, -85.7], ...stg });
-      inst.push({ id: mgId, node: 'Magnet_10x2mm', pos: [mx, mcy + 4.2, -86], ...stg });
+      inst.push({ id: mcId, node: 'MagnetClip_10x2mm', pos: [mx, mcy, -85.7], owner: u.id, ...stg });
+      inst.push({ id: mgId, node: 'Magnet_10x2mm', pos: [mx, mcy + 4.2, -86], owner: u.id, ...stg });
       add('MagnetClip_10x2mm', 'Magnet Clip 10×2', 'MagnetClip', LINKS.hw, 2);
       add('Magnet_10x2mm', 'Magnet 10×2 mm', 'Magnet', null, 2, true);
       members.push(mcId, mgId);
@@ -427,9 +427,9 @@ export function generateManifest(build) {
       const stopIds = [];
       if (isDrawer) for (let c = u.col; c < u.col + u.w; c++) {
         if (stopperOff(u, c)) continue; // user removed this 1W's stopper pair
-        const lx = colCenter(c), idL = `tst${i}c${c}L`, idR = `tst${i}c${c}R`;
-        inst.push({ id: idL, node: 'Drawer_Stoppers_L', pos: [lx - 12.6, flatTopY - 2, 76.5], ...stg });
-        inst.push({ id: idR, node: 'Drawer_Stoppers_R', pos: [lx + 12.4, flatTopY - 2, 76.5], ...stg });
+        const lx = colCenter(c), idL = `tst${i}c${c}L`, idR = `tst${i}c${c}R`, sk = `${u.id}:${c - u.col}`;
+        inst.push({ id: idL, node: 'Drawer_Stoppers_L', pos: [lx - 12.6, flatTopY - 2, 76.5], stopperKey: sk, ...stg });
+        inst.push({ id: idR, node: 'Drawer_Stoppers_R', pos: [lx + 12.4, flatTopY - 2, 76.5], stopperKey: sk, ...stg });
         add('Drawer_Stoppers_L', 'Drawer Stopper L', 'Stopper', LINKS.hw);
         add('Drawer_Stoppers_R', 'Drawer Stopper R', 'Stopper', LINKS.hw);
         stopIds.push(idL, idR);
@@ -567,9 +567,9 @@ export function generateManifest(build) {
     units.filter(u => u.topIdx === maxTop && (u.fill === 'decor' || u.fill === 'classic')).forEach(u => {
       for (let c = u.col; c < u.col + u.w; c++) {
         if (stopperOff(u, c)) continue; // user removed this 1W's stopper pair
-        const lx = colCenter(c), idL = `tst${c}L`, idR = `tst${c}R`;
-        inst.push({ id: idL, node: 'Drawer_Stoppers_L', pos: [lx - 12.6, flatTopY - 2, 76.5], stage: 'wtop' });
-        inst.push({ id: idR, node: 'Drawer_Stoppers_R', pos: [lx + 12.4, flatTopY - 2, 76.5], stage: 'wtop' });
+        const lx = colCenter(c), idL = `tst${c}L`, idR = `tst${c}R`, sk = `${u.id}:${c - u.col}`;
+        inst.push({ id: idL, node: 'Drawer_Stoppers_L', pos: [lx - 12.6, flatTopY - 2, 76.5], stopperKey: sk, stage: 'wtop' });
+        inst.push({ id: idR, node: 'Drawer_Stoppers_R', pos: [lx + 12.4, flatTopY - 2, 76.5], stopperKey: sk, stage: 'wtop' });
         add('Drawer_Stoppers_L', 'Drawer Stopper L', 'Stopper', LINKS.hw);
         add('Drawer_Stoppers_R', 'Drawer Stopper R', 'Stopper', LINKS.hw);
         stopIds.push(idL, idR);
@@ -617,10 +617,10 @@ export function generateManifest(build) {
     for (let c = u.col; c < u.col + u.w; c++) {
       if (stopperOff(u, c)) continue; // user removed this 1W's stopper pair
       const lx = colCenter(c);
-      const idL = `st${stopN}L`, idR = `st${stopN}R`;
+      const idL = `st${stopN}L`, idR = `st${stopN}R`, sk = `${u.id}:${c - u.col}`;
       stopN++;
-      inst.push({ id: idL, node: 'Drawer_Stoppers_L', pos: [lx - 12.6, sy, 76.5] });
-      inst.push({ id: idR, node: 'Drawer_Stoppers_R', pos: [lx + 12.4, sy, 76.5] });
+      inst.push({ id: idL, node: 'Drawer_Stoppers_L', pos: [lx - 12.6, sy, 76.5], stopperKey: sk });
+      inst.push({ id: idR, node: 'Drawer_Stoppers_R', pos: [lx + 12.4, sy, 76.5], stopperKey: sk });
       add('Drawer_Stoppers_L', 'Drawer Stopper L', 'Stopper', LINKS.hw);
       add('Drawer_Stoppers_R', 'Drawer Stopper R', 'Stopper', LINKS.hw);
       const host = units.findIndex(v => v.rowIdx === u.topIdx && c >= v.col && c < v.col + v.w);
@@ -700,8 +700,8 @@ export function generateManifest(build) {
     if (hasMag) {
       // the clip + magnet are already counted once per magnet drawer in the case
       // loop (qty 2 covers this drawer-side clip and the case-back clip); no add.
-      inst.push({ id: `dc${i}`, node: 'MagnetClip_10x2mm', pos: [dx, bottom + 5.72 + drwH - 20, -83], yaw: 180, rides: `drw${i}` });
-      inst.push({ id: `dm${i}`, node: 'Magnet_10x2mm', pos: [dx, bottom + 5.72 + drwH - 15, -84], rides: `drw${i}` });
+      inst.push({ id: `dc${i}`, node: 'MagnetClip_10x2mm', pos: [dx, bottom + 5.72 + drwH - 20, -83], yaw: 180, rides: `drw${i}`, owner: u.id });
+      inst.push({ id: `dm${i}`, node: 'Magnet_10x2mm', pos: [dx, bottom + 5.72 + drwH - 15, -84], rides: `drw${i}`, owner: u.id });
     }
     inst.push({ id: `fp${i}`, node: `Faceplate_Essential_${u.w}W-${H}H`, pos: [cx + 0.47, bottom + 3.72, 95.07], rides: `drw${i}` });
     // handle: back face against the faceplate front (97.57), vertically centered
