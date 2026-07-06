@@ -120,12 +120,13 @@ function resize() {
 // `build` is the decoded planner build (null for static kits). The options menu
 // mutates it and regenerate() re-runs the generator + re-mounts the scene, so
 // most manifest-derived state below is (re)built inside mountManifest().
-let manifest, PARTS_BASE, build = null;
+let manifest, PARTS_BASE, build = null, originalBuild = null;
 const decodeBuild = h => { const raw = JSON.parse(decodeURIComponent(escape(atob(decodeURIComponent(h))))); return raw.data || raw; };
 if (BUILD_HASH) {
   let gen;
   try {
     build = decodeBuild(BUILD_HASH[1]); // accept raw serializeBuild() or the file export wrapper
+    originalBuild = structuredClone(build); // "Reset to original" restores this exact build
     gen = generateManifest(build);
   } catch (e) {
     gen = { errors: ['This build link is damaged or truncated — try copying it again from the planner.'], manifest: null };
@@ -617,7 +618,63 @@ function linkEl(text, href) {
   return a;
 }
 
+// ---------- build options (generated builds only; static kits skip it) ----------
+const drawersInBuild = () => build ? build.placed.filter(u => u.fill === 'decor' || u.fill === 'classic') : [];
+const allStopperKeys = () => drawersInBuild().flatMap(u => Array.from({ length: u.w }, (_, k) => `${u.id}:${k}`));
+function optSeg(label, options, activeVal, onPick) {
+  const row = document.createElement('div'); row.className = 'opt-row';
+  const lab = document.createElement('span'); lab.className = 'opt-label'; lab.textContent = label;
+  const grp = document.createElement('div'); grp.className = 'opt-seg';
+  for (const o of options) {
+    const b = document.createElement('button');
+    b.textContent = o.label;
+    if (o.val === activeVal) b.classList.add('on');
+    b.onclick = () => onPick(o.val);
+    grp.appendChild(b);
+  }
+  row.append(lab, grp);
+  return row;
+}
+async function setAllClosure(val) { drawersInBuild().forEach(u => u.closure = val); await regenerate(); }
+async function setAllStoppers(on) { build.removedStoppers = on ? [] : allStopperKeys(); await regenerate(); }
+async function resetBuild() { build = structuredClone(originalBuild); activeHandleStyle = null; await regenerate(); }
+function renderOptions() {
+  const box = $('build-options');
+  if (!box) return;
+  box.innerHTML = '';
+  if (!build) { box.classList.add('hidden'); return; } // static kits have no editable build
+  box.classList.remove('hidden');
+  const title = document.createElement('div'); title.className = 'opt-title'; title.textContent = '⚙ Build options';
+  box.appendChild(title);
+  const drawers = drawersInBuild();
+  if (drawers.length) {
+    const closures = drawers.map(u => u.closure === 'magnet' ? 'magnet' : 'none');
+    const closureActive = closures.every(c => c === 'magnet') ? 'magnet' : closures.every(c => c === 'none') ? 'none' : null;
+    box.appendChild(optSeg('Drawer close', [{ label: 'None', val: 'none' }, { label: 'Magnets', val: 'magnet' }], closureActive, setAllClosure));
+    const removed = new Set(build.removedStoppers || []), keys = allStopperKeys();
+    const stopActive = removed.size === 0 ? 'all' : (keys.length && keys.every(k => removed.has(k))) ? 'none' : null;
+    box.appendChild(optSeg('Drawer stoppers', [{ label: 'All', val: 'all' }, { label: 'None', val: 'none' }], stopActive, v => setAllStoppers(v === 'all')));
+  }
+  if (currentHandleStyleIndex() >= 0) {
+    const row = document.createElement('div'); row.className = 'opt-row';
+    const lab = document.createElement('span'); lab.className = 'opt-label'; lab.textContent = 'Handle';
+    const grp = document.createElement('div'); grp.className = 'opt-seg opt-cycle';
+    const prev = document.createElement('button'); prev.textContent = '◀'; prev.onclick = () => cycleHandleStyle(-1);
+    const name = document.createElement('span'); name.className = 'opt-cycle-name';
+    const idx = currentHandleStyleIndex(); name.textContent = idx >= 0 ? HANDLE_STYLES[idx].label.replace(' Handle', '') : '?';
+    const next = document.createElement('button'); next.textContent = '▶'; next.onclick = () => cycleHandleStyle(1);
+    grp.append(prev, name, next); row.append(lab, grp); box.appendChild(row);
+  }
+  if (isWallBuild) {
+    box.appendChild(optSeg('Top cover', [{ label: 'Per-column', val: false }, { label: 'Staggered', val: true }], !!build.wallStagger,
+      async v => { build.wallStagger = v; await regenerate(); }));
+  }
+  const reset = document.createElement('button'); reset.className = 'opt-reset'; reset.textContent = '↺ Reset to original';
+  reset.onclick = resetBuild; box.appendChild(reset);
+}
+
 function renderChecklist() {
+  renderOptions();
   const rows = $('checklist-rows');
   rows.innerHTML = '';
   let total = 0;
@@ -1106,7 +1163,10 @@ function faceplateHeightOf(node) {
   const hh = m ? { '05': 1, '1': 2, '15': 3, '2': 4, '3': 6 }[m[2]] : 2;
   return (hh || 2) * 28 - 1;
 }
+let activeHandleStyle = null; // the specific HANDLE_STYLES entry in use (BlockBar_D etc.), re-applied after a regenerate so a variant survives
 async function applyHandleStyle(style) {
+  activeHandleStyle = style;
+  if (build) build.handleStyle = style.planner; // keep the build in sync (regenerate/BOM/reset read this)
   if (!templates[style.node]) {
     const gltf = await loader.loadAsync(`${PARTS_BASE}${style.node}.lib.glb`);
     const mat = materials.Handle || fallbackMat;
@@ -1591,6 +1651,12 @@ async function regenerate() {
   const keep = Math.min(cur, gen.manifest.steps.length); // step indices are stable (deterministic gen)
   await mountManifest(gen.manifest);
   applyPalette(); // re-tint any custom filament colors onto the fresh materials
+  // the generator rebuilds handles as the planner-level default (blockbar → A);
+  // re-apply the specific variant the user picked so it survives the regenerate
+  if (activeHandleStyle && currentHandleStyleIndex() >= 0 &&
+      instances.get([...instances.keys()].find(id => typeByNode[instances.get(id).cfg.node] === 'Handle'))?.cfg.node !== activeHandleStyle.node) {
+    await applyHandleStyle(activeHandleStyle);
+  }
   goTo(keep, { animate: false });
   regenBusy = false;
   syncBuildToPlanner(); // keep the opener planner tab in step (no-op if opened cold)
