@@ -340,9 +340,18 @@ body {
 }
 #controls button:active { transform: translateY(1px); }
 #btn-next { background: var(--accent); border-color: var(--accent); color: #fff; }
-#btn-replay, #btn-slow, #btn-cam { padding: 10px 14px; }
+/* the three tool buttons sit together as one group: icon + tiny caption */
+#ctl-tools { display: flex; gap: 6px; }
+#ctl-tools button {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 6px 12px 5px; min-width: 64px;
+}
+#ctl-tools button i { font-style: normal; font-size: 15px; line-height: 1.1; }
+#ctl-tools button span { font-size: 9.5px; font-weight: 700; line-height: 1; color: var(--ink-soft); }
 #btn-slow.on { border-color: var(--accent); color: var(--accent); background: #fff6f0; box-shadow: inset 0 0 0 1px var(--accent); }
+#btn-slow.on span { color: var(--accent); }
 #btn-cam { border-color: var(--accent); } /* appears only while the user has camera control */
+#btn-cam span { color: var(--accent); }
 #controls button:disabled { opacity: .35; cursor: default; }
 
 #step-dots { display: flex; gap: 5px; flex-wrap: wrap; justify-content: center; }
@@ -412,5 +421,7 @@ body {
 
   #controls { padding-bottom: calc(10px + env(safe-area-inset-bottom)); }
   #controls button { padding: 11px 14px; }
-  #btn-replay, #btn-slow, #btn-cam { padding: 11px 10px; } /* icon buttons stay compact with 6 in the bar */
+  #ctl-tools { gap: 4px; }
+  #ctl-tools button { padding: 5px 7px 4px; min-width: 0; } /* the tool group stays compact with 6 items in the bar */
+  #ctl-tools button span { font-size: 8.5px; }
 }

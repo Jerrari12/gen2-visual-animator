@@ -236,25 +236,31 @@ fitWall();
 
 // size the surface slab to the assembled build + margin, its underside resting
 // on the rail tops (the screws poke INTO the wood — excluded from sizing, same
-// as the wall excludes its screw tips).
+// as the wall excludes its screw tips). The slab's FRONT edge sits flush with
+// the rail fronts — the kit mounts at a desk's front edge, so drawers (and
+// their handles) poke out past it; margins only on the back and sides.
 let surfaceUnderY = 0;
 function fitSurface() {
   if (!isUnderTableBuild) return;
-  const box = new THREE.Box3(), one = new THREE.Box3();
+  const box = new THREE.Box3(), rails = new THREE.Box3(), one = new THREE.Box3();
   for (const inst of instances.values()) {
     if (inst.cfg.node.startsWith('WoodScrew')) continue;
     inst.group.position.copy(basePos(inst, false));
     inst.group.updateMatrixWorld(true);
     one.setFromObject(inst.group);
-    if (!one.isEmpty()) box.union(one);
+    if (one.isEmpty()) continue;
+    box.union(one);
+    if (inst.cfg.node.startsWith('UnderTableRail')) rails.union(one);
   }
   if (box.isEmpty()) return;
   const size = box.getSize(new THREE.Vector3()), ctr = box.getCenter(new THREE.Vector3());
   const margin = 90;
   surfaceUnderY = box.max.y;
+  const front = rails.isEmpty() ? box.max.z : rails.max.z; // rail front = the desk edge
+  const depth = (front - box.min.z) + margin;              // margin on the back only
   surface.geometry.dispose();
-  surface.geometry = new THREE.BoxGeometry(size.x + margin * 2, 25, size.z + margin * 2);
-  surface.position.set(ctr.x, surfaceUnderY + 12.5, ctr.z);
+  surface.geometry = new THREE.BoxGeometry(size.x + margin * 2, 25, depth);
+  surface.position.set(ctr.x, surfaceUnderY + 12.5, front - depth / 2);
 }
 fitSurface();
 
