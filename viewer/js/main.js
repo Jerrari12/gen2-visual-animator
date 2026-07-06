@@ -117,12 +117,16 @@ function resize() {
 }
 
 // ---------- load manifest + parts ----------
-let manifest, PARTS_BASE;
+// `build` is the decoded planner build (null for static kits). The options menu
+// mutates it and regenerate() re-runs the generator + re-mounts the scene, so
+// most manifest-derived state below is (re)built inside mountManifest().
+let manifest, PARTS_BASE, build = null;
+const decodeBuild = h => { const raw = JSON.parse(decodeURIComponent(escape(atob(decodeURIComponent(h))))); return raw.data || raw; };
 if (BUILD_HASH) {
   let gen;
   try {
-    const build = JSON.parse(decodeURIComponent(escape(atob(decodeURIComponent(BUILD_HASH[1])))));
-    gen = generateManifest(build.data || build); // accept raw serializeBuild() or the file export wrapper
+    build = decodeBuild(BUILD_HASH[1]); // accept raw serializeBuild() or the file export wrapper
+    gen = generateManifest(build);
   } catch (e) {
     gen = { errors: ['This build link is damaged or truncated — try copying it again from the planner.'], manifest: null };
   }
@@ -139,8 +143,9 @@ if (BUILD_HASH) {
   manifest = await (await fetch(KIT_URL + 'manifest.json')).json();
   PARTS_BASE = KIT_URL + 'parts/';
 }
-document.getElementById('kit-title').textContent = manifest.title;
-document.title = manifest.title;
+
+// mount type is fixed for the life of the page (toggles never change it), so the
+// backdrop + polar limits are set once here from the first manifest.
 
 // wall builds hang on a wall, not a table — swap the table+grid for the backdrop.
 const isWallBuild = manifest.mount === 'wall';
@@ -165,9 +170,11 @@ const loader = new GLTFLoader();
 loader.setMeshoptDecoder(MeshoptDecoder);
 
 const materials = {};
-for (const [type, hex] of Object.entries(manifest.colors))
-  materials[type] = new THREE.MeshStandardMaterial({ color: new THREE.Color(hex), roughness: 0.55, metalness: 0.05 });
 const fallbackMat = new THREE.MeshStandardMaterial({ color: 0xb9bcc2, roughness: 0.6 });
+function ensureMaterials() { // one shared material per part type (idempotent across re-mounts)
+  for (const [type, hex] of Object.entries(manifest.colors))
+    if (!materials[type]) materials[type] = new THREE.MeshStandardMaterial({ color: new THREE.Color(hex), roughness: 0.55, metalness: 0.05 });
+}
 
 // tiled multi-width types: adjacent same-type tiles alternate a slightly lighter
 // shade of the type color, so a 2W landing next to a 1W reads as two parts, not
@@ -185,39 +192,47 @@ function altMatFor(type) {
   return altMaterials[type];
 }
 
-const typeByNode = Object.fromEntries(manifest.parts.map(p => [p.node, p.type]));
-const partInfoByNode = Object.fromEntries(manifest.parts.map(p => [p.node, p]));
+let typeByNode = {}, partInfoByNode = {};
 
-const uniqueNodes = [...new Set(manifest.instances.map(i => i.node))];
+// GLB templates are cached across re-mounts — only newly-needed nodes load (e.g.
+// turning magnet closure ON pulls in the clip/magnet GLBs the first time).
 const templates = {};
-await Promise.all(uniqueNodes.map(async node => {
-  const gltf = await loader.loadAsync(`${PARTS_BASE}${node}.lib.glb`);
-  const mat = materials[typeByNode[node]] || fallbackMat;
-  gltf.scene.traverse(o => { if (o.isMesh) o.material = mat; });
-  templates[node] = gltf.scene;
-}));
+async function loadTemplates() {
+  const need = [...new Set(manifest.instances.map(i => i.node))].filter(n => !templates[n]);
+  await Promise.all(need.map(async node => {
+    const gltf = await loader.loadAsync(`${PARTS_BASE}${node}.lib.glb`);
+    const mat = materials[typeByNode[node]] || fallbackMat;
+    gltf.scene.traverse(o => { if (o.isMesh) o.material = mat; });
+    templates[node] = gltf.scene;
+  }));
+}
 
 // ---------- instances ----------
 const instances = new Map(); // id -> { cfg, group, staged, alt }
-const tileSeen = {};         // per-type tile counter — every second tile shades lighter
-for (const cfg of manifest.instances) {
-  const group = new THREE.Group();
-  group.add(templates[cfg.node].clone(true));
-  // yaw (about Y) covers most parts; rot = [rx,ry,rz] degrees adds pitch/roll
-  // for the few that need it (under-table screws stand UP into the surface)
-  const rot = cfg.rot || [0, cfg.yaw || 0, 0];
-  group.rotation.set(THREE.MathUtils.degToRad(rot[0]), THREE.MathUtils.degToRad(rot[1]), THREE.MathUtils.degToRad(rot[2]));
-  group.visible = false;
-  group.userData.instanceId = cfg.id;
-  scene.add(group);
-  const type = typeByNode[cfg.node];
-  let alt = false;
-  if (TILED_TYPES.has(type)) {
-    const n = tileSeen[type] = (tileSeen[type] || 0) + 1;
-    alt = n % 2 === 0; // tiles are emitted in spatial order, so neighbors alternate
-    if (alt) group.traverse(o => { if (o.isMesh) o.material = altMatFor(type); });
+let tileSeen = {};           // per-type tile counter — every second tile shades lighter
+function buildInstances() {
+  for (const inst of instances.values()) scene.remove(inst.group); // tear down a previous mount
+  instances.clear();
+  tileSeen = {};
+  for (const cfg of manifest.instances) {
+    const group = new THREE.Group();
+    group.add(templates[cfg.node].clone(true));
+    // yaw (about Y) covers most parts; rot = [rx,ry,rz] degrees adds pitch/roll
+    // for the few that need it (under-table screws stand UP into the surface)
+    const rot = cfg.rot || [0, cfg.yaw || 0, 0];
+    group.rotation.set(THREE.MathUtils.degToRad(rot[0]), THREE.MathUtils.degToRad(rot[1]), THREE.MathUtils.degToRad(rot[2]));
+    group.visible = false;
+    group.userData.instanceId = cfg.id;
+    scene.add(group);
+    const type = typeByNode[cfg.node];
+    let alt = false;
+    if (TILED_TYPES.has(type)) {
+      const n = tileSeen[type] = (tileSeen[type] || 0) + 1;
+      alt = n % 2 === 0; // tiles are emitted in spatial order, so neighbors alternate
+      if (alt) group.traverse(o => { if (o.isMesh) o.material = altMatFor(type); });
+    }
+    instances.set(cfg.id, { cfg, group, staged: !!cfg.stage, alt });
   }
-  instances.set(cfg.id, { cfg, group, staged: !!cfg.stage, alt });
 }
 function basePos(inst, staged) {
   const p = new THREE.Vector3(...inst.cfg.pos);
@@ -244,7 +259,6 @@ function fitWall() {
   wall.geometry = new THREE.PlaneGeometry(size.x + margin * 2, size.y + margin * 2);
   wall.position.set(ctr.x, ctr.y, box.min.z - 2); // just behind the case backs / bracket
 }
-fitWall();
 
 // size the surface slab to the assembled build + margin, its underside resting
 // on the rail tops (the screws poke INTO the wood — excluded from sizing, same
@@ -274,12 +288,11 @@ function fitSurface() {
   surface.geometry = new THREE.BoxGeometry(size.x + margin * 2, 25, depth);
   surface.position.set(ctr.x, surfaceUnderY + 12.5, front - depth / 2);
 }
-fitSurface();
 
 // build bounding sphere, for aspect-aware "fit to view" camera framing (so
 // whole-build shots fill the frame on any aspect, not just tall/square ones)
 let buildCenter = new THREE.Vector3(), buildRadius = 400;
-{
+function computeBounds() {
   const box = new THREE.Box3();
   for (const inst of instances.values()) {
     inst.group.position.copy(basePos(inst, false));
@@ -307,7 +320,8 @@ function fitDistance(margin, fovDeg) {
 // ---------- step state (deterministic jump to any step) ----------
 // After step i: which instances are visible, which stages are settled.
 const afterState = [];
-{
+function buildAfterState() {
+  afterState.length = 0;
   const visible = new Set(), settled = new Set();
   manifest.steps.forEach(step => {
     for (const ph of step.phases || []) {
@@ -338,7 +352,8 @@ function applyState(i) { // instant snap to "after step i" (i = -1 for nothing)
 // or generated build: radial spread from the assembly center, per-type pushes
 // for parts that hide inside others, drawer attachments explode with their drawer.
 const exploded = new Map();
-{
+function buildExploded() {
+  exploded.clear();
   const center = new THREE.Vector3();
   for (const inst of instances.values()) center.add(basePos(inst, false));
   center.divideScalar(instances.size);
@@ -578,15 +593,19 @@ function tweenCamera(preset, duration = 900, force = false) {
 // Pages = [cover, ...manifest steps]. The cover is synthetic (page 0); the
 // checklist/exploded page is the unnumbered intro; assembly steps count from 1.
 const $ = id => document.getElementById(id);
-const PAGES = [{ cover: true }, ...manifest.steps, { outro: true }];
-let cur = 0;
-const dots = PAGES.map((_, i) => {
-  const d = document.createElement('div');
-  d.className = 'dot';
-  d.onclick = () => goTo(i);
-  $('step-dots').appendChild(d);
-  return d;
-});
+let PAGES = [], dots = [], cur = 0;
+function buildPages() {
+  PAGES = [{ cover: true }, ...manifest.steps, { outro: true }];
+  const wrap = $('step-dots');
+  wrap.innerHTML = ''; // rebuilt on re-mount (step count can change)
+  dots = PAGES.map((_, i) => {
+    const d = document.createElement('div');
+    d.className = 'dot';
+    d.onclick = () => goTo(i);
+    wrap.appendChild(d);
+    return d;
+  });
+}
 
 function linkEl(text, href) {
   const a = document.createElement('a');
@@ -1534,12 +1553,55 @@ function updatePointerLine() {
   svg.classList.remove('hidden');
 }
 
+// ---------- planner sync (assigned in the sync section below) ----------
+let syncBuildToPlanner = () => {}; // posts the current build options to the opener planner tab
+
+// ---------- (re)mount a manifest ----------
+// Builds (or rebuilds) all manifest-derived scene state. Called once at boot and
+// again by regenerate() after the options menu mutates `build`. Mount type,
+// lights, table/wall/surface and the tween/camera state are page-lifetime and
+// live outside this.
+async function mountManifest(m) {
+  manifest = m;
+  $('kit-title').textContent = m.title;
+  document.title = m.title;
+  typeByNode = Object.fromEntries(m.parts.map(p => [p.node, p.type]));
+  partInfoByNode = Object.fromEntries(m.parts.map(p => [p.node, p]));
+  ensureMaterials();
+  await loadTemplates();
+  buildInstances();
+  computeBounds();
+  if (isWallBuild) fitWall();
+  if (isUnderTableBuild) fitSurface();
+  buildAfterState();
+  buildExploded();
+  buildPages();
+  renderChecklist();
+}
+
+// regenerate: re-run the generator on the (mutated) build and re-mount, keeping
+// the current step. Generated builds only — static kits have no `build`.
+let regenBusy = false;
+async function regenerate() {
+  if (!build || regenBusy) return;
+  const gen = generateManifest(build);
+  if (!gen.manifest) return; // valid toggles can't make an unbuildable build; ignore defensively
+  regenBusy = true;
+  setSelected(null);
+  const keep = Math.min(cur, gen.manifest.steps.length); // step indices are stable (deterministic gen)
+  await mountManifest(gen.manifest);
+  applyPalette(); // re-tint any custom filament colors onto the fresh materials
+  goTo(keep, { animate: false });
+  regenBusy = false;
+  syncBuildToPlanner(); // keep the opener planner tab in step (no-op if opened cold)
+}
+
 // ---------- boot ----------
 const X_URL = 'https://x.com/jerrari3D';
 if (X_URL) { const a = $('outro-x'); a.href = X_URL; a.classList.remove('hidden'); }
 const YT_URL = 'https://www.youtube.com/@jerrari3D';
 if (YT_URL) { const a = $('outro-yt'); a.href = YT_URL; a.classList.remove('hidden'); }
-renderChecklist();
+await mountManifest(manifest);
 applyPalette(); // restore any saved filament colors
 $('loading-overlay').remove();
 goTo(0); // open on the cover
@@ -1560,5 +1622,6 @@ renderer.setAnimationLoop(now => {
 
 // dev-only hook (mirrors the planner's guarded test-hook convention): ?debug=1
 if (new URLSearchParams(location.search).get('debug')) {
-  window.__GEN2_VIEWER__ = { THREE, scene, camera, controls, goTo, applyState, instances, manifest, cinema, updateCinema, cinemaScene, party, confetti, confettiPop };
+  window.__GEN2_VIEWER__ = { THREE, scene, camera, controls, goTo, applyState, instances, manifest, cinema, updateCinema, cinemaScene, party, confetti, confettiPop,
+    get build() { return build; }, regenerate };
 }
