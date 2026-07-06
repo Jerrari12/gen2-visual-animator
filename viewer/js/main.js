@@ -14,9 +14,14 @@ const BUILD_HASH = (location.hash || '').match(/build=([^&]+)/);
 
 // ---------- tiny tween runner (no lib) ----------
 const tweens = new Set();
+// slow-motion study mode (🐢 in the controls bar): stretches every step and
+// camera tween so an installation can be watched closely. The outro cinema
+// drives its own clock and is never slowed.
+let slowmo = false;
 function tween({ duration = 700, delay = 0, onUpdate, onDone }) {
+  const f = slowmo && !cinema.on ? 2.5 : 1;
   return new Promise(resolve => {
-    tweens.add({ t0: performance.now() + delay, duration, onUpdate, done: () => { onDone?.(); resolve(); } });
+    tweens.add({ t0: performance.now() + delay * f, duration: duration * f, onUpdate, done: () => { onDone?.(); resolve(); } });
   });
 }
 function stepTweens(now) {
@@ -92,7 +97,7 @@ function resize() {
     camera.updateProjectionMatrix();
     // re-fit a whole-build shot to the new aspect (skip during the cinema, which
     // drives the camera itself)
-    if (curCamPreset?.fit && !cinema.on && !tweens.size) {
+    if (curCamPreset?.fit && !cinema.on && !tweens.size && !camOverride) {
       const { pos, target } = camPos(curCamPreset);
       camera.position.copy(pos); controls.target.copy(target); controls.update();
     }
@@ -152,6 +157,22 @@ for (const [type, hex] of Object.entries(manifest.colors))
   materials[type] = new THREE.MeshStandardMaterial({ color: new THREE.Color(hex), roughness: 0.55, metalness: 0.05 });
 const fallbackMat = new THREE.MeshStandardMaterial({ color: 0xb9bcc2, roughness: 0.6 });
 
+// tiled multi-width types: adjacent same-type tiles alternate a slightly lighter
+// shade of the type color, so a 2W landing next to a 1W reads as two parts, not
+// one fused piece. Same hue = same identity in the BOM; the lightened variants
+// re-derive from the active palette (instruction OR custom filament colors).
+const TILED_TYPES = new Set(['FootrailL', 'FootrailU', 'CoverL', 'CoverU', 'Bracket', 'Rail']);
+const ALT_LIGHTEN = 0.16;
+const altMaterials = {};
+function altMatFor(type) {
+  if (!altMaterials[type]) {
+    const m = (materials[type] || fallbackMat).clone();
+    m.color.lerp(new THREE.Color('#ffffff'), ALT_LIGHTEN);
+    altMaterials[type] = m;
+  }
+  return altMaterials[type];
+}
+
 const typeByNode = Object.fromEntries(manifest.parts.map(p => [p.node, p.type]));
 const partInfoByNode = Object.fromEntries(manifest.parts.map(p => [p.node, p]));
 
@@ -165,7 +186,8 @@ await Promise.all(uniqueNodes.map(async node => {
 }));
 
 // ---------- instances ----------
-const instances = new Map(); // id -> { cfg, group, staged }
+const instances = new Map(); // id -> { cfg, group, staged, alt }
+const tileSeen = {};         // per-type tile counter — every second tile shades lighter
 for (const cfg of manifest.instances) {
   const group = new THREE.Group();
   group.add(templates[cfg.node].clone(true));
@@ -176,7 +198,14 @@ for (const cfg of manifest.instances) {
   group.visible = false;
   group.userData.instanceId = cfg.id;
   scene.add(group);
-  instances.set(cfg.id, { cfg, group, staged: !!cfg.stage });
+  const type = typeByNode[cfg.node];
+  let alt = false;
+  if (TILED_TYPES.has(type)) {
+    const n = tileSeen[type] = (tileSeen[type] || 0) + 1;
+    alt = n % 2 === 0; // tiles are emitted in spatial order, so neighbors alternate
+    if (alt) group.traverse(o => { if (o.isMesh) o.material = altMatFor(type); });
+  }
+  instances.set(cfg.id, { cfg, group, staged: !!cfg.stage, alt });
 }
 function basePos(inst, staged) {
   const p = new THREE.Vector3(...inst.cfg.pos);
@@ -247,8 +276,11 @@ let buildCenter = new THREE.Vector3(), buildRadius = 400;
 // distance at which the bounding sphere (× margin) fits BOTH the vertical and
 // horizontal FOV — the max keeps it uncropped on wide (fills height) and narrow
 // (fills width) viewports alike.
-function fitDistance(margin) {
-  const vFov = THREE.MathUtils.degToRad(camera.fov || 40);
+function fitDistance(margin, fovDeg) {
+  // frame with the fov the shot will END at (presets default to 40) — reading
+  // the live camera.fov here overshot ~4× when dot-jumping from the telephoto
+  // cover (fov 9) straight to a fit step.
+  const vFov = THREE.MathUtils.degToRad(fovDeg || camera.fov || 40);
   const hFov = 2 * Math.atan(Math.tan(vFov / 2) * (camera.aspect || 1.6));
   const R = buildRadius * margin;
   return Math.max(R / Math.sin(vFov / 2), R / Math.sin(hFov / 2));
@@ -279,7 +311,7 @@ function applyState(i) { // instant snap to "after step i" (i = -1 for nothing)
     inst.staged = !!inst.cfg.stage && !st.settled.has(inst.cfg.stage);
     inst.group.position.copy(basePos(inst, inst.staged));
     // restore shared materials (an interrupted fade leaves per-mesh clones)
-    inst.group.traverse(o => { if (o.isMesh) o.material = materialFor(inst.cfg.node, false); });
+    inst.group.traverse(o => { if (o.isMesh) o.material = materialFor(inst, false); });
   }
 }
 
@@ -323,7 +355,7 @@ function applyExploded() {
     inst.group.visible = true;
     inst.staged = false;
     inst.group.position.copy(exploded.get(inst.cfg.id));
-    inst.group.traverse(o => { if (o.isMesh) o.material = materialFor(inst.cfg.node, false); });
+    inst.group.traverse(o => { if (o.isMesh) o.material = materialFor(inst, false); });
   }
 }
 // animated variant: parts drift from wherever they are (the finished cover
@@ -332,7 +364,7 @@ function playExploded() {
   killTweens();
   for (const inst of instances.values()) {
     inst.staged = false;
-    inst.group.traverse(o => { if (o.isMesh) o.material = materialFor(inst.cfg.node, false); });
+    inst.group.traverse(o => { if (o.isMesh) o.material = materialFor(inst, false); });
     const e = exploded.get(inst.cfg.id);
     if (!inst.group.visible) { inst.group.visible = true; inst.group.position.copy(e); continue; }
     const fromV = inst.group.position.clone();
@@ -377,7 +409,7 @@ async function playStep(i) {
       const mats = [];
       inst.group.traverse(o => {
         if (!o.isMesh) return;
-        const m = materialFor(inst.cfg.node, false).clone();
+        const m = materialFor(inst, false).clone();
         m.transparent = true; m.opacity = 1;
         o.material = m; mats.push(m);
       });
@@ -390,12 +422,17 @@ async function playStep(i) {
       jobs.push(tween({
         duration: DUR.fade,
         onUpdate: k => mats.forEach(m => { m.opacity = 0.15 + 0.85 * k; }),
-        onDone: () => inst.group.traverse(o => { if (o.isMesh) o.material = materialFor(inst.cfg.node, false); })
+        onDone: () => inst.group.traverse(o => { if (o.isMesh) o.material = materialFor(inst, false); })
       }));
     });
     // enter items normally stagger (parts arriving one by one). `sync: true`
     // moves them in unison — for a pre-assembled group sliding in as one piece
     // (e.g. a wall case with its QuickLocks already fitted).
+    // Multi-tile landings (covers, footrails, brackets, rails) read too fast at
+    // full speed and then fuse visually — pace them down so each tile is seen
+    // arriving on its own. Manifests can override with an explicit `pace`.
+    const tileCount = (ph.enter || []).filter(e => TILED_TYPES.has(typeByNode[instances.get(e.id).cfg.node])).length;
+    const pace = ph.pace || (tileCount >= 2 ? 1.6 : 1);
     (ph.enter || []).forEach((e, n) => {
       const inst = instances.get(e.id);
       const to = basePos(inst, inst.staged);
@@ -404,7 +441,7 @@ async function playStep(i) {
       inst.group.visible = true;
       inst.group.position.copy(fromV);
       jobs.push(tween({
-        duration: DUR.enter, delay: ph.sync ? 0 : n * DUR.stagger,
+        duration: DUR.enter * pace, delay: ph.sync ? 0 : n * DUR.stagger * pace,
         onUpdate: k => inst.group.position.lerpVectors(fromV, to, k)
       }));
     });
@@ -428,7 +465,7 @@ async function playStep(i) {
       const mats = [];
       inst.group.traverse(o => {
         if (!o.isMesh) return;
-        const m = materialFor(inst.cfg.node, false).clone();
+        const m = materialFor(inst, false).clone();
         m.transparent = true;
         m.opacity = 0;
         o.material = m;
@@ -437,7 +474,7 @@ async function playStep(i) {
       jobs.push(tween({
         duration: DUR.fade, delay: n * 80,
         onUpdate: k => mats.forEach(m => { m.opacity = k; }),
-        onDone: () => inst.group.traverse(o => { if (o.isMesh) o.material = materialFor(inst.cfg.node, false); })
+        onDone: () => inst.group.traverse(o => { if (o.isMesh) o.material = materialFor(inst, false); })
       }));
     });
     if (ph.settle) {
@@ -468,7 +505,7 @@ function camPos(preset) {
   const target = new THREE.Vector3(...preset.target);
   // whole-build presets carry `fit` (a margin) — frame to the actual bounds at
   // the current aspect instead of a fixed distance; others use their tuned r.
-  const r = preset.fit ? fitDistance(preset.fit) : preset.r;
+  const r = preset.fit ? fitDistance(preset.fit, preset.fov || 40) : preset.r;
   const pos = new THREE.Vector3(
     r * Math.sin(p) * Math.sin(t),
     r * Math.cos(p),
@@ -476,10 +513,31 @@ function camPos(preset) {
   ).add(target);
   return { pos, target };
 }
+// user camera override — orbit/zoom during a step and the guided camera stops
+// fighting you (per-phase retargets included). A "resume" button returns to
+// wherever the tour camera last wanted to be (google-maps-style re-center).
+// The cover and outro reset it (they own the camera); replay keeps it, so an
+// installation can be studied up close from any angle.
+let camOverride = false, interactFrom = null;
+function setCamOverride(on) {
+  camOverride = on;
+  document.getElementById('btn-cam').classList.toggle('hidden', !on);
+}
+controls.addEventListener('start', () => {
+  interactFrom = { p: camera.position.clone(), t: controls.target.clone() };
+});
+controls.addEventListener('end', () => {
+  if (!interactFrom || cinema.on) { interactFrom = null; return; }
+  const moved = camera.position.distanceTo(interactFrom.p) + controls.target.distanceTo(interactFrom.t);
+  if (moved > 4) setCamOverride(true); // a real orbit/zoom — an identify tap doesn't move the camera
+  interactFrom = null;
+});
+
 let camTweenToken = 0, curCamPreset = null;
-function tweenCamera(preset, duration = 900) {
+function tweenCamera(preset, duration = 900, force = false) {
   if (!preset) return Promise.resolve();
-  curCamPreset = preset;
+  curCamPreset = preset;                 // always record the tour's intent — Resume returns here
+  if (camOverride && !force) return Promise.resolve(); // the user owns the camera right now
   const my = ++camTweenToken;
   const { pos, target } = camPos(preset);
   const p0 = camera.position.clone(), t0 = controls.target.clone();
@@ -622,6 +680,7 @@ function goTo(i, { animate = true } = {}) {
   updateColorToggle();
   if (isCover) {
     $('step-counter').textContent = '';
+    setCamOverride(false); // the cover owns the camera — reset any user override
     setChecklist(false);
     $('checklist-tab').classList.add('hidden'); // cover stays clean
     animToken++;
@@ -636,6 +695,7 @@ function goTo(i, { animate = true } = {}) {
   }
   if (isOutro) {
     $('step-counter').textContent = 'Thanks for building';
+    setCamOverride(false); // the cinema owns the camera
     setChecklist(!isMobile()); // desktop finale shows the full list; mobile keeps it one tap away (less clutter)
     $('btn-prev').disabled = false;
     $('btn-next').disabled = true;
@@ -667,6 +727,13 @@ function goTo(i, { animate = true } = {}) {
 $('btn-prev').onclick = () => goTo(cur - 1, { animate: false });
 $('btn-next').onclick = () => goTo(cur + 1);
 $('btn-replay').onclick = () => goTo(cur);
+$('btn-slow').onclick = () => {
+  slowmo = !slowmo;
+  $('btn-slow').classList.toggle('on', slowmo);
+};
+// google-maps-style "re-center": drop the user override and glide back to
+// wherever the guided camera last wanted to be.
+$('btn-cam').onclick = () => { setCamOverride(false); tweenCamera(curCamPreset, 900, true); };
 $('btn-start').onclick = () => goTo(1); // cover → intro, camera pans + de-zooms
 $('checklist-tab').onclick = () => { if (isMobile()) setSelected(null); setChecklist(true); };
 $('checklist-close').onclick = () => setChecklist(false);
@@ -682,17 +749,19 @@ addEventListener('keydown', e => {
 // Suppressed when the pointer dragged (= orbiting).
 const ray = new THREE.Raycaster();
 let downXY = null, selectedId = null;
-const highlightMats = {}; // type -> emissive clone of the type material
-function materialFor(node, highlighted) {
-  const type = typeByNode[node];
-  if (!highlighted) return materials[type] || fallbackMat;
-  if (!highlightMats[type]) {
-    const m = (materials[type] || fallbackMat).clone();
+const highlightMats = {}, altHighlightMats = {}; // type -> emissive clone (base / lightened tile)
+function materialFor(inst, highlighted) {
+  const type = typeByNode[inst.cfg.node];
+  const base = inst.alt ? altMatFor(type) : (materials[type] || fallbackMat);
+  if (!highlighted) return base;
+  const cache = inst.alt ? altHighlightMats : highlightMats;
+  if (!cache[type]) {
+    const m = base.clone();
     m.emissive = new THREE.Color(0xff8a40);
     m.emissiveIntensity = 0.4;
-    highlightMats[type] = m;
+    cache[type] = m;
   }
-  return highlightMats[type];
+  return cache[type];
 }
 // selecting a seated drawer (or anything riding it — faceplate, handle, clip)
 // slides it open 40 mm like a real drawer; deselecting slides it shut
@@ -720,7 +789,7 @@ function setSelected(id) {
   if (selectedId === id) return;
   if (selectedId && instances.has(selectedId)) {
     const prev = instances.get(selectedId);
-    prev.group.traverse(o => { if (o.isMesh) o.material = materialFor(prev.cfg.node, false); });
+    prev.group.traverse(o => { if (o.isMesh) o.material = materialFor(prev, false); });
   }
   if (openCarrier) { slideDrawer(openCarrier, false); openCarrier = null; }
   selectedId = id;
@@ -729,7 +798,7 @@ function setSelected(id) {
   if (!id) { card.classList.add('hidden'); $('pointer-line').classList.add('hidden'); return; }
   if (isMobile()) setChecklist(false); // mobile: parts list & identify sheet are mutually exclusive
   const inst = instances.get(id);
-  inst.group.traverse(o => { if (o.isMesh) o.material = materialFor(inst.cfg.node, true); });
+  inst.group.traverse(o => { if (o.isMesh) o.material = materialFor(inst, true); });
   selAnchor = new THREE.Box3().setFromObject(inst.group).getCenter(new THREE.Vector3()).sub(inst.group.position);
   const info = partInfoByNode[inst.cfg.node] || { label: inst.cfg.node, qty: '?' };
   const selType = typeByNode[inst.cfg.node];
@@ -853,6 +922,9 @@ const activeHex = type => (useCustom && customColors[type]) ? customColors[type]
 function applyPalette() {
   for (const [type, mat] of Object.entries(materials)) mat.color.set(activeHex(type));
   for (const [type, mat] of Object.entries(highlightMats)) mat.color.set(activeHex(type));
+  // lightened alternate-tile variants track the active palette too
+  for (const [type, mat] of Object.entries(altMaterials)) mat.color.set(activeHex(type)).lerp(new THREE.Color('#ffffff'), ALT_LIGHTEN);
+  for (const [type, mat] of Object.entries(altHighlightMats)) mat.color.set(activeHex(type)).lerp(new THREE.Color('#ffffff'), ALT_LIGHTEN);
   renderChecklist();
   updateColorToggle();
   if (selectedId) {
@@ -1031,7 +1103,7 @@ async function cycleHandleStyle(dir) {
   if (!selectedId) return;
   const inst = instances.get(selectedId);
   if (typeByNode[inst.cfg.node] !== 'Handle') return;
-  inst.group.traverse(o => { if (o.isMesh) o.material = materialFor(inst.cfg.node, true); });
+  inst.group.traverse(o => { if (o.isMesh) o.material = materialFor(inst, true); });
   selAnchor = new THREE.Box3().setFromObject(inst.group).getCenter(new THREE.Vector3()).sub(inst.group.position);
   const info = partInfoByNode[inst.cfg.node] || { label: next.label };
   $('identify-name').textContent = info.label;

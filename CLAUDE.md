@@ -67,7 +67,21 @@ and per-phase `camera` (retarget mid-step, e.g. zoom to the pegs then back), and
 `land` (mark a staged group settled in place — used after explicit `move` phases
 already carried it home, so a two-step staged hang stays deterministic). Steps
 are deterministic — prev/jump snaps to computed after-state, next/replay
-animates.
+animates. Phases may set `pace` (duration+stagger multiplier); without it the
+engine auto-paces 1.6× any enter phase landing ≥2 tiles of a TILED_TYPES part
+(covers/footrails/brackets/rails — multi-tile landings read too fast at 1×).
+**Readability & study aids (main.js, Joey 2026-07-06):** adjacent same-type
+tiles alternate a lighter shade (TILED_TYPES + ALT_LIGHTEN 0.16 — instance
+`alt` flag, altMaterials/altHighlightMats track the active palette, so a 2W
+next to a 1W never fuses visually; materialFor is instance-keyed for this).
+🐢 `#btn-slow` toggles slow-motion (tween() stretches all step/camera tweens
+2.5×; never the cinema). Camera override: orbiting/zooming >4 mm during a step
+sets `camOverride` — tweenCamera then only RECORDS presets (curCamPreset)
+without moving, per-phase retargets included, until 🎥 `#btn-cam` (visible only
+while overridden) glides back to the tour's latest preset; cover/outro reset
+the override, replay keeps it (study a step from any angle). fitDistance takes
+the preset's END fov (dot-jumping cover→fit-step used to overframe ~4× off the
+cover's fov-9 telephoto).
 `parts[]` is the BOM: type keys into `colors`. Generated builds use a **K'nex-
 style identification palette** (generate.js COLORS): one distinct saturated hue
 per part TYPE for easy identification — cases dark ("black", Joey's one rule),

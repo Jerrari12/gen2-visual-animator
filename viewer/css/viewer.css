@@ -340,7 +340,9 @@ body {
 }
 #controls button:active { transform: translateY(1px); }
 #btn-next { background: var(--accent); border-color: var(--accent); color: #fff; }
-#btn-replay { padding: 10px 14px; }
+#btn-replay, #btn-slow, #btn-cam { padding: 10px 14px; }
+#btn-slow.on { border-color: var(--accent); color: var(--accent); background: #fff6f0; box-shadow: inset 0 0 0 1px var(--accent); }
+#btn-cam { border-color: var(--accent); } /* appears only while the user has camera control */
 #controls button:disabled { opacity: .35; cursor: default; }
 
 #step-dots { display: flex; gap: 5px; flex-wrap: wrap; justify-content: center; }
@@ -410,4 +412,5 @@ body {
 
   #controls { padding-bottom: calc(10px + env(safe-area-inset-bottom)); }
   #controls button { padding: 11px 14px; }
+  #btn-replay, #btn-slow, #btn-cam { padding: 11px 10px; } /* icon buttons stay compact with 6 in the bar */
 }
