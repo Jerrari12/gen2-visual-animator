@@ -1209,8 +1209,7 @@ async function applyHandleStyle(style) {
     partInfoByNode[style.node] = row;
     renderChecklist();
   }
-  // live-sync the planner tab that opened us (harmless no-op otherwise)
-  if (window.opener) window.opener.postMessage({ gen2: 'handleStyle', style: style.planner }, '*');
+  syncBuildToPlanner(); // live-sync the planner tab that opened us (no-op if opened cold)
 }
 async function cycleHandleStyle(dir) {
   const idx = currentHandleStyleIndex();
@@ -1638,8 +1637,42 @@ function updatePointerLine() {
   svg.classList.remove('hidden');
 }
 
-// ---------- planner sync (assigned in the sync section below) ----------
-let syncBuildToPlanner = () => {}; // posts the current build options to the opener planner tab
+// ---------- bidirectional planner sync ----------
+// The planner opens us with a live opener ref, so option changes round-trip
+// both ways. Applying a received change must NOT re-post (loop guard). Static
+// kits (no build) never sync.
+let applyingRemote = false;
+function currentOpts() {
+  if (!build) return null;
+  const closures = {};
+  for (const u of build.placed) if (u.fill === 'decor' || u.fill === 'classic') closures[u.id] = u.closure === 'magnet' ? 'magnet' : 'none';
+  return { closures, removedStoppers: build.removedStoppers || [], wallStagger: !!build.wallStagger, handleStyle: build.handleStyle };
+}
+let syncBuildToPlanner = () => {
+  if (applyingRemote || !build || !window.opener) return;
+  try { window.opener.postMessage({ gen2: 'buildOptions', opts: currentOpts() }, '*'); } catch (e) { /* cross-origin opener gone */ }
+};
+addEventListener('message', async (e) => {
+  const d = e.data;
+  if (!d || d.gen2 !== 'buildOptions' || !d.opts || !build || regenBusy) return;
+  const o = d.opts;
+  // ignore a message that matches our current state — this is what breaks the
+  // planner↔viewer echo loop (an applied change bounces back identical → dropped)
+  let changed = false;
+  if (o.closures) for (const u of build.placed) if (o.closures[u.id] && (o.closures[u.id] === 'magnet') !== (u.closure === 'magnet')) changed = true;
+  if (Array.isArray(o.removedStoppers) && [...o.removedStoppers].sort().join(',') !== [...(build.removedStoppers || [])].sort().join(',')) changed = true;
+  if (typeof o.wallStagger === 'boolean' && o.wallStagger !== !!build.wallStagger) changed = true;
+  if (o.handleStyle && o.handleStyle !== build.handleStyle) changed = true;
+  if (!changed) return;
+  applyingRemote = true;
+  try {
+    if (o.closures) for (const u of build.placed) if (o.closures[u.id]) u.closure = o.closures[u.id];
+    if (Array.isArray(o.removedStoppers)) build.removedStoppers = o.removedStoppers;
+    if (typeof o.wallStagger === 'boolean') build.wallStagger = o.wallStagger;
+    if (o.handleStyle) build.handleStyle = o.handleStyle;
+    await regenerate();
+  } finally { applyingRemote = false; }
+});
 
 // ---------- (re)mount a manifest ----------
 // Builds (or rebuilds) all manifest-derived scene state. Called once at boot and
