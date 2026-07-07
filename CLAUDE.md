@@ -11,9 +11,12 @@ no bundler — `viewer/index.html` runs from any static server.
     colors, staged subassemblies, phased step animations, camera preset tweens,
     checklist, tap-to-identify. Data-driven: **never hardcode a kit here.**
   - `kits/<kit>/manifest.json` + `kits/<kit>/parts/*.lib.glb` — one folder per
-    kit is the entire authoring surface. Kits: `tabletop-185` (default, 2×2)
-    and `tabletop-185-3w` (3W×2H with a 2W case/drawer — proves multi-width,
-    rail-junction feet dedup, and the 2W left-slot magnet rule). Select via
+    kit is the entire authoring surface. Kits: `tabletop-185` (default, 2×2),
+    `tabletop-185-3w` (3W×2H with a 2W case/drawer — proves multi-width,
+    rail-junction feet dedup, and the 2W left-slot magnet rule), and
+    `tabletop-165` (2×2 165-collection demo — PORTED from tabletop-185: node
+    names 185→165 + each shared-hardware Z shifted ±dz; keeps the GEN2 palette).
+    Select via
     `?kit=<name>`. BOM panel: expanded on the checklist step and final step,
     minimized to a "Parts · N" tab elsewhere (user-toggleable). The panel has
 **Copy list / Download CSV** export buttons (main.js copyBom/downloadCsv, mirrors
@@ -96,17 +99,33 @@ keep the planner's GEN2 palette in their manifests. Per-part
 `links` {p, t} = Printables/Thangs URLs **mirrored from the planner's verified
 LINK_OVERRIDES** (`gen2-planner-main/js/data.js` is the source of truth — update
 both together). `purchased: true` marks hardware-store items (magnets, screws
-would-be) — excluded from the print count, shown "×N · buy". Per-part `img`
+would-be) — excluded from the print count, shown "×N · buy", and **color-locked**
+(main.js `colorLocked`: a type whose rows are all purchased gets no filament
+picker — BOM chip + identify swatch inert, presets/saved tints ignored by
+activeHex — it always renders its manifest color). Per-part `img`
 points at `viewer/img/parts/` (copied from the planner's BOM renders — same
 art in both tools). Links + image render in the tap-to-identify card (tap
 highlights the part, draws a thin pointer line to it, empty tap dismisses).
 Instance `rides: "<drawerId>"` marks drawer attachments (faceplate, handle,
-clip, magnet): selecting a seated drawer or anything riding it slides the whole
-set open 40 mm, deselect slides it shut. Steps show a LEGO-style number badge.
+clip, magnet): in assembled scenes, selecting a RIDER (faceplate/handle/clip/
+magnet) of a seated drawer slides the whole set open 40 mm (a peek — enough to
+expose the body for tapping); selecting the drawer BODY pulls it ~90% of the
+safe travel (`(collection − 20) · 0.9` — deep enough to read the body colour/
+interior). A faceplate→body reselect re-pulls the SAME drawer further (prevOpen
+counts as seated); switching drawers shuts the old one; empty tap slides shut.
+Steps show a LEGO-style number badge; `#note-collapse` (chevron in the note
+panel) folds the step text down to that badge — session-sticky across steps —
+so the model stays visible while recoloring on small screens. Mobile (≤560px):
+`#step-dots` gets its own full-width row above the buttons (`order:-1` +
+`flex-basis:100%` — squeezed between Back and the tools they used to wrap into
+a tall column when 🎥 Resume cam appeared), and the button paddings are sized
+so Back + 4 tools + Next fit one row on a 360px phone.
 **Build options (generated builds only, main.js 2026-07-06):** the whole scene
 is regenerate-able — `mountManifest()` (re)builds every manifest-derived thing
 and `regenerate()` re-runs `generateManifest` on the mutated `build`, lazy-
-loading new GLBs, tearing down old instance groups, preserving the step. A
+loading new GLBs, tearing down old instance groups, preserving the step AND the
+open parts panel (every toggle lives inside it; goTo's default panel policy
+would close it when a toggle changes the step count, e.g. wallStagger). A
 "⚙ Build options" block at the top of the parts panel (so it reuses the panel's
 mobile bottom-sheet + updates the BOM live) drives it: Drawer close None/Magnets
 (per-drawer `closure`), Drawer stoppers All/None (`build.removedStoppers` — set
@@ -126,11 +145,16 @@ cache; deploys are SHA-stamped so prod is immune).
 The checklist step shows an engine-computed **exploded parts preview** (radial
 spread from assembly center + per-type pushes; riders explode with their
 drawer) — no manifest data, works for generated builds too.
-**Filament colors:** FILAMENTS in main.js = all 28 real Panchroma™ Basic PLA
-1kg variants (names + Shopify variant ids scraped 2026-07-05; hexes are
-approximations) each deep-linking to its ?variant= page — swap for affiliate
-URLs when Joey has them — plus ★ "Elegoo PETG Black" (amzn.to affiliate,
-Joey's budget pick for cases/drawer bodies). Menu carries an affiliate
+**Filament colors:** FILAMENT_DB in main.js = a multi-BRAND database — one
+entry per brand `{brand, line, url, colors[]}`, rendered as collapsible
+sections (session-remembered expansion, count badge) under a live search box
+(filters across brand+line+label; matches force-open; empty state). Adding
+Prusa / Polar / Printed Solids later = appending one DB entry. Today: Elegoo
+PETG (★ "Elegoo PETG Black", amzn.to affiliate, Joey's budget pick for
+cases/drawer bodies) + Polymaker Panchroma™ PLA (all 28 real 1kg variants,
+Shopify variant ids scraped 2026-07-05, hexes approximated) — swap for
+affiliate URLs when Joey has them. Color `label` must stay UNIQUE across
+brands (it's the customColors identity key). Menu carries an affiliate
 disclosure line. Tap a part → swatch in the identify card → filament menu; OR
 click a part's color chip in the BOM panel — both open the same menu. Picking
 assigns per part TYPE, persists to localStorage
@@ -140,7 +164,15 @@ palette; "Get filament" link appears on customized parts. **Filament presets**
 (main.js PRESETS, shown in the BOM panel): one click sets a filament per type —
 "The Jerrari" (black shell, prusa-orange faceplates, silver handles, orange-PETG
 hardware) + Stealth / Signal / Sandstone. Colors are PLACEHOLDERS (swap for real
-Panchroma/Prusa variants + affiliate links later). **Save colors / Upload**
+Panchroma/Prusa variants + affiliate links later). **Preset-proof "My
+palette"** (Joey 2026-07-06): every HAND edit (swatch pick / per-type reset /
+Upload) snapshots the whole working palette into `userPalette` (stored as
+`user` in the same localStorage record; pre-existing saves migrate their
+colors into it); presets only replace the WORKING palette, so a "★ My
+palette" chip (first in the preset row) restores the hand-built one — the
+active chip (preset or mine) gets an `.on` highlight via order-independent
+`palKey` compare. Hand-editing after a preset FORKS it into the new user
+palette (standard custom-theme semantics). **Save colors / Upload**
 export/import the current per-type choices as JSON. The first exploded page shows
 a dismissable `#tap-hint` pill encouraging part taps + color changes.
 **Outro page** (last, synthetic): Jerrari club promo (Printables
@@ -201,13 +233,35 @@ Or: `cd viewer; python -m http.server 8123`. Not a git repo (yet).
 (`encodeBuildHash()` in planner app.js; also accepts the file-export wrapper).
 Planner's "🧊 3D assembly instructions" button (bom-actions row) opens
 `INSTRUCTIONS_VIEWER_URL + "#build=" + encodeBuildHash()` — update that constant
-in planner app.js when the viewer deploys. Generated builds load parts from the
-shared pool `viewer/parts/185/` (all 185+hardware+faceplate GLBs; lazy per node).
-v1 scope: **tabletop + wall + under-table, 185 only**; classic drawers = BOM row
+in planner app.js when the viewer deploys. Generated builds load parts from a
+per-collection pool `viewer/parts/<L>/` (`165`/`185` — each self-contained: the
+collection GLBs + copies of the shared hardware/faceplate GLBs; lazy per node;
+`PARTS_BASE` in main.js = `parts/${manifest.collection}/`).
+v1 scope: **tabletop + wall + under-table; 165 + 185**; classic drawers = BOM row
 only (no GLB); shelf >1H / cabinet / other lengths → graceful error overlay. Also
 rejected: non-flat tops (mirrors the planner's columnTops() flat-top rule —
 the planner button greys out with the reason via updateInstructionsButton())
 and builds over 80 units (a step per case stops being instructions).
+**Collections 165 + 185** (generate.js `COLL` table, `build.length`): the 165 is
+the 185 shrunk exactly 20 mm deep. Every part exports re-centered on its own bbox
+(`depth_mode: center`), so in file coords each case face moves `dz = (185−depth)/2`
+(= 10 mm for 165) toward center. Node names template off `L` (`${L}-…_Case`,
+`DecorDrawer_${L}-…`, `CL/CU-${L}-…`, `FR-L/U_${L}-…`, `UnderTableRail_${L}-…`);
+collection-specific parts (case/drawer/cover/footrail/rail) shrank with the case
+and keep their center-relative Z (**drawer z-center 5.24 is unchanged** — the
+drawer is 5.7 mm shorter than the case in BOTH collections). SHARED hardware is
+placed against a case face, so its Z shifts ±dz: faceplate/handle/QuickLock/
+stopper/front-feet `−dz`, magnet clip+magnet/back-feet `+dz`. Wall mount is
+BACK-aligned (case back meets the bracket) → the bracket + wood screws shift
+`+dz` forward to meet the shorter back; front hardware is unchanged from tabletop.
+Under-table rail front-aligns with the case front (`railZ = depth/2 − railDepth/2`
+→ −8/185, −7/165); its screw rows keep the same inset from each rail face.
+**DERIVED, no 165 ground-truth assembly** (185 was calibrated against the TableTop
+Assembly Example): QuickLock / stopper / feet / UT-screw Z — verify by eye on a
+printed 165 build, like the non-1H drawers. 165 has no BOM renders yet (imgFor
+reuses the 185 render); LINKS still point at the 185 Printables/Thangs pages
+(swap when 165 URLs exist). Verified 2026-07-06: all 3 mounts generate, every
+GLB resolves in `parts/165/`, 185 output byte-identical (no regression).
 **Wall mount** (`build.mount === 'wall'`): no feet/footrails — one bracket
 course (WallMount_Lite_1/2/3W, tiled to width, no 4W) spans the flat top with 2
 WoodScrews per 1W column at ±24 as pegs; cases hang TOP-DOWN (steps reversed).
@@ -274,7 +328,10 @@ placeholder (needs the 185 wall-kit URL).
 **Single-case bottom row → no footrails**: feet go into the case's own
 underside slots (lengthwise, 4/1W, middle dedup) and the stack sits at 7.65.
 **Handle styles are swappable** (identify card ◀ ▶ on any handle): all styles
-mount back-face-at-97.57, vertically centered on the faceplate — registry in
+mount back-face against the faceplate front (= fp z-center + 2.5 — 97.57/185,
+87.57/165; derived from the faceplate instance, never hardcoded — a hardcoded
+97.57 once left 165 handles floating 10 mm out), vertically centered on the
+faceplate — registry in
 main.js HANDLE_STYLES (Deco + BlockBar A–F); swaps postMessage
 {gen2:"handleStyle"} back to the planner opener tab, which updates
 state.handleStyle live. Generator honors build.handleStyle (blockbar → A).

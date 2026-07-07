@@ -49,6 +49,19 @@ body {
 .note-body { min-width: 0; }
 #step-title { font-weight: 700; font-size: 15px; margin-bottom: 2px; }
 #step-note { font-size: 13px; color: var(--ink-soft); line-height: 1.45; }
+/* collapse the step text to a small badge pill — reclaims the canvas while
+   recoloring/inspecting; the header's "Step x / y" keeps the context */
+#note-collapse {
+  pointer-events: auto; /* the panel itself is pointer-events: none */
+  flex: none; align-self: flex-start;
+  font: inherit; font-size: 13px; line-height: 1;
+  width: 24px; height: 24px; margin: 4px -4px 0 0;
+  border: none; background: none; color: var(--ink-soft);
+  border-radius: 50%; cursor: pointer;
+}
+#note-collapse:hover { color: var(--accent); background: rgba(0,0,0,.05); }
+#note-panel.collapsed { right: auto; } /* shrink to the badge + chevron */
+#note-panel.collapsed .note-body { display: none; }
 
 #pointer-line {
   position: absolute; inset: 0; width: 100%; height: 100%;
@@ -91,6 +104,9 @@ body {
 }
 .checklist-row .chip { width: 15px; height: 15px; border-radius: 4px; flex: none; border: 1px solid rgba(0,0,0,.15); margin-top: 2px; padding: 0; cursor: pointer; }
 .checklist-row .chip:hover { outline: 2px solid var(--accent); outline-offset: 1px; }
+/* purchased hardware: the chip is a plain color dot, not a filament picker */
+.checklist-row .chip.locked { cursor: default; }
+.checklist-row .chip.locked:hover { outline: none; }
 /* section headers inside the parts/options panel — one look for all three
    (⚙ Build options · 🎨 Filament colors · 🧩 Parts to print) */
 .section-head { font-size: 11.5px; font-weight: 800; color: var(--ink-soft); letter-spacing: .01em; margin-bottom: 7px; }
@@ -116,6 +132,9 @@ body {
   border-radius: 999px; padding: 3px 9px 3px 4px; cursor: pointer;
 }
 .preset-chip:hover { border-color: var(--accent); color: var(--accent); }
+.preset-chip.on { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+/* the user's own hand-built palette — presets never overwrite it */
+.preset-chip.mine::before { content: "★"; color: var(--accent); font-size: 10px; margin-right: -1px; }
 .preset-sw { display: inline-flex; }
 .preset-sw i { width: 11px; height: 11px; border-radius: 50%; display: block; margin-left: -3px; border: 1.5px solid var(--panel); }
 .preset-sw i:first-child { margin-left: 0; }
@@ -198,6 +217,8 @@ body {
   cursor: pointer; padding: 0;
 }
 #identify-swatch:hover { outline-color: var(--accent); }
+#identify-swatch.locked { cursor: default; }
+#identify-swatch.locked:hover { outline-color: var(--panel-border); }
 
 #tap-hint {
   position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
@@ -226,18 +247,35 @@ body {
   backdrop-filter: blur(6px);
   box-shadow: 0 6px 24px rgba(0,0,0,.16);
 }
-.fm-head { font-weight: 800; font-size: 13px; margin-bottom: 9px; }
+.fm-head { font-weight: 800; font-size: 13px; margin-bottom: 7px; }
 .fm-head span { font-weight: 600; color: var(--ink-soft); font-size: 11.5px; }
-#fm-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 7px; }
-#fm-grid button {
+#fm-search {
+  width: 100%; box-sizing: border-box; font: inherit; font-size: 11.5px;
+  border: 1px solid var(--panel-border); border-radius: 7px;
+  padding: 5px 9px; margin-bottom: 8px; background: none; color: var(--ink);
+}
+#fm-search:focus { outline: none; border-color: var(--accent); }
+#fm-brands { max-height: 264px; overflow-y: auto; overscroll-behavior: contain; }
+.fm-brand + .fm-brand { margin-top: 4px; }
+.fm-brand-head {
+  display: flex; align-items: center; justify-content: space-between; width: 100%;
+  font: inherit; font-size: 11.5px; font-weight: 800; color: var(--ink);
+  background: none; border: none; padding: 5px 2px; cursor: pointer; text-align: left;
+}
+.fm-brand-head i { font-style: normal; font-weight: 600; color: var(--ink-soft); font-size: 10.5px; }
+.fm-brand-head:hover, .fm-brand-head:hover i { color: var(--accent); }
+.fm-chev { color: var(--ink-soft); font-size: 10px; }
+.fm-none { font-size: 11.5px; color: var(--ink-soft); padding: 8px 2px; }
+.fm-swatches { display: grid; grid-template-columns: repeat(8, 1fr); gap: 7px; padding: 3px 2px 7px; }
+.fm-swatches button {
   width: 26px; height: 26px; border-radius: 50%;
   border: 2px solid #fff; outline: 1px solid var(--panel-border);
   cursor: pointer; padding: 0;
 }
-#fm-grid button:hover { outline: 2px solid var(--accent); }
-#fm-grid button.active { outline: 2.5px solid var(--accent); }
-#fm-grid button.pick { position: relative; }
-#fm-grid button.pick::after {
+.fm-swatches button:hover { outline: 2px solid var(--accent); }
+.fm-swatches button.active { outline: 2.5px solid var(--accent); }
+.fm-swatches button.pick { position: relative; }
+.fm-swatches button.pick::after {
   content: "★"; position: absolute; top: -7px; right: -5px;
   font-size: 10px; color: var(--accent);
   text-shadow: 0 0 2px #fff;
@@ -424,7 +462,8 @@ body {
     border-radius: 16px 16px 0 0; padding: 12px 14px 16px;
     z-index: 34; box-shadow: 0 -6px 24px rgba(0,0,0,.18);
   }
-  #fm-grid button { width: 30px; height: 30px; }
+  .fm-swatches button { width: 30px; height: 30px; }
+  #fm-brands { max-height: 42vh; } /* bottom-sheet: keep the list scrollable, footer visible */
 
   /* the "tap any part" hint rides above the bottom pills, not over them */
   #tap-hint { bottom: 64px; max-width: 92%; font-size: 12.5px; }
@@ -440,9 +479,15 @@ body {
   /* Cover: don't crush the brand text into a thin column */
   .cover-right { width: min(340px, 84vw); }
 
-  #controls { padding-bottom: calc(10px + env(safe-area-inset-bottom)); }
-  #controls button { padding: 11px 14px; }
-  #ctl-tools { gap: 4px; }
-  #ctl-tools button { padding: 5px 7px 4px; min-width: 0; } /* the tool group stays compact with 6 items in the bar */
+  /* Back | 4 tools | Next must fit ONE row on a 360px phone with Resume cam
+     visible (≈330px of buttons) — hence the tight paddings + gaps here */
+  #controls { padding: 10px 10px calc(10px + env(safe-area-inset-bottom)); flex-wrap: wrap; gap: 5px; row-gap: 8px; }
+  #controls button { padding: 11px 8px; }
+  #ctl-tools { gap: 3px; }
+  #ctl-tools button { padding: 5px 5px 4px; min-width: 0; }
   #ctl-tools button span { font-size: 8.5px; }
+  /* the step dots get their own full-width row ABOVE the buttons — squeezed
+     between Back and the tool group they used to wrap into a tall vertical
+     column the moment Resume cam appeared (4 tools + 15 dots never fit 360px) */
+  #step-dots { order: -1; flex-basis: 100%; }
 }

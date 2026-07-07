@@ -133,6 +133,70 @@
       "code_regex": "185-\\dW",
       "name_template": "UnderTableRail_{code}",
       "depth_mode": "center"
+    },
+
+    {
+      "name": "Under-Table Rails (165)",
+      "_note": "165 under-table rails, 1W-4W (179mm deep). Mixed source poses (1W/2W net-180Y, 3W/4W 180X) all bake to the same world orientation -- verified via depth-asymmetry sign check.",
+      "blend": "D:\\Code Projects\\GEN2 Visual Animator\\Blender Files\\165\\GEN2 GLB Exporter - GEN2 165 Under-Table Rails.blend",
+      "out": "D:\\Code Projects\\GEN2 Visual Animator\\GLB Library\\UnderTable",
+      "select": "prefix:GEN2 Rails",
+      "code_regex": "165-\\dW",
+      "name_template": "UnderTableRail_{code}",
+      "depth_mode": "center"
+    },
+
+    {
+      "name": "165 Cases",
+      "_note": "165 collection (165mm deep) cases, 1W-4W. Same seam print-bridges as the 185 cases -> dropped at export. Mirror of the 185 Cases job with 165 depth/naming.",
+      "blend": "D:\\Code Projects\\GEN2 Visual Animator\\Blender Files\\165\\GEN2 GLB Exporter - 165 Cases.blend",
+      "out": "D:\\Code Projects\\GEN2 Visual Animator\\GLB Library\\165",
+      "select": "prefix:165-",
+      "code_regex": "165-\\d+W-\\d+H",
+      "name_template": "{code}_Case",
+      "depth_mode": "center",
+      "drop_islands_max_verts": 80,
+      "drop_islands_max_thick": 2.0
+    },
+
+    {
+      "name": "165 Decor Drawers",
+      "_note": "165 collection decor drawers, 1W-4W. Mirror of the 185 Decor Drawers job with 165 depth (159.3mm).",
+      "blend": "D:\\Code Projects\\GEN2 Visual Animator\\Blender Files\\165\\GEN2 GLB Exporter - 165 Decor Drawers.blend",
+      "out": "D:\\Code Projects\\GEN2 Visual Animator\\GLB Library\\165",
+      "select": "prefix:Decor Drawer",
+      "code_regex": "165-\\d+W-\\d+H",
+      "name_template": "DecorDrawer_{code}",
+      "depth_mode": "center"
+    },
+
+    {
+      "name": "165 Covers CL",
+      "_note": "165 cover source objects use a SPACE ('CL 165-1W'), so these CL/CU passes rename to hyphen (CL-165-1W) to match the 185 covers. If you rename the source objects to hyphen, all 8 collapse into one 'select:all' job like the 185 Covers+Footrails.",
+      "blend": "D:\\Code Projects\\GEN2 Visual Animator\\Blender Files\\165\\GEN2 GLB Exporter - 165 Covers and Footrails.blend",
+      "out": "D:\\Code Projects\\GEN2 Visual Animator\\GLB Library\\165",
+      "select": "prefix:CL 165",
+      "code_regex": "165-\\d+W",
+      "name_template": "CL-{code}",
+      "depth_mode": "center"
+    },
+    {
+      "name": "165 Covers CU",
+      "blend": "D:\\Code Projects\\GEN2 Visual Animator\\Blender Files\\165\\GEN2 GLB Exporter - 165 Covers and Footrails.blend",
+      "out": "D:\\Code Projects\\GEN2 Visual Animator\\GLB Library\\165",
+      "select": "prefix:CU 165",
+      "code_regex": "165-\\d+W",
+      "name_template": "CU-{code}",
+      "depth_mode": "center"
+    },
+    {
+      "name": "165 Footrails",
+      "blend": "D:\\Code Projects\\GEN2 Visual Animator\\Blender Files\\165\\GEN2 GLB Exporter - 165 Covers and Footrails.blend",
+      "out": "D:\\Code Projects\\GEN2 Visual Animator\\GLB Library\\165",
+      "select": "prefix:FR-",
+      "code_regex": "",
+      "name_template": "{name}",
+      "depth_mode": "center"
     }
   ]
 }

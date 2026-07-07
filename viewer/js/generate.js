@@ -4,12 +4,28 @@
 // All placement numbers derive from the ground-truth calibration of
 // 2026-07-04 (see CLAUDE.md "Placement math"). Rules generalized from the
 // 1H ground truth are marked DERIVED; positions Joey tuned by eye are
-// marked TUNED. Scope: 185 collection — tabletop, wall, and under-table mounts.
+// marked TUNED. Scope: 165 + 185 collections — tabletop, wall, and under-table.
 
 const PITCH_X = 88, PITCH_HALF_Y = 28;        // 1W column / half-row pitch
 const ROW0_BOTTOM = 17.65;                    // bottom-row case bottom (7.65 + 10.00)
 const FRL_Y = 7.65, FRU_Y = 12.75;
-const DEPTH = 185;
+const DEPTH = 185;                            // staging/framing baseline (slide-in reach, camera size floor) — NOT placement
+
+// Collection depth table. The 165 is the 185 model shortened exactly 20 mm
+// overall; every part is exported re-centered on its own bbox (depth_mode:
+// center), so in file coordinates each case face moves dz = (185−depth)/2 toward
+// center (10 mm for 165). Collection-specific parts (case/drawer/cover/footrail/
+// rail) shrank with the case and keep their center-relative Z; SHARED hardware
+// (QuickLock, faceplate, handle, stopper, magnet clip, feet, wall bracket/screw)
+// is placed against a case face, so its Z shifts ±dz. Wall mount is back-aligned
+// (case back meets the bracket) → the bracket + screws shift forward by dz.
+// DERIVED, no 165 ground-truth assembly (185 was calibrated against the TableTop
+// Assembly Example): QuickLock / stopper / feet / under-table-screw Z. Verify by
+// eye against a printed 165 build, same as the non-1H drawers.
+const COLL = {
+  185: { depth: 185, railDepth: 201 },
+  165: { depth: 165, railDepth: 179 },
+};
 
 // Wall mount — CALIBRATED 2026-07-05 from Joey's case-to-bracket reference
 // (see GEN2-Part-Orientation-Notes.md "Case → bracket attachment"). Values in
@@ -37,12 +53,15 @@ const WALL = {
 // swallow the case's 3 mm-proud top plus 2 mm: rail bottom = flat-top − 2.
 const UT = {
   railH: 8.9,             // rail plate + channel height
-  railZ: -8.0,            // rail depth-center vs the case column center (front-aligned)
+  // railZ / screwFrontZ / screwBackZ are now derived PER COLLECTION in
+  // generateManifest (railZ, utScrewFrontZ, utScrewBackZ) so the shorter 165
+  // rail front-aligns correctly; these 185 values are kept only as documentation.
+  railZ: -8.0,            // rail depth-center vs the case column center (front-aligned) — 185; see local railZ
   railBottom: -2.0,       // rail bottom = flatTopY − 2 (channels nest over the case top)
   surface: 6.9,           // table underside = rail top = flatTopY + 6.9
   screwY: 19.775,         // screw CENTER height above flatTopY (head 3 mm inside the rail plate, tip 28.75 into the wood)
-  screwFrontZ: 77.07,     // screw axis rows: z ≈ +80.5 front / −72.5 back, minus the
-  screwBackZ: -75.93,     //   3.43 mm radial offset the pitched (rot 90°X) GLB carries
+  screwFrontZ: 77.07,     // 185 front screw row (z ≈ +80.5 − 3.43 radial offset the pitched GLB carries) — see local utScrewFrontZ
+  screwBackZ: -75.93,     // 185 back screw row (z ≈ −72.5 − 3.43) — see local utScrewBackZ
   screwInset: 5,          // outer screws 5 mm in from each rail end + one at every 88 mm seam → 2(W+1) per tile = planner railScrews(w)
   fwd: DEPTH + 40,        // cases slide in from a full case-depth out front (same read as the wall's lowerFwd)
 };
@@ -103,8 +122,36 @@ export function generateManifest(build) {
   const isStaggered = isWall && !!build.wallStagger;
   if (build.mount !== 'tabletop' && !hangs)
     errors.push(`"${build.mount}" mounts aren't supported yet — tabletop, wall, and under-table builds for now.`);
-  if (build.length !== 185)
-    errors.push(`The ${build.length} collection isn't in the 3D part library yet — 185 builds only for now.`);
+  // ---- collection depth (165 vs 185) --------------------------------------
+  // node names key off L; depth-referenced SHARED hardware shifts by ±dz. See
+  // the COLL table comment for the geometry. coll falls back to 185 so an
+  // unknown collection reports the error above without crashing the placement.
+  const L = build.length;
+  if (!COLL[L])
+    errors.push(`The ${L} collection isn't in the 3D part library yet — 165 and 185 builds for now.`);
+  const coll = COLL[L] || COLL[185];
+  const depth = coll.depth;
+  const dz = (185 - depth) / 2;                       // 0 for 185, 10 for 165 — each case face moves this toward center
+  // Under-table rail: front-aligned with the case front (= depth/2). The rail
+  // (railDepth deep) overhangs the case back. Screw rows keep the SAME inset
+  // from each rail face as the 185 calibration (DERIVED for 165). front inset
+  // 15.43, back inset 32.57 (from the 201-deep 185 rail: front 92.5→77.07,
+  // back −108.5→−75.93).
+  const railFrontZ = depth / 2, railBackZ = depth / 2 - coll.railDepth;
+  const railZ = (railFrontZ + railBackZ) / 2;         // −8 (185) / −7 (165)
+  const utScrewFrontZ = railFrontZ - 15.43;           // 77.07 (185) / 67.07 (165)
+  const utScrewBackZ = railBackZ + 32.57;             // −75.93 (185) / −63.93 (165)
+  // 165 has its own model pages; override the Thangs (`t`) links Joey provided.
+  // Printables (`p`) for cases/decor and ALL other 165 links (kit/covers/
+  // footrails/rail/hardware/faceplate/handle) still point at the 185 pages —
+  // swap when the 165 URLs exist.
+  const links = L === 165
+    ? { ...LINKS,
+        cases: { ...LINKS.cases, t: 'https://than.gs/m/1535457' },
+        decor: { ...LINKS.decor, t: 'https://than.gs/m/1493950' },
+        wall:  { ...LINKS.wall,  t: 'https://than.gs/m/1515711' },
+      }
+    : LINKS;
   if (build.faceStyle && build.faceStyle !== 'essential')
     warnings.push(`Faceplates are shown in the Essential style (your "${build.faceStyle}" style isn't modeled yet).`);
 
@@ -135,8 +182,8 @@ export function generateManifest(build) {
 
   // handle style from the planner build (crystal not modeled yet -> Deco)
   const HANDLE_STYLES = {
-    deco:     { node: 'Handle_Deco',       label: 'Deco Handle',        h: 9, d: 24, links: LINKS.h },
-    blockbar: { node: 'Handle_BlockBar_A', label: 'BlockBar Handle',    h: 9, d: 9,  links: LINKS.hb },
+    deco:     { node: 'Handle_Deco',       label: 'Deco Handle',        h: 9, d: 24, links: links.h },
+    blockbar: { node: 'Handle_BlockBar_A', label: 'BlockBar Handle',    h: 9, d: 9,  links: links.hb },
   };
   const handleStyle = HANDLE_STYLES[build.handleStyle] || HANDLE_STYLES.deco;
   if (build.handleStyle && !HANDLE_STYLES[build.handleStyle])
@@ -229,19 +276,19 @@ export function generateManifest(build) {
       const t = { col: c, w };
       const id = `utr${utIds.length}`;
       utIds.push(id);
-      inst.push({ id, node: `UnderTableRail_185-${w}W`, pos: [railX(t), flatTopY + UT.railBottom, UT.railZ] });
-      add(`UnderTableRail_185-${w}W`, `Under-Table Rail 185-${w}W`, 'Rail', LINKS.rail);
+      inst.push({ id, node: `UnderTableRail_${L}-${w}W`, pos: [railX(t), flatTopY + UT.railBottom, railZ] });
+      add(`UnderTableRail_${L}-${w}W`, `Under-Table Rail ${L}-${w}W`, 'Rail', links.rail);
       // screws: one x-position at each rail end (inset 5) + every internal 88 mm
       // seam, × 2 depth rows (front/back) → 2(W+1) per tile = planner railScrews(w).
       // Pitched 90° about X so they stand tip-up into the surface.
       const xs = [-(44 * w - UT.screwInset)];
       for (let i = 1; i < w; i++) xs.push(-44 * w + 88 * i);
       xs.push(44 * w - UT.screwInset);
-      for (const lx of xs) for (const z of [UT.screwBackZ, UT.screwFrontZ]) {
+      for (const lx of xs) for (const z of [utScrewBackZ, utScrewFrontZ]) {
         const sid = `uts${utScrewIds.length}`;
         utScrewIds.push(sid);
         inst.push({ id: sid, node: 'WoodScrew', pos: [railX(t) + lx, flatTopY + UT.screwY, z], rot: [90, 0, 0] });
-        add('WoodScrew', 'Wood Screw', 'Screw', LINKS.rail, 1, true); // purchased hardware
+        add('WoodScrew', 'Wood Screw', 'Screw', links.rail, 1, true); // purchased hardware
       }
       c += w;
     }
@@ -255,15 +302,15 @@ export function generateManifest(build) {
       const r = { col: c, w };
       const id = `br${bracketIds.length}`;
       bracketIds.push(id);
-      inst.push({ id, node: `WallMount_Lite_${w}W`, pos: [railX(r), bracketBaseY, WALL.bracketZ] });
-      add(`WallMount_Lite_${w}W`, `Wall Mount Lite ${w}W`, 'Bracket', LINKS.wall);
+      inst.push({ id, node: `WallMount_Lite_${w}W`, pos: [railX(r), bracketBaseY, WALL.bracketZ + dz] });
+      add(`WallMount_Lite_${w}W`, `Wall Mount Lite ${w}W`, 'Bracket', links.wall);
       c += w;
     }
     for (let c = 0; c < totalW; c++) for (const dx of [-WALL.screwDX, WALL.screwDX]) {
       const id = `sc${screwIds.length}`;
       screwIds.push(id);
-      inst.push({ id, node: 'WoodScrew', pos: [colCenter(c) + dx, pegY, WALL.screwZ] });
-      add('WoodScrew', 'Wood Screw', 'Screw', LINKS.wall, 1, true); // purchased hardware
+      inst.push({ id, node: 'WoodScrew', pos: [colCenter(c) + dx, pegY, WALL.screwZ + dz] });
+      add('WoodScrew', 'Wood Screw', 'Screw', links.wall, 1, true); // purchased hardware
     }
   } else if (singleBase) {
     // feet slide into the bottom case's own underside slots: 4 per 1W, running
@@ -277,11 +324,11 @@ export function generateManifest(build) {
     for (let i = 0; i < u0.w; i++) xs.push(leftEdge + i * PITCH_X + 11.5, leftEdge + i * PITCH_X + 76.5);
     const slots = [];
     for (const x of xs) if (!slots.length || x - slots[slots.length - 1] >= 30) slots.push(x);
-    for (const x of slots) for (const z of [-73, 81.15]) {
+    for (const x of slots) for (const z of [-73 + dz, 81.15 - dz]) {
       const id2 = `f${inst.length}`;
       feetIds[z < 0 ? 'back' : 'front'].push(id2);
       inst.push({ id: id2, node: 'Tabletop-Kit-Foot', pos: [x, 0, z], yaw: z < 0 ? 90 : 270, stage: 'base' });
-      add('Tabletop-Kit-Foot', 'Tabletop Kit Foot', 'Foot', LINKS.kit);
+      add('Tabletop-Kit-Foot', 'Tabletop Kit Foot', 'Foot', links.kit);
     }
   } else {
     for (const r of runs) {
@@ -289,12 +336,12 @@ export function generateManifest(build) {
       rails.push(...tileOut(r, tilesLower(n)));
       uppers.push(...tileOut(r, tilesUpper(n)));
     }
-    uppers.forEach(r => add(`FR-U_185-${r.w}W`, `Footrail Upper 185-${r.w}W`, 'FootrailU', LINKS.kit));
+    uppers.forEach(r => add(`FR-U_${L}-${r.w}W`, `Footrail Upper ${L}-${r.w}W`, 'FootrailU', links.kit));
     rails.forEach((r, i) => {
       const id = `frl${i}`;
       frlIds.push(id);
-      inst.push({ id, node: `FR-L_185-${r.w}W`, pos: [railX(r), FRL_Y, 0], stage: 'base' });
-      add(`FR-L_185-${r.w}W`, `Footrail Lower 185-${r.w}W`, 'FootrailL', LINKS.kit);
+      inst.push({ id, node: `FR-L_${L}-${r.w}W`, pos: [railX(r), FRL_Y, 0], stage: 'base' });
+      add(`FR-L_${L}-${r.w}W`, `Footrail Lower ${L}-${r.w}W`, 'FootrailL', links.kit);
       // foot slots: 2W local x ±76.48 / −0.18, 1W local ±32.5 (DERIVED by symmetry).
       // Junction rule (Joey): where rails meet, install feet on one rail only —
       // a rail with a left neighbor in the same run skips its left slot pair.
@@ -302,11 +349,11 @@ export function generateManifest(build) {
       if (!r.first) slots = slots.slice(1);
       for (const lx of slots) {
         const yaw = (r.first && lx === slots[0]) ? 180 : 0; // outer-left feet point left
-        for (const z of [-73, 81.15]) {
+        for (const z of [-73 + dz, 81.15 - dz]) {
           const id2 = `f${inst.length}`;
           feetIds[z < 0 ? 'back' : 'front'].push(id2);
           inst.push({ id: id2, node: 'Tabletop-Kit-Foot', pos: [railX(r) + lx, 0, z], yaw, stage: 'base' });
-          add('Tabletop-Kit-Foot', 'Tabletop Kit Foot', 'Foot', LINKS.kit);
+          add('Tabletop-Kit-Foot', 'Tabletop Kit Foot', 'Foot', links.kit);
         }
       }
     });
@@ -326,7 +373,7 @@ export function generateManifest(build) {
   let stagCoverStep = null;
   units.forEach((u, i) => {
     const H = H_LABEL[u.hh];
-    const caseNode = `185-${u.w}W-${H}H_Case`;
+    const caseNode = `${L}-${u.w}W-${H}H_Case`;
     const bottom = row0 + u.rowIdx * PITCH_HALF_Y;
     const caseH = u.hh * PITCH_HALF_Y + 3;
     const cx = spanCenter(u);
@@ -343,14 +390,14 @@ export function generateManifest(build) {
     if (st && !isBase) stages[st] = isWall ? [0, WALL.drop, WALL.benchFwd] : [0, 0, -170];
     const stg = st ? { stage: st } : {};
     inst.push({ id: `case${i}`, node: caseNode, pos: [cx, bottom, 0], ...stg });
-    add(caseNode, `Case 185-${u.w}W-${H}H`, 'Case', LINKS.cases);
+    add(caseNode, `Case ${L}-${u.w}W-${H}H`, 'Case', links.cases);
     // QuickLocks: one handed pair per case, outer walls, near the top.
     // y = caseBottom + caseH − 23.32 (DERIVED from 1H ground truth 35.68).
     const qy = bottom + caseH - 23.32;
-    inst.push({ id: `ql${i}L`, node: 'QuickLock-L', pos: [left + 3.88, qy, 65.02], ...stg });
-    inst.push({ id: `ql${i}R`, node: 'QuickLock-R', pos: [right - 3.45, qy, 65.02], ...stg });
-    add('QuickLock-L', 'QuickLock L', 'QuickLock', LINKS.hw);
-    add('QuickLock-R', 'QuickLock R', 'QuickLock', LINKS.hw);
+    inst.push({ id: `ql${i}L`, node: 'QuickLock-L', pos: [left + 3.88, qy, 65.02 - dz], ...stg });
+    inst.push({ id: `ql${i}R`, node: 'QuickLock-R', pos: [right - 3.45, qy, 65.02 - dz], ...stg });
+    add('QuickLock-L', 'QuickLock L', 'QuickLock', links.hw);
+    add('QuickLock-R', 'QuickLock R', 'QuickLock', links.hw);
 
     const isDrawer = u.fill === 'decor' || u.fill === 'classic';
     const hasMagnet = isDrawer && u.closure === 'magnet'; // planner "Drawer close = Magnets"
@@ -365,9 +412,9 @@ export function generateManifest(build) {
       const mx = colCenter(u.col + slotCol);
       const mcy = bottom + caseH - 23.2;
       mcId = `mc${i}`; mgId = `mg${i}`;
-      inst.push({ id: mcId, node: 'MagnetClip_10x2mm', pos: [mx, mcy, -85.7], owner: u.id, ...stg });
-      inst.push({ id: mgId, node: 'Magnet_10x2mm', pos: [mx, mcy + 4.2, -86], owner: u.id, ...stg });
-      add('MagnetClip_10x2mm', 'Magnet Clip 10×2', 'MagnetClip', LINKS.hw, 2);
+      inst.push({ id: mcId, node: 'MagnetClip_10x2mm', pos: [mx, mcy, -85.7 + dz], owner: u.id, ...stg });
+      inst.push({ id: mgId, node: 'Magnet_10x2mm', pos: [mx, mcy + 4.2, -86 + dz], owner: u.id, ...stg });
+      add('MagnetClip_10x2mm', 'Magnet Clip 10×2', 'MagnetClip', links.hw, 2);
       add('Magnet_10x2mm', 'Magnet 10×2 mm', 'Magnet', null, 2, true);
       members.push(mcId, mgId);
     }
@@ -413,13 +460,13 @@ export function generateManifest(build) {
       const clLocal = [], cuLocal = [];
       for (const t of tileOut(run, tilesLower(u.w))) {
         const id = `cl${clIds.length}`; clIds.push(id); clLocal.push(id);
-        inst.push({ id, node: `CL-185-${t.w}W`, pos: [railX(t), flatTopY, 0], ...stg });
-        add(`CL-185-${t.w}W`, `Cover Lower 185-${t.w}W`, 'CoverL', LINKS.kit);
+        inst.push({ id, node: `CL-${L}-${t.w}W`, pos: [railX(t), flatTopY, 0], ...stg });
+        add(`CL-${L}-${t.w}W`, `Cover Lower ${L}-${t.w}W`, 'CoverL', links.kit);
       }
       for (const t of tileOut(run, tilesUpper(u.w))) {
         const id = `cu${cuIds.length}`; cuIds.push(id); cuLocal.push(id);
-        inst.push({ id, node: `CU-185-${t.w}W`, pos: [railX(t), flatTopY + 4.3, 0], ...stg });
-        add(`CU-185-${t.w}W`, `Cover Upper 185-${t.w}W`, 'CoverU', LINKS.kit);
+        inst.push({ id, node: `CU-${L}-${t.w}W`, pos: [railX(t), flatTopY + 4.3, 0], ...stg });
+        add(`CU-${L}-${t.w}W`, `Cover Upper ${L}-${t.w}W`, 'CoverU', links.kit);
       }
       const coverIds = [...clLocal, ...cuLocal];
       // a top-row drawer's own stoppers go into its CL (handled here, so the
@@ -428,10 +475,10 @@ export function generateManifest(build) {
       if (isDrawer) for (let c = u.col; c < u.col + u.w; c++) {
         if (stopperOff(u, c)) continue; // user removed this 1W's stopper pair
         const lx = colCenter(c), idL = `tst${i}c${c}L`, idR = `tst${i}c${c}R`, sk = `${u.id}:${c - u.col}`;
-        inst.push({ id: idL, node: 'Drawer_Stoppers_L', pos: [lx - 12.6, flatTopY - 2, 76.5], stopperKey: sk, ...stg });
-        inst.push({ id: idR, node: 'Drawer_Stoppers_R', pos: [lx + 12.4, flatTopY - 2, 76.5], stopperKey: sk, ...stg });
-        add('Drawer_Stoppers_L', 'Drawer Stopper L', 'Stopper', LINKS.hw);
-        add('Drawer_Stoppers_R', 'Drawer Stopper R', 'Stopper', LINKS.hw);
+        inst.push({ id: idL, node: 'Drawer_Stoppers_L', pos: [lx - 12.6, flatTopY - 2, 76.5 - dz], stopperKey: sk, ...stg });
+        inst.push({ id: idR, node: 'Drawer_Stoppers_R', pos: [lx + 12.4, flatTopY - 2, 76.5 - dz], stopperKey: sk, ...stg });
+        add('Drawer_Stoppers_L', 'Drawer Stopper L', 'Stopper', links.hw);
+        add('Drawer_Stoppers_R', 'Drawer Stopper R', 'Stopper', links.hw);
         stopIds.push(idL, idR);
       }
       members.push(...coverIds, ...stopIds); // all ride the hang together
@@ -555,23 +602,23 @@ export function generateManifest(build) {
     const clLocal = [], cuLocal = [], stopIds = [];
     for (const t of tileOut(run, tilesLower(totalW))) {
       const id = `cl${clIds.length}`; clIds.push(id); clLocal.push(id);
-      inst.push({ id, node: `CL-185-${t.w}W`, pos: [railX(t), flatTopY, 0], stage: 'wtop' });
-      add(`CL-185-${t.w}W`, `Cover Lower 185-${t.w}W`, 'CoverL', LINKS.kit);
+      inst.push({ id, node: `CL-${L}-${t.w}W`, pos: [railX(t), flatTopY, 0], stage: 'wtop' });
+      add(`CL-${L}-${t.w}W`, `Cover Lower ${L}-${t.w}W`, 'CoverL', links.kit);
     }
     for (const t of tileOut(run, tilesUpper(totalW))) {
       const id = `cu${cuIds.length}`; cuIds.push(id); cuLocal.push(id);
-      inst.push({ id, node: `CU-185-${t.w}W`, pos: [railX(t), flatTopY + 4.3, 0], stage: 'wtop' });
-      add(`CU-185-${t.w}W`, `Cover Upper 185-${t.w}W`, 'CoverU', LINKS.kit);
+      inst.push({ id, node: `CU-${L}-${t.w}W`, pos: [railX(t), flatTopY + 4.3, 0], stage: 'wtop' });
+      add(`CU-${L}-${t.w}W`, `Cover Upper ${L}-${t.w}W`, 'CoverU', links.kit);
     }
     // stoppers into the CL for each top-row drawer column (before the CU caps them)
     units.filter(u => u.topIdx === maxTop && (u.fill === 'decor' || u.fill === 'classic')).forEach(u => {
       for (let c = u.col; c < u.col + u.w; c++) {
         if (stopperOff(u, c)) continue; // user removed this 1W's stopper pair
         const lx = colCenter(c), idL = `tst${c}L`, idR = `tst${c}R`, sk = `${u.id}:${c - u.col}`;
-        inst.push({ id: idL, node: 'Drawer_Stoppers_L', pos: [lx - 12.6, flatTopY - 2, 76.5], stopperKey: sk, stage: 'wtop' });
-        inst.push({ id: idR, node: 'Drawer_Stoppers_R', pos: [lx + 12.4, flatTopY - 2, 76.5], stopperKey: sk, stage: 'wtop' });
-        add('Drawer_Stoppers_L', 'Drawer Stopper L', 'Stopper', LINKS.hw);
-        add('Drawer_Stoppers_R', 'Drawer Stopper R', 'Stopper', LINKS.hw);
+        inst.push({ id: idL, node: 'Drawer_Stoppers_L', pos: [lx - 12.6, flatTopY - 2, 76.5 - dz], stopperKey: sk, stage: 'wtop' });
+        inst.push({ id: idR, node: 'Drawer_Stoppers_R', pos: [lx + 12.4, flatTopY - 2, 76.5 - dz], stopperKey: sk, stage: 'wtop' });
+        add('Drawer_Stoppers_L', 'Drawer Stopper L', 'Stopper', links.hw);
+        add('Drawer_Stoppers_R', 'Drawer Stopper R', 'Stopper', links.hw);
         stopIds.push(idL, idR);
       }
     });
@@ -619,10 +666,10 @@ export function generateManifest(build) {
       const lx = colCenter(c);
       const idL = `st${stopN}L`, idR = `st${stopN}R`, sk = `${u.id}:${c - u.col}`;
       stopN++;
-      inst.push({ id: idL, node: 'Drawer_Stoppers_L', pos: [lx - 12.6, sy, 76.5], stopperKey: sk });
-      inst.push({ id: idR, node: 'Drawer_Stoppers_R', pos: [lx + 12.4, sy, 76.5], stopperKey: sk });
-      add('Drawer_Stoppers_L', 'Drawer Stopper L', 'Stopper', LINKS.hw);
-      add('Drawer_Stoppers_R', 'Drawer Stopper R', 'Stopper', LINKS.hw);
+      inst.push({ id: idL, node: 'Drawer_Stoppers_L', pos: [lx - 12.6, sy, 76.5 - dz], stopperKey: sk });
+      inst.push({ id: idR, node: 'Drawer_Stoppers_R', pos: [lx + 12.4, sy, 76.5 - dz], stopperKey: sk });
+      add('Drawer_Stoppers_L', 'Drawer Stopper L', 'Stopper', links.hw);
+      add('Drawer_Stoppers_R', 'Drawer Stopper R', 'Stopper', links.hw);
       const host = units.findIndex(v => v.rowIdx === u.topIdx && c >= v.col && c < v.col + v.w);
       const entry = { enter: [{ id: idL, from: [0, 55, 0] }, { id: idR, from: [0, 55, 0] }] };
       // a drawer's stoppers drop into the floor of the case above it (that case's
@@ -666,15 +713,15 @@ export function generateManifest(build) {
     // (and the cases under them) together — planner brickTiling() rule.
     for (const t of tileOut(r, tilesLower(n))) {
       const i = clIds.length;
-      inst.push({ id: `cl${i}`, node: `CL-185-${t.w}W`, pos: [railX(t), clY, 0] });
+      inst.push({ id: `cl${i}`, node: `CL-${L}-${t.w}W`, pos: [railX(t), clY, 0] });
       clIds.push(`cl${i}`);
-      add(`CL-185-${t.w}W`, `Cover Lower 185-${t.w}W`, 'CoverL', LINKS.kit);
+      add(`CL-${L}-${t.w}W`, `Cover Lower ${L}-${t.w}W`, 'CoverL', links.kit);
     }
     for (const t of tileOut(r, tilesUpper(n))) {
       const i = cuIds.length;
-      inst.push({ id: `cu${i}`, node: `CU-185-${t.w}W`, pos: [railX(t), clY + 4.3, 0] });
+      inst.push({ id: `cu${i}`, node: `CU-${L}-${t.w}W`, pos: [railX(t), clY + 4.3, 0] });
       cuIds.push(`cu${i}`);
-      add(`CU-185-${t.w}W`, `Cover Upper 185-${t.w}W`, 'CoverU', LINKS.kit);
+      add(`CU-${L}-${t.w}W`, `Cover Upper ${L}-${t.w}W`, 'CoverU', links.kit);
     }
   });
 
@@ -684,7 +731,7 @@ export function generateManifest(build) {
   units.forEach((u, i) => {
     if (u.fill === 'classic') {
       classicCount += 1;
-      add(`_classic_${u.w}W_${H_LABEL[u.hh]}H`, `Classic Drawer 185-${u.w}W-${H_LABEL[u.hh]}H (3D model coming soon)`, 'Drawer', LINKS.decor ? null : null);
+      add(`_classic_${u.w}W_${H_LABEL[u.hh]}H`, `Classic Drawer ${L}-${u.w}W-${H_LABEL[u.hh]}H (3D model coming soon)`, 'Drawer', links.decor ? null : null);
       return;
     }
     if (u.fill !== 'decor') return;
@@ -701,23 +748,23 @@ export function generateManifest(build) {
     // Push the 2H drawer (and its back-wall clip/magnet) forward 2mm to close it
     // (Joey-verified 2026-07-06). Other non-1H heights are still derived (warned).
     const drwFwd = u.hh === 4 ? 2 : 0;
-    inst.push({ id: `drw${i}`, node: `DecorDrawer_185-${u.w}W-${H}H`, pos: [cx + 0.16, bottom + 5.72, 5.24 + drwFwd] });
+    inst.push({ id: `drw${i}`, node: `DecorDrawer_${L}-${u.w}W-${H}H`, pos: [cx + 0.16, bottom + 5.72, 5.24 + drwFwd] });
     if (hasMag) {
       // the clip + magnet are already counted once per magnet drawer in the case
       // loop (qty 2 covers this drawer-side clip and the case-back clip); no add.
-      inst.push({ id: `dc${i}`, node: 'MagnetClip_10x2mm', pos: [dx, bottom + 5.72 + drwH - 20, -83 + drwFwd], yaw: 180, rides: `drw${i}`, owner: u.id });
-      inst.push({ id: `dm${i}`, node: 'Magnet_10x2mm', pos: [dx, bottom + 5.72 + drwH - 15, -84 + drwFwd], rides: `drw${i}`, owner: u.id });
+      inst.push({ id: `dc${i}`, node: 'MagnetClip_10x2mm', pos: [dx, bottom + 5.72 + drwH - 20, -83 + dz + drwFwd], yaw: 180, rides: `drw${i}`, owner: u.id });
+      inst.push({ id: `dm${i}`, node: 'Magnet_10x2mm', pos: [dx, bottom + 5.72 + drwH - 15, -84 + dz + drwFwd], rides: `drw${i}`, owner: u.id });
     }
     // faceplate: ground-truth z-center 95.07, front face 97.57 (handle mounts
     // there). Correct at every height — the faceplate does NOT move with the
     // above drawer-body nudge (it's placed to sit flush regardless).
-    inst.push({ id: `fp${i}`, node: `Faceplate_Essential_${u.w}W-${H}H`, pos: [cx + 0.47, bottom + 3.72, 95.07], rides: `drw${i}` });
+    inst.push({ id: `fp${i}`, node: `Faceplate_Essential_${u.w}W-${H}H`, pos: [cx + 0.47, bottom + 3.72, 95.07 - dz], rides: `drw${i}` });
     // handle: back face against the faceplate front, vertically centered on the
     // plate — the mounting rule that holds for every style (from the Deco ground
     // truth: bottom = fp + 22.49, z-center 109.57 for h9 × d24)
-    inst.push({ id: `h${i}`, node: handleStyle.node, pos: [cx + 0.46, bottom + 3.72 + (fpH - handleStyle.h) / 2 - 0.5, 97.57 + handleStyle.d / 2], rides: `drw${i}` });
-    add(`DecorDrawer_185-${u.w}W-${H}H`, `Decor Drawer 185-${u.w}W-${H}H`, 'Drawer', LINKS.decor);
-    add(`Faceplate_Essential_${u.w}W-${H}H`, `Faceplate Essential ${u.w}W-${H}H`, 'Faceplate', LINKS.fp);
+    inst.push({ id: `h${i}`, node: handleStyle.node, pos: [cx + 0.46, bottom + 3.72 + (fpH - handleStyle.h) / 2 - 0.5, 97.57 - dz + handleStyle.d / 2], rides: `drw${i}` });
+    add(`DecorDrawer_${L}-${u.w}W-${H}H`, `Decor Drawer ${L}-${u.w}W-${H}H`, 'Drawer', links.decor);
+    add(`Faceplate_Essential_${u.w}W-${H}H`, `Faceplate Essential ${u.w}W-${H}H`, 'Faceplate', links.fp);
     add(handleStyle.node, handleStyle.label, 'Handle', handleStyle.links);
     const mag = hasMag ? [{ id: `dc${i}` }, { id: `dm${i}` }] : []; // clip+magnet riders, or none
     if (firstDrawerDemo === null) {
@@ -839,7 +886,7 @@ export function generateManifest(build) {
         (uppers.length > 1 ? ' The upper sections are staggered brick-style over the lower ones, tying the base together.' : ''),
       camera: cam(0, 30, totalW, gridBottom, FIT),
       phases: [{ enter: uppers.map((r, i) => {
-        inst.push({ id: `fru${i}`, node: `FR-U_185-${r.w}W`, pos: [railX(r), FRU_Y, 0] });
+        inst.push({ id: `fru${i}`, node: `FR-U_${L}-${r.w}W`, pos: [railX(r), FRU_Y, 0] });
         return { id: `fru${i}`, from: [0, 0, -170] };
       }) }],
     });
@@ -905,8 +952,8 @@ export function generateManifest(build) {
     ? [...topPlacements, stagCoverStep, stagHang, ...[...steps].reverse()]
     : hangs ? [...steps].reverse() : steps;
   const manifest = {
-    title: `${funName} · GEN2 Custom · 185`,
-    collection: '185',
+    title: `${funName} · GEN2 Custom · ${L}`,
+    collection: String(L),
     generated: true,
     mount: build.mount,
     pitch: { x: PITCH_X, y: 56 },
@@ -922,9 +969,12 @@ export function generateManifest(build) {
 // part image for the identify card / checklist — same renders as the planner BOM
 function imgFor(node) {
   let m;
-  if ((m = node.match(/^185-(\d)W-(\w+)H_Case$/))) return `img/parts/Case 185-${m[1]}W-${m[2]}H.png`;
-  if ((m = node.match(/^DecorDrawer_185-(\d)W-(\w+)H$/))) return `img/parts/Decor Drawer 185-${m[1]}W-${m[2]}H.png`;
-  if ((m = node.match(/^_classic_(\d)W_(\w+)H$/))) return `img/parts/Classic Drawer 185-${m[1]}W-${m[2]}H.png`;
+  // Case / decor renders are per-collection. 165 has no renders yet — the
+  // identify card's <img> onerror (main.js) hides it if the file 404s, so a 165
+  // part shows no photo rather than a wrong 185 one.
+  if ((m = node.match(/^(\d+)-(\d)W-(\w+)H_Case$/))) return `img/parts/Case ${m[1]}-${m[2]}W-${m[3]}H.png`;
+  if ((m = node.match(/^DecorDrawer_(\d+)-(\d)W-(\w+)H$/))) return `img/parts/Decor Drawer ${m[1]}-${m[2]}W-${m[3]}H.png`;
+  if ((m = node.match(/^_classic_(\d)W_(\w+)H$/))) return 'img/parts/Classic Drawer 185-' + m[1] + 'W-' + m[2] + 'H.png'; // classic node carries no collection → 185 placeholder
   if (node.startsWith('QuickLock')) return 'img/parts/QuickLock.png';
   if (node.startsWith('Drawer_Stoppers')) return 'img/parts/Drawer Stopper.png';
   if (node === 'MagnetClip_10x2mm') return 'img/parts/Magnet Clip.png';

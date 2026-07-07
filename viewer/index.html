@@ -30,6 +30,7 @@
           <div id="step-title"></div>
           <div id="step-note"></div>
         </div>
+        <button id="note-collapse" title="Collapse the step text">&#9662;</button>
       </div>
 
       <svg id="pointer-line" class="hidden"><line x1="0" y1="0" x2="0" y2="0" /></svg>
@@ -78,10 +79,11 @@
       </div>
 
       <div id="filament-menu" class="hidden">
-        <div class="fm-head">Filament colors <span>Panchroma&trade; PLA by Polymaker · &#9733; Joey's pick</span></div>
-        <div id="fm-grid"></div>
+        <div class="fm-head">Filament colors <span>&#9733; Joey's pick</span></div>
+        <input id="fm-search" type="search" placeholder="Search filaments&hellip;" autocomplete="off">
+        <div id="fm-brands"></div>
         <div class="fm-foot">
-          <a id="fm-buy" href="#" target="_blank" rel="noopener">Shop Panchroma PLA &rarr;</a>
+          <a id="fm-buy" href="#" target="_blank" rel="noopener">Shop filament &rarr;</a>
           <button id="fm-reset">Instruction color</button>
         </div>
         <div class="fm-note">Some links are affiliate links &mdash; buying through them supports the project at no extra cost.</div>

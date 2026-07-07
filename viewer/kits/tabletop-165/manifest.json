@@ -1,0 +1,1693 @@
+{
+  "title": "GEN2 Table Top Kit · 165",
+  "collection": "165",
+  "pitch": {
+    "x": 88,
+    "y": 56
+  },
+  "colors": {
+    "Case": "#56575c",
+    "Drawer": "#ff8a40",
+    "CoverL": "#c96a2e",
+    "CoverU": "#ff8a40",
+    "FootrailL": "#1f6ea6",
+    "FootrailU": "#2f9be0",
+    "Foot": "#2e3238",
+    "QuickLock": "#2f9be0",
+    "Faceplate": "#7c7e84",
+    "Handle": "#d9b36c",
+    "Stopper": "#1f6ea6",
+    "MagnetClip": "#e2641b",
+    "Magnet": "#c9ccd2"
+  },
+  "_links": "URLs mirrored from the planner's verified LINK_OVERRIDES (js/data.js) — planner stays the source of truth; update both together.",
+  "parts": [
+    {
+      "node": "FR-L_165-2W",
+      "label": "Footrail Lower 165-2W",
+      "type": "FootrailL",
+      "qty": 1,
+      "links": {
+        "p": "https://www.printables.com/model/1118906-gen2-table-top-kit-v2-185-standard",
+        "t": "https://thangs.com/designer/Jerrari/3d-model/GEN2%20Table%20Top%20Kit%20V2%20-%20185-1231757"
+      }
+    },
+    {
+      "node": "FR-U_165-2W",
+      "label": "Footrail Upper 165-2W",
+      "type": "FootrailU",
+      "qty": 1,
+      "links": {
+        "p": "https://www.printables.com/model/1118906-gen2-table-top-kit-v2-185-standard",
+        "t": "https://thangs.com/designer/Jerrari/3d-model/GEN2%20Table%20Top%20Kit%20V2%20-%20185-1231757"
+      }
+    },
+    {
+      "node": "Tabletop-Kit-Foot",
+      "label": "Tabletop Kit Foot",
+      "type": "Foot",
+      "qty": 6,
+      "links": {
+        "p": "https://www.printables.com/model/1118906-gen2-table-top-kit-v2-185-standard",
+        "t": "https://thangs.com/designer/Jerrari/3d-model/GEN2%20Table%20Top%20Kit%20V2%20-%20185-1231757"
+      }
+    },
+    {
+      "node": "165-1W-1H_Case",
+      "label": "Case 165-1W-1H",
+      "img": "img/parts/Case 165-1W-1H.png",
+      "type": "Case",
+      "qty": 4,
+      "links": {
+        "p": "https://www.printables.com/model/1658700-gen2-185-cases-all",
+        "t": "https://than.gs/m/1535457"
+      }
+    },
+    {
+      "node": "QuickLock-L",
+      "label": "QuickLock L",
+      "img": "img/parts/QuickLock.png",
+      "type": "QuickLock",
+      "qty": 4,
+      "links": {
+        "p": "https://www.printables.com/model/1012796-gen2-hardware",
+        "t": "https://thangs.com/designer/Jerrari/3d-model/GEN2%20Hardware-1141439"
+      }
+    },
+    {
+      "node": "QuickLock-R",
+      "label": "QuickLock R",
+      "img": "img/parts/QuickLock.png",
+      "type": "QuickLock",
+      "qty": 4,
+      "links": {
+        "p": "https://www.printables.com/model/1012796-gen2-hardware",
+        "t": "https://thangs.com/designer/Jerrari/3d-model/GEN2%20Hardware-1141439"
+      }
+    },
+    {
+      "node": "Drawer_Stoppers_L",
+      "label": "Drawer Stopper L",
+      "img": "img/parts/Drawer Stopper.png",
+      "type": "Stopper",
+      "qty": 4,
+      "links": {
+        "p": "https://www.printables.com/model/1012796-gen2-hardware",
+        "t": "https://thangs.com/designer/Jerrari/3d-model/GEN2%20Hardware-1141439"
+      }
+    },
+    {
+      "node": "Drawer_Stoppers_R",
+      "label": "Drawer Stopper R",
+      "img": "img/parts/Drawer Stopper.png",
+      "type": "Stopper",
+      "qty": 4,
+      "links": {
+        "p": "https://www.printables.com/model/1012796-gen2-hardware",
+        "t": "https://thangs.com/designer/Jerrari/3d-model/GEN2%20Hardware-1141439"
+      }
+    },
+    {
+      "node": "CL-165-2W",
+      "label": "Cover Lower 165-2W",
+      "type": "CoverL",
+      "qty": 1,
+      "links": {
+        "p": "https://www.printables.com/model/1118906-gen2-table-top-kit-v2-185-standard",
+        "t": "https://thangs.com/designer/Jerrari/3d-model/GEN2%20Table%20Top%20Kit%20V2%20-%20185-1231757"
+      }
+    },
+    {
+      "node": "CU-165-2W",
+      "label": "Cover Upper 165-2W",
+      "type": "CoverU",
+      "qty": 1,
+      "links": {
+        "p": "https://www.printables.com/model/1118906-gen2-table-top-kit-v2-185-standard",
+        "t": "https://thangs.com/designer/Jerrari/3d-model/GEN2%20Table%20Top%20Kit%20V2%20-%20185-1231757"
+      }
+    },
+    {
+      "node": "DecorDrawer_165-1W-1H",
+      "label": "Decor Drawer 165-1W-1H",
+      "img": "img/parts/Decor Drawer 165-1W-1H.png",
+      "type": "Drawer",
+      "qty": 4,
+      "links": {
+        "t": "https://than.gs/m/1493950"
+      }
+    },
+    {
+      "node": "Faceplate_Essential_1W-1H",
+      "label": "Faceplate Essential 1W-1H",
+      "img": "img/parts/Faceplate-Essential.jpg",
+      "type": "Faceplate",
+      "qty": 4,
+      "links": {
+        "p": "https://www.printables.com/model/964559-gen2-decor-faceplates-essential-series",
+        "t": "https://thangs.com/designer/Jerrari/3d-model/GEN2%20Decor%20-%20Faceplates%20-%20Essential%20Series-1116946"
+      }
+    },
+    {
+      "node": "Handle_Deco",
+      "label": "Deco Handle",
+      "type": "Handle",
+      "qty": 4,
+      "links": {
+        "p": "https://www.printables.com/model/1044972-gen2-decor-handles-deco-series",
+        "t": "https://thangs.com/designer/Jerrari/3d-model/GEN2%20Decor%20Handles%20-%20Deco%20Series-1159960"
+      }
+    },
+    {
+      "node": "MagnetClip_10x2mm",
+      "label": "Magnet Clip 10×2",
+      "img": "img/parts/Magnet Clip.png",
+      "type": "MagnetClip",
+      "qty": 8,
+      "links": {
+        "p": "https://www.printables.com/model/1012796-gen2-hardware",
+        "t": "https://thangs.com/designer/Jerrari/3d-model/GEN2%20Hardware-1141439"
+      }
+    },
+    {
+      "node": "Magnet_10x2mm",
+      "label": "Magnet 10×2 mm",
+      "img": "img/parts/Magnets.png",
+      "type": "Magnet",
+      "qty": 8,
+      "purchased": true
+    }
+  ],
+  "_datums": "PORTED from tabletop-185 for the 165 collection (20 mm shorter): node names 185→165 and each shared-hardware Z shifted ±10 mm toward center (faceplate/handle/QuickLock/stopper/front-feet −10, magnet/back-feet +10; case/cover/footrail/drawer unchanged, drawer z-center 5.24 holds). DERIVED, no 165 ground-truth — verify vs a printed build. Calibrated 2026-07-04 against Blender Files/Training Examples/GEN2 TableTop Kit Assembly Example.glb (two independent extractions, 0 discrepancies). Chain: foot exposed 7.65 (10.62 - 2.97 insertion) -> FR-L 7.65 -> FR-U +5.10 -> row0 cases +10.00 -> rows +56.00 exact -> CL = top row +56.00 -> CU = CL +4.30. QuickLock bottom = case +35.68, z-center 65.02, handed x (outer L -84.12 / R +84.55, inner R -3.45 / L +3.88). Drawer bottom = case +5.72, z-center 5.24 (front protrudes 2.39 past case face to meet faceplate). Faceplate bottom = case +3.72, z-center 95.07. Handle bottom = faceplate +22.49, z-center 109.57. Stoppers: bottom = covering unit bottom -2.00 (tabs hang into the bay below), z-center 76.5. Feet: x -76.48/-0.18/+76.65, z -73.00 (back) / +81.15 (front).",
+  "instances": [
+    {
+      "id": "frl",
+      "node": "FR-L_165-2W",
+      "pos": [
+        0,
+        7.65,
+        0
+      ],
+      "stage": "base"
+    },
+    {
+      "id": "f1",
+      "node": "Tabletop-Kit-Foot",
+      "pos": [
+        -76.48,
+        0,
+        -63
+      ],
+      "yaw": 180,
+      "stage": "base"
+    },
+    {
+      "id": "f2",
+      "node": "Tabletop-Kit-Foot",
+      "pos": [
+        -76.48,
+        0,
+        71.15
+      ],
+      "yaw": 180,
+      "stage": "base"
+    },
+    {
+      "id": "f3",
+      "node": "Tabletop-Kit-Foot",
+      "pos": [
+        76.65,
+        0,
+        -63
+      ],
+      "yaw": 0,
+      "stage": "base"
+    },
+    {
+      "id": "f4",
+      "node": "Tabletop-Kit-Foot",
+      "pos": [
+        76.65,
+        0,
+        71.15
+      ],
+      "yaw": 0,
+      "stage": "base"
+    },
+    {
+      "id": "f5",
+      "node": "Tabletop-Kit-Foot",
+      "pos": [
+        -0.18,
+        0,
+        -63
+      ],
+      "yaw": 0,
+      "stage": "base"
+    },
+    {
+      "id": "f6",
+      "node": "Tabletop-Kit-Foot",
+      "pos": [
+        -0.18,
+        0,
+        71.15
+      ],
+      "yaw": 0,
+      "stage": "base"
+    },
+    {
+      "id": "fru",
+      "node": "FR-U_165-2W",
+      "pos": [
+        0,
+        12.75,
+        0
+      ]
+    },
+    {
+      "id": "caseA",
+      "node": "165-1W-1H_Case",
+      "pos": [
+        -44,
+        17.65,
+        0
+      ],
+      "stage": "cA"
+    },
+    {
+      "id": "qlAL",
+      "node": "QuickLock-L",
+      "pos": [
+        -84.12,
+        53.33,
+        55.02
+      ],
+      "stage": "cA"
+    },
+    {
+      "id": "qlAR",
+      "node": "QuickLock-R",
+      "pos": [
+        -3.45,
+        53.33,
+        55.02
+      ],
+      "stage": "cA"
+    },
+    {
+      "id": "mcA",
+      "node": "MagnetClip_10x2mm",
+      "pos": [
+        -44,
+        53.45,
+        -75.7
+      ],
+      "stage": "cA"
+    },
+    {
+      "id": "mgA",
+      "node": "Magnet_10x2mm",
+      "pos": [
+        -44,
+        57.65,
+        -76
+      ],
+      "stage": "cA"
+    },
+    {
+      "id": "caseB",
+      "node": "165-1W-1H_Case",
+      "pos": [
+        44,
+        17.65,
+        0
+      ],
+      "stage": "cB"
+    },
+    {
+      "id": "qlBL",
+      "node": "QuickLock-L",
+      "pos": [
+        3.88,
+        53.33,
+        55.02
+      ],
+      "stage": "cB"
+    },
+    {
+      "id": "qlBR",
+      "node": "QuickLock-R",
+      "pos": [
+        84.55,
+        53.33,
+        55.02
+      ],
+      "stage": "cB"
+    },
+    {
+      "id": "mcB",
+      "node": "MagnetClip_10x2mm",
+      "pos": [
+        44,
+        53.45,
+        -75.7
+      ],
+      "stage": "cB"
+    },
+    {
+      "id": "mgB",
+      "node": "Magnet_10x2mm",
+      "pos": [
+        44,
+        57.65,
+        -76
+      ],
+      "stage": "cB"
+    },
+    {
+      "id": "caseC",
+      "node": "165-1W-1H_Case",
+      "pos": [
+        -44,
+        73.65,
+        0
+      ],
+      "stage": "cC"
+    },
+    {
+      "id": "qlCL",
+      "node": "QuickLock-L",
+      "pos": [
+        -84.12,
+        109.33,
+        55.02
+      ],
+      "stage": "cC"
+    },
+    {
+      "id": "qlCR",
+      "node": "QuickLock-R",
+      "pos": [
+        -3.45,
+        109.33,
+        55.02
+      ],
+      "stage": "cC"
+    },
+    {
+      "id": "mcC",
+      "node": "MagnetClip_10x2mm",
+      "pos": [
+        -44,
+        109.45,
+        -75.7
+      ],
+      "stage": "cC"
+    },
+    {
+      "id": "mgC",
+      "node": "Magnet_10x2mm",
+      "pos": [
+        -44,
+        113.65,
+        -76
+      ],
+      "stage": "cC"
+    },
+    {
+      "id": "caseD",
+      "node": "165-1W-1H_Case",
+      "pos": [
+        44,
+        73.65,
+        0
+      ],
+      "stage": "cD"
+    },
+    {
+      "id": "qlDL",
+      "node": "QuickLock-L",
+      "pos": [
+        3.88,
+        109.33,
+        55.02
+      ],
+      "stage": "cD"
+    },
+    {
+      "id": "qlDR",
+      "node": "QuickLock-R",
+      "pos": [
+        84.55,
+        109.33,
+        55.02
+      ],
+      "stage": "cD"
+    },
+    {
+      "id": "mcD",
+      "node": "MagnetClip_10x2mm",
+      "pos": [
+        44,
+        109.45,
+        -75.7
+      ],
+      "stage": "cD"
+    },
+    {
+      "id": "mgD",
+      "node": "Magnet_10x2mm",
+      "pos": [
+        44,
+        113.65,
+        -76
+      ],
+      "stage": "cD"
+    },
+    {
+      "id": "stAL",
+      "node": "Drawer_Stoppers_L",
+      "pos": [
+        -56.6,
+        71.65,
+        66.5
+      ]
+    },
+    {
+      "id": "stAR",
+      "node": "Drawer_Stoppers_R",
+      "pos": [
+        -31.6,
+        71.65,
+        66.5
+      ]
+    },
+    {
+      "id": "stBL",
+      "node": "Drawer_Stoppers_L",
+      "pos": [
+        31.4,
+        71.65,
+        66.5
+      ]
+    },
+    {
+      "id": "stBR",
+      "node": "Drawer_Stoppers_R",
+      "pos": [
+        56.4,
+        71.65,
+        66.5
+      ]
+    },
+    {
+      "id": "cl",
+      "node": "CL-165-2W",
+      "pos": [
+        0,
+        129.65,
+        0
+      ]
+    },
+    {
+      "id": "stCL",
+      "node": "Drawer_Stoppers_L",
+      "pos": [
+        -56.6,
+        127.65,
+        66.5
+      ]
+    },
+    {
+      "id": "stCR",
+      "node": "Drawer_Stoppers_R",
+      "pos": [
+        -31.6,
+        127.65,
+        66.5
+      ]
+    },
+    {
+      "id": "stDL",
+      "node": "Drawer_Stoppers_L",
+      "pos": [
+        31.4,
+        127.65,
+        66.5
+      ]
+    },
+    {
+      "id": "stDR",
+      "node": "Drawer_Stoppers_R",
+      "pos": [
+        56.4,
+        127.65,
+        66.5
+      ]
+    },
+    {
+      "id": "cu",
+      "node": "CU-165-2W",
+      "pos": [
+        0,
+        133.95,
+        0
+      ]
+    },
+    {
+      "id": "drwA",
+      "node": "DecorDrawer_165-1W-1H",
+      "pos": [
+        -43.84,
+        23.37,
+        5.24
+      ]
+    },
+    {
+      "id": "drwB",
+      "node": "DecorDrawer_165-1W-1H",
+      "pos": [
+        44.16,
+        23.37,
+        5.24
+      ]
+    },
+    {
+      "id": "drwC",
+      "node": "DecorDrawer_165-1W-1H",
+      "pos": [
+        -43.84,
+        79.37,
+        5.24
+      ]
+    },
+    {
+      "id": "drwD",
+      "node": "DecorDrawer_165-1W-1H",
+      "pos": [
+        44.16,
+        79.37,
+        5.24
+      ]
+    },
+    {
+      "id": "dcA",
+      "node": "MagnetClip_10x2mm",
+      "pos": [
+        -43.84,
+        53.37,
+        -73
+      ],
+      "yaw": 180,
+      "rides": "drwA"
+    },
+    {
+      "id": "dmA",
+      "node": "Magnet_10x2mm",
+      "pos": [
+        -43.84,
+        58.37,
+        -74
+      ],
+      "rides": "drwA"
+    },
+    {
+      "id": "dcB",
+      "node": "MagnetClip_10x2mm",
+      "pos": [
+        44.16,
+        53.37,
+        -73
+      ],
+      "yaw": 180,
+      "rides": "drwB"
+    },
+    {
+      "id": "dmB",
+      "node": "Magnet_10x2mm",
+      "pos": [
+        44.16,
+        58.37,
+        -74
+      ],
+      "rides": "drwB"
+    },
+    {
+      "id": "dcC",
+      "node": "MagnetClip_10x2mm",
+      "pos": [
+        -43.84,
+        109.37,
+        -73
+      ],
+      "yaw": 180,
+      "rides": "drwC"
+    },
+    {
+      "id": "dmC",
+      "node": "Magnet_10x2mm",
+      "pos": [
+        -43.84,
+        114.37,
+        -74
+      ],
+      "rides": "drwC"
+    },
+    {
+      "id": "dcD",
+      "node": "MagnetClip_10x2mm",
+      "pos": [
+        44.16,
+        109.37,
+        -73
+      ],
+      "yaw": 180,
+      "rides": "drwD"
+    },
+    {
+      "id": "dmD",
+      "node": "Magnet_10x2mm",
+      "pos": [
+        44.16,
+        114.37,
+        -74
+      ],
+      "rides": "drwD"
+    },
+    {
+      "id": "fpA",
+      "node": "Faceplate_Essential_1W-1H",
+      "pos": [
+        -43.53,
+        21.37,
+        85.07
+      ],
+      "rides": "drwA"
+    },
+    {
+      "id": "fpB",
+      "node": "Faceplate_Essential_1W-1H",
+      "pos": [
+        44.47,
+        21.37,
+        85.07
+      ],
+      "rides": "drwB"
+    },
+    {
+      "id": "fpC",
+      "node": "Faceplate_Essential_1W-1H",
+      "pos": [
+        -43.53,
+        77.37,
+        85.07
+      ],
+      "rides": "drwC"
+    },
+    {
+      "id": "fpD",
+      "node": "Faceplate_Essential_1W-1H",
+      "pos": [
+        44.47,
+        77.37,
+        85.07
+      ],
+      "rides": "drwD"
+    },
+    {
+      "id": "hA",
+      "node": "Handle_Deco",
+      "pos": [
+        -43.54,
+        43.86,
+        99.57
+      ],
+      "rides": "drwA"
+    },
+    {
+      "id": "hB",
+      "node": "Handle_Deco",
+      "pos": [
+        44.46,
+        43.86,
+        99.57
+      ],
+      "rides": "drwB"
+    },
+    {
+      "id": "hC",
+      "node": "Handle_Deco",
+      "pos": [
+        -43.54,
+        99.86,
+        99.57
+      ],
+      "rides": "drwC"
+    },
+    {
+      "id": "hD",
+      "node": "Handle_Deco",
+      "pos": [
+        44.46,
+        99.86,
+        99.57
+      ],
+      "rides": "drwD"
+    }
+  ],
+  "stages": {
+    "base": [
+      0,
+      110,
+      0
+    ],
+    "cA": [
+      0,
+      0,
+      -170
+    ],
+    "cB": [
+      0,
+      0,
+      -170
+    ],
+    "cC": [
+      0,
+      0,
+      -170
+    ],
+    "cD": [
+      0,
+      0,
+      -170
+    ]
+  },
+  "steps": [
+    {
+      "title": "Print checklist",
+      "note": "50 prints — quantities on the right. You'll also need 8× M3 screws for the handles (2 each) and 8× 10×2 mm disc magnets for the optional magnet closures (hardware store items). Feet, QuickLocks, stoppers and clips are small; print a spare of each.",
+      "camera": {
+        "t": 28,
+        "p": 60,
+        "r": 1200,
+        "target": [
+          0,
+          95,
+          60
+        ]
+      },
+      "checklist": true
+    },
+    {
+      "title": "Bench: lower footrail",
+      "note": "Start at the bench with the lower footrail upside-down-friendly work: we show it raised so you can see the six foot slots on its underside.",
+      "camera": {
+        "t": 30,
+        "p": 55,
+        "r": 620,
+        "target": [
+          0,
+          115,
+          0
+        ]
+      },
+      "phases": [
+        {
+          "enter": [
+            {
+              "id": "frl",
+              "from": [
+                0,
+                90,
+                0
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Bench: insert the six feet",
+      "note": "Pointy end slides in first. Outer feet slide toward the rail ends; the middle pair slides left to right.",
+      "camera": {
+        "t": 30,
+        "p": 55,
+        "r": 620,
+        "target": [
+          0,
+          115,
+          0
+        ]
+      },
+      "phases": [
+        {
+          "enter": [
+            {
+              "id": "f1",
+              "from": [
+                30,
+                0,
+                0
+              ]
+            },
+            {
+              "id": "f3",
+              "from": [
+                -30,
+                0,
+                0
+              ]
+            },
+            {
+              "id": "f5",
+              "from": [
+                -30,
+                0,
+                0
+              ]
+            }
+          ]
+        },
+        {
+          "enter": [
+            {
+              "id": "f2",
+              "from": [
+                30,
+                0,
+                0
+              ]
+            },
+            {
+              "id": "f4",
+              "from": [
+                -30,
+                0,
+                0
+              ]
+            },
+            {
+              "id": "f6",
+              "from": [
+                -30,
+                0,
+                0
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Set the base down",
+      "note": "Flip the base feet-down and set it where the kit will live.",
+      "camera": {
+        "t": 30,
+        "p": 60,
+        "r": 700,
+        "target": [
+          0,
+          50,
+          0
+        ]
+      },
+      "phases": [
+        {
+          "settle": "base"
+        }
+      ]
+    },
+    {
+      "title": "Upper footrail",
+      "note": "The upper footrail slides onto the lower one from the back, all the way forward until it stops.",
+      "camera": {
+        "t": 30,
+        "p": 58,
+        "r": 640,
+        "target": [
+          0,
+          30,
+          0
+        ]
+      },
+      "phases": [
+        {
+          "enter": [
+            {
+              "id": "fru",
+              "from": [
+                0,
+                0,
+                -170
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Case 1 — QuickLocks, clip, then slide",
+      "note": "Drop a QuickLock into each outer wall slot: L in the left wall, R in the right. Optional magnet closure: snap a magnet clip into the back-wall slot and press a 10×2 mm magnet into its pocket — it's unreachable after assembly, so now is the time. Then slide the case on from the back until the QuickLocks click.",
+      "camera": {
+        "t": 30,
+        "p": 58,
+        "r": 640,
+        "target": [
+          -44,
+          45,
+          0
+        ]
+      },
+      "phases": [
+        {
+          "enter": [
+            {
+              "id": "caseA",
+              "from": [
+                0,
+                60,
+                0
+              ]
+            }
+          ]
+        },
+        {
+          "enter": [
+            {
+              "id": "qlAL",
+              "from": [
+                0,
+                55,
+                0
+              ]
+            },
+            {
+              "id": "qlAR",
+              "from": [
+                0,
+                55,
+                0
+              ]
+            }
+          ]
+        },
+        {
+          "enter": [
+            {
+              "id": "mcA",
+              "at": [
+                0,
+                35,
+                0
+              ],
+              "from": [
+                0,
+                30,
+                0
+              ]
+            }
+          ]
+        },
+        {
+          "enter": [
+            {
+              "id": "mgA",
+              "at": [
+                0,
+                35,
+                0
+              ],
+              "from": [
+                0,
+                0,
+                -30
+              ]
+            }
+          ]
+        },
+        {
+          "move": [
+            {
+              "id": "mcA",
+              "by": [
+                0,
+                -35,
+                0
+              ]
+            },
+            {
+              "id": "mgA",
+              "by": [
+                0,
+                -35,
+                0
+              ]
+            }
+          ]
+        },
+        {
+          "settle": "cA"
+        }
+      ]
+    },
+    {
+      "title": "Case 2 — QuickLocks, clip, then slide",
+      "note": "Same again for the right column: QuickLocks in, magnet clip in the back, then slide the case forward until it clicks.",
+      "camera": {
+        "t": 30,
+        "p": 58,
+        "r": 640,
+        "target": [
+          44,
+          45,
+          0
+        ]
+      },
+      "phases": [
+        {
+          "enter": [
+            {
+              "id": "caseB",
+              "from": [
+                0,
+                60,
+                0
+              ]
+            }
+          ]
+        },
+        {
+          "enter": [
+            {
+              "id": "qlBL",
+              "from": [
+                0,
+                55,
+                0
+              ]
+            },
+            {
+              "id": "qlBR",
+              "from": [
+                0,
+                55,
+                0
+              ]
+            }
+          ]
+        },
+        {
+          "fade": [
+            {
+              "id": "mcB"
+            },
+            {
+              "id": "mgB"
+            }
+          ]
+        },
+        {
+          "settle": "cB"
+        }
+      ]
+    },
+    {
+      "title": "Case 3 — second row, left",
+      "note": "Rows always build bottom-up. QuickLocks and magnet clip in, slide the case on — then drop the two drawer stoppers into its floor slots. Stoppers are optional: they stop the drawer BELOW from being pulled all the way out.",
+      "camera": {
+        "t": 30,
+        "p": 55,
+        "r": 660,
+        "target": [
+          -44,
+          90,
+          0
+        ]
+      },
+      "phases": [
+        {
+          "enter": [
+            {
+              "id": "caseC",
+              "from": [
+                0,
+                60,
+                0
+              ]
+            }
+          ]
+        },
+        {
+          "enter": [
+            {
+              "id": "qlCL",
+              "from": [
+                0,
+                55,
+                0
+              ]
+            },
+            {
+              "id": "qlCR",
+              "from": [
+                0,
+                55,
+                0
+              ]
+            }
+          ]
+        },
+        {
+          "fade": [
+            {
+              "id": "mcC"
+            },
+            {
+              "id": "mgC"
+            }
+          ]
+        },
+        {
+          "settle": "cC"
+        },
+        {
+          "enter": [
+            {
+              "id": "stAL",
+              "from": [
+                0,
+                55,
+                0
+              ]
+            },
+            {
+              "id": "stAR",
+              "from": [
+                0,
+                55,
+                0
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Case 4 — second row, right",
+      "note": "Last case: QuickLocks and magnet clip in, slide it home, then its two drawer stoppers — again protecting the drawer below.",
+      "camera": {
+        "t": 30,
+        "p": 55,
+        "r": 660,
+        "target": [
+          44,
+          90,
+          0
+        ]
+      },
+      "phases": [
+        {
+          "enter": [
+            {
+              "id": "caseD",
+              "from": [
+                0,
+                60,
+                0
+              ]
+            }
+          ]
+        },
+        {
+          "enter": [
+            {
+              "id": "qlDL",
+              "from": [
+                0,
+                55,
+                0
+              ]
+            },
+            {
+              "id": "qlDR",
+              "from": [
+                0,
+                55,
+                0
+              ]
+            }
+          ]
+        },
+        {
+          "fade": [
+            {
+              "id": "mcD"
+            },
+            {
+              "id": "mgD"
+            }
+          ]
+        },
+        {
+          "settle": "cD"
+        },
+        {
+          "enter": [
+            {
+              "id": "stBL",
+              "from": [
+                0,
+                55,
+                0
+              ]
+            },
+            {
+              "id": "stBR",
+              "from": [
+                0,
+                55,
+                0
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Lower cover",
+      "note": "The lower cover slides over the top row from the back — the top row's QuickLocks lock it. Then drop the last four stoppers into the cover's slots to protect the top-row drawers.",
+      "camera": {
+        "t": 30,
+        "p": 52,
+        "r": 680,
+        "target": [
+          0,
+          115,
+          0
+        ]
+      },
+      "phases": [
+        {
+          "enter": [
+            {
+              "id": "cl",
+              "from": [
+                0,
+                0,
+                -170
+              ]
+            }
+          ]
+        },
+        {
+          "enter": [
+            {
+              "id": "stCL",
+              "from": [
+                0,
+                55,
+                0
+              ]
+            },
+            {
+              "id": "stCR",
+              "from": [
+                0,
+                55,
+                0
+              ]
+            },
+            {
+              "id": "stDL",
+              "from": [
+                0,
+                55,
+                0
+              ]
+            },
+            {
+              "id": "stDR",
+              "from": [
+                0,
+                55,
+                0
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Upper cover",
+      "note": "The upper cover slides in from the back, onto the lower cover's dovetails, closing over the stopper slots.",
+      "camera": {
+        "t": 30,
+        "p": 52,
+        "r": 680,
+        "target": [
+          0,
+          120,
+          0
+        ]
+      },
+      "phases": [
+        {
+          "enter": [
+            {
+              "id": "cu",
+              "from": [
+                0,
+                0,
+                -170
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Drawers",
+      "note": "Before a drawer goes in: snap a magnet clip into its back-wall slot and press in the magnet (optional — it pairs with the clip in the case back to pull the drawer shut). Then slide each drawer in from the front.",
+      "camera": {
+        "t": 12,
+        "p": 68,
+        "r": 720,
+        "target": [
+          0,
+          60,
+          40
+        ]
+      },
+      "phases": [
+        {
+          "enter": [
+            {
+              "id": "drwA",
+              "at": [
+                0,
+                0,
+                190
+              ],
+              "from": [
+                0,
+                0,
+                60
+              ]
+            }
+          ]
+        },
+        {
+          "enter": [
+            {
+              "id": "dcA",
+              "at": [
+                0,
+                35,
+                190
+              ],
+              "from": [
+                0,
+                30,
+                0
+              ],
+              "rides": "drwA"
+            }
+          ]
+        },
+        {
+          "enter": [
+            {
+              "id": "dmA",
+              "at": [
+                0,
+                35,
+                190
+              ],
+              "from": [
+                0,
+                0,
+                30
+              ],
+              "rides": "drwA"
+            }
+          ]
+        },
+        {
+          "move": [
+            {
+              "id": "dcA",
+              "by": [
+                0,
+                -35,
+                0
+              ],
+              "rides": "drwA"
+            },
+            {
+              "id": "dmA",
+              "by": [
+                0,
+                -35,
+                0
+              ],
+              "rides": "drwA"
+            }
+          ]
+        },
+        {
+          "move": [
+            {
+              "id": "drwA",
+              "by": [
+                0,
+                0,
+                -190
+              ]
+            },
+            {
+              "id": "dcA",
+              "by": [
+                0,
+                0,
+                -190
+              ],
+              "rides": "drwA"
+            },
+            {
+              "id": "dmA",
+              "by": [
+                0,
+                0,
+                -190
+              ],
+              "rides": "drwA"
+            }
+          ]
+        },
+        {
+          "fade": [
+            {
+              "id": "dcB"
+            },
+            {
+              "id": "dmB"
+            },
+            {
+              "id": "dcC"
+            },
+            {
+              "id": "dmC"
+            },
+            {
+              "id": "dcD"
+            },
+            {
+              "id": "dmD"
+            }
+          ]
+        },
+        {
+          "enter": [
+            {
+              "id": "drwB",
+              "from": [
+                0,
+                0,
+                200
+              ]
+            },
+            {
+              "id": "drwC",
+              "from": [
+                0,
+                0,
+                200
+              ]
+            },
+            {
+              "id": "drwD",
+              "from": [
+                0,
+                0,
+                200
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Faceplates & handles",
+      "note": "Pop a drawer out about 40 mm, slide the faceplate DOWN onto the drawer front until it snaps, screw on the Deco handle (2× M3), then push the drawer home. Repeat for every drawer — the kit is done. Tap any part to see its name and download links.",
+      "camera": {
+        "t": 15,
+        "p": 66,
+        "r": 600,
+        "target": [
+          -20,
+          70,
+          40
+        ]
+      },
+      "phases": [
+        {
+          "move": [
+            {
+              "id": "drwA",
+              "by": [
+                0,
+                0,
+                40
+              ]
+            },
+            {
+              "id": "dcA",
+              "by": [
+                0,
+                0,
+                40
+              ],
+              "rides": "drwA"
+            },
+            {
+              "id": "dmA",
+              "by": [
+                0,
+                0,
+                40
+              ],
+              "rides": "drwA"
+            }
+          ]
+        },
+        {
+          "enter": [
+            {
+              "id": "fpA",
+              "at": [
+                0,
+                0,
+                40
+              ],
+              "from": [
+                0,
+                45,
+                0
+              ],
+              "rides": "drwA"
+            }
+          ]
+        },
+        {
+          "enter": [
+            {
+              "id": "hA",
+              "at": [
+                0,
+                0,
+                40
+              ],
+              "from": [
+                0,
+                0,
+                55
+              ],
+              "rides": "drwA"
+            }
+          ]
+        },
+        {
+          "move": [
+            {
+              "id": "drwA",
+              "by": [
+                0,
+                0,
+                -40
+              ]
+            },
+            {
+              "id": "dcA",
+              "by": [
+                0,
+                0,
+                -40
+              ],
+              "rides": "drwA"
+            },
+            {
+              "id": "dmA",
+              "by": [
+                0,
+                0,
+                -40
+              ],
+              "rides": "drwA"
+            },
+            {
+              "id": "fpA",
+              "by": [
+                0,
+                0,
+                -40
+              ],
+              "rides": "drwA"
+            },
+            {
+              "id": "hA",
+              "by": [
+                0,
+                0,
+                -40
+              ],
+              "rides": "drwA"
+            }
+          ]
+        },
+        {
+          "fade": [
+            {
+              "id": "fpB"
+            },
+            {
+              "id": "hB"
+            },
+            {
+              "id": "fpC"
+            },
+            {
+              "id": "hC"
+            },
+            {
+              "id": "fpD"
+            },
+            {
+              "id": "hD"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

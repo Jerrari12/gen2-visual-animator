@@ -139,7 +139,7 @@ if (BUILD_HASH) {
     throw new Error('unsupported build: ' + gen.errors.join('; '));
   }
   manifest = gen.manifest;
-  PARTS_BASE = 'parts/185/';
+  PARTS_BASE = 'parts/' + (manifest.collection || '185') + '/';   // one self-contained pool per collection (parts/165, parts/185)
 } else {
   manifest = await (await fetch(KIT_URL + 'manifest.json')).json();
   PARTS_BASE = KIT_URL + 'parts/';
@@ -685,8 +685,13 @@ function renderChecklist() {
     const chip = document.createElement('button');
     chip.className = 'chip';
     chip.style.background = activeHex(p.type); // reflects custom filament colors
-    chip.title = (useCustom && customColors[p.type] ? customColors[p.type].name + ' · ' : '') + 'click to pick a filament color';
-    chip.onclick = () => openFilamentMenu(p.type);
+    if (colorLocked(p.type)) { // purchased hardware: no filament picker
+      chip.classList.add('locked');
+      chip.title = 'Hardware-store item — shown in its real finish';
+    } else {
+      chip.title = (useCustom && customColors[p.type] ? customColors[p.type].name + ' · ' : '') + 'click to pick a filament color';
+      chip.onclick = () => openFilamentMenu(p.type);
+    }
     const mid = document.createElement('div');
     mid.className = 'cl-mid';
     const label = document.createElement('span');
@@ -825,6 +830,13 @@ function goTo(i, { animate = true } = {}) {
 $('btn-prev').onclick = () => goTo(cur - 1, { animate: false });
 $('btn-next').onclick = () => goTo(cur + 1);
 $('btn-replay').onclick = () => goTo(cur);
+// collapse the step text to its number badge (session-sticky across steps) —
+// reclaims the canvas while recoloring/inspecting on small screens
+$('note-collapse').onclick = () => {
+  const collapsed = $('note-panel').classList.toggle('collapsed');
+  $('note-collapse').innerHTML = collapsed ? '&#9656;' : '&#9662;';
+  $('note-collapse').title = collapsed ? 'Show the step text' : 'Collapse the step text';
+};
 $('btn-slow').onclick = () => {
   slowmo = !slowmo;
   $('btn-slow').classList.toggle('on', slowmo);
@@ -880,13 +892,13 @@ function drawerCarrier(inst) {
   }
   return null;
 }
-function slideDrawer(carrier, open) {
+function slideDrawer(carrier, open, dist = 40) {
   const group = [carrier, ...[...instances.values()].filter(x => x.cfg.rides === carrier.cfg.id)];
   for (const i of group) {
     const to = basePos(i, i.staged);
-    if (open) to.z += 40;
+    if (open) to.z += dist;
     const fromV = i.group.position.clone();
-    tween({ duration: 320, onUpdate: k => i.group.position.lerpVectors(fromV, to, k) });
+    tween({ duration: open ? 380 : 320, onUpdate: k => i.group.position.lerpVectors(fromV, to, k) });
   }
 }
 
@@ -897,29 +909,33 @@ function setSelected(id) {
     const prev = instances.get(selectedId);
     prev.group.traverse(o => { if (o.isMesh) o.material = materialFor(prev, false); });
   }
-  if (openCarrier) { slideDrawer(openCarrier, false); openCarrier = null; }
+  const prevOpen = openCarrier; openCarrier = null; // may re-pull the SAME drawer further below
   selectedId = id;
   $('filament-menu').classList.add('hidden');
   const card = $('identify-card');
-  if (!id) { card.classList.add('hidden'); $('pointer-line').classList.add('hidden'); return; }
+  if (!id) { if (prevOpen) slideDrawer(prevOpen, false); card.classList.add('hidden'); $('pointer-line').classList.add('hidden'); return; }
   if (isMobile()) setChecklist(false); // mobile: parts list & identify sheet are mutually exclusive
   const inst = instances.get(id);
   inst.group.traverse(o => { if (o.isMesh) o.material = materialFor(inst, true); });
   selAnchor = new THREE.Box3().setFromObject(inst.group).getCenter(new THREE.Vector3()).sub(inst.group.position);
   const info = partInfoByNode[inst.cfg.node] || { label: inst.cfg.node, qty: '?' };
   const selType = typeByNode[inst.cfg.node];
-  $('identify-swatch').style.background = activeHex(selType);
+  const selLocked = colorLocked(selType); // purchased hardware: swatch is a plain color dot, not a picker
+  const sw = $('identify-swatch');
+  sw.style.background = activeHex(selType);
+  sw.classList.toggle('locked', selLocked);
+  sw.title = selLocked ? 'Hardware-store item — shown in its real finish' : 'Pick a filament color';
   $('identify-name').textContent = info.label;
   $('identify-qty').textContent = `×${info.qty} in this kit` +
-    (customColors[selType] ? ` · ${customColors[selType].name}` : '');
+    (!selLocked && customColors[selType] ? ` · ${customColors[selType].name}` : '');
   const img = $('identify-img');
-  if (info.img) { img.src = info.img; img.classList.remove('hidden'); }
+  if (info.img) { img.onerror = () => img.classList.add('hidden'); img.src = info.img; img.classList.remove('hidden'); } // hide if the render 404s (e.g. 165 has no renders yet)
   else img.classList.add('hidden');
   const linksEl = $('identify-links');
   linksEl.innerHTML = '';
   if (info.links?.p) linksEl.appendChild(linkEl('Printables', info.links.p));
   if (info.links?.t) linksEl.appendChild(linkEl('Thangs', info.links.t));
-  if (customColors[selType]) linksEl.appendChild(linkEl('Get filament', customColors[selType].url));
+  if (!selLocked && customColors[selType]) linksEl.appendChild(linkEl('Get filament', customColors[selType].url));
   // handles get a style switcher (Deco / BlockBar A–F)
   if (typeByNode[inst.cfg.node] === 'Handle') {
     const idx = currentHandleStyleIndex();
@@ -939,53 +955,71 @@ function setSelected(id) {
   rmBtn.classList.toggle('hidden', !removable);
   if (removable) rmBtn.textContent = rmType === 'Stopper' ? '✕ Remove this stopper' : '✕ Remove magnet closure';
   card.classList.remove('hidden');
-  // drawer-open interaction: only when the drawer is seated in its final spot
+  // drawer-open interaction (assembled scenes only — the drawer must be resting
+  // in its FINAL seat, not staged or mid-step). Selecting the drawer BODY pulls
+  // it ~90% of the safe travel (case depth − 20 mm rear engagement) so its
+  // colour/interior reads clearly; selecting a rider (faceplate/handle/clip/
+  // magnet) pulls just 40 mm — enough to expose the body for tapping. prevOpen
+  // counts as seated (we opened it from base), so a faceplate→body reselect
+  // re-pulls the SAME drawer further instead of snapping it shut first.
   const carrier = drawerCarrier(inst);
-  if (carrier && !carrier.staged && carrier.group.visible &&
-      carrier.group.position.distanceTo(basePos(carrier, false)) < 0.01) {
-    slideDrawer(carrier, true);
+  const seatable = carrier && !carrier.staged && carrier.group.visible &&
+    (carrier === prevOpen || carrier.group.position.distanceTo(basePos(carrier, false)) < 0.01);
+  if (prevOpen && prevOpen !== carrier) slideDrawer(prevOpen, false); // switching drawers (or to none) → shut the old one
+  if (seatable) {
+    const travel = (parseInt(manifest.collection, 10) || 185) - 20;
+    slideDrawer(carrier, true, carrier === inst ? travel * 0.9 : 40); // body → deep pull, rider → peek
     openCarrier = carrier;
   }
 }
 // ---------- filament colors ----------
-// Real Panchroma™ Basic PLA 1.75mm/1kg variants (names + Shopify variant ids
-// pulled from shop.polymaker.com 2026-07-05; hexes approximated — refine
-// against the spool renders anytime). Swap the urls for affiliate versions
+// Multi-brand filament database. Each brand entry: { brand, line, url (shop
+// fallback), colors: [{name, label, hex, url, pick?}] }. `label` must stay
+// UNIQUE across all brands — customColors stores it as the identity key.
+// Adding a brand (Prusa / Polar / Printed Solids / …) = appending one entry
+// here; the menu renders it as its own collapsible section automatically.
+// Polymaker: real Panchroma™ Basic PLA 1.75mm/1kg variants (names + Shopify
+// variant ids pulled from shop.polymaker.com 2026-07-05; hexes approximated —
+// refine against the spool renders anytime). Swap urls for affiliate versions
 // when Joey's Polymaker affiliate links exist. The Elegoo entry is Joey's
 // budget pick (amzn.to IS an affiliate link) — mainly cases & drawer bodies.
 const PM = id => `https://shop.polymaker.com/products/panchroma-pla?variant=${id}`;
 const POLYMAKER_URL = PM(44863271895097);
-const FILAMENTS = [
-  { name: 'Elegoo PETG Black', label: 'Elegoo PETG Black', hex: '#232427', url: 'https://amzn.to/3QWCdV6', pick: true },
-  { name: 'Black',           hex: '#2b2b2e', id: 44863271731257 },
-  { name: 'Dark Grey',       hex: '#4a4c51', id: 44863271010361 },
-  { name: 'Steel Grey',      hex: '#6e7178', id: 44863271829561 },
-  { name: 'Grey',            hex: '#9a9da3', id: 44863271862329 },
-  { name: 'Cold White',      hex: '#eef1f4', id: 44863271043129 },
-  { name: 'White',           hex: '#f5f4ee', id: 44863271895097 },
-  { name: 'Cream',           hex: '#f1e7cf', id: 44863271239737 },
-  { name: 'Beige',           hex: '#ddc9a3', id: 44863271436345 },
-  { name: 'Tan',             hex: '#c8a97e', id: 44863271108665 },
-  { name: 'Brown',           hex: '#7a5236', id: 44863271338041 },
-  { name: 'Red',             hex: '#d23a2e', id: 44863271796793 },
-  { name: 'Wine Red',        hex: '#7e2432', id: 44863271534649 },
-  { name: 'Magenta',         hex: '#d4308f', id: 44863271174201 },
-  { name: 'Pink',            hex: '#f0a4c0', id: 44863271632953 },
-  { name: 'Orange',          hex: '#ff8a40', id: 44863271665721 },
-  { name: 'Yellow',          hex: '#f5c542', id: 44863271567417 },
-  { name: 'Lemon Yellow',    hex: '#f8e35a', id: 44863271305273 },
-  { name: 'Lime Green',      hex: '#9ccb3b', id: 44863271206969 },
-  { name: 'Green',           hex: '#3f9b4f', id: 44863271698489 },
-  { name: 'Jungle Green',    hex: '#1f6e46', id: 44863271501881 },
-  { name: 'Olive Green',     hex: '#708238', id: 44863271469113 },
-  { name: 'Dark Olive Drab', hex: '#4e5136', id: 44863271075897 },
-  { name: 'Polymaker Teal',  hex: '#00a5a5', id: 44863271272505 },
-  { name: 'Aqua Blue',       hex: '#5cc6e0', id: 44863271403577 },
-  { name: 'Azure Blue',      hex: '#2e8fdc', id: 44863271141433 },
-  { name: 'Blue',            hex: '#2f6fbe', id: 44863271764025 },
-  { name: 'Stone Blue',      hex: '#4a6a8a', id: 44863271370809 },
-  { name: 'Purple',          hex: '#7a4fb0', id: 44863271600185 },
-].map(f => ({ ...f, label: f.label || `Panchroma ${f.name}`, url: f.url || PM(f.id) }));
+const FILAMENT_DB = [
+  { brand: 'Elegoo', line: 'PETG', url: 'https://amzn.to/3QWCdV6', colors: [
+    { name: 'PETG Black', label: 'Elegoo PETG Black', hex: '#232427', url: 'https://amzn.to/3QWCdV6', pick: true },
+  ] },
+  { brand: 'Polymaker', line: 'Panchroma™ PLA', url: POLYMAKER_URL, colors: [
+    { name: 'Black',           hex: '#2b2b2e', id: 44863271731257 },
+    { name: 'Dark Grey',       hex: '#4a4c51', id: 44863271010361 },
+    { name: 'Steel Grey',      hex: '#6e7178', id: 44863271829561 },
+    { name: 'Grey',            hex: '#9a9da3', id: 44863271862329 },
+    { name: 'Cold White',      hex: '#eef1f4', id: 44863271043129 },
+    { name: 'White',           hex: '#f5f4ee', id: 44863271895097 },
+    { name: 'Cream',           hex: '#f1e7cf', id: 44863271239737 },
+    { name: 'Beige',           hex: '#ddc9a3', id: 44863271436345 },
+    { name: 'Tan',             hex: '#c8a97e', id: 44863271108665 },
+    { name: 'Brown',           hex: '#7a5236', id: 44863271338041 },
+    { name: 'Red',             hex: '#d23a2e', id: 44863271796793 },
+    { name: 'Wine Red',        hex: '#7e2432', id: 44863271534649 },
+    { name: 'Magenta',         hex: '#d4308f', id: 44863271174201 },
+    { name: 'Pink',            hex: '#f0a4c0', id: 44863271632953 },
+    { name: 'Orange',          hex: '#ff8a40', id: 44863271665721 },
+    { name: 'Yellow',          hex: '#f5c542', id: 44863271567417 },
+    { name: 'Lemon Yellow',    hex: '#f8e35a', id: 44863271305273 },
+    { name: 'Lime Green',      hex: '#9ccb3b', id: 44863271206969 },
+    { name: 'Green',           hex: '#3f9b4f', id: 44863271698489 },
+    { name: 'Jungle Green',    hex: '#1f6e46', id: 44863271501881 },
+    { name: 'Olive Green',     hex: '#708238', id: 44863271469113 },
+    { name: 'Dark Olive Drab', hex: '#4e5136', id: 44863271075897 },
+    { name: 'Polymaker Teal',  hex: '#00a5a5', id: 44863271272505 },
+    { name: 'Aqua Blue',       hex: '#5cc6e0', id: 44863271403577 },
+    { name: 'Azure Blue',      hex: '#2e8fdc', id: 44863271141433 },
+    { name: 'Blue',            hex: '#2f6fbe', id: 44863271764025 },
+    { name: 'Stone Blue',      hex: '#4a6a8a', id: 44863271370809 },
+    { name: 'Purple',          hex: '#7a4fb0', id: 44863271600185 },
+  ].map(f => ({ ...f, label: `Panchroma ${f.name}`, url: PM(f.id) })) },
+];
 
 // ---------- filament presets ----------
 // One click sets a filament per part TYPE. Colors/links are PLACEHOLDERS for now
@@ -1028,12 +1062,31 @@ const PRESETS = [
 
 const COLOR_STORE_KEY = 'gen2-colors:' + (BUILD_HASH ? 'custom-build' : KIT);
 let customColors = {}, useCustom = false; // customColors: type -> {name, hex, url}
+// userPalette = the last palette the user built BY HAND (individual swatch
+// picks / per-type resets / file upload). Hand edits mirror the whole working
+// state into it; presets never touch it — so one preset click can't destroy
+// hours of picking. A "★ My palette" chip (renderPresets) restores it.
+let userPalette = {};
 try {
   const saved = JSON.parse(localStorage.getItem(COLOR_STORE_KEY) || 'null');
-  if (saved) { customColors = saved.colors || {}; useCustom = !!saved.on; }
+  if (saved) {
+    customColors = saved.colors || {};
+    useCustom = !!saved.on;
+    // migration: pre-userPalette saves treat the current colors as hand-picked
+    userPalette = saved.user || structuredClone(customColors);
+  }
 } catch (e) { /* corrupt storage — start fresh */ }
-const saveColors = () => localStorage.setItem(COLOR_STORE_KEY, JSON.stringify({ colors: customColors, on: useCustom }));
-const activeHex = type => (useCustom && customColors[type]) ? customColors[type].hex : (manifest.colors[type] || '#b9bcc2');
+const saveColors = () => localStorage.setItem(COLOR_STORE_KEY, JSON.stringify({ colors: customColors, on: useCustom, user: userPalette }));
+// call after any HAND edit to the palette (never after a preset)
+const snapshotUserPalette = () => { userPalette = structuredClone(customColors); };
+// purchased hardware (wood screws, magnets — every row of the type is `purchased`)
+// isn't printed, so it can't take a filament color: no picker, and any stored/
+// preset tint for the type is ignored — it always renders its manifest color.
+const colorLocked = type => {
+  const rows = manifest.parts.filter(p => p.type === type);
+  return rows.length > 0 && rows.every(p => p.purchased);
+};
+const activeHex = type => (useCustom && customColors[type] && !colorLocked(type)) ? customColors[type].hex : (manifest.colors[type] || '#b9bcc2');
 
 function applyPalette() {
   for (const [type, mat] of Object.entries(materials)) mat.color.set(activeHex(type));
@@ -1043,6 +1096,7 @@ function applyPalette() {
   for (const [type, mat] of Object.entries(altHighlightMats)) mat.color.set(activeHex(type)).lerp(new THREE.Color('#ffffff'), ALT_LIGHTEN);
   renderChecklist();
   updateColorToggle();
+  renderPresets(); // keep the active preset / My-palette chip highlight in step
   if (selectedId) {
     const type = typeByNode[instances.get(selectedId).cfg.node];
     $('identify-swatch').style.background = activeHex(type);
@@ -1057,25 +1111,48 @@ function updateColorToggle() {
 }
 $('color-toggle').onclick = () => { useCustom = !useCustom; saveColors(); applyPalette(); };
 
-// preset picker: apply a whole per-type filament set at once, and save/load them
+// preset picker: apply a whole per-type filament set at once, and save/load
+// them. Presets only replace the WORKING palette (customColors) — the user's
+// hand-built palette survives in userPalette and comes back via its chip.
 function applyPreset(p) {
   customColors = {};
   for (const [type, f] of Object.entries(p.colors)) customColors[type] = { ...f };
   useCustom = true;
   saveColors();
   applyPalette();
-  renderPresets();
 }
+function restoreUserPalette() {
+  customColors = structuredClone(userPalette);
+  useCustom = true;
+  saveColors();
+  applyPalette();
+}
+// order-independent palette identity — for highlighting the active chip
+const palKey = o => JSON.stringify(Object.keys(o).sort().map(k => [k, o[k]?.name, o[k]?.hex]));
 function renderPresets() {
   const box = $('preset-chips');
   box.innerHTML = '';
-  for (const p of PRESETS) {
+  const cur = useCustom ? palKey(customColors) : null;
+  const chip = (label, swatches, title, onclick, extraClass) => {
     const b = document.createElement('button');
-    b.className = 'preset-chip';
-    b.title = `Apply the "${p.name}" filament preset`;
-    b.innerHTML = `<span class="preset-sw">${p.swatches.map(h => `<i style="background:${h}"></i>`).join('')}</span>${p.name}`;
-    b.onclick = () => applyPreset(p);
+    b.className = 'preset-chip' + (extraClass ? ' ' + extraClass : '');
+    b.title = title;
+    b.innerHTML = `<span class="preset-sw">${swatches.map(h => `<i style="background:${h}"></i>`).join('')}</span>${label}`;
+    b.onclick = onclick;
     box.appendChild(b);
+    return b;
+  };
+  // the user's own hand-built palette leads (only once they've picked something)
+  if (Object.keys(userPalette).length) {
+    const order = ['Case', 'Drawer', 'Faceplate', 'Handle', 'CoverU'];
+    const hexes = [...new Set([...order.filter(t => userPalette[t]), ...Object.keys(userPalette)])]
+      .map(t => userPalette[t].hex).slice(0, 3);
+    const b = chip('My palette', hexes, 'Your own hand-picked filament colors — presets never overwrite these', restoreUserPalette, 'mine');
+    if (cur && cur === palKey(userPalette)) b.classList.add('on');
+  }
+  for (const p of PRESETS) {
+    const b = chip(p.name, p.swatches, `Apply the "${p.name}" filament preset`, () => applyPreset(p));
+    if (cur && cur === palKey(p.colors)) b.classList.add('on');
   }
 }
 function savePreset() {
@@ -1092,7 +1169,9 @@ function loadPresetFile(file) {
     try {
       const d = JSON.parse(r.result);
       if (d && d.colors && typeof d.colors === 'object') {
-        customColors = d.colors; useCustom = true; saveColors(); applyPalette(); renderPresets();
+        customColors = d.colors; useCustom = true;
+        snapshotUserPalette(); // an uploaded file is a hand-authored palette
+        saveColors(); applyPalette();
       }
     } catch (e) { /* ignore a bad file */ }
   };
@@ -1103,45 +1182,83 @@ $('preset-load').onclick = () => $('preset-file').click();
 $('preset-file').onchange = e => { if (e.target.files[0]) loadPresetFile(e.target.files[0]); e.target.value = ''; };
 renderPresets();
 
-let fmType = null; // the part type the filament menu is editing
+let fmType = null;     // the part type the filament menu is editing
+let fmQuery = '';      // live search filter (cleared on every open)
+let fmExpanded = null; // Set of expanded brand names (null → first render expands all)
+function renderFilamentBrands() {
+  if (!fmExpanded) fmExpanded = new Set(FILAMENT_DB.map(b => b.brand)); // session default: everything visible
+  const box = $('fm-brands');
+  box.innerHTML = '';
+  const q = fmQuery.trim().toLowerCase();
+  for (const brand of FILAMENT_DB) {
+    const colors = q
+      ? brand.colors.filter(f => `${brand.brand} ${brand.line} ${f.label}`.toLowerCase().includes(q))
+      : brand.colors;
+    if (q && !colors.length) continue;                    // searching: hide brands with no hits
+    const open = q ? true : fmExpanded.has(brand.brand);  // searching force-opens the matches
+    const sec = document.createElement('div');
+    sec.className = 'fm-brand';
+    const head = document.createElement('button');
+    head.className = 'fm-brand-head';
+    head.innerHTML = `<span>${brand.brand} <i>${brand.line} · ${colors.length}</i></span><span class="fm-chev">${open ? '▾' : '▸'}</span>`;
+    head.onclick = () => { fmExpanded[fmExpanded.has(brand.brand) ? 'delete' : 'add'](brand.brand); renderFilamentBrands(); };
+    sec.appendChild(head);
+    if (open) {
+      const grid = document.createElement('div');
+      grid.className = 'fm-swatches';
+      for (const f of colors) {
+        const b = document.createElement('button');
+        b.style.background = f.hex;
+        b.title = f.label + (f.pick ? ' — Joey’s budget pick for cases & drawer bodies' : '');
+        if (f.pick) b.classList.add('pick');
+        if (customColors[fmType]?.name === f.label) b.classList.add('active');
+        b.onclick = () => {
+          customColors[fmType] = { name: f.label, hex: f.hex, url: f.url };
+          useCustom = true;
+          snapshotUserPalette(); // a hand pick — this IS the user's palette now
+          saveColors();
+          applyPalette();
+          renderFilamentBrands(); // refresh the active ring across sections
+          const buy = $('fm-buy');
+          buy.href = f.url;
+          buy.textContent = `Buy ${f.name} →`;
+        };
+        grid.appendChild(b);
+      }
+      sec.appendChild(grid);
+    }
+    box.appendChild(sec);
+  }
+  if (q && !box.children.length) {
+    const none = document.createElement('div');
+    none.className = 'fm-none';
+    none.textContent = 'No filaments match';
+    box.appendChild(none);
+  }
+}
 function openFilamentMenu(type) {
   fmType = type;
-  const grid = $('fm-grid');
-  grid.innerHTML = '';
-  for (const f of FILAMENTS) {
-    const b = document.createElement('button');
-    b.style.background = f.hex;
-    b.title = f.label + (f.pick ? ' — Joey’s budget pick for cases & drawer bodies' : '');
-    if (f.pick) b.classList.add('pick');
-    if (customColors[type]?.name === f.label) b.classList.add('active');
-    b.onclick = () => {
-      customColors[type] = { name: f.label, hex: f.hex, url: f.url };
-      useCustom = true;
-      saveColors();
-      applyPalette();
-      [...grid.children].forEach(x => x.classList.remove('active'));
-      b.classList.add('active');
-      const buy = $('fm-buy');
-      buy.href = f.url;
-      buy.textContent = `Buy ${f.name} →`;
-    };
-    grid.appendChild(b);
-  }
+  fmQuery = '';
+  $('fm-search').value = '';
+  renderFilamentBrands();
   const buy = $('fm-buy');
   const sel = customColors[type];
-  buy.href = sel ? sel.url : POLYMAKER_URL;
-  buy.textContent = sel ? `Buy ${sel.name.replace('Panchroma ', '')} →` : 'Shop Panchroma PLA →';
+  buy.href = sel ? sel.url : FILAMENT_DB[0].url;
+  buy.textContent = sel ? `Buy ${sel.name.replace('Panchroma ', '')} →` : 'Shop filament →';
   $('filament-menu').classList.remove('hidden');
 }
+$('fm-search').oninput = e => { fmQuery = e.target.value; renderFilamentBrands(); };
 $('identify-swatch').onclick = () => {
   if (!selectedId) return;
   const type = typeByNode[instances.get(selectedId).cfg.node];
+  if (colorLocked(type)) return; // purchased hardware: no filament picker
   if ($('filament-menu').classList.contains('hidden')) openFilamentMenu(type);
   else $('filament-menu').classList.add('hidden');
 };
 $('fm-reset').onclick = () => {
   if (fmType) delete customColors[fmType];
   if (!Object.keys(customColors).length) useCustom = false;
+  snapshotUserPalette(); // a per-type reset is a hand edit too
   saveColors();
   applyPalette();
   $('filament-menu').classList.add('hidden');
@@ -1149,7 +1266,8 @@ $('fm-reset').onclick = () => {
 
 // ---------- handle style swap ----------
 // Every handle style mounts the same way: back face against the faceplate
-// front (z 97.57), vertically centered on the plate — so swapping is just a
+// front (= faceplate z-center + 2.5, half the plate depth — 97.57 on 185,
+// 87.57 on 165), vertically centered on the plate — so swapping is just a
 // node change + a reposition from the style's own height/depth. The choice is
 // reported back to the planner tab (postMessage) so both stay in sync.
 const HANDLE_STYLES = [
@@ -1192,7 +1310,10 @@ async function applyHandleStyle(style) {
     const fp = [...instances.values()].find(x => x.cfg.rides && x.cfg.rides === inst.cfg.rides && typeByNode[x.cfg.node] === 'Faceplate');
     if (fp) {
       const fpH = faceplateHeightOf(fp.cfg.node);
-      inst.cfg.pos = [inst.cfg.pos[0], fp.cfg.pos[1] + (fpH - style.h) / 2 - 0.5, 97.57 + style.d / 2];
+      // faceplate front = its z-center + 2.5 (half the plate depth) — derived
+      // from the faceplate instance so it's collection-agnostic (97.57 on 185,
+      // 87.57 on 165; a hardcoded 97.57 left 165 handles floating 10 mm out)
+      inst.cfg.pos = [inst.cfg.pos[0], fp.cfg.pos[1] + (fpH - style.h) / 2 - 0.5, fp.cfg.pos[2] + 2.5 + style.d / 2];
     }
     inst.cfg.node = style.node;
     inst.group.clear();
@@ -1708,6 +1829,11 @@ async function regenerate() {
   regenBusy = true;
   setSelected(null);
   const keep = Math.min(cur, gen.manifest.steps.length); // step indices are stable (deterministic gen)
+  // every options toggle lives INSIDE the parts panel, so it's open right now —
+  // keep it open through goTo(), whose default policy would close it whenever a
+  // toggle changes the step count (e.g. wallStagger restructures the step list
+  // so `keep` no longer lands on the auto-open final step).
+  const panelOpen = !$('checklist-panel').classList.contains('hidden');
   await mountManifest(gen.manifest);
   applyPalette(); // re-tint any custom filament colors onto the fresh materials
   // the generator rebuilds handles as the planner-level default (blockbar → A);
@@ -1717,6 +1843,7 @@ async function regenerate() {
     await applyHandleStyle(activeHandleStyle);
   }
   goTo(keep, { animate: false });
+  if (panelOpen) setChecklist(true); // restore the panel the user was just clicking in
   regenBusy = false;
   syncBuildToPlanner(); // keep the opener planner tab in step (no-op if opened cold)
 }
