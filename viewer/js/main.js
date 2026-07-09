@@ -552,7 +552,7 @@ async function playStep(i) {
       jobs.push(tween({
         duration: DUR.fade,
         onUpdate: k => mats.forEach(m => { m.opacity = 0.15 + 0.85 * k; }),
-        onDone: () => inst.group.traverse(o => { if (o.isMesh) o.material = materialFor(inst, false); })
+        onDone: () => inst.group.traverse(o => { if (o.isMesh) o.material = materialFor(inst, false, o.userData.zone); })
       }));
     });
     // enter items normally stagger (parts arriving one by one). `sync: true`
@@ -604,7 +604,7 @@ async function playStep(i) {
       jobs.push(tween({
         duration: DUR.fade, delay: n * 80,
         onUpdate: k => mats.forEach(m => { m.opacity = k; }),
-        onDone: () => inst.group.traverse(o => { if (o.isMesh) o.material = materialFor(inst, false); })
+        onDone: () => inst.group.traverse(o => { if (o.isMesh) o.material = materialFor(inst, false, o.userData.zone); })
       }));
     });
     if (ph.settle) {
@@ -1407,7 +1407,7 @@ function fadeOutInstance(inst) {
   const mats = [];
   inst.group.traverse(o => {
     if (!o.isMesh) return;
-    const m = materialFor(inst, false).clone();
+    const m = materialFor(inst, false, o.userData.zone).clone();
     m.transparent = true;
     m.userData.fpFade = true; // exit only reclaims meshes that still hold OUR clone
     o.material = m;
