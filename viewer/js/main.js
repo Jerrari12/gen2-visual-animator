@@ -484,12 +484,54 @@ async function playStep(i) {
   if (step.checklist) { playExploded(); tweenCamera(step.camera, 1400); return; }
   applyState(i - 1);
   tweenCamera(step.camera);
+  const vanished = new Set(); // ids hidden by a `vanish` phase, restored by `appear`
   for (const ph of step.phases || []) {
     if (my !== animToken) return;
     const jobs = [];
     // a phase can retarget the camera mid-step (e.g. zoom in on the pegs, then
     // zoom back out) — the phase waits for the move like any other job.
     if (ph.camera) jobs.push(tweenCamera(ph.camera, DUR.camera));
+    // vanish/appear: the step-scripted twin of the faceplate tap-isolation —
+    // fade EVERY currently-visible instance to nothing (then hide), and later
+    // fade the hidden set back in. `room: 0|1` drives the table/grid/wall fade
+    // via the same render-loop lerp the isolation uses (goTo resets it to 1).
+    // Both are transient within the step (an `appear` always follows), so
+    // prev/jump determinism is untouched; an aborted step never fires the
+    // onDone hide (killTweens drops it) and applyState restores everything.
+    if (ph.room !== undefined) fpEnv.target = ph.room;
+    if (ph.vanish) {
+      for (const inst of instances.values()) {
+        if (!inst.group.visible) continue;
+        const mats = [];
+        inst.group.traverse(o => {
+          if (!o.isMesh) return;
+          const m = materialFor(inst, false, o.userData.zone).clone();
+          m.transparent = true;
+          o.material = m; mats.push(m);
+        });
+        vanished.add(inst.cfg.id);
+        jobs.push(tween({
+          duration: DUR.fade,
+          onUpdate: k => mats.forEach(m => { m.opacity = 1 - k; }),
+          onDone: () => { inst.group.visible = false; },
+        }));
+      }
+    }
+    if (ph.appear) {
+      for (const id of vanished) {
+        const inst = instances.get(id);
+        if (!inst) continue;
+        inst.group.visible = true;
+        const mats = [];
+        inst.group.traverse(o => { if (o.isMesh && o.material.transparent) mats.push(o.material); });
+        jobs.push(tween({
+          duration: DUR.fade,
+          onUpdate: k => mats.forEach(m => { m.opacity = k; }),
+          onDone: () => inst.group.traverse(o => { if (o.isMesh) o.material = materialFor(inst, false, o.userData.zone); }),
+        }));
+      }
+      vanished.clear();
+    }
     // ghost: fade instances to translucent so you can see through them (e.g. a
     // cover, to reveal the pegs behind it); solid: fade them back opaque.
     (ph.ghost || []).forEach(g => {
@@ -841,6 +883,7 @@ function goTo(i, { animate = true } = {}) {
   setSelected(null); // a highlighted part may hide or move between steps
   setPaused(false);  // paging is an implicit resume — a frozen new step reads as broken
   setMeasure(false); // parts move between steps — a measurement would go stale
+  fpEnv.target = 1;  // a step-scripted `room: 0` (faceplate cinematic) must not outlive its page
   $('filament-menu').classList.add('hidden');
   stopCinema();
   cur = Math.max(0, Math.min(PAGES.length - 1, i));

@@ -749,6 +749,11 @@ export function generateManifest(build) {
 
   // drawers + faceplates + handles (decor only; classic has no model yet)
   const drawerPhases = [], drawerFades = [], fpDemo = [], fpFades = [];
+  // overall build height (also used by the step-list cameras below) + the
+  // faceplate step's own camera — hoisted so the EdgeLabel cinematic's final
+  // phase can glide back to exactly this preset
+  const H_MM = row0 + maxTop * PITCH_HALF_Y + 10;
+  const fpStepCam = { ...cam(0, H_MM * 0.5, totalW, gridBottom, FIT), t: 15, p: isUT ? 99 : 66 };
   let classicCount = 0;
   units.forEach((u, i) => {
     if (u.fill === 'classic') {
@@ -833,22 +838,56 @@ export function generateManifest(build) {
       );
       drawerPhases.push({ move: [{ id: `drw${i}`, by: [0, 0, -190] }, ...mag.map(m => ({ id: m.id, by: [0, 0, -190] }))] });
       const hasAccent = face.extras && u.hh !== 1;
-      fpDemo.push(
-        { move: [{ id: `drw${i}`, by: [0, 0, 40] }, ...mag.map(m => ({ id: m.id, by: [0, 0, 40] }))] },
-        ...(bcOn ? [{ enter: [{ id: `bc${i}`, at: [0, 0, 40], from: [0, 55, 0] }] }] : []), // cover first — it sits behind the plate
-        { enter: [{ id: `fp${i}`, at: [0, 0, 40], from: [0, 45, 0] }] },
-        ...(hasAccent ? [{ enter: [{ id: `fa${i}`, at: [0, 0, 40], from: [0, 0, 55] }] }] : []),   // accent presses into the face
-        ...(face.extras ? [{ enter: [{ id: `fl${i}`, at: [0, 0, 40], from: [0, 45, 0] }] }] : []), // label drops into its window
-        ...(face.hasHandle ? [{ enter: [{ id: `h${i}`, at: [0, 0, 40], from: [0, 0, 55] }] }] : []),
-        { move: [
-          { id: `drw${i}`, by: [0, 0, -40] }, ...mag.map(m => ({ id: m.id, by: [0, 0, -40] })),
-          ...(bcOn ? [{ id: `bc${i}`, by: [0, 0, -40] }] : []),
-          { id: `fp${i}`, by: [0, 0, -40] },
-          ...(hasAccent ? [{ id: `fa${i}`, by: [0, 0, -40] }] : []),
-          ...(face.extras ? [{ id: `fl${i}`, by: [0, 0, -40] }] : []),
-          ...(face.hasHandle ? [{ id: `h${i}`, by: [0, 0, -40] }] : []),
-        ] },
-      );
+      const homeMove = { move: [ // everyone glides home together at the end
+        { id: `drw${i}`, by: [0, 0, -40] }, ...mag.map(m => ({ id: m.id, by: [0, 0, -40] })),
+        ...(bcOn ? [{ id: `bc${i}`, by: [0, 0, -40] }] : []),
+        { id: `fp${i}`, by: [0, 0, -40] },
+        ...(hasAccent ? [{ id: `fa${i}`, by: [0, 0, -40] }] : []),
+        ...(face.extras ? [{ id: `fl${i}`, by: [0, 0, -40] }] : []),
+        ...(face.hasHandle ? [{ id: `h${i}`, by: [0, 0, -40] }] : []),
+      ] };
+      if (face.extras) {
+        // Joey's faceplate cinematic (2026-07-08): pop the drawer, fade the
+        // WHOLE WORLD away (vanish + room 0 — the step twin of the tap
+        // isolation), stage the plate on the clean stage, attach the accent
+        // and label with the exact motions their removal rituals reverse,
+        // swing BEHIND the plate for the back cover when one is on, then
+        // glide the camera home, fade the world back and push the drawer in.
+        // Every at-offset + move nets to zero → prev/jump stays deterministic.
+        const plateW = u.w * PITCH_X - 1;
+        const pc = [cx + 0.47, bottom + 3.72 + fpH / 2, face.z - dz + 40]; // plate center at its popped-out seat
+        const rCam = 180 + plateW * 1.5;
+        const camFront = { t: 12, p: 82, r: rCam, target: pc };
+        const camBack = { t: 168, p: 82, r: rCam, target: pc };
+        fpDemo.push(
+          { move: [{ id: `drw${i}`, by: [0, 0, 40] }, ...mag.map(m => ({ id: m.id, by: [0, 0, 40] }))] },
+          { vanish: true, room: 0, camera: camFront },                        // world away → the faceplate stage
+          { enter: [{ id: `fp${i}`, at: [0, 0, 40], from: [0, 45, 0] }] },    // plate slides DOWN onto the drawer front
+          ...(hasAccent ? [
+            { enter: [{ id: `fa${i}`, at: [0, -4, 60], from: [0, 0, 30] }] }, // accent arrives out front, riding low…
+            { move: [{ id: `fa${i}`, by: [0, 0, -20] }] },                    // …in 20 (its removal ritual, reversed)
+            { move: [{ id: `fa${i}`, by: [0, 4, 0] }] },                      // …up 4 onto its clips
+          ] : []),
+          { enter: [{ id: `fl${i}`, at: [0, 20, 40], from: [0, 30, 0] }] },   // label hovers over its window…
+          { move: [{ id: `fl${i}`, by: [0, -20, 0] }] },                      // …and slides in
+          ...(bcOn ? [
+            { camera: camBack },                                              // swing behind the plate
+            { enter: [{ id: `bc${i}`, at: [0, 4, 20], from: [0, 0, -35] }] }, // cover arrives behind, riding high…
+            { move: [{ id: `bc${i}`, by: [0, 0, 20] }] },                     // …forward 20 into the drawer-front gap
+            { move: [{ id: `bc${i}`, by: [0, -4, 0] }] },                     // …down 4 onto its hooks
+          ] : []),
+          { appear: true, room: 1, camera: fpStepCam },                       // world returns, camera glides home
+          homeMove,
+        );
+      } else {
+        fpDemo.push(
+          { move: [{ id: `drw${i}`, by: [0, 0, 40] }, ...mag.map(m => ({ id: m.id, by: [0, 0, 40] }))] },
+          ...(bcOn ? [{ enter: [{ id: `bc${i}`, at: [0, 0, 40], from: [0, 55, 0] }] }] : []), // cover first — it sits behind the plate
+          { enter: [{ id: `fp${i}`, at: [0, 0, 40], from: [0, 45, 0] }] },
+          ...(face.hasHandle ? [{ enter: [{ id: `h${i}`, at: [0, 0, 40], from: [0, 0, 55] }] }] : []),
+          homeMove,
+        );
+      }
     } else {
       if (hasMag) drawerFades.push({ id: `dc${i}` }, { id: `dm${i}` });
       drawerPhases._laterDrawers = (drawerPhases._laterDrawers || []).concat({ id: `drw${i}`, from: [0, 0, 200] });
@@ -864,7 +903,7 @@ export function generateManifest(build) {
   if (units.some(u => u.fill === 'decor' && u.hh !== 2)) warnings.push('Non-1H drawers use some derived (not-yet-calibrated) sizing — double-check the tall drawers and report anything that looks off.');
 
   // ---- assemble the step list ----------------------------------------------
-  const H_MM = row0 + maxTop * PITCH_HALF_Y + 10;
+  // (H_MM is hoisted above the drawer/faceplate loop — the cinematic needs it)
   const wide = cam(0, H_MM * 0.45, totalW, gridBottom);
 
   const magnetTotal = bom.get('Magnet_10x2mm')?.qty || 0;
@@ -1005,13 +1044,16 @@ export function generateManifest(build) {
     });
     postSteps.push({
       title: face.hasHandle ? 'Faceplates & handles' : 'Faceplates',
-      note: 'Pop a drawer out about 40 mm, ' + (bcOn ? 'clip the back cover into the drawer front, ' : '') +
-        'slide the faceplate DOWN onto the drawer front until it snaps, ' +
-        (face.extras
-          ? 'press the accent panel into the face and slide the label into its window, then push the drawer home.'
-          : 'screw on the Deco handle (2× M3), then push the drawer home.') +
-        ' Repeat for every drawer — the build is done. Tap any part to see its name and download links.',
-      camera: { ...cam(0, H_MM * 0.5, totalW, gridBottom, FIT), t: 15, p: isUT ? 99 : 66 },
+      // the note follows each family's demo order — EdgeLabel: plate → accent
+      // → label → cover from BEHIND; Essential: cover first (behind the plate)
+      note: face.extras
+        ? 'Pop a drawer out about 40 mm, slide the faceplate DOWN onto the drawer front until it snaps, press the accent panel into the face and slide the label into its window' +
+          (bcOn ? ', then clip the back cover in from behind' : '') +
+          ', then push the drawer home. Repeat for every drawer — the build is done. Tap any part to see its name and download links.'
+        : 'Pop a drawer out about 40 mm, ' + (bcOn ? 'clip the back cover into the drawer front, ' : '') +
+          'slide the faceplate DOWN onto the drawer front until it snaps, screw on the Deco handle (2× M3), then push the drawer home.' +
+          ' Repeat for every drawer — the build is done. Tap any part to see its name and download links.',
+      camera: fpStepCam,
       phases: [
         ...fpDemo,
         ...(fpFades.length ? [{ fade: fpFades }] : []),

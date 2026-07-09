@@ -121,7 +121,13 @@ optional `at` = temporary landing offset, e.g. onto a popped-out drawer),
 step** so prev/jump's computed after-state stays true; used for the per-drawer
 faceplate pop-out choreography and the wall hang), `ghost`/`solid` (fade
 instances to translucent 0.15 and back — used to see the pegs through a cover),
-and per-phase `camera` (retarget mid-step, e.g. zoom to the pegs then back), and
+`vanish`/`appear` + `room: 0|1` (2026-07-08: fade EVERY visible instance to
+nothing then hide / fade the hidden set back — the step-scripted twin of the
+faceplate tap-isolation, `room` drives the table/grid/wall via the fpEnv lerp
+and goTo resets it to 1; transient within a step — an appear always follows —
+so after-state math is untouched; killTweens never fires the hide-onDone and
+applyState restores everything), and per-phase `camera` (retarget mid-step,
+e.g. zoom to the pegs then back), and
 `land` (mark a staged group settled in place — used after explicit `move` phases
 already carried it home, so a two-step staged hang stays deterministic). Steps
 are deterministic — prev/jump snaps to computed after-state, next/replay
@@ -601,7 +607,16 @@ assumption was wrong; a 2-zone part needs worker + verifier changes):**
   center = plate LEFT edge + 28.5 on EVERY width — a center-based −15 was off by
   half a pitch on 2W, Joey measured the 44 mm; bottom fp+plateH−27, z-center
   plate−6.3) — offsets DERIVED from the EdgeLabel B blend @1W-1H — riding the
-  drawer, entering the demo after the plate + joining fades/push-home; NO handle
+  drawer. **The EdgeLabel install step is a CINEMATIC** (Joey 2026-07-08, first
+  drawer only): pop +40 → `vanish`+`room:0`+camera to a plate-front preset (t12
+  p82, r=180+plateW·1.5, target = plate center at the popped seat) → plate
+  slides down → accent + label attach with their removal rituals REVERSED
+  (at-offsets + canceling moves) → if backCover, camera swings to t168 BEHIND
+  the plate and the cover attaches (fwd 20, down 4) → `appear`+`room:1`+camera
+  back to `fpStepCam` (hoisted with H_MM ABOVE the drawer loop — it was
+  declared after, TDZ crash on first try) → push home. Camera dip verified
+  (minZ −156); later drawers keep the fade-in; Essential keeps the classic
+  cover-first choreography. NO handle
   instance/BOM/step ("Faceplates" title, accent/label note); COLORS Accent deep-navy
   #25316e, Label near-white #eef0f4. currentOpts posts `faceStyle`; the incoming
   handler applies it (live planner style changes regenerate). STATIC KITS keep the
