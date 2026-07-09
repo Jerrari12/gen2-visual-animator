@@ -732,10 +732,10 @@ function renderOptions() {
     const next = document.createElement('button'); next.textContent = '▶'; next.onclick = () => cycleFaceplateStyle(1);
     grp.append(prev, name, next); row.append(lab, grp); box.appendChild(row);
   }
-  // faceplate back cover — a universal decor-faceplate accessory (Essential /
-  // EdgeLabel / Classic Pro seat the same part); fills the new open-front Decor
-  // drawer's gap, off = older closed-front drawers. 165 covers aren't modeled.
-  if (drawersInBuild().length && String(build.length) !== '165') {
+  // faceplate back cover — a universal decor-faceplate accessory (every family
+  // seats the same SHARED part, both collections); fills the new open-front
+  // Decor drawer's gap, off = older closed-front drawers
+  if (drawersInBuild().length) {
     box.appendChild(optSeg('Faceplate back cover', [{ label: 'Off', val: false }, { label: 'On', val: true }], !!build.backCover,
       async v => { build.backCover = v; await regenerate(); }));
   }
@@ -1884,8 +1884,10 @@ async function cycleHandleStyle(dir) {
 // applyState/exploded/phases/computeBounds/checklist/bomRows); switching back
 // restores them untouched (their cfg was never edited).
 const FACEPLATE_STYLES = [
+  // faceplates are SHARED hardware — the same GLBs serve 165 and 185 (both
+  // pools + kit folders carry copies; placement shifts −dz on 165)
   { key: 'essential', label: 'Essential', node: c => `Faceplate_Essential_${c}`, hasHandle: true,  collections: ['185', '165'] },
-  { key: 'edgelabel', label: 'EdgeLabel', node: c => `Faceplate_EdgeLabel_${c}`, hasHandle: false, collections: ['185'] }, // no 165 EdgeLabel GLBs yet
+  { key: 'edgelabel', label: 'EdgeLabel', node: c => `Faceplate_EdgeLabel_${c}`, hasHandle: false, collections: ['185', '165'] },
 ];
 const fpSizeCode = node => (node.match(/_(\dW-\d+H)$/) || [])[1] || null;
 const availableFaceplateStyles = () => FACEPLATE_STYLES.filter(s => s.collections.includes(manifest.collection || '185'));

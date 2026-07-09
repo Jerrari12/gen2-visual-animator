@@ -166,18 +166,16 @@ export function generateManifest(build) {
     edgelabel: { key: 'edgelabel', node: c => `Faceplate_EdgeLabel_${c}`, z: 104.62, hasHandle: false,
                  label: c => `EdgeLabel Faceplate ${c}`, extras: true }, // no public links yet — club family
   };
-  const face = (String(L) !== '165' && FACE_FAMILIES[build.faceStyle]) || FACE_FAMILIES.essential;
-  if (build.faceStyle === 'edgelabel' && String(L) === '165')
-    warnings.push('EdgeLabel faceplates aren\'t modeled for the 165 collection yet — shown in the Essential style.');
-  else if (build.faceStyle && !FACE_FAMILIES[build.faceStyle])
+  // faceplates are SHARED hardware (same GLBs both collections, placed −dz on
+  // 165 like every other front-face part) — both families serve 165 and 185
+  const face = FACE_FAMILIES[build.faceStyle] || FACE_FAMILIES.essential;
+  if (build.faceStyle && !FACE_FAMILIES[build.faceStyle])
     warnings.push(`Faceplates are shown in the Essential style (your "${build.faceStyle}" style isn't modeled yet).`);
-  // faceplate back cover: a UNIVERSAL decor-faceplate accessory (Essential /
-  // EdgeLabel / Classic Pro all seat the same per-size part — the GLB family
-  // name is historical, from the EdgeLabel exporter blend). Optional: fills
-  // the new open-front Decor drawer's gap; off = older closed-front drawers.
-  const bcOn = !!build.backCover && String(L) !== '165';
-  if (build.backCover && String(L) === '165')
-    warnings.push('Faceplate back covers aren\'t modeled for the 165 collection yet — shown without them.');
+  // faceplate back cover: a UNIVERSAL decor-faceplate accessory (every family
+  // seats the same per-size part — the GLB family name is historical, from the
+  // EdgeLabel exporter blend). Optional: fills the new open-front Decor
+  // drawer's gap; off = older closed-front drawers. Shared hardware → −dz.
+  const bcOn = !!build.backCover;
 
   // ---- normalize units to a bottom-left origin ----------------------------
   const gridBottom = build.gridH * 2; // planner y counts half-rows from the TOP

@@ -220,10 +220,11 @@ per decor faceplate: z-center 92.795 = mounting plane + 0.225, bottom = fp
 bottom + 7.22 (DERIVED from the EdgeLabel blend @1W-1H — verify on a print),
 rides the drawer, enters the faceplate demo BEFORE the plate + joins the
 push-home/fades, note gains "clip the back cover…"; BOM type `BackCover`
-×drawers, COLORS indigo #5b6ee1. 185 only — a 165 build hides the toggle and
-the generator warns. Family-agnostic (Essential/EdgeLabel/Classic Pro all seat
-the same cover), so it coexists with the plate swap — verified on a constructed
-#build= link, incl. `activeFaceplateStyle` surviving the toggle's regenerate),
+×drawers, COLORS indigo #5b6ee1. Serves BOTH collections (shared hardware,
+−dz on 165 → cover z 82.8). Family-agnostic (Essential/EdgeLabel/Classic Pro
+all seat the same cover), so it coexists with the plate swap — verified on
+constructed #build= links, incl. `activeFaceplateStyle` surviving the toggle's
+regenerate),
 wall-only Top cover Per-column/Staggered (`wallStagger`), and Reset to original
 (snapshotted `originalBuild`). `currentOpts` posts closures/removedStoppers/
 wallStagger/handleStyle/faceStyle/backCover and the incoming handler applies
@@ -580,8 +581,11 @@ assumption was wrong; a 2-zone part needs worker + verifier changes):**
   tabletop-185 has 0 zoned meshes, handle swap + cards unchanged.
 - **Faceplate family swap (DONE 2026-07-08, verified in-browser):** identify-card ◀▶
   row (`cycleStyle` dispatches by selected type) + a Faceplate row in Build options.
-  `FACEPLATE_STYLES` in main.js: essential (185+165) / edgelabel (185 only — no 165
-  family, so 165 hides the row + the generator warns and falls back). **Generated
+  `FACEPLATE_STYLES` in main.js: essential / edgelabel — BOTH serve 185 AND 165
+  (2026-07-08, Joey's live 165 repro caught the wrong 185-only guard): faceplates
+  are SHARED hardware, same GLBs placed −dz on 165 (EdgeLabel plate 94.62, accent
+  86.95, label 88.32, cover 82.8 — DERIVED like every 165 number; swap round-trips
+  Essential@85.07); GLB copies in parts/165/ + the tabletop-165 kit folder. **Generated
   builds swap through the GENERATOR** (2026-07-08, Joey hit the bare-plate limit):
   applyFaceplateStyle sets `build.faceStyle` — the PLANNER'S OWN field (ids
   essential/edgelabel/classicpro, already in BUILD_FIELDS + share links, so a planner
