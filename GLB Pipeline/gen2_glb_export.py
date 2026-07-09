@@ -49,6 +49,9 @@ CONFIG = {
     "drop_islands_max_verts": 0,               # >0 = delete tiny mesh islands (print bridges/
     "drop_islands_max_thick": 2.0,             #   supports) that are ALSO thinner than this (mm, Z)
     "report":        "_export_report.json",    # written into --out
+    "export_materials": "NONE",                # NONE (law #2 default) | PLACEHOLDER | EXPORT
+                                               #   EXPORT keeps multi-slot zones as tiny named
+                                               #   stubs (e.g. 2-zone faceplate BODY/GRIP)
 }
 
 # depth-mode note:
@@ -73,6 +76,9 @@ def get_config():
     ap.add_argument("--name-template", dest="name_template", default=CONFIG["name_template"])
     ap.add_argument("--depth-mode", dest="depth_mode", default=CONFIG["depth_mode"],
                     choices=["center", "front", "back"])
+    ap.add_argument("--export-materials", dest="export_materials",
+                    default=CONFIG["export_materials"],
+                    choices=["NONE", "PLACEHOLDER", "EXPORT"])
     ap.add_argument("--drop-islands-max-verts", dest="drop_islands_max_verts",
                     type=int, default=CONFIG["drop_islands_max_verts"])
     ap.add_argument("--drop-islands-max-thick", dest="drop_islands_max_thick",
@@ -128,7 +134,7 @@ def rebase_offset(bounds, depth_mode):
     return Vector((dx, dy, dz))
 
 
-def export_selected(obj, path):
+def export_selected(obj, path, export_materials="NONE"):
     for o in bpy.context.view_layer.objects:
         o.select_set(False)
     obj.select_set(True)
@@ -138,7 +144,7 @@ def export_selected(obj, path):
         export_format="GLB",
         use_selection=True,
         export_yup=True,           # law #1: Blender Z-up -> glTF Y-up
-        export_materials="NONE",   # law #2: no materials
+        export_materials=export_materials,  # law #2 default "NONE"; EXPORT keeps zone stubs
         export_cameras=False,
         export_lights=False,
         export_apply=True,
@@ -234,7 +240,7 @@ def run():
 
         b = world_bounds(dup)  # Blender-space bounds after rebase (sanity only)
         path = os.path.join(out_dir, node + ".glb")
-        export_selected(dup, path)
+        export_selected(dup, path, cfg["export_materials"])
 
         report.append({
             "source_object": src.name,
@@ -264,6 +270,7 @@ def run():
         "code_regex": cfg["code_regex"],
         "name_template": cfg["name_template"],
         "depth_mode": cfg["depth_mode"],
+        "export_materials": cfg["export_materials"],
         "exported": len(report),
         "parts": report,
     }

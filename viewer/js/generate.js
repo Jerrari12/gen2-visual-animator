@@ -100,6 +100,9 @@ const COLORS = {
   Stopper: '#d84fb0',     // magenta (L & R share)
   MagnetClip: '#b06a3c',  // brown
   Magnet: '#b8bcc4',      // silver
+  BackCover: '#5b6ee1',   // indigo — faceplate back cover (optional)
+  Accent: '#25316e',      // deep navy — EdgeLabel/Classic Pro accent panel
+  Label: '#eef0f4',       // near-white — the universal swap-in label card
   Bracket: '#8792a2',     // steel — wall bracket
   Screw: '#d5dae1',       // light steel — wood screw
   Rail: '#2f7fd6',        // blue — under-table rail (footrails never coexist with it)
@@ -152,8 +155,29 @@ export function generateManifest(build) {
         wall:  { ...LINKS.wall,  t: 'https://than.gs/m/1515711' },
       }
     : LINKS;
-  if (build.faceStyle && build.faceStyle !== 'essential')
+  // ---- faceplate family (planner `faceStyle`, carried in share links) -----
+  // essential: flat 5 mm plate + bolt-on handle. edgelabel: 24.1 mm deep 2-zone
+  // plate (grip printed in — NO handle) + accent panel (not on 05H) + the
+  // universal label card. Both mount their BACK FACE on the same plane (the
+  // drawer front, 92.57 − dz): z-center = plane + depth/2.
+  const FACE_FAMILIES = {
+    essential: { key: 'essential', node: c => `Faceplate_Essential_${c}`, z: 95.07, hasHandle: true,
+                 label: c => `Faceplate Essential ${c}`, extras: false },
+    edgelabel: { key: 'edgelabel', node: c => `Faceplate_EdgeLabel_${c}`, z: 104.62, hasHandle: false,
+                 label: c => `EdgeLabel Faceplate ${c}`, extras: true }, // no public links yet — club family
+  };
+  const face = (String(L) !== '165' && FACE_FAMILIES[build.faceStyle]) || FACE_FAMILIES.essential;
+  if (build.faceStyle === 'edgelabel' && String(L) === '165')
+    warnings.push('EdgeLabel faceplates aren\'t modeled for the 165 collection yet — shown in the Essential style.');
+  else if (build.faceStyle && !FACE_FAMILIES[build.faceStyle])
     warnings.push(`Faceplates are shown in the Essential style (your "${build.faceStyle}" style isn't modeled yet).`);
+  // faceplate back cover: a UNIVERSAL decor-faceplate accessory (Essential /
+  // EdgeLabel / Classic Pro all seat the same per-size part — the GLB family
+  // name is historical, from the EdgeLabel exporter blend). Optional: fills
+  // the new open-front Decor drawer's gap; off = older closed-front drawers.
+  const bcOn = !!build.backCover && String(L) !== '165';
+  if (build.backCover && String(L) === '165')
+    warnings.push('Faceplate back covers aren\'t modeled for the 165 collection yet — shown without them.');
 
   // ---- normalize units to a bottom-left origin ----------------------------
   const gridBottom = build.gridH * 2; // planner y counts half-rows from the TOP
@@ -755,17 +779,51 @@ export function generateManifest(build) {
       inst.push({ id: `dc${i}`, node: 'MagnetClip_10x2mm', pos: [dx, bottom + 5.72 + drwH - 20, -83 + dz + drwFwd], yaw: 180, rides: `drw${i}`, owner: u.id });
       inst.push({ id: `dm${i}`, node: 'Magnet_10x2mm', pos: [dx, bottom + 5.72 + drwH - 15, -84 + dz + drwFwd], rides: `drw${i}`, owner: u.id });
     }
-    // faceplate: ground-truth z-center 95.07, front face 97.57 (handle mounts
-    // there). Correct at every height — the faceplate does NOT move with the
-    // above drawer-body nudge (it's placed to sit flush regardless).
-    inst.push({ id: `fp${i}`, node: `Faceplate_Essential_${u.w}W-${H}H`, pos: [cx + 0.47, bottom + 3.72, 95.07 - dz], rides: `drw${i}` });
-    // handle: back face against the faceplate front, vertically centered on the
-    // plate — the mounting rule that holds for every style (from the Deco ground
-    // truth: bottom = fp + 22.49, z-center 109.57 for h9 × d24)
-    inst.push({ id: `h${i}`, node: handleStyle.node, pos: [cx + 0.46, bottom + 3.72 + (fpH - handleStyle.h) / 2 - 0.5, 97.57 - dz + handleStyle.d / 2], rides: `drw${i}` });
+    // faceplate: Essential ground-truth z-center 95.07 (front face 97.57, where
+    // the handle mounts); EdgeLabel 104.62 — both = mounting plane + depth/2.
+    // Correct at every height — the faceplate does NOT move with the above
+    // drawer-body nudge (it's placed to sit flush regardless).
+    const code = `${u.w}W-${H}H`;
+    inst.push({ id: `fp${i}`, node: face.node(code), pos: [cx + 0.47, bottom + 3.72, face.z - dz], rides: `drw${i}` });
+    if (bcOn) {
+      // back cover: seats in the drawer-front gap BEHIND the plate — z-center =
+      // the mounting plane (fp back face, 92.57) + 0.225, bottom = fp bottom
+      // + 7.22 (DERIVED from the EdgeLabel B blend @1W-1H — verify on a print;
+      // works under every plate family since the mounting plane never moves)
+      inst.push({ id: `bc${i}`, node: `BackCover_EdgeLabel_${u.w}W-${H}H`, pos: [cx + 0.47, bottom + 3.72 + 7.22, 92.795 - dz], rides: `drw${i}` });
+      add(`BackCover_EdgeLabel_${u.w}W-${H}H`, `Faceplate Back Cover ${u.w}W-${H}H`, 'BackCover', null);
+    }
+    if (face.extras) {
+      // EdgeLabel dressing (offsets DERIVED from the EdgeLabel B blend @1W-1H,
+      // relative to the plate): accent panel — bottom +0.05, z-center −7.675
+      // from the plate center — fills the face below the label band, so 05H
+      // (where the band IS the whole plate) has none. The universal label card
+      // is LEFT-ANCHORED: its center sits 28.5 from the plate's LEFT edge on
+      // EVERY width (the window doesn't move as plates widen — a center-based
+      // −15 was off by half a pitch on 2W, Joey measured the 44 mm). Bottom
+      // + plate height − 27 (top band), z-center −6.3. All ride the drawer.
+      if (u.hh !== 1) {
+        // the accent GLBs exported UPSIDE DOWN (blend pose) — counter-rotate 180°
+        // about Z (the depth axis): top↔bottom + left↔right, face still forward
+        // (an X flip showed the accent's BACK — Joey). Bottom-anchored parts hang
+        // below their origin when flipped, so place at their TOP (bottom + accent
+        // height, = fpH − 27.2 label band) to keep the flip centered on itself.
+        inst.push({ id: `fa${i}`, node: `Accent_EdgeLabel_${code}`, rot: [0, 0, 180], pos: [cx + 0.47, bottom + 3.77 + (fpH - 27.2), face.z - 7.675 - dz], rides: `drw${i}` });
+        add(`Accent_EdgeLabel_${code}`, `EdgeLabel Accent ${code}`, 'Accent', null);
+      }
+      inst.push({ id: `fl${i}`, node: 'Label_EdgeLabel', pos: [cx + 0.47 - (u.w * PITCH_X - 1) / 2 + 28.5, bottom + 3.72 + fpH - 27, face.z - 6.3 - dz], rides: `drw${i}` });
+      add('Label_EdgeLabel', 'EdgeLabel Label (universal)', 'Label', null);
+    }
+    if (face.hasHandle) {
+      // handle: back face against the faceplate front, vertically centered on
+      // the plate — the mounting rule that holds for every style (from the Deco
+      // ground truth: bottom = fp + 22.49, z-center 109.57 for h9 × d24).
+      // EdgeLabel prints its grip into the plate — no bolt-on handle at all.
+      inst.push({ id: `h${i}`, node: handleStyle.node, pos: [cx + 0.46, bottom + 3.72 + (fpH - handleStyle.h) / 2 - 0.5, 97.57 - dz + handleStyle.d / 2], rides: `drw${i}` });
+    }
     add(`DecorDrawer_${L}-${u.w}W-${H}H`, `Decor Drawer ${L}-${u.w}W-${H}H`, 'Drawer', links.decor);
-    add(`Faceplate_Essential_${u.w}W-${H}H`, `Faceplate Essential ${u.w}W-${H}H`, 'Faceplate', links.fp);
-    add(handleStyle.node, handleStyle.label, 'Handle', handleStyle.links);
+    add(face.node(code), face.label(code), 'Faceplate', face.key === 'essential' ? links.fp : null);
+    if (face.hasHandle) add(handleStyle.node, handleStyle.label, 'Handle', handleStyle.links);
     const mag = hasMag ? [{ id: `dc${i}` }, { id: `dm${i}` }] : []; // clip+magnet riders, or none
     if (firstDrawerDemo === null) {
       firstDrawerDemo = i;
@@ -776,16 +834,31 @@ export function generateManifest(build) {
         { move: [{ id: `dc${i}`, by: [0, -35, 0] }, { id: `dm${i}`, by: [0, -35, 0] }] },
       );
       drawerPhases.push({ move: [{ id: `drw${i}`, by: [0, 0, -190] }, ...mag.map(m => ({ id: m.id, by: [0, 0, -190] }))] });
+      const hasAccent = face.extras && u.hh !== 1;
       fpDemo.push(
         { move: [{ id: `drw${i}`, by: [0, 0, 40] }, ...mag.map(m => ({ id: m.id, by: [0, 0, 40] }))] },
+        ...(bcOn ? [{ enter: [{ id: `bc${i}`, at: [0, 0, 40], from: [0, 55, 0] }] }] : []), // cover first — it sits behind the plate
         { enter: [{ id: `fp${i}`, at: [0, 0, 40], from: [0, 45, 0] }] },
-        { enter: [{ id: `h${i}`, at: [0, 0, 40], from: [0, 0, 55] }] },
-        { move: [{ id: `drw${i}`, by: [0, 0, -40] }, ...mag.map(m => ({ id: m.id, by: [0, 0, -40] })), { id: `fp${i}`, by: [0, 0, -40] }, { id: `h${i}`, by: [0, 0, -40] }] },
+        ...(hasAccent ? [{ enter: [{ id: `fa${i}`, at: [0, 0, 40], from: [0, 0, 55] }] }] : []),   // accent presses into the face
+        ...(face.extras ? [{ enter: [{ id: `fl${i}`, at: [0, 0, 40], from: [0, 45, 0] }] }] : []), // label drops into its window
+        ...(face.hasHandle ? [{ enter: [{ id: `h${i}`, at: [0, 0, 40], from: [0, 0, 55] }] }] : []),
+        { move: [
+          { id: `drw${i}`, by: [0, 0, -40] }, ...mag.map(m => ({ id: m.id, by: [0, 0, -40] })),
+          ...(bcOn ? [{ id: `bc${i}`, by: [0, 0, -40] }] : []),
+          { id: `fp${i}`, by: [0, 0, -40] },
+          ...(hasAccent ? [{ id: `fa${i}`, by: [0, 0, -40] }] : []),
+          ...(face.extras ? [{ id: `fl${i}`, by: [0, 0, -40] }] : []),
+          ...(face.hasHandle ? [{ id: `h${i}`, by: [0, 0, -40] }] : []),
+        ] },
       );
     } else {
       if (hasMag) drawerFades.push({ id: `dc${i}` }, { id: `dm${i}` });
       drawerPhases._laterDrawers = (drawerPhases._laterDrawers || []).concat({ id: `drw${i}`, from: [0, 0, 200] });
-      fpFades.push({ id: `fp${i}` }, { id: `h${i}` });
+      if (bcOn) fpFades.push({ id: `bc${i}` });
+      fpFades.push({ id: `fp${i}` });
+      if (face.extras && u.hh !== 1) fpFades.push({ id: `fa${i}` });
+      if (face.extras) fpFades.push({ id: `fl${i}` });
+      if (face.hasHandle) fpFades.push({ id: `h${i}` });
     }
   });
 
@@ -933,8 +1006,13 @@ export function generateManifest(build) {
       ],
     });
     postSteps.push({
-      title: 'Faceplates & handles',
-      note: 'Pop a drawer out about 40 mm, slide the faceplate DOWN onto the drawer front until it snaps, screw on the Deco handle (2× M3), then push the drawer home. Repeat for every drawer — the build is done. Tap any part to see its name and download links.',
+      title: face.hasHandle ? 'Faceplates & handles' : 'Faceplates',
+      note: 'Pop a drawer out about 40 mm, ' + (bcOn ? 'clip the back cover into the drawer front, ' : '') +
+        'slide the faceplate DOWN onto the drawer front until it snaps, ' +
+        (face.extras
+          ? 'press the accent panel into the face and slide the label into its window, then push the drawer home.'
+          : 'screw on the Deco handle (2× M3), then push the drawer home.') +
+        ' Repeat for every drawer — the build is done. Tap any part to see its name and download links.',
       camera: { ...cam(0, H_MM * 0.5, totalW, gridBottom, FIT), t: 15, p: isUT ? 99 : 66 },
       phases: [
         ...fpDemo,

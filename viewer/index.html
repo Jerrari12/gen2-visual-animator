@@ -23,6 +23,7 @@
 
     <div id="stage-wrap">
       <canvas id="stage"></canvas>
+      <div id="cover-bg"></div>
 
       <div id="note-panel">
         <div id="step-num"></div>
@@ -37,6 +38,11 @@
 
       <button id="checklist-tab" class="hidden" title="Show parts list">Parts</button>
       <button id="color-toggle" class="hidden" title="Switch between instruction colors and your filament colors"></button>
+      <button id="measure-toggle" class="hidden" title="Measure between two points on the model (real mm)">&#128207; Measure</button>
+      <div id="measure-label" class="hidden"></div>
+      <div id="dim-w" class="dim-label hidden"></div>
+      <div id="dim-h" class="dim-label hidden"></div>
+      <div id="dim-l" class="dim-label hidden"></div>
       <div id="checklist-panel" class="hidden">
         <div class="checklist-head">
           <span id="checklist-title">Your build</span>
@@ -68,12 +74,17 @@
             <span id="identify-name"></span>
           </div>
           <div id="identify-qty"></div>
+          <div id="identify-zones" class="hidden"></div>
+          <div id="identify-debug" class="hidden"></div>
           <div id="identify-links"></div>
+          <a id="identify-label-gen" class="hidden" href="#" target="_blank" rel="noopener"></a>
           <div id="identify-style" class="hidden">
             <button id="style-prev" title="Previous style">&#9664;</button>
             <span id="style-name"></span>
             <button id="style-next" title="Next style">&#9654;</button>
           </div>
+          <button id="identify-open-drawer" class="hidden" title="Slide this drawer open to see inside">Open the drawer &#9656;</button>
+          <button id="identify-close-drawer" class="hidden" title="Slide the drawer shut and zoom back out">&#10005; Close drawer</button>
           <button id="identify-remove" class="hidden" title="Remove this optional part">&#10005; Remove</button>
         </div>
       </div>
@@ -91,8 +102,10 @@
 
       <div id="outro-overlay" class="hidden">
         <div class="outro-card">
-          <img id="outro-logo" src="img/jerrari-logo.svg" alt="JERRARI" onerror="this.classList.add('hidden')" />
-          <div class="outro-title">Thanks for building!</div>
+          <div class="outro-head">
+            <img id="outro-logo" src="img/jerrari-logo.svg" alt="JERRARI" onerror="this.classList.add('hidden')" />
+            <div class="outro-title">Thanks for building!</div>
+          </div>
           <div class="outro-sub">The core GEN2 system is free and independent. The Club unlocks exclusive faceplate styles like EdgeLabel and Classic Pro, plus early access — and keeps new parts coming.</div>
           <a class="outro-btn primary" href="https://www.printables.com/@Jerrari#join.@Jerrari.893" target="_blank" rel="noopener">Join the Club on Printables</a>
           <a class="outro-btn" href="https://thangs.com/designer/Jerrari/memberships" target="_blank" rel="noopener">Join the Club on Thangs</a>
@@ -105,12 +118,17 @@
       </div>
 
       <div id="cover-overlay" class="hidden">
+        <div id="cover-ribbon"><div class="cr-band"><b id="cover-ribbon-num"></b><span>Collection</span></div></div>
         <div class="cover-right">
           <img id="cover-logo" src="img/gen2-logo.png" alt="GEN2 QuickLock Modular System" onerror="this.classList.add('hidden')" />
-          <div class="cover-dynamic">DYNAMIC</div>
-          <div class="cover-manual">INSTRUCTION MANUAL</div>
-          <button id="btn-start">Get started</button>
+          <div class="cover-lede">
+            <span class="cover-dynamic">Dynamic</span>
+            <span class="cover-manual">Instruction Manual</span>
+          </div>
+          <button id="btn-start">Get started <i>&rarr;</i></button>
+          <button id="btn-skip-end" title="Jump straight to the completed model — tap parts to recolor or customize">Skip to the finished build &rarr;</button>
         </div>
+        <div id="cover-badges"></div>
       </div>
 
       <div id="tap-hint" class="hidden">

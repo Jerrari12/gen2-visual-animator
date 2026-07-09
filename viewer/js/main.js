@@ -108,8 +108,9 @@ function resize() {
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
     // re-fit a whole-build shot to the new aspect (skip during the cinema, which
-    // drives the camera itself)
-    if (curCamPreset?.fit && !cinema.on && !tweens.size && !camOverride) {
+    // drives the camera itself, and during drawer/faceplate focus, which park
+    // the camera on the part)
+    if (curCamPreset?.fit && !cinema.on && !tweens.size && !camOverride && !dFocus.carrier && !fpFocus.id) {
       const { pos, target } = camPos(curCamPreset);
       camera.position.copy(pos); controls.target.copy(target); controls.update();
     }
@@ -170,11 +171,21 @@ if (isUnderTableBuild) {
 const loader = new GLTFLoader();
 loader.setMeshoptDecoder(MeshoptDecoder);
 
+// Materials are keyed by part TYPE ('Faceplate') or a ZONE of one
+// ('Faceplate:GRIP'). Zones come from 2-zone GLBs (EdgeLabel body+grip): the
+// exporter ships tiny NAMED material stubs whose name tags each primitive —
+// the viewer replaces every material, the name is the only thing it reads.
 const materials = {};
 const fallbackMat = new THREE.MeshStandardMaterial({ color: 0xb9bcc2, roughness: 0.6 });
-function ensureMaterials() { // one shared material per part type (idempotent across re-mounts)
-  for (const [type, hex] of Object.entries(manifest.colors))
-    if (!materials[type]) materials[type] = new THREE.MeshStandardMaterial({ color: new THREE.Color(hex), roughness: 0.55, metalness: 0.05 });
+const zoneKey = (type, zone) => zone ? `${type}:${zone}` : type;
+function ensureMaterials() { // one shared material per type/zone key (idempotent across re-mounts)
+  for (const [key, hex] of Object.entries(manifest.colors))
+    if (!materials[key]) materials[key] = new THREE.MeshStandardMaterial({ color: new THREE.Color(hex), roughness: 0.55, metalness: 0.05 });
+}
+function baseMatFor(type, zone = '') { // shared material per (type, zone) — zones build lazily off the active palette
+  const key = zoneKey(type, zone);
+  if (!materials[key]) materials[key] = new THREE.MeshStandardMaterial({ color: new THREE.Color(activeHex(key)), roughness: 0.55, metalness: 0.05 });
+  return materials[key];
 }
 
 // tiled multi-width types: adjacent same-type tiles alternate a slightly lighter
@@ -202,10 +213,22 @@ async function loadTemplates() {
   const need = [...new Set(manifest.instances.map(i => i.node))].filter(n => !templates[n]);
   await Promise.all(need.map(async node => {
     const gltf = await loader.loadAsync(`${PARTS_BASE}${node}.lib.glb`);
-    const mat = materials[typeByNode[node]] || fallbackMat;
-    gltf.scene.traverse(o => { if (o.isMesh) o.material = mat; });
-    templates[node] = gltf.scene;
+    templates[node] = adoptTemplate(gltf.scene, typeByNode[node]);
   }));
+}
+// 2-zone parts (EdgeLabel body+grip) arrive as two primitives carrying named
+// material stubs — the NAME is the zone tag, read once here and stamped on the
+// mesh (clones inherit it). 'BODY' means "the part's main color" = the plain
+// type key (so BOM chip / header swatch / presets all drive it). Material-free
+// parts get an unnamed default → no zone.
+function adoptTemplate(sceneRoot, type) {
+  sceneRoot.traverse(o => {
+    if (!o.isMesh) return;
+    const zone = (o.material?.name && o.material.name !== 'BODY') ? o.material.name : '';
+    if (zone) o.userData.zone = zone;
+    o.material = baseMatFor(type, zone);
+  });
+  return sceneRoot;
 }
 
 // ---------- instances ----------
@@ -293,12 +316,18 @@ function fitSurface() {
 // build bounding sphere, for aspect-aware "fit to view" camera framing (so
 // whole-build shots fill the frame on any aspect, not just tall/square ones)
 let buildCenter = new THREE.Vector3(), buildRadius = 400;
+const assembledBox = new THREE.Box3(); // final-state extents, wood screws excluded — feeds the W/H/L dimension callouts
 function computeBounds() {
   const box = new THREE.Box3();
+  assembledBox.makeEmpty();
   for (const inst of instances.values()) {
     inst.group.position.copy(basePos(inst, false));
     inst.group.updateMatrixWorld(true);
+    if (inst.styleHidden) continue; // style-suppressed (handles under an EdgeLabel plate) — not part of the build
     box.expandByObject(inst.group);
+    // screws sink INTO the mounting surface (wall/wood) — not part of the
+    // build's physical envelope (same rule as fitWall/fitSurface)
+    if (!inst.cfg.node.startsWith('WoodScrew')) assembledBox.expandByObject(inst.group);
   }
   if (!box.isEmpty()) {
     box.getCenter(buildCenter);
@@ -340,11 +369,12 @@ function applyState(i) { // instant snap to "after step i" (i = -1 for nothing)
   killTweens();
   const st = i < 0 ? { visible: new Set(), settled: new Set() } : afterState[i];
   for (const inst of instances.values()) {
-    inst.group.visible = st.visible.has(inst.cfg.id);
+    inst.group.visible = st.visible.has(inst.cfg.id) && !inst.styleHidden; // styleHidden: bolt-on handles while an EdgeLabel plate is active
     inst.staged = !!inst.cfg.stage && !st.settled.has(inst.cfg.stage);
     inst.group.position.copy(basePos(inst, inst.staged));
+    if (inst.group.children[0]) inst.group.children[0].position.set(0, 0, 0); // clear a stranded label lift (killed mid-tween)
     // restore shared materials (an interrupted fade leaves per-mesh clones)
-    inst.group.traverse(o => { if (o.isMesh) o.material = materialFor(inst, false); });
+    inst.group.traverse(o => { if (o.isMesh) o.material = materialFor(inst, false, o.userData.zone); });
   }
 }
 
@@ -386,10 +416,11 @@ function buildExploded() {
 function applyExploded() {
   killTweens();
   for (const inst of instances.values()) {
-    inst.group.visible = true;
+    inst.group.visible = !inst.styleHidden;
     inst.staged = false;
     inst.group.position.copy(exploded.get(inst.cfg.id));
-    inst.group.traverse(o => { if (o.isMesh) o.material = materialFor(inst, false); });
+    if (inst.group.children[0]) inst.group.children[0].position.set(0, 0, 0); // clear a stranded label lift
+    inst.group.traverse(o => { if (o.isMesh) o.material = materialFor(inst, false, o.userData.zone); });
   }
 }
 // animated variant: parts drift from wherever they are (the finished cover
@@ -398,9 +429,9 @@ function playExploded() {
   killTweens();
   for (const inst of instances.values()) {
     inst.staged = false;
-    inst.group.traverse(o => { if (o.isMesh) o.material = materialFor(inst, false); });
+    inst.group.traverse(o => { if (o.isMesh) o.material = materialFor(inst, false, o.userData.zone); });
     const e = exploded.get(inst.cfg.id);
-    if (!inst.group.visible) { inst.group.visible = true; inst.group.position.copy(e); continue; }
+    if (!inst.group.visible || inst.styleHidden) { inst.group.visible = !inst.styleHidden; inst.group.position.copy(e); continue; }
     const fromV = inst.group.position.clone();
     tween({ duration: 1000, onUpdate: k => inst.group.position.lerpVectors(fromV, e, k) });
   }
@@ -408,8 +439,9 @@ function playExploded() {
 
 // ---------- cover page ----------
 // Synthetic page 0: the finished build, shot "telephoto" (tiny FOV, camera far
-// away) for an isometric feel, framed left of center to leave room for the
-// brand overlay. Engine-computed — works for kits and generated builds alike.
+// away) STRAIGHT-ON at the build's mid-height — faceplates read almost 2D,
+// like box-art product photography (Joey) — framed left of center to leave
+// room for the brand overlay. Engine-computed — kits and generated builds alike.
 function applyCover() {
   killTweens();
   applyState(manifest.steps.length - 1); // the finished assembly
@@ -417,7 +449,29 @@ function applyCover() {
   for (const inst of instances.values()) if (inst.group.visible) box.expandByObject(inst.group);
   const size = box.getSize(new THREE.Vector3()), c = box.getCenter(new THREE.Vector3());
   const spread = Math.max(size.x, size.y * 1.9, size.z);
-  return { t: 0, p: 82, r: spread * 7.2, target: [c.x + size.x * 0.33, c.y * 0.98, 0], fov: 9 };
+  return { t: 0, p: 90, r: spread * 7.2, target: [c.x + size.x * 0.33, c.y, 0], fov: 9 };
+}
+// LEGO-box dressing: a thick corner ribbon (collection number + "COLLECTION")
+// and stat badges bottom-left (big "ONLY N PARTS" block + drawers / steps /
+// real W×H×L). All engine-computed from the manifest/bounds — regenerate-safe.
+function renderCoverBadges() {
+  const drawers = manifest.parts.filter(p => p.type === 'Drawer').reduce((n, p) => n + p.qty, 0);
+  const cases = manifest.parts.filter(p => p.type === 'Case').reduce((n, p) => n + p.qty, 0);
+  const steps = manifest.steps.length - 1; // numbered steps (intro is unnumbered)
+  const s = assembledBox.isEmpty() ? null : assembledBox.getSize(new THREE.Vector3());
+  $('cover-ribbon-num').textContent = manifest.collection || 'GEN2'; // e.g. 185 / 165
+  // Hero = the storage you GET (drawers) rather than the raw printed-piece count
+  // — small QuickLocks/stoppers made "N parts" read as print labor. Drawer-less
+  // builds lead with the case/module count so the hero is never "0". The full
+  // print count still lives on the checklist page.
+  const hero = drawers
+    ? { n: drawers, label: drawers === 1 ? 'drawer' : 'drawers' }
+    : { n: cases, label: cases === 1 ? 'case' : 'cases' };
+  const chip = (b, l) => `<div class="cv-chip"><b>${b}</b><span>${l}</span></div>`;
+  $('cover-badges').innerHTML =
+    `<div class="cv-hero"><b>${hero.n}</b><span>${hero.label}</span></div>` +
+    chip(steps, 'steps') +
+    (s ? chip(`${s.x.toFixed(0)}×${s.y.toFixed(0)}×${s.z.toFixed(0)}`, 'mm · W·H·L') : '');
 }
 
 // ---------- step animation ----------
@@ -443,7 +497,7 @@ async function playStep(i) {
       const mats = [];
       inst.group.traverse(o => {
         if (!o.isMesh) return;
-        const m = materialFor(inst, false).clone();
+        const m = materialFor(inst, false, o.userData.zone).clone();
         m.transparent = true; m.opacity = 1;
         o.material = m; mats.push(m);
       });
@@ -472,7 +526,7 @@ async function playStep(i) {
       const to = basePos(inst, inst.staged);
       if (e.at) to.add(new THREE.Vector3(...e.at)); // land at a temporary offset (e.g. onto a popped-out drawer)
       const fromV = to.clone().add(new THREE.Vector3(...e.from));
-      inst.group.visible = true;
+      inst.group.visible = !inst.styleHidden;
       inst.group.position.copy(fromV);
       jobs.push(tween({
         duration: DUR.enter * pace, delay: ph.sync ? 0 : n * DUR.stagger * pace,
@@ -494,12 +548,12 @@ async function playStep(i) {
     // the rest") — one demonstrated install + a fade keeps big kits one step
     (ph.fade || []).forEach((f, n) => {
       const inst = instances.get(f.id);
-      inst.group.visible = true;
+      inst.group.visible = !inst.styleHidden;
       inst.group.position.copy(basePos(inst, inst.staged));
       const mats = [];
       inst.group.traverse(o => {
         if (!o.isMesh) return;
-        const m = materialFor(inst, false).clone();
+        const m = materialFor(inst, false, o.userData.zone).clone();
         m.transparent = true;
         m.opacity = 0;
         o.material = m;
@@ -602,6 +656,9 @@ function buildPages() {
   dots = PAGES.map((_, i) => {
     const d = document.createElement('div');
     d.className = 'dot';
+    // the final ASSEMBLY step (2nd-to-last page) is the finished build — mark
+    // it so customizers can jump straight there from anywhere on the timeline
+    if (i === PAGES.length - 2) { d.classList.add('finish'); d.title = 'Skip to the finished build'; }
     d.onclick = () => goTo(i);
     wrap.appendChild(d);
     return d;
@@ -637,7 +694,7 @@ function optSeg(label, options, activeVal, onPick) {
 }
 async function setAllClosure(val) { drawersInBuild().forEach(u => u.closure = val); await regenerate(); }
 async function setAllStoppers(on) { build.removedStoppers = on ? [] : allStopperKeys(); await regenerate(); }
-async function resetBuild() { build = structuredClone(originalBuild); activeHandleStyle = null; await regenerate(); }
+async function resetBuild() { build = structuredClone(originalBuild); activeHandleStyle = null; activeFaceplateStyle = null; await regenerate(); }
 function renderOptions() {
   const box = $('build-options');
   if (!box) return;
@@ -655,7 +712,7 @@ function renderOptions() {
     const stopActive = removed.size === 0 ? 'all' : (keys.length && keys.every(k => removed.has(k))) ? 'none' : null;
     box.appendChild(optSeg('Drawer stoppers', [{ label: 'All', val: 'all' }, { label: 'None', val: 'none' }], stopActive, v => setAllStoppers(v === 'all')));
   }
-  if (currentHandleStyleIndex() >= 0) {
+  if (currentHandleStyleIndex() >= 0 && currentFaceplateStyle()?.hasHandle !== false) { // EdgeLabel prints its grip in — no handle to style
     const row = document.createElement('div'); row.className = 'opt-row';
     const lab = document.createElement('span'); lab.className = 'opt-label'; lab.textContent = 'Handle';
     const grp = document.createElement('div'); grp.className = 'opt-seg opt-cycle';
@@ -664,6 +721,23 @@ function renderOptions() {
     const idx = currentHandleStyleIndex(); name.textContent = idx >= 0 ? HANDLE_STYLES[idx].label.replace(' Handle', '') : '?';
     const next = document.createElement('button'); next.textContent = '▶'; next.onclick = () => cycleHandleStyle(1);
     grp.append(prev, name, next); row.append(lab, grp); box.appendChild(row);
+  }
+  if (currentFaceplateStyle() && availableFaceplateStyles().length > 1) {
+    const row = document.createElement('div'); row.className = 'opt-row';
+    const lab = document.createElement('span'); lab.className = 'opt-label'; lab.textContent = 'Faceplate';
+    const grp = document.createElement('div'); grp.className = 'opt-seg opt-cycle';
+    const prev = document.createElement('button'); prev.textContent = '◀'; prev.onclick = () => cycleFaceplateStyle(-1);
+    const name = document.createElement('span'); name.className = 'opt-cycle-name';
+    name.textContent = currentFaceplateStyle().label;
+    const next = document.createElement('button'); next.textContent = '▶'; next.onclick = () => cycleFaceplateStyle(1);
+    grp.append(prev, name, next); row.append(lab, grp); box.appendChild(row);
+  }
+  // faceplate back cover — a universal decor-faceplate accessory (Essential /
+  // EdgeLabel / Classic Pro seat the same part); fills the new open-front Decor
+  // drawer's gap, off = older closed-front drawers. 165 covers aren't modeled.
+  if (drawersInBuild().length && String(build.length) !== '165') {
+    box.appendChild(optSeg('Faceplate back cover', [{ label: 'Off', val: false }, { label: 'On', val: true }], !!build.backCover,
+      async v => { build.backCover = v; await regenerate(); }));
   }
   if (isWallBuild) {
     box.appendChild(optSeg('Top cover', [{ label: 'Per-column', val: false }, { label: 'Staggered', val: true }], !!build.wallStagger,
@@ -679,6 +753,7 @@ function renderChecklist() {
   rows.innerHTML = '';
   let total = 0;
   for (const p of manifest.parts) {
+    if (p.styleHidden) continue; // suppressed by the active faceplate style (handles under EdgeLabel)
     if (!p.purchased) total += p.qty; // purchased hardware isn't a print
     const row = document.createElement('div');
     row.className = 'checklist-row';
@@ -728,7 +803,7 @@ function setChecklist(open) {
 
 // ---------- BOM export (mirrors the planner's Copy / CSV actions) ----------
 function bomRows() {
-  return manifest.parts.filter(p => p.qty > 0).map(p => ({
+  return manifest.parts.filter(p => p.qty > 0 && !p.styleHidden).map(p => ({
     qty: p.qty,
     name: p.label + (p.purchased ? ' (buy)' : ''),
     printables: p.links?.p || '',
@@ -765,15 +840,19 @@ $('bom-csv').onclick = downloadCsv;
 function goTo(i, { animate = true } = {}) {
   setSelected(null); // a highlighted part may hide or move between steps
   setPaused(false);  // paging is an implicit resume — a frozen new step reads as broken
+  setMeasure(false); // parts move between steps — a measurement would go stale
   $('filament-menu').classList.add('hidden');
   stopCinema();
   cur = Math.max(0, Math.min(PAGES.length - 1, i));
   const page = PAGES[cur];
   const isCover = !!page.cover, isOutro = !!page.outro;
   $('cover-overlay').classList.toggle('hidden', !isCover);
+  $('cover-bg').classList.toggle('show', isCover); // premium cover backdrop fades out into the normal bg on page 2
   $('outro-overlay').classList.toggle('hidden', !isOutro);
   $('controls').classList.toggle('hidden', isCover);
   $('note-panel').classList.toggle('hidden', isCover || isOutro);
+  $('measure-toggle').classList.toggle('hidden', isCover || isOutro);
+  setDims(!isCover && !isOutro && cur - 1 === manifest.steps.length - 1); // W/H/L callouts on the fully-assembled final step
   // the "tap any part" hint only rides the exploded intro page (and only until dismissed)
   const onChecklist = !isCover && !isOutro && !!manifest.steps[cur - 1]?.checklist;
   $('tap-hint').classList.toggle('hidden', !onChecklist || tapHintDismissed);
@@ -784,6 +863,7 @@ function goTo(i, { animate = true } = {}) {
     setCamOverride(false); // the cover owns the camera — reset any user override
     setChecklist(false);
     $('checklist-tab').classList.add('hidden'); // cover stays clean
+    renderCoverBadges(); // box-art series + stat badges (fresh after a regenerate)
     animToken++;
     camTweenToken++;
     const preset = applyCover();
@@ -853,6 +933,9 @@ $('btn-pause').onclick = () => setPaused(!paused);
 // wherever the guided camera last wanted to be.
 $('btn-cam').onclick = () => { setCamOverride(false); tweenCamera(curCamPreset, 900, true); };
 $('btn-start').onclick = () => goTo(1); // cover → intro, camera pans + de-zooms
+// customizers' shortcut: straight to the finished build (final assembly step —
+// dims + expanded BOM), skipping the step-by-step. Snap, don't replay the step.
+$('btn-skip-end').onclick = () => goTo(PAGES.length - 2, { animate: false });
 $('checklist-tab').onclick = () => { if (isMobile()) setSelected(null); setChecklist(true); };
 $('checklist-close').onclick = () => setChecklist(false);
 let tapHintDismissed = false;
@@ -866,20 +949,22 @@ addEventListener('keydown', e => {
 // name, kit quantity, and download links (tap empty space to dismiss).
 // Suppressed when the pointer dragged (= orbiting).
 const ray = new THREE.Raycaster();
+const DEBUG_ON = !!new URLSearchParams(location.search).get('debug'); // ?debug=1 — same flag as the __GEN2_VIEWER__ hook
 let downXY = null, selectedId = null;
-const highlightMats = {}, altHighlightMats = {}; // type -> emissive clone (base / lightened tile)
-function materialFor(inst, highlighted) {
+const highlightMats = {}, altHighlightMats = {}; // (type | type:zone) -> emissive clone (base / lightened tile)
+function materialFor(inst, highlighted, zone = '') {
   const type = typeByNode[inst.cfg.node];
-  const base = inst.alt ? altMatFor(type) : (materials[type] || fallbackMat);
+  const key = zoneKey(type, zone);
+  const base = (inst.alt && !zone) ? altMatFor(type) : baseMatFor(type, zone); // zoned types aren't tiled — alt is a body-only concept
   if (!highlighted) return base;
-  const cache = inst.alt ? altHighlightMats : highlightMats;
-  if (!cache[type]) {
+  const cache = (inst.alt && !zone) ? altHighlightMats : highlightMats;
+  if (!cache[key]) {
     const m = base.clone();
     m.emissive = new THREE.Color(0xff8a40);
     m.emissiveIntensity = 0.4;
-    cache[type] = m;
+    cache[key] = m;
   }
-  return cache[type];
+  return cache[key];
 }
 // selecting a seated drawer (or anything riding it — faceplate, handle, clip)
 // slides it open 40 mm like a real drawer; deselecting slides it shut
@@ -901,22 +986,90 @@ function slideDrawer(carrier, open, dist = 40) {
     tween({ duration: open ? 380 : 320, onUpdate: k => i.group.position.lerpVectors(fromV, to, k) });
   }
 }
+// Selection "removal rituals": some parts glide through world-space waypoints
+// when selected — the "this part swaps/removes" demo — and back in exact
+// reverse on deselect. The tween rides the group's INNER child, so it composes
+// with drawer peeks/slides and step motion (those drive the group itself);
+// waypoints map through the INVERSE group rotation (accents are group-rotated
+// 180°), applyState/applyExploded zero the child as kill-tween self-heal, and
+// a PER-INSTANCE token cancels that part's stale chain when its direction
+// flips mid-ritual (per-instance, NOT global — switching accent→label runs
+// the accent's reseat and the label's lift CONCURRENTLY) — an interrupted
+// reattach glides straight home instead of replaying steps it never reached.
+const RITUALS = {
+  Label:     { path: [[0, 20, 0]],               durs: [420] },      // lift out of its window
+  Accent:    { path: [[0, -4, 0], [0, -4, 20]],  durs: [260, 380] }, // drop off its clips, pull away
+  BackCover: { path: [[0, 4, 0], [0, 4, -20]],   durs: [240, 380] }, // lift off its hooks, draw back
+};
+let ritualInst = null; // the part the CURRENT selection popped (selection is single)
+async function slideRitual(inst, out, delay = 0) {
+  const r = RITUALS[typeByNode[inst.cfg.node]];
+  const child = inst.group.children[0];
+  if (!r || !child) return;
+  const my = inst._ritualTok = (inst._ritualTok || 0) + 1;
+  const inv = inst.group.quaternion.clone().invert();
+  const toLocal = p => new THREE.Vector3(...p).applyQuaternion(inv);
+  let targets = r.path, durs = r.durs;
+  if (!out) {
+    const atEnd = child.position.distanceTo(toLocal(r.path[r.path.length - 1])) < 0.5;
+    if (atEnd) { targets = [...r.path.slice(0, -1)].reverse().concat([[0, 0, 0]]); durs = [...r.durs].reverse(); }
+    else { targets = [[0, 0, 0]]; durs = [400]; } // interrupted mid-ritual → one clean glide home
+  }
+  for (let s = 0; s < targets.length; s++) {
+    if (my !== inst._ritualTok) return;
+    const from = child.position.clone(), to = toLocal(targets[s]);
+    await tween({ duration: durs[s], delay: s === 0 ? delay : 0,
+      onUpdate: k => { if (my === inst._ritualTok) child.position.lerpVectors(from, to, k); } });
+  }
+}
+
+// 2-zone parts (EdgeLabel body+grip): the identify card offers one labeled
+// swatch per color zone — Body (the base type key) + each named zone (Grip,
+// 'Type:ZONE' key) — every chip opening the same filament menu on its own key.
+// Single-zone parts hide the row (the header swatch already covers them).
+function renderZoneChips(inst) {
+  const box = $('identify-zones');
+  box.innerHTML = '';
+  const type = typeByNode[inst.cfg.node];
+  const zones = new Set();
+  inst.group.traverse(o => { if (o.isMesh && o.userData.zone) zones.add(o.userData.zone); });
+  const show = zones.size > 0 && !colorLocked(type);
+  box.classList.toggle('hidden', !show);
+  if (!show) return;
+  const chip = (label, key) => {
+    const b = document.createElement('button');
+    b.className = 'zone-chip';
+    const dot = document.createElement('i');
+    dot.style.background = activeHex(key);
+    b.appendChild(dot);
+    b.appendChild(document.createTextNode(label));
+    b.title = `Pick a filament color for the ${label.toLowerCase()}`;
+    b.onclick = () => { openFilamentMenu(key); };
+    box.appendChild(b);
+  };
+  chip('Body', type);
+  for (const z of [...zones].sort()) chip(z.charAt(0) + z.slice(1).toLowerCase(), zoneKey(type, z));
+}
 
 let selAnchor = new THREE.Vector3(); // selected part's bbox-center offset from its origin
 function setSelected(id) {
   if (selectedId === id) return;
   if (selectedId && instances.has(selectedId)) {
     const prev = instances.get(selectedId);
-    prev.group.traverse(o => { if (o.isMesh) o.material = materialFor(prev, false); });
+    prev.group.traverse(o => { if (o.isMesh) o.material = materialFor(prev, false, o.userData.zone); });
   }
   const prevOpen = openCarrier; openCarrier = null; // may re-pull the SAME drawer further below
   selectedId = id;
   $('filament-menu').classList.add('hidden');
   const card = $('identify-card');
-  if (!id) { if (prevOpen) slideDrawer(prevOpen, false); card.classList.add('hidden'); $('pointer-line').classList.add('hidden'); return; }
+  if (ritualInst && (!id || !instances.has(id) || instances.get(id) !== ritualInst)) {
+    slideRitual(ritualInst, false); // label/accent/cover reseats in reverse on deselect/switch
+    ritualInst = null;
+  }
+  if (!id) { if (prevOpen) slideDrawer(prevOpen, false); exitFaceplateFocus(); exitDrawerFocus(); card.classList.add('hidden'); $('pointer-line').classList.add('hidden'); return; }
   if (isMobile()) setChecklist(false); // mobile: parts list & identify sheet are mutually exclusive
   const inst = instances.get(id);
-  inst.group.traverse(o => { if (o.isMesh) o.material = materialFor(inst, true); });
+  inst.group.traverse(o => { if (o.isMesh) o.material = materialFor(inst, true, o.userData.zone); });
   selAnchor = new THREE.Box3().setFromObject(inst.group).getCenter(new THREE.Vector3()).sub(inst.group.position);
   const info = partInfoByNode[inst.cfg.node] || { label: inst.cfg.node, qty: '?' };
   const selType = typeByNode[inst.cfg.node];
@@ -925,9 +1078,32 @@ function setSelected(id) {
   sw.style.background = activeHex(selType);
   sw.classList.toggle('locked', selLocked);
   sw.title = selLocked ? 'Hardware-store item — shown in its real finish' : 'Pick a filament color';
+  renderZoneChips(inst); // 2-zone parts get Body + Grip swatches; others hide the row
+  // the swappable label's card links to the label generator (pre-filled with
+  // the build's typed labels — the same #labels= handoff the planner's button
+  // uses); the 20 mm lift itself starts down in the drawer block, so the
+  // drawer peek can glide out FIRST
+  const lg = $('identify-label-gen');
+  const lgInfo = selType === 'Label' ? labelGenInfo() : null;
+  lg.classList.toggle('hidden', !lgInfo);
+  if (lgInfo) {
+    lg.href = lgInfo.href;
+    lg.textContent = `🏷 Design your labels${lgInfo.count ? ` · ${lgInfo.count} ready` : ''} →`;
+  }
   $('identify-name').textContent = info.label;
   $('identify-qty').textContent = `×${info.qty} in this kit` +
     (!selLocked && customColors[selType] ? ` · ${customColors[selType].name}` : '');
+  // ?debug=1 calibration readout: the instance's MANIFEST position (the exact
+  // numbers generate.js placed it with — hand these back to shift a part) +
+  // its world bbox size. Complements the measure tool for offset work.
+  const dbg = $('identify-debug');
+  if (DEBUG_ON) {
+    const size = new THREE.Box3().setFromObject(inst.group).getSize(new THREE.Vector3());
+    dbg.textContent = `pos [${inst.cfg.pos.map(n => +(+n).toFixed(2)).join(', ')}]` +
+      (inst.cfg.yaw ? ` · yaw ${inst.cfg.yaw}°` : '') +
+      ` · ${size.x.toFixed(1)}×${size.y.toFixed(1)}×${size.z.toFixed(1)} mm`;
+    dbg.classList.remove('hidden');
+  } else dbg.classList.add('hidden');
   const img = $('identify-img');
   if (info.img) { img.onerror = () => img.classList.add('hidden'); img.src = info.img; img.classList.remove('hidden'); } // hide if the render 404s (e.g. 165 has no renders yet)
   else img.classList.add('hidden');
@@ -936,10 +1112,14 @@ function setSelected(id) {
   if (info.links?.p) linksEl.appendChild(linkEl('Printables', info.links.p));
   if (info.links?.t) linksEl.appendChild(linkEl('Thangs', info.links.t));
   if (!selLocked && customColors[selType]) linksEl.appendChild(linkEl('Get filament', customColors[selType].url));
-  // handles get a style switcher (Deco / BlockBar A–F)
+  // handles get a style switcher (Deco / BlockBar A–F); faceplates get the
+  // family switcher (Essential / EdgeLabel) when this collection has >1 family
   if (typeByNode[inst.cfg.node] === 'Handle') {
     const idx = currentHandleStyleIndex();
     $('style-name').textContent = idx >= 0 ? HANDLE_STYLES[idx].label : '?';
+    $('identify-style').classList.remove('hidden');
+  } else if (typeByNode[inst.cfg.node] === 'Faceplate' && availableFaceplateStyles().length > 1 && currentFaceplateStyle()) {
+    $('style-name').textContent = currentFaceplateStyle().label;
     $('identify-style').classList.remove('hidden');
   } else {
     $('identify-style').classList.add('hidden');
@@ -963,14 +1143,335 @@ function setSelected(id) {
   // counts as seated (we opened it from base), so a faceplate→body reselect
   // re-pulls the SAME drawer further instead of snapping it shut first.
   const carrier = drawerCarrier(inst);
-  const seatable = carrier && !carrier.staged && carrier.group.visible &&
+  // NB the isolation HIDES fully-faded parts — a carrier hidden by the focus
+  // (it's in fpFocus.mats) is still present on this step, unlike one hidden by
+  // paging; without this, "Open the drawer" dies once the fade-out completes
+  const seatable = carrier && !carrier.staged && (carrier.group.visible || fpFocus.mats.has(carrier.cfg.id)) &&
     (carrier === prevOpen || carrier.group.position.distanceTo(basePos(carrier, false)) < 0.01);
-  if (prevOpen && prevOpen !== carrier) slideDrawer(prevOpen, false); // switching drawers (or to none) → shut the old one
-  if (seatable) {
+  // faceplates get an ISOLATION view instead of the old 40 mm rider peek: the
+  // rest of the build + the room fade away and the camera frames the plate.
+  // The card's "Open the drawer" button is the hand-off into the drawer-body
+  // focus the peek used to lead to; "Close drawer" is the obvious way back out.
+  const isFp = selType === 'Faceplate';
+  // tapping the focused plate's own dressing (handle / accent / label / cover)
+  // keeps the isolation — those pieces are part of the faceplate there (swap
+  // styles / recolor each without leaving)
+  const keepIso = !!fpFocus.id && !isFp && fpFocus.mates.has(id);
+  $('identify-open-drawer').classList.toggle('hidden', !((isFp || keepIso) && seatable));
+  $('identify-close-drawer').classList.toggle('hidden', !(seatable && carrier === inst));
+  if (prevOpen && (prevOpen !== carrier || isFp)) slideDrawer(prevOpen, false); // switching drawers (or isolating a plate) → shut the old one
+  let drawerGliding = false;
+  if (seatable && !isFp && !keepIso) {
     const travel = (parseInt(manifest.collection, 10) || 185) - 20;
-    slideDrawer(carrier, true, carrier === inst ? travel * 0.9 : 40); // body → deep pull, rider → peek
+    // back-cover work happens on an OPEN drawer — selecting it must not yank an
+    // already-open drawer back to the 40 mm peek (Joey); anything else follows
+    // the normal body → deep pull / rider → peek rule
+    const keepOpen = selType === 'BackCover' && carrier === prevOpen;
+    if (!keepOpen) {
+      const dist = carrier === inst ? travel * 0.9 : 40;
+      const target = basePos(carrier, false); target.z += dist;
+      drawerGliding = carrier.group.position.distanceTo(target) > 1; // a real glide, not a re-target no-op
+      slideDrawer(carrier, true, dist);
+    }
     openCarrier = carrier;
   }
+  // removal rituals (label lift / accent pop / cover pop) — AFTER the drawer
+  // glide lands when one is running (Joey: drawer out first, then the part);
+  // immediate when nothing moved (isolation tap, exploded page, open drawer)
+  if (RITUALS[selType] && ritualInst !== inst) {
+    slideRitual(inst, true, drawerGliding ? 420 : 0);
+    ritualInst = inst;
+  }
+  // drawer BODY selected → zoom into the open drawer + show its inner dims;
+  // faceplate → isolation focus; the focused plate's handle stays inside the
+  // isolation; anything else leaves/never enters either focus
+  if (isFp) {
+    exitDrawerFocus(true); // keep the saved pose — the faceplate focus adopts it
+    enterFaceplateFocus(inst, seatable);
+  } else if (!keepIso) {
+    exitFaceplateFocus();
+    if (seatable && carrier === inst) enterDrawerFocus(carrier);
+    else exitDrawerFocus();
+  }
+}
+
+// ---------- drawer focus: camera zoom + INNER dimensions ----------
+// Selecting a drawer BODY (the deep pull above) swings the camera to a
+// front-above 3/4 on the open drawer — floor and back wall both readable —
+// hides the overall build dims, and shows the drawer's usable INTERIOR
+// W / L / H with lines drawn inside the cavity (reusing the dim-label pills;
+// the build dims are hidden while focused). Deselect tweens the camera back
+// to where it was and brings the build dims back. Interior sizes are MEASURED
+// live — raycasts from inside the cavity to its walls/floor — so every drawer
+// GLB works without data tables; results are cached per node.
+const dFocus = { carrier: null, saved: null, group: null, lines: null, cache: new Map() };
+function drawerInterior(carrier) {
+  const key = carrier.cfg.node;
+  if (dFocus.cache.has(key)) return dFocus.cache.get(key);
+  const g = carrier.group;
+  const box = new THREE.Box3().setFromObject(g);
+  const c = box.getCenter(new THREE.Vector3());
+  const cast = (o, dx, dy, dz) => {
+    dimRay.set(o, new THREE.Vector3(dx, dy, dz));
+    const h = dimRay.intersectObject(g, true)[0];
+    return h ? h.point : null;
+  };
+  // 1) find the cavity floor: straight down from mid-height center
+  const D = cast(new THREE.Vector3(c.x, box.min.y + (box.max.y - box.min.y) * 0.55, c.z), 0, -1, 0);
+  if (!D) { dFocus.cache.set(key, null); return null; } // odd geometry — skip inner dims
+  // 2) walls: cast from just above the floor, where every wall exists — the
+  //    decor drawers' FRONT wall is a low lip (the faceplate is the real
+  //    front), so a mid-height forward ray flies straight over it
+  const o2 = new THREE.Vector3(c.x, D.y + 6, c.z);
+  const R = cast(o2, 1, 0, 0), L = cast(o2, -1, 0, 0), B = cast(o2, 0, 0, -1);
+  let F = cast(o2, 0, 0, 1);
+  if (!R || !L || !B) { dFocus.cache.set(key, null); return null; }
+  if (!F) F = new THREE.Vector3(c.x, o2.y, box.max.z - 2); // truly open front → assume a thin lip at the body's front
+  const p = g.position; // drawers are unrotated → local = world − position
+  const it = { xL: L.x - p.x, xR: R.x - p.x, yF: D.y - p.y, yT: box.max.y - p.y, zB: B.z - p.z, zF: F.z - p.z };
+  it.w = it.xR - it.xL; it.d = it.zF - it.zB; it.h = it.yT - it.yF;
+  dFocus.cache.set(key, it);
+  return it;
+}
+function enterDrawerFocus(carrier) {
+  if (dFocus.carrier === carrier) return;
+  exitDrawerFocus(true); // switching drawers: drop the old lines, keep the saved pose
+  const it = drawerInterior(carrier);
+  if (!it) return;
+  dFocus.carrier = carrier;
+  if (!dFocus.saved) dFocus.saved = { pos: camera.position.clone(), target: controls.target.clone() };
+  setDims(false); // the drawer owns the stage — overall dims come back on exit
+  const mmIn = (mm, axis) => `<b>${axis}</b> ${mm.toFixed(0)} mm<small>${(mm / 25.4).toFixed(1)} in</small>`;
+  $('dim-w').innerHTML = mmIn(it.w, 'W');
+  $('dim-l').innerHTML = mmIn(it.d, 'L');
+  $('dim-h').innerHTML = mmIn(it.h, 'H');
+  // interior lines live INSIDE the drawer group, so they ride the slide;
+  // spread across the cavity so the three pills never crowd each other:
+  // W across the floor near the front, L along the floor near the left wall,
+  // H up the back wall right of center
+  const t = 6, V = (x, y, z) => new THREE.Vector3(x, y, z);
+  const segs = [];
+  const line = (a, c2, tickDir) => {
+    segs.push(a, c2);
+    for (const end of [a, c2]) segs.push(end.clone().addScaledVector(tickDir, -t), end.clone().addScaledVector(tickDir, t));
+    return { a, c: c2 };
+  };
+  const yF = it.yF + 1; // floor lines float 1 mm above the floor (no z-fighting)
+  dFocus.lines = {
+    'dim-w': line(V(it.xL, yF, it.zB + it.d * 0.68), V(it.xR, yF, it.zB + it.d * 0.68), V(0, 0, 1)),
+    'dim-l': line(V(it.xL + it.w * 0.24, yF, it.zB), V(it.xL + it.w * 0.24, yF, it.zF), V(1, 0, 0)),
+    'dim-h': line(V(it.xL + it.w * 0.76, it.yF, it.zB + 1), V(it.xL + it.w * 0.76, it.yT, it.zB + 1), V(1, 0, 0)),
+  };
+  const geo = new THREE.BufferGeometry().setFromPoints(segs);
+  dFocus.group = new THREE.Group();
+  dFocus.group.add(new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color: 0x656a73, transparent: true, opacity: 0.9 })));
+  carrier.group.add(dFocus.group);
+  // camera: frame the drawer's OPEN position from front-above (≈50° down) on
+  // whichever side the camera is already on — floor + back wall both visible
+  const travel = (parseInt(manifest.collection, 10) || 185) - 20;
+  const openPos = basePos(carrier, false); openPos.z += travel * 0.9;
+  const target = new THREE.Vector3(openPos.x + (it.xL + it.xR) / 2, openPos.y + (it.yF + it.yT) / 2, openPos.z + (it.zB + it.zF) / 2);
+  const s = Math.max(it.w, it.d);
+  const side = Math.sign(camera.position.x - target.x) || 1;
+  const pos = target.clone().add(new THREE.Vector3(side * s * 0.45, s * 1.5, s * 1.15));
+  const my = ++camTweenToken; // cancels tour tweens; paging cancels this one
+  const p0 = camera.position.clone(), t0 = controls.target.clone();
+  // settle the fov too — cancelling a cover→step tween mid-flight would
+  // otherwise strand the cover's telephoto 9 on the drawer close-up
+  const fov0 = camera.fov, fov1 = curCamPreset?.fov || 40;
+  tween({ duration: 750, onUpdate: k => {
+    if (my !== camTweenToken) return;
+    camera.position.lerpVectors(p0, pos, k);
+    controls.target.lerpVectors(t0, target, k);
+    if (fov0 !== fov1) { camera.fov = fov0 + (fov1 - fov0) * k; camera.updateProjectionMatrix(); }
+  } });
+}
+function exitDrawerFocus(keepPose = false) {
+  if (dFocus.group) {
+    dFocus.group.parent?.remove(dFocus.group);
+    dFocus.group.traverse(o => o.geometry?.dispose());
+    dFocus.group = null;
+  }
+  dFocus.lines = null;
+  const was = dFocus.carrier;
+  dFocus.carrier = null;
+  if (!was) return;
+  for (const id of ['dim-w', 'dim-h', 'dim-l']) $(id).classList.add('hidden');
+  if (keepPose) return; // hopping straight to another drawer — no restore yet
+  if (dFocus.saved) { // glide back to wherever the user was before the zoom
+    const { pos, target } = dFocus.saved;
+    dFocus.saved = null;
+    const my = ++camTweenToken;
+    const p0 = camera.position.clone(), t0 = controls.target.clone();
+    tween({ duration: 650, onUpdate: k => {
+      if (my !== camTweenToken) return;
+      camera.position.lerpVectors(p0, pos, k);
+      controls.target.lerpVectors(t0, target, k);
+    } });
+  }
+  // overall build dims return (only the final assembly step shows them)
+  setDims(!PAGES[cur]?.cover && !PAGES[cur]?.outro && cur - 1 === manifest.steps.length - 1);
+}
+function updateDrawerDims() { // render-loop: pills track their lines while the drawer slides / camera tweens
+  if (!dFocus.lines || !dFocus.carrier) return;
+  const r = canvas.getBoundingClientRect();
+  for (const [id, seg] of Object.entries(dFocus.lines)) {
+    const el = $(id);
+    const mid = seg.a.clone().add(seg.c).multiplyScalar(0.5).add(dFocus.carrier.group.position).project(camera);
+    if (mid.z > 1) { el.classList.add('hidden'); continue; }
+    el.style.left = Math.min(Math.max((mid.x + 1) / 2 * r.width, 40), r.width - 40) + 'px';
+    el.style.top = Math.min(Math.max((1 - mid.y) / 2 * r.height, 24), r.height - 24) + 'px';
+    el.classList.remove('hidden');
+  }
+}
+
+// ---------- faceplate focus: isolate + frame the plate ----------
+// Selecting a FACEPLATE fades everything else away COMPLETELY — every other
+// part fades to nothing (then hides, so the user can orbit clear around the
+// plate and read its back side), the table/grid/wall/surface fade out, the
+// overall W/H/L dims hide — and the camera frames the plate near straight-on,
+// fit to its real bbox at the current aspect (so a 1W-1H fills the view
+// exactly like a 4W-2H). The plate's DRESSING is treated as part of the plate
+// and stays solid + tappable in isolation: the bolt-on handle (Essential) or
+// the accent / label / back cover (EdgeLabel) — swap styles / recolor each
+// piece without leaving. The old 40 mm rider peek is skipped for faceplates;
+// the identify card's "Open the drawer" button is the explicit hand-off into
+// the drawer-body focus (deep pull + interior dims). Deselect restores
+// materials, the room, the dims and the camera pose the user started from.
+const FP_FADE = 0; // the rest vanishes completely — orbit all the way around the plate, back side included
+const FP_COMPANIONS = new Set(['Handle', 'Accent', 'Label', 'BackCover']);
+const fpFocus = { id: null, mates: new Set(), saved: null, mats: new Map() }; // mates = the plate's dressing (stays solid); mats: instId -> fade-clone mats
+// a companion shares the plate's carrier (generated builds: both ride the
+// drawer) or rides the plate itself (the static test kit)
+const fpCompanions = inst => [...instances.values()].filter(x =>
+  x !== inst && FP_COMPANIONS.has(typeByNode[x.cfg.node]) &&
+  ((inst.cfg.rides && x.cfg.rides === inst.cfg.rides) || x.cfg.rides === inst.cfg.id));
+// the room fades via a render-loop lerp, NOT tween() — killTweens() on a page
+// snap would strand a half-faded table otherwise (part materials don't need
+// this: every killTweens caller restores shared materials itself)
+const fpEnv = { k: 1, target: 1, meshes: [table, grid, wall, surface] };
+function updateFpEnv() {
+  if (fpEnv.k === fpEnv.target) return;
+  fpEnv.k += Math.sign(fpEnv.target - fpEnv.k) * Math.min(0.05, Math.abs(fpEnv.target - fpEnv.k));
+  for (const m of fpEnv.meshes) {
+    const t = fpEnv.k < 1; // flipping `transparent` re-bakes the program — needsUpdate or it keeps rendering opaque
+    if (m.material.transparent !== t) { m.material.transparent = t; m.material.needsUpdate = true; }
+    m.material.opacity = fpEnv.k;
+  }
+}
+function fadeOutInstance(inst) {
+  if (fpFocus.mats.has(inst.cfg.id)) return;
+  const mats = [];
+  inst.group.traverse(o => {
+    if (!o.isMesh) return;
+    const m = materialFor(inst, false).clone();
+    m.transparent = true;
+    m.userData.fpFade = true; // exit only reclaims meshes that still hold OUR clone
+    o.material = m;
+    mats.push(m);
+  });
+  fpFocus.mats.set(inst.cfg.id, mats);
+  tween({
+    duration: DUR.fade,
+    onUpdate: k => mats.forEach(m => { m.opacity = 1 - (1 - FP_FADE) * k; }),
+    // fully faded → stop drawing it (an invisible part must not catch taps or
+    // occlude anything; skipped if the focus already ended / hopped away)
+    onDone: () => { if (fpFocus.id && fpFocus.mats.has(inst.cfg.id)) inst.group.visible = false; },
+  });
+}
+function unfadeInstance(inst) {
+  const mats = fpFocus.mats.get(inst.cfg.id);
+  if (!mats) return;
+  fpFocus.mats.delete(inst.cfg.id);
+  inst.group.visible = true; // only instances that were visible at focus time ever get faded
+  tween({
+    duration: DUR.fade,
+    onUpdate: k => mats.forEach(m => { m.opacity = FP_FADE + (1 - FP_FADE) * k; }),
+    // only reclaim meshes that still hold OUR clone — a step phase, applyState
+    // or a handle-style swap may have replaced materials while we faded back
+    onDone: () => inst.group.traverse(o => { if (o.isMesh && o.material.userData?.fpFade) o.material = materialFor(inst, false, o.userData.zone); }),
+  });
+}
+function enterFaceplateFocus(inst, seated) {
+  if (fpFocus.id === inst.cfg.id) return;
+  // the plate's dressing stays solid with it (handle / accent / label / cover)
+  const mates = new Set(fpCompanions(inst).filter(x => !x.styleHidden).map(x => x.cfg.id));
+  // remember where the user was BEFORE any focus — the drawer focus may already
+  // hold that pose (faceplate tapped while a drawer was zoomed)
+  if (!fpFocus.saved) {
+    fpFocus.saved = dFocus.saved || { pos: camera.position.clone(), target: controls.target.clone() };
+    dFocus.saved = null;
+  }
+  if (!fpFocus.id) { // first entry: fade the rest of the build + the room
+    for (const other of instances.values()) if (other !== inst && !mates.has(other.cfg.id) && other.group.visible) fadeOutInstance(other);
+    fpEnv.target = 0;
+    setDims(false); // the plate owns the stage — overall dims come back on exit
+  } else {           // hopping plate → plate (programmatic only — hidden plates can't be tapped): swap the fades
+    const prev = instances.get(fpFocus.id);
+    if (prev) fadeOutInstance(prev);
+    for (const id of fpFocus.mates) if (!mates.has(id) && id !== inst.cfg.id && instances.has(id)) fadeOutInstance(instances.get(id));
+    fpFocus.mats.delete(inst.cfg.id); // the new plate is already solid — the selection highlight replaced its fade clone
+    inst.group.visible = true;        // (its own earlier fade-out may have hidden it)
+    for (const id of mates) if (instances.has(id)) unfadeInstance(instances.get(id));
+  }
+  fpFocus.id = inst.cfg.id;
+  fpFocus.mates = mates;
+  // frame the plate where it will REST: a seated drawer that was open is
+  // sliding shut right now, so aim at the seat, not the in-flight position;
+  // unseated (exploded page / staged bench) plates frame where they float
+  const box = new THREE.Box3().setFromObject(inst.group);
+  if (seated) box.translate(basePos(inst, inst.staged).sub(inst.group.position));
+  const c = box.getCenter(new THREE.Vector3());
+  const R = box.getSize(new THREE.Vector3()).length() / 2 * 1.4; // breathing room at any plate size
+  const vFov = THREE.MathUtils.degToRad(curCamPreset?.fov || 40);
+  const hFov = 2 * Math.atan(Math.tan(vFov / 2) * (camera.aspect || 1.6));
+  const dist = Math.max(R / Math.sin(vFov / 2), R / Math.sin(hFov / 2));
+  const side = Math.sign(camera.position.x - c.x) || 1; // approach from the side the camera is already on
+  const dir = new THREE.Vector3(side * 0.2, 0.16, 1).normalize(); // near straight-on, a hint of 3/4 for depth
+  // aim a touch low so the plate rides the upper half of the frame, clear of
+  // the identify card (bottom-center) — a fixed fraction of the VIEW height,
+  // so 1W-1H and 4W-2H sit at the same spot on screen
+  c.y -= dist * Math.tan(vFov / 2) * 0.15;
+  const pos = c.clone().addScaledVector(dir, dist);
+  const my = ++camTweenToken; // cancels tour tweens; paging cancels this one
+  const p0 = camera.position.clone(), t0 = controls.target.clone();
+  // settle the fov the fit math assumed — cancelling a cover→step tween
+  // mid-flight (skip-to-end, then tap a plate) would strand the telephoto 9
+  const fov0 = camera.fov, fov1 = curCamPreset?.fov || 40;
+  tween({ duration: 750, onUpdate: k => {
+    if (my !== camTweenToken) return;
+    camera.position.lerpVectors(p0, pos, k);
+    controls.target.lerpVectors(t0, c, k);
+    if (fov0 !== fov1) { camera.fov = fov0 + (fov1 - fov0) * k; camera.updateProjectionMatrix(); }
+  } });
+}
+function exitFaceplateFocus() {
+  if (!fpFocus.id) return;
+  fpFocus.id = null;
+  fpFocus.mates = new Set();
+  for (const id of [...fpFocus.mats.keys()]) {
+    const other = instances.get(id);
+    if (other) unfadeInstance(other); else fpFocus.mats.delete(id);
+  }
+  fpEnv.target = 1;
+  // a faceplate-style swap inside the isolation may have suppressed/restored
+  // the plate's dressing (handles/accent/label/cover) — those pieces were never
+  // part of the fade set, so give them the current page state's visibility
+  for (const other of instances.values())
+    if (FP_COMPANIONS.has(typeByNode[other.cfg.node])) other.group.visible = pageVisibility(other);
+  if (fpFocus.saved) { // glide back to wherever the user was before the zoom
+    const { pos, target } = fpFocus.saved;
+    fpFocus.saved = null;
+    const my = ++camTweenToken;
+    const p0 = camera.position.clone(), t0 = controls.target.clone();
+    tween({ duration: 650, onUpdate: k => {
+      if (my !== camTweenToken) return;
+      camera.position.lerpVectors(p0, pos, k);
+      controls.target.lerpVectors(t0, target, k);
+    } });
+  }
+  // overall build dims return (only the final assembly step shows them)
+  setDims(!PAGES[cur]?.cover && !PAGES[cur]?.outro && cur - 1 === manifest.steps.length - 1);
 }
 // ---------- filament colors ----------
 // Multi-brand filament database. Each brand entry: { brand, line, url (shop
@@ -1083,10 +1584,18 @@ const snapshotUserPalette = () => { userPalette = structuredClone(customColors);
 // isn't printed, so it can't take a filament color: no picker, and any stored/
 // preset tint for the type is ignored — it always renders its manifest color.
 const colorLocked = type => {
-  const rows = manifest.parts.filter(p => p.type === type);
+  const rows = manifest.parts.filter(p => p.type === type.split(':')[0]); // zone keys lock with their base type
   return rows.length > 0 && rows.every(p => p.purchased);
 };
-const activeHex = type => (useCustom && customColors[type] && !colorLocked(type)) ? customColors[type].hex : (manifest.colors[type] || '#b9bcc2');
+// key = a part TYPE ('Faceplate') or a zone of one ('Faceplate:GRIP'). A zone
+// with no explicit pick and no manifest color FOLLOWS THE BODY — one
+// identification color per part by default; a zone forks only when chosen.
+const activeHex = key => {
+  if (useCustom && customColors[key] && !colorLocked(key)) return customColors[key].hex;
+  if (manifest.colors[key]) return manifest.colors[key];
+  const base = key.split(':')[0];
+  return base !== key ? activeHex(base) : '#b9bcc2';
+};
 
 function applyPalette() {
   for (const [type, mat] of Object.entries(materials)) mat.color.set(activeHex(type));
@@ -1098,8 +1607,9 @@ function applyPalette() {
   updateColorToggle();
   renderPresets(); // keep the active preset / My-palette chip highlight in step
   if (selectedId) {
-    const type = typeByNode[instances.get(selectedId).cfg.node];
-    $('identify-swatch').style.background = activeHex(type);
+    const inst = instances.get(selectedId);
+    $('identify-swatch').style.background = activeHex(typeByNode[inst.cfg.node]);
+    renderZoneChips(inst); // keep the Body/Grip dots tracking the live palette
   }
 }
 function updateColorToggle() {
@@ -1246,6 +1756,17 @@ function openFilamentMenu(type) {
   buy.href = sel ? sel.url : FILAMENT_DB[0].url;
   buy.textContent = sel ? `Buy ${sel.name.replace('Panchroma ', '')} →` : 'Shop filament →';
   $('filament-menu').classList.remove('hidden');
+  refreshSelHighlight(); // color mode: drop the emissive glow so picks read true
+}
+// The selection highlight is an emissive orange — it SKEWS the very color the
+// user is trying to judge (a blue pick reads pink). While the filament menu is
+// open the selected part renders in its plain material; the identify card +
+// pointer line still mark it. Glow returns the moment the menu closes.
+function refreshSelHighlight() {
+  if (!selectedId || !instances.has(selectedId)) return;
+  const inst = instances.get(selectedId);
+  const glow = $('filament-menu').classList.contains('hidden');
+  inst.group.traverse(o => { if (o.isMesh) o.material = materialFor(inst, glow, o.userData.zone); });
 }
 $('fm-search').oninput = e => { fmQuery = e.target.value; renderFilamentBrands(); };
 $('identify-swatch').onclick = () => {
@@ -1253,7 +1774,7 @@ $('identify-swatch').onclick = () => {
   const type = typeByNode[instances.get(selectedId).cfg.node];
   if (colorLocked(type)) return; // purchased hardware: no filament picker
   if ($('filament-menu').classList.contains('hidden')) openFilamentMenu(type);
-  else $('filament-menu').classList.add('hidden');
+  else { $('filament-menu').classList.add('hidden'); refreshSelHighlight(); }
 };
 $('fm-reset').onclick = () => {
   if (fmType) delete customColors[fmType];
@@ -1262,6 +1783,7 @@ $('fm-reset').onclick = () => {
   saveColors();
   applyPalette();
   $('filament-menu').classList.add('hidden');
+  refreshSelHighlight();
 };
 
 // ---------- handle style swap ----------
@@ -1310,10 +1832,10 @@ async function applyHandleStyle(style) {
     const fp = [...instances.values()].find(x => x.cfg.rides && x.cfg.rides === inst.cfg.rides && typeByNode[x.cfg.node] === 'Faceplate');
     if (fp) {
       const fpH = faceplateHeightOf(fp.cfg.node);
-      // faceplate front = its z-center + 2.5 (half the plate depth) — derived
-      // from the faceplate instance so it's collection-agnostic (97.57 on 185,
-      // 87.57 on 165; a hardcoded 97.57 left 165 handles floating 10 mm out)
-      inst.cfg.pos = [inst.cfg.pos[0], fp.cfg.pos[1] + (fpH - style.h) / 2 - 0.5, fp.cfg.pos[2] + 2.5 + style.d / 2];
+      // faceplate front = its z-center + half the plate's REAL depth (measured
+      // off the loaded template — 2.5 for Essential; collection-agnostic, and
+      // it stays sane even if the plate family was swapped under the handles)
+      inst.cfg.pos = [inst.cfg.pos[0], fp.cfg.pos[1] + (fpH - style.h) / 2 - 0.5, fp.cfg.pos[2] + nodeDepth(fp.cfg.node) / 2 + style.d / 2];
     }
     inst.cfg.node = style.node;
     inst.group.clear();
@@ -1342,7 +1864,7 @@ async function cycleHandleStyle(dir) {
   if (!selectedId) return;
   const inst = instances.get(selectedId);
   if (typeByNode[inst.cfg.node] !== 'Handle') return;
-  inst.group.traverse(o => { if (o.isMesh) o.material = materialFor(inst, true); });
+  refreshSelHighlight(); // no glow if the filament menu is open (color mode)
   selAnchor = new THREE.Box3().setFromObject(inst.group).getCenter(new THREE.Vector3()).sub(inst.group.position);
   const info = partInfoByNode[inst.cfg.node] || { label: next.label };
   $('identify-name').textContent = info.label;
@@ -1351,8 +1873,157 @@ async function cycleHandleStyle(dir) {
   if (info.links?.p) linksEl.appendChild(linkEl('Printables', info.links.p));
   if (info.links?.t) linksEl.appendChild(linkEl('Thangs', info.links.t));
 }
-$('style-prev').onclick = () => cycleHandleStyle(-1);
-$('style-next').onclick = () => cycleHandleStyle(1);
+// ---------- faceplate style swap ----------
+// Like the handle swap, but faceplates are PER-SIZE (the whole family swaps,
+// each plate keeping its W-H code) and the families mount differently: the
+// swap preserves each plate's MOUNTING PLANE (back face against the drawer
+// front) by re-deriving z from the two templates' REAL depths — measured off
+// the loaded GLBs, never hardcoded (center-mode canonical ⇒ back = −depth/2).
+// EdgeLabel prints its grip INTO the plate, so its style SUPPRESSES every
+// bolt-on Handle instance + BOM row (inst/row.styleHidden — honored by
+// applyState/exploded/phases/computeBounds/checklist/bomRows); switching back
+// restores them untouched (their cfg was never edited).
+const FACEPLATE_STYLES = [
+  { key: 'essential', label: 'Essential', node: c => `Faceplate_Essential_${c}`, hasHandle: true,  collections: ['185', '165'] },
+  { key: 'edgelabel', label: 'EdgeLabel', node: c => `Faceplate_EdgeLabel_${c}`, hasHandle: false, collections: ['185'] }, // no 165 EdgeLabel GLBs yet
+];
+const fpSizeCode = node => (node.match(/_(\dW-\d+H)$/) || [])[1] || null;
+const availableFaceplateStyles = () => FACEPLATE_STYLES.filter(s => s.collections.includes(manifest.collection || '185'));
+// label-bearing families link out to their label generator, carrying the
+// build's typed drawer labels so they pre-fill there — the SAME
+// `#labels=<base64 JSON array>` handoff the planner's own button uses
+// (updateLabelGenLink in planner app.js; URLs from its faceplateStyles data)
+const LABEL_GEN_URLS = { edgelabel: 'https://edgelabel.jerrari3d.com/', classicpro: 'https://classic.jerrari3d.com/' };
+function labelGenInfo() {
+  const url = LABEL_GEN_URLS[currentFaceplateStyle()?.key];
+  if (!url) return null;
+  const labels = build ? build.placed.filter(p => p.fill === 'decor' && p.label).map(p => p.label) : [];
+  return { href: url + (labels.length ? '#labels=' + btoa(unescape(encodeURIComponent(JSON.stringify(labels)))) : ''), count: labels.length };
+}
+const currentFaceplateStyle = () => {
+  const inst = [...instances.values()].find(i => typeByNode[i.cfg.node] === 'Faceplate');
+  return inst ? FACEPLATE_STYLES.find(s => inst.cfg.node.startsWith(s.node(''))) || null : null;
+};
+const nodeDepths = {};
+const nodeDepth = node => {
+  if (!(node in nodeDepths)) nodeDepths[node] = new THREE.Box3().setFromObject(templates[node]).getSize(new THREE.Vector3()).z;
+  return nodeDepths[node];
+};
+// what SHOULD this instance's visibility be right now, per the current page —
+// used to reconcile handles after a suppress/restore without a full applyState
+function pageVisibility(inst) {
+  if (inst.styleHidden) return false;
+  const page = PAGES[cur];
+  if (!page || page.cover || page.outro) return inst.group.visible;
+  const step = manifest.steps[cur - 1];
+  if (step?.checklist) return true;
+  return !!afterState[cur - 1]?.visible.has(inst.cfg.id);
+}
+let activeFaceplateStyle = null; // kit-swap memory (generated builds carry the family in build.faceStyle instead)
+async function applyFaceplateStyle(style) {
+  activeFaceplateStyle = style;
+  if (build) {
+    // generated builds go through the GENERATOR — it emits the full family
+    // natively (EdgeLabel brings its accent + label and drops the handles) and
+    // the planner's own `faceStyle` field carries it in share links. Keep the
+    // user's selection: the plate ids are deterministic across regenerates.
+    build.faceStyle = style.key;
+    const keepSel = selectedId;
+    await regenerate();
+    if (keepSel && instances.has(keepSel)) setSelected(keepSel); // re-isolate the plate the user was on
+    return;
+  }
+  // static kits: in-place mutation (bare plate swap — kits author their own extras)
+  const fps = [...instances.values()].filter(i => typeByNode[i.cfg.node] === 'Faceplate');
+  if (!fps.length) return;
+  // lazy-load every size the scene needs in the new family (zone tags included)
+  const codes = [...new Set(fps.map(i => fpSizeCode(i.cfg.node)).filter(Boolean))];
+  await Promise.all(codes.map(async code => {
+    const node = style.node(code);
+    if (templates[node]) return;
+    const gltf = await loader.loadAsync(`${PARTS_BASE}${node}.lib.glb`);
+    templates[node] = adoptTemplate(gltf.scene, 'Faceplate');
+  }));
+  for (const inst of fps) {
+    const code = fpSizeCode(inst.cfg.node);
+    if (!code) continue;
+    const newNode = style.node(code);
+    if (newNode === inst.cfg.node) continue;
+    const off = inst.group.position.clone().sub(basePos(inst, inst.staged)); // keep open/exploded offsets
+    const back = inst.cfg.pos[2] - nodeDepth(inst.cfg.node) / 2; // the mounting plane stays put
+    inst.cfg.pos = [inst.cfg.pos[0], inst.cfg.pos[1], back + nodeDepth(newNode) / 2];
+    inst.cfg.node = newNode;
+    typeByNode[newNode] = 'Faceplate';
+    inst.group.clear();
+    inst.group.add(templates[newNode].clone(true));
+    inst.group.position.copy(basePos(inst, inst.staged)).add(off);
+  }
+  // handles: EdgeLabel's grip is part of the plate print — no bolt-on part.
+  // Inside the plate isolation everything is hidden anyway; exitFaceplateFocus
+  // runs the same reconcile so restored handles reappear on deselect.
+  for (const inst of instances.values()) {
+    if (typeByNode[inst.cfg.node] !== 'Handle') continue;
+    inst.styleHidden = !style.hasHandle;
+    if (!fpFocus.id) inst.group.visible = pageVisibility(inst);
+    else if (inst.styleHidden) inst.group.visible = false;
+  }
+  // BOM: faceplate rows follow the family; Handle rows hide with the style.
+  // The original rows (labels/links/renders) are backed up on first swap so
+  // returning to the manifest's own family restores them exactly.
+  for (const row of manifest.parts) {
+    if (row.type === 'Handle') { row.styleHidden = !style.hasHandle; continue; }
+    if (row.type !== 'Faceplate') continue;
+    const code = fpSizeCode(row.node);
+    if (!code) continue;
+    row._origFp = row._origFp || { node: row.node, label: row.label, links: row.links, img: row.img };
+    const newNode = style.node(code);
+    if (newNode === row.node) continue;
+    delete partInfoByNode[row.node];
+    if (newNode === row._origFp.node) Object.assign(row, row._origFp);
+    else {
+      row.node = newNode;
+      row.label = `${style.label} Faceplate ${code}`;
+      delete row.links; delete row.img; // club family — no public links/renders yet
+    }
+    partInfoByNode[row.node] = row;
+  }
+  renderChecklist();
+  computeBounds(); // the envelope changed (24 mm plate vs 5 mm plate + handle) — dims/wall sizing follow
+  setDims(dims.on); // rebuild the callouts if they're showing
+  syncBuildToPlanner(); // no-op if opened cold; carries build.faceplateStyle
+}
+async function cycleFaceplateStyle(dir) {
+  const styles = availableFaceplateStyles();
+  const curStyle = currentFaceplateStyle();
+  if (styles.length < 2 || !curStyle) return;
+  const next = styles[(Math.max(0, styles.indexOf(curStyle)) + dir + styles.length) % styles.length];
+  await applyFaceplateStyle(next);
+  $('style-name').textContent = next.label;
+  if (!selectedId) return;
+  const inst = instances.get(selectedId);
+  if (typeByNode[inst.cfg.node] !== 'Faceplate') return;
+  refreshSelHighlight(); // no glow if the filament menu is open (color mode)
+  renderZoneChips(inst); // EdgeLabel gains the Grip swatch, Essential drops it
+  selAnchor = new THREE.Box3().setFromObject(inst.group).getCenter(new THREE.Vector3()).sub(inst.group.position);
+  const info = partInfoByNode[inst.cfg.node] || { label: `${next.label} Faceplate` };
+  $('identify-name').textContent = info.label;
+  $('identify-img').classList.add('hidden');
+  if (info.img) { const img = $('identify-img'); img.onerror = () => img.classList.add('hidden'); img.src = info.img; img.classList.remove('hidden'); }
+  const linksEl = $('identify-links');
+  linksEl.innerHTML = '';
+  if (info.links?.p) linksEl.appendChild(linkEl('Printables', info.links.p));
+  if (info.links?.t) linksEl.appendChild(linkEl('Thangs', info.links.t));
+}
+// the ◀ ▶ row serves whichever swappable part is selected
+const cycleStyle = dir => {
+  const inst = selectedId && instances.get(selectedId);
+  if (!inst) return;
+  const t = typeByNode[inst.cfg.node];
+  if (t === 'Handle') cycleHandleStyle(dir);
+  else if (t === 'Faceplate') cycleFaceplateStyle(dir);
+};
+$('style-prev').onclick = () => cycleStyle(-1);
+$('style-next').onclick = () => cycleStyle(1);
 // remove the selected optional part (magnet closure for its drawer, or a 1W
 // stopper pair), then regenerate + update the BOM
 $('identify-remove').onclick = async () => {
@@ -1368,6 +2039,20 @@ $('identify-remove').onclick = async () => {
   setSelected(null);
   await regenerate();
 };
+// faceplate isolation → drawer hand-off: "Open the drawer" re-selects the
+// drawer BODY, which runs the normal deep-pull + interior-dims focus. The
+// pre-isolation camera pose transfers to the drawer focus so the final
+// deselect still returns to where the user started.
+$('identify-open-drawer').onclick = () => {
+  const inst = selectedId && instances.get(selectedId);
+  const carrier = inst && drawerCarrier(inst);
+  if (!carrier) return;
+  if (fpFocus.saved && !dFocus.saved) { dFocus.saved = fpFocus.saved; fpFocus.saved = null; }
+  openCarrier = carrier; // counts as "seated" even if a shut-slide is still in flight
+  setSelected(carrier.cfg.id);
+};
+// the obvious way OUT of an open drawer (an empty tap still works too)
+$('identify-close-drawer').onclick = () => setSelected(null);
 
 canvas.addEventListener('pointerdown', e => { downXY = [e.clientX, e.clientY]; });
 canvas.addEventListener('pointerup', e => {
@@ -1377,12 +2062,222 @@ canvas.addEventListener('pointerup', e => {
     ((e.clientX - r.left) / r.width) * 2 - 1,
     -((e.clientY - r.top) / r.height) * 2 + 1
   ), camera);
-  const hits = ray.intersectObjects([...instances.values()].filter(i => i.group.visible).map(i => i.group), true);
+  // faceplate isolation: only the plate + its dressing are tappable (mid-fade
+  // parts are still technically visible — anything else counts as empty space)
+  const pickable = [...instances.values()].filter(i => i.group.visible &&
+    (!fpFocus.id || i.cfg.id === fpFocus.id || fpFocus.mates.has(i.cfg.id)));
+  const hits = ray.intersectObjects(pickable.map(i => i.group), true);
+  if (measure.on) { // measure mode swallows taps: surface point, not part identity
+    if (hits.length) addMeasurePoint(hits[0].point);
+    else clearMeasure(); // empty tap wipes the current measurement (stay in mode)
+    return;
+  }
   if (!hits.length) { setSelected(null); return; }
   let o = hits[0].object;
   while (o && !o.userData.instanceId) o = o.parent;
   setSelected(o ? o.userData.instanceId : null);
 });
+
+// ---------- measure tool ----------
+// PrusaSlicer-lite: two taps on part surfaces → markers + a line + a floating
+// distance readout. The scene is authored in REAL millimetres (GLBs + every
+// generate.js placement number), so the measured distance IS the mm value —
+// no scaling. Markers rescale each frame to stay a constant on-screen size.
+// Page changes clear it (parts move between steps, measurements go stale).
+const measure = { on: false, pts: [], marks: [], line: null };
+const measureMat = new THREE.MeshBasicMaterial({ color: 0xff8a40, depthTest: false, transparent: true });
+function clearMeasure() {
+  measure.pts = [];
+  for (const m of measure.marks) scene.remove(m);
+  measure.marks = [];
+  if (measure.line) { scene.remove(measure.line); measure.line = null; }
+  $('measure-label').classList.add('hidden');
+}
+function setMeasure(on) {
+  measure.on = on;
+  $('measure-toggle').classList.toggle('on', on);
+  if (on) setSelected(null); // identify and measure are mutually exclusive
+  else clearMeasure();
+}
+$('measure-toggle').onclick = () => setMeasure(!measure.on);
+function addMeasurePoint(p) {
+  if (measure.pts.length >= 2) clearMeasure(); // 3rd tap starts a fresh measurement
+  measure.pts.push(p.clone());
+  const mark = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 12), measureMat);
+  mark.position.copy(p);
+  mark.renderOrder = 999; // depthTest off → always visible, even inside parts
+  scene.add(mark);
+  measure.marks.push(mark);
+  if (measure.pts.length === 2) {
+    const [a, b] = measure.pts;
+    measure.line = new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints([a, b]),
+      new THREE.LineBasicMaterial({ color: 0xff8a40, depthTest: false, transparent: true }));
+    measure.line.renderOrder = 998;
+    scene.add(measure.line);
+    $('measure-label').innerHTML = `${a.distanceTo(b).toFixed(1)} mm` +
+      `<small>&#916;X ${Math.abs(b.x - a.x).toFixed(1)} &middot; &#916;Y ${Math.abs(b.y - a.y).toFixed(1)} &middot; &#916;Z ${Math.abs(b.z - a.z).toFixed(1)}</small>`;
+  }
+}
+function updateMeasure() { // render-loop: constant marker screen-size + label tracking
+  for (const m of measure.marks) m.scale.setScalar(camera.position.distanceTo(m.position) * 0.006);
+  const label = $('measure-label');
+  if (measure.pts.length !== 2) return;
+  const mid = measure.pts[0].clone().add(measure.pts[1]).multiplyScalar(0.5).project(camera);
+  if (mid.z > 1) { label.classList.add('hidden'); return; } // midpoint behind the camera
+  const r = canvas.getBoundingClientRect();
+  label.style.left = ((mid.x + 1) / 2 * r.width) + 'px';
+  label.style.top = ((1 - mid.y) / 2 * r.height) + 'px';
+  label.classList.remove('hidden');
+}
+
+// ---------- overall dimensions (final assembled step) ----------
+// Product-diagram style W / H / L callouts along the assembled build's bounding
+// box. True physical envelope (handles/faceplates/bracket included, screws
+// excluded), labelled in mm + inches. The edges the lines ride are chosen PER
+// CAMERA (Joey: a line that ends up over the build should redraw somewhere
+// clear): H hops between the four vertical corners to the screen-OUTERMOST one
+// (offset diagonally outward = it can never overlap the model), W and L flip
+// to whichever floor edge faces the camera. Geometry rebuilds only when that
+// choice changes; labels re-place only when the camera pose changes.
+const dims = { on: false, group: null, lines: {}, choice: '', hCorner: null, lastKey: null };
+function setDims(on) {
+  dims.on = on && !assembledBox.isEmpty();
+  dims.choice = ''; dims.hCorner = null; dims.lastKey = null;
+  if (dims.group) { scene.remove(dims.group); dims.group.traverse(o => o.geometry?.dispose()); dims.group = null; }
+  for (const id of ['dim-w', 'dim-h', 'dim-l']) $(id).classList.add('hidden');
+  if (!dims.on) return;
+  const size = assembledBox.getSize(new THREE.Vector3());
+  const mmIn = (mm, axis) => `<b>${axis}</b> ${mm.toFixed(0)} mm<small>${(mm / 25.4).toFixed(1)} in</small>`;
+  $('dim-w').innerHTML = mmIn(size.x, 'W');
+  $('dim-h').innerHTML = mmIn(size.y, 'H');
+  $('dim-l').innerHTML = mmIn(size.z, 'L');
+  // lines + labels materialize in updateDims (they depend on the camera)
+}
+function buildDimLines(wFront, lRight, hsx, hsz) {
+  if (dims.group) { scene.remove(dims.group); dims.group.traverse(o => o.geometry?.dispose()); dims.group = null; }
+  const b = assembledBox, size = b.getSize(new THREE.Vector3());
+  const gap = Math.max(30, Math.max(size.x, size.y, size.z) * 0.08); // breathing room off the model
+  const t = 8; // tick half-length
+  const V = (x, y, z) => new THREE.Vector3(x, y, z);
+  const segs = [];
+  const line = (a, c, tickDir) => { // main segment + perpendicular end ticks
+    segs.push(a, c);
+    for (const end of [a, c]) segs.push(end.clone().addScaledVector(tickDir, -t), end.clone().addScaledVector(tickDir, t));
+    return { a, c }; // endpoints — updateDims anchors the label ON this line
+  };
+  // floor lines sit +1 mm above b.min.y so they don't z-fight the table plane
+  const floorY = b.min.y + 1;
+  const wz = wFront ? b.max.z + gap : b.min.z - gap;  // W: the floor edge facing the camera
+  const lx = lRight ? b.max.x + gap : b.min.x - gap;  // L: same, left/right
+  const hx = hsx > 0 ? b.max.x + gap : b.min.x - gap; // H: screen-outermost corner, pushed out
+  const hz = hsz > 0 ? b.max.z + gap : b.min.z - gap; //    diagonally so it clears the build
+  dims.lines = {
+    'dim-w': line(V(b.min.x, floorY, wz), V(b.max.x, floorY, wz), V(0, 0, wFront ? 1 : -1)),
+    'dim-h': line(V(hx, b.min.y, hz), V(hx, b.max.y, hz), V(hsx, 0, hsz).normalize()),
+    'dim-l': line(V(lx, floorY, b.min.z), V(lx, floorY, b.max.z), V(lRight ? 1 : -1, 0, 0)),
+  };
+  const geo = new THREE.BufferGeometry().setFromPoints(segs);
+  dims.group = new THREE.Group();
+  // depth-tested (unlike the measure tool): the lines sit OUTSIDE the box, so
+  // any segment the model hides is genuinely behind the build — occluding it
+  // reads as physical, and nothing draws over the model
+  dims.group.add(new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color: 0x656a73, transparent: true, opacity: 0.85 })));
+  scene.add(dims.group);
+}
+const dimRay = new THREE.Raycaster();
+function updateDims() { // render-loop: pick edges for the camera, then place labels ON their lines
+  if (!dims.on) return;
+  const r = canvas.getBoundingClientRect();
+  // static camera → nothing to do (edge choice + placement both raycast)
+  const key = camera.matrixWorld.elements.map(e => e.toFixed(2)).join() + '|' + r.width + 'x' + r.height;
+  if (dims.lastKey === key) return;
+  dims.lastKey = key;
+  // broad-phase: the model's projected-AABB rect. Points OUTSIDE it are visible
+  // for free; points inside get a precise raycast (the rect over-covers at 3/4
+  // angles — its empty corners are fine places for a label).
+  const b = assembledBox, ctr = b.getCenter(new THREE.Vector3());
+  let rx0 = Infinity, ry0 = Infinity, rx1 = -Infinity, ry1 = -Infinity;
+  for (let i = 0; i < 8; i++) {
+    const c = new THREE.Vector3(i & 1 ? b.max.x : b.min.x, i & 2 ? b.max.y : b.min.y, i & 4 ? b.max.z : b.min.z).project(camera);
+    if (c.z > 1) continue;
+    const sx = (c.x + 1) / 2 * r.width, sy = (1 - c.y) / 2 * r.height;
+    rx0 = Math.min(rx0, sx); rx1 = Math.max(rx1, sx);
+    ry0 = Math.min(ry0, sy); ry1 = Math.max(ry1, sy);
+  }
+  const cx = (rx0 + rx1) / 2, cy = (ry0 + ry1) / 2;
+  // the desktop parts panel overlays the canvas's right side when open — keep
+  // the H line (and clamp all labels) clear of it
+  const cp = $('checklist-panel');
+  const panelLeft = (!cp.classList.contains('hidden') && !isMobile())
+    ? cp.getBoundingClientRect().left - r.left : Infinity;
+  // ---- choose the edges for this view --------------------------------------
+  const wFront = camera.position.z >= ctr.z;
+  const lRight = camera.position.x >= ctr.x;
+  // H: score each vertical corner by how far OUT it projects horizontally —
+  // the screen-outermost corner clears the silhouette. Penalize corners under
+  // the parts panel; 15% hysteresis so the line doesn't flip-flop mid-orbit.
+  let hBest = null, hCur = null;
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+    const p = new THREE.Vector3(sx > 0 ? b.max.x : b.min.x, ctr.y, sz > 0 ? b.max.z : b.min.z).project(camera);
+    if (p.z > 1) continue;
+    const px = (p.x + 1) / 2 * r.width;
+    // penalize corners whose LABEL would have no room before the panel (pill
+    // needs ~90px) — not just corners literally under it
+    const score = Math.abs(px - cx) * (px > panelLeft - 90 ? 0.25 : 1);
+    const cand = { sx, sz, score };
+    if (!hBest || score > hBest.score) hBest = cand;
+    if (dims.hCorner && sx === dims.hCorner.sx && sz === dims.hCorner.sz) hCur = cand;
+  }
+  if (!hBest) { for (const id of ['dim-w', 'dim-h', 'dim-l']) $(id).classList.add('hidden'); return; }
+  const hPick = (hCur && hBest.score < hCur.score * 1.15) ? hCur : hBest;
+  dims.hCorner = hPick;
+  const choice = `${wFront}|${lRight}|${hPick.sx},${hPick.sz}`;
+  if (choice !== dims.choice || !dims.group) { dims.choice = choice; buildDimLines(wFront, lRight, hPick.sx, hPick.sz); }
+  // ---- place the labels on their lines -------------------------------------
+  const targets = [...instances.values()].filter(i => i.group.visible).map(i => i.group);
+  const modelCovers = (ndcX, ndcY, worldPt) => { // is the model IN FRONT of this line point?
+    dimRay.setFromCamera(new THREE.Vector2(ndcX, ndcY), camera);
+    const hit = dimRay.intersectObjects(targets, true)[0];
+    return !!hit && hit.distance < camera.position.distanceTo(worldPt) - 2;
+  };
+  // center-out walk: 0.5, ±1/16, ±2/16 … — the label sits at the line's MIDDLE
+  // whenever the view allows and only slides along the line as far as needed
+  const T = [0]; for (let k = 1; k <= 8; k++) T.push(k, -k);
+  const placedRects = []; // labels must not overlap each other either
+  for (const [id, seg] of Object.entries(dims.lines)) {
+    const el = $(id);
+    const hw = el.offsetWidth / 2 + 8, hh = el.offsetHeight / 2 + 6; // pill half-size + breathing room
+    let pos = null, fallback = null, fallbackDist = -1;
+    for (const off of T) {
+      const t01 = 0.5 + off / 16;
+      const wp = seg.a.clone().lerp(seg.c, t01);
+      const p = wp.clone().project(camera);
+      if (p.z > 1) continue;
+      const x = (p.x + 1) / 2 * r.width, y = (1 - p.y) / 2 * r.height;
+      const collides = placedRects.some(q => x + hw > q.x0 && x - hw < q.x1 && y + hh > q.y0 && y - hh < q.y1);
+      if (!collides) {
+        const dc = Math.hypot(x - cx, y - cy);
+        if (dc > fallbackDist) { fallbackDist = dc; fallback = { x, y } };
+        const inRect = x > rx0 - hw && x < rx1 + hw && y > ry0 - hh && y < ry1 + hh;
+        if (!inRect || !modelCovers(p.x, p.y, wp)) { pos = { x, y }; break; } // first clear spot walking out from center
+      }
+    }
+    pos = pos || fallback; // whole line covered → least-bad point (farthest from the model, still on the line)
+    if (!pos) { el.classList.add('hidden'); continue; } // entire line behind the camera
+    // clamp to the viewport (and clear of the parts panel) — the label pins to
+    // the edge if a tight crop pushes its line point off-screen
+    const maxX = Math.min(r.width - 40, panelLeft - hw);
+    const fx = Math.min(Math.max(pos.x, 40), Math.max(40, maxX)), fy = Math.min(Math.max(pos.y, 24), r.height - 24);
+    placedRects.push({ x0: fx - hw, x1: fx + hw, y0: fy - hh, y1: fy + hh });
+    el.style.left = fx + 'px';
+    el.style.top = fy + 'px';
+    el.classList.remove('hidden');
+  }
+  // first pass after setDims runs with hidden labels (offsetWidth 0) — their
+  // real sizes exist next frame; force one more placement pass then
+  if (['dim-w', 'dim-h', 'dim-l'].some(id => !$(id).offsetWidth)) dims.lastKey = null;
+}
 
 // ---------- outro party dressing ----------
 // The finale gets stage treatment: the room dims to night, an HDR-style
@@ -1747,7 +2642,11 @@ function updatePointerLine() {
   const svg = $('pointer-line');
   if (!selectedId) { svg.classList.add('hidden'); return; }
   const inst = instances.get(selectedId);
-  const p = inst.group.position.clone().add(selAnchor).project(camera);
+  const p = inst.group.position.clone().add(selAnchor);
+  // track the label lift / accent pop — the child offset is group-local, so
+  // rotate it into world space (accents are group-rotated 180°)
+  if (inst.group.children[0]) p.add(inst.group.children[0].position.clone().applyQuaternion(inst.group.quaternion));
+  p.project(camera);
   if (p.z > 1 || !inst.group.visible) { svg.classList.add('hidden'); return; }
   const wrap = document.getElementById('stage-wrap').getBoundingClientRect();
   const card = $('identify-card').getBoundingClientRect();
@@ -1768,7 +2667,7 @@ function currentOpts() {
   if (!build) return null;
   const closures = {};
   for (const u of build.placed) if (u.fill === 'decor' || u.fill === 'classic') closures[u.id] = u.closure === 'magnet' ? 'magnet' : 'none';
-  return { closures, removedStoppers: build.removedStoppers || [], wallStagger: !!build.wallStagger, handleStyle: build.handleStyle };
+  return { closures, removedStoppers: build.removedStoppers || [], wallStagger: !!build.wallStagger, handleStyle: build.handleStyle, faceStyle: build.faceStyle, backCover: !!build.backCover };
 }
 let syncBuildToPlanner = () => {
   if (applyingRemote || !build || !window.opener) return;
@@ -1785,6 +2684,8 @@ addEventListener('message', async (e) => {
   if (Array.isArray(o.removedStoppers) && [...o.removedStoppers].sort().join(',') !== [...(build.removedStoppers || [])].sort().join(',')) changed = true;
   if (typeof o.wallStagger === 'boolean' && o.wallStagger !== !!build.wallStagger) changed = true;
   if (o.handleStyle && o.handleStyle !== build.handleStyle) changed = true;
+  if (o.faceStyle && o.faceStyle !== build.faceStyle) changed = true;
+  if (typeof o.backCover === 'boolean' && o.backCover !== !!build.backCover) changed = true;
   if (!changed) return;
   applyingRemote = true;
   try {
@@ -1792,6 +2693,8 @@ addEventListener('message', async (e) => {
     if (Array.isArray(o.removedStoppers)) build.removedStoppers = o.removedStoppers;
     if (typeof o.wallStagger === 'boolean') build.wallStagger = o.wallStagger;
     if (o.handleStyle) build.handleStyle = o.handleStyle;
+    if (o.faceStyle) build.faceStyle = o.faceStyle;
+    if (typeof o.backCover === 'boolean') build.backCover = o.backCover;
     await regenerate();
   } finally { applyingRemote = false; }
 });
@@ -1842,6 +2745,8 @@ async function regenerate() {
       instances.get([...instances.keys()].find(id => typeByNode[instances.get(id).cfg.node] === 'Handle'))?.cfg.node !== activeHandleStyle.node) {
     await applyHandleStyle(activeHandleStyle);
   }
+  // (no faceplate re-apply here: the generator emits the family natively from
+  // build.faceStyle, so a regenerate always lands on the right plates)
   goTo(keep, { animate: false });
   if (panelOpen) setChecklist(true); // restore the panel the user was just clicking in
   regenBusy = false;
@@ -1869,11 +2774,15 @@ renderer.setAnimationLoop(now => {
   // its underside, so the rails/screw layout can be inspected from the top.
   if (isUnderTableBuild && !cinema.on) surface.visible = camera.position.y < surfaceUnderY;
   updatePointerLine();
+  updateMeasure();
+  updateDims();
+  updateDrawerDims();
+  updateFpEnv();
   renderer.render(scene, camera);
 });
 
 // dev-only hook (mirrors the planner's guarded test-hook convention): ?debug=1
 if (new URLSearchParams(location.search).get('debug')) {
-  window.__GEN2_VIEWER__ = { THREE, scene, camera, controls, goTo, applyState, instances, manifest, cinema, updateCinema, cinemaScene, party, confetti, confettiPop,
+  window.__GEN2_VIEWER__ = { THREE, scene, camera, controls, goTo, applyState, instances, manifest, cinema, updateCinema, cinemaScene, party, confetti, confettiPop, fpFocus, fpEnv,
     get build() { return build; }, regenerate, setSelected, get selectedId() { return selectedId; } };
 }

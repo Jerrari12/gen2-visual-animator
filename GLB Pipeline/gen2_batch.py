@@ -61,6 +61,7 @@ def run_export(blender_exe, job):
         "--code-regex", job.get("code_regex", ""),
         "--name-template", job.get("name_template", "{name}"),
         "--depth-mode", job.get("depth_mode", "center"),
+        "--export-materials", job.get("export_materials", "NONE"),
         "--drop-islands-max-verts", str(job.get("drop_islands_max_verts", 0)),
         "--drop-islands-max-thick", str(job.get("drop_islands_max_thick", 2.0)),
     ]
@@ -113,26 +114,44 @@ def position_accessor(js):
 
 
 def world_bounds(js):
-    """Real-world bounds, applying node TRS and de-normalising quantized ints."""
+    """Real-world bounds, applying node TRS and de-normalising quantized ints.
+    Unions ALL primitives of the mesh: a multi-material part exports one primitive
+    per material slot (e.g. a 2-zone faceplate = BODY + GRIP), so measuring only
+    primitives[0] would miss the other zone."""
     n = js["nodes"][0]
-    acc, _ = position_accessor(js)
     t = n.get("translation", [0, 0, 0])
     s = n.get("scale", [1, 1, 1])
-    div = 32767.0 if (acc.get("normalized") and acc["componentType"] == 5122) else 1.0
-    mn = [max(v / div, -1.0) * s[i] + t[i] for i, v in enumerate(acc["min"])]
-    mx = [(v / div) * s[i] + t[i] for i, v in enumerate(acc["max"])]
+    mn = [float("inf")] * 3
+    mx = [float("-inf")] * 3
+    for prim in js["meshes"][0]["primitives"]:
+        acc = js["accessors"][prim["attributes"]["POSITION"]]
+        div = 32767.0 if (acc.get("normalized") and acc["componentType"] == 5122) else 1.0
+        pmn = [max(v / div, -1.0) * s[i] + t[i] for i, v in enumerate(acc["min"])]
+        pmx = [(v / div) * s[i] + t[i] for i, v in enumerate(acc["max"])]
+        for i in range(3):
+            mn[i] = min(mn[i], pmn[i]); mx[i] = max(mx[i], pmx[i])
     return mn, mx
 
 
-def verify_canonical(js, tol=0.15):
-    """glTF space: X=width, Y=height, Z=depth. Canonical = X/Z centred, Y bottom=0."""
+def verify_canonical(js, tol=0.15, allow_materials=False):
+    """glTF space: X=width, Y=height, Z=depth. Canonical = X/Z centred, Y bottom=0.
+    allow_materials=True (job opted into export_materials): law #2 relaxes -- the
+    materials are just zone tags the viewer ignores, so we only reject TEXTURED
+    materials, not the tiny named stubs that mark BODY/GRIP zones."""
     mn, mx = world_bounds(js)
+    mats = js.get("materials") or []
+    if allow_materials:
+        mats_ok = all("pbrMetallicRoughness" not in m
+                      or not m["pbrMetallicRoughness"].get("baseColorTexture")
+                      for m in mats)
+    else:
+        mats_ok = not mats
     checks = {
         "x_centered": abs(mn[0] + mx[0]) < tol,
         "z_centered": abs(mn[2] + mx[2]) < tol,
         "y_bottom_zero": abs(mn[1]) < tol,
         "y_positive_height": mx[1] > tol,
-        "no_materials": not js.get("materials"),
+        "no_materials": mats_ok,
     }
     return all(checks.values()), checks, mn, mx
 
@@ -143,7 +162,7 @@ def verify_canonical(js, tol=0.15):
 CODE_RE = re.compile(r"(\d+)W-(\d+)H")
 
 
-def post_process(out_dir, do_compress=True):
+def post_process(out_dir, do_compress=True, allow_materials=False):
     raw_dir = os.path.join(out_dir, "raw")
     raws = sorted(glob.glob(os.path.join(raw_dir, "*.glb")))
     rows, problems = [], []
@@ -156,7 +175,7 @@ def post_process(out_dir, do_compress=True):
         target = lib if os.path.exists(lib) else raw
 
         js = glb_json(target)
-        ok, checks, mn, mx = verify_canonical(js)
+        ok, checks, mn, mx = verify_canonical(js, allow_materials=allow_materials)
         if not ok:
             problems.append({"file": os.path.basename(target), "checks": checks})
 
@@ -233,7 +252,8 @@ def main():
             continue
         print(f"- JOB   {job.get('name','?')}")
         run_export(blender_exe, job)
-        rows, problems = post_process(job["out"], do_compress=do_comp)
+        allow_mats = job.get("export_materials", "NONE") != "NONE"
+        rows, problems = post_process(job["out"], do_compress=do_comp, allow_materials=allow_mats)
         write_index(rows, os.path.join(job["out"], "parts_index.csv"))
         all_rows += rows
         all_problems += problems

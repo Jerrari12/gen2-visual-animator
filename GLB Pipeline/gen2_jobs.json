@@ -197,6 +197,48 @@
       "code_regex": "",
       "name_template": "{name}",
       "depth_mode": "center"
+    },
+
+    {
+      "name": "EdgeLabel Faceplates (185)",
+      "_note": "18 sizes. Body+GRIP MERGED into one object per size = 2 material slots -> 2 primitives. export_materials=EXPORT keeps tiny named BODY/GRIP zone stubs so the viewer tints each zone (law #2 relaxed to zone tags). NO handle part -- the grip is integral to the print. Object names are already part-code -> name_template {name}.",
+      "blend": "D:\\Code Projects\\GEN2 Visual Animator\\Blender Files\\Decor Faceplates\\GEN2 GLB Exporter - GEN2 Faceplates - EdgeLabel B.blend",
+      "out": "D:\\Code Projects\\GEN2 Visual Animator\\GLB Library\\Faceplates\\EdgeLabel",
+      "select": "prefix:Faceplate_EdgeLabel",
+      "code_regex": "",
+      "name_template": "{name}",
+      "depth_mode": "center",
+      "export_materials": "EXPORT"
+    },
+    {
+      "name": "EdgeLabel Accents (185)",
+      "_note": "14 accents (none on the four 05H sizes). Separate print (designed face-down for texture/holo). Single ACCENT zone -> export_materials stays NONE. Shared per-size with the upcoming Classic Pro faceplate.",
+      "blend": "D:\\Code Projects\\GEN2 Visual Animator\\Blender Files\\Decor Faceplates\\GEN2 GLB Exporter - GEN2 Faceplates - EdgeLabel B.blend",
+      "out": "D:\\Code Projects\\GEN2 Visual Animator\\GLB Library\\Faceplates\\EdgeLabel\\Accents",
+      "select": "prefix:Accent_EdgeLabel",
+      "code_regex": "",
+      "name_template": "{name}",
+      "depth_mode": "center"
+    },
+    {
+      "name": "EdgeLabel Back Covers (185)",
+      "_note": "18 OPTIONAL back covers (fill the new Decor drawer front gap; toggle off = backwards-compat with older closed-front drawers). Single zone.",
+      "blend": "D:\\Code Projects\\GEN2 Visual Animator\\Blender Files\\Decor Faceplates\\GEN2 GLB Exporter - GEN2 Faceplates - EdgeLabel B.blend",
+      "out": "D:\\Code Projects\\GEN2 Visual Animator\\GLB Library\\Faceplates\\EdgeLabel\\BackCovers",
+      "select": "prefix:BackCover_EdgeLabel",
+      "code_regex": "",
+      "name_template": "{name}",
+      "depth_mode": "center"
+    },
+    {
+      "name": "EdgeLabel Label (universal)",
+      "_note": "ONE universal swappable label (same part as the EdgeLabel generator). All 18 collections share one linked mesh; the authoritative object is named Label_EdgeLabel so this prefix matches exactly one -> exports once.",
+      "blend": "D:\\Code Projects\\GEN2 Visual Animator\\Blender Files\\Decor Faceplates\\GEN2 GLB Exporter - GEN2 Faceplates - EdgeLabel B.blend",
+      "out": "D:\\Code Projects\\GEN2 Visual Animator\\GLB Library\\Faceplates\\EdgeLabel\\Label",
+      "select": "prefix:Label_EdgeLabel",
+      "code_regex": "",
+      "name_template": "{name}",
+      "depth_mode": "center"
     }
   ]
 }

@@ -1,0 +1,48 @@
+{
+  "title": "EdgeLabel Faceplate · Test Bench",
+  "collection": "185",
+  "_note": "Dev-only kit: proves the 2-zone (BODY|GRIP) faceplate GLB end-to-end — zone tagging from material stubs, Body+Grip swatches in the identify card, accent/back-cover/label as separate colorable parts. Positions derive from the EdgeLabel B blend world bounds (body bottom placed at Y=20).",
+  "colors": {
+    "Faceplate": "#56575c",
+    "Faceplate:GRIP": "#ff8a40",
+    "Accent": "#2a2f6e",
+    "BackCover": "#33363c",
+    "Label": "#f2f3f5"
+  },
+  "parts": [
+    { "node": "Faceplate_EdgeLabel_1W-1H", "label": "EdgeLabel Faceplate 1W-1H", "type": "Faceplate", "qty": 1 },
+    { "node": "Accent_EdgeLabel_1W-1H", "label": "EdgeLabel Accent 1W-1H", "type": "Accent", "qty": 1 },
+    { "node": "BackCover_EdgeLabel_1W-1H", "label": "EdgeLabel Back Cover 1W-1H (optional)", "type": "BackCover", "qty": 1 },
+    { "node": "Label_EdgeLabel", "label": "EdgeLabel Label (universal)", "type": "Label", "qty": 1 }
+  ],
+  "instances": [
+    { "id": "fp", "node": "Faceplate_EdgeLabel_1W-1H", "pos": [0, 20, 0] },
+    { "id": "acc", "node": "Accent_EdgeLabel_1W-1H", "rot": [0, 0, 180], "pos": [0, 47.85, -7.68], "rides": "fp" },
+    { "id": "lbl", "node": "Label_EdgeLabel", "pos": [-15, 48.0, -6.3], "rides": "fp" },
+    { "id": "bc", "node": "BackCover_EdgeLabel_1W-1H", "pos": [0, 27.22, -11.83], "rides": "fp" }
+  ],
+  "stages": {},
+  "steps": [
+    {
+      "title": "Print checklist",
+      "note": "The EdgeLabel test bench: the 2-color faceplate (Body + Grip zones in ONE print), the textured accent panel, the optional back cover and the universal swap-in label.",
+      "camera": { "t": 24, "p": 62, "r": 520, "target": [0, 40, 0] },
+      "checklist": true
+    },
+    {
+      "title": "The EdgeLabel set",
+      "note": "Tap the faceplate — the identify card offers TWO swatches (Body + Grip) because the GLB carries two primitives tagged by material name. Accent, back cover and label are their own parts.",
+      "camera": { "t": 18, "p": 64, "r": 330, "target": [0, 45, 0] },
+      "phases": [
+        {
+          "enter": [
+            { "id": "fp", "from": [0, 110, 0] },
+            { "id": "acc", "from": [0, 110, -60] },
+            { "id": "lbl", "from": [0, 110, 60] },
+            { "id": "bc", "from": [0, 110, -120] }
+          ]
+        }
+      ]
+    }
+  ]
+}

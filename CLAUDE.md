@@ -15,7 +15,9 @@ no bundler — `viewer/index.html` runs from any static server.
     `tabletop-185-3w` (3W×2H with a 2W case/drawer — proves multi-width,
     rail-junction feet dedup, and the 2W left-slot magnet rule), and
     `tabletop-165` (2×2 165-collection demo — PORTED from tabletop-185: node
-    names 185→165 + each shared-hardware Z shifted ±dz; keeps the GEN2 palette).
+    names 185→165 + each shared-hardware Z shifted ±dz; keeps the GEN2 palette),
+    and `edgelabel-test` (dev bench: the 2-zone EdgeLabel faceplate set — see the
+    EdgeLabel section).
     Select via
     `?kit=<name>`. BOM panel: expanded on the checklist step and final step,
     minimized to a "Parts · N" tab elsewhere (user-toggleable). The panel has
@@ -24,7 +26,60 @@ the planner's BOM actions) and is shown on the outro so the finale lists every
 part with its color chip + download links.
   - `vendor/three/` — vendored three.js (0.185.1) + addons; import-mapped in
     index.html. No CDN (works offline, no version drift).
-  - Debug hook: append `?debug=1` → `window.__GEN2_VIEWER__` (guarded, planner-style).
+  - Debug hook: append `?debug=1` → `window.__GEN2_VIEWER__` (guarded, planner-
+    style) + a calibration readout in the identify card (`#identify-debug`:
+    the instance's MANIFEST pos + yaw + world bbox mm — the exact numbers to
+    hand back when a part needs shifting). NB `__GEN2_VIEWER__.manifest` is a
+    boot-time snapshot — stale after regenerate (only `build` is a getter).
+  - 📏 Measure (`#measure-toggle` pill, hidden on cover/outro): PrusaSlicer-
+    lite — two taps on part surfaces raycast to the mesh, drop always-visible
+    markers (depthTest off, screen-constant size) + a line + a floating
+    mid-point label with distance + ΔX/ΔY/ΔZ. The scene is authored in REAL
+    mm, so the reading IS the mm value. 3rd tap starts fresh; empty tap
+    clears; identify is suppressed while measuring; page changes exit the
+    mode (parts move). Feature-snapping (edges/holes/angles) deliberately
+    skipped.
+  - Overall W/H/L dimension callouts (product-diagram style) auto-show on the
+    FINAL assembly step only: tick-capped lines along `assembledBox` (computed
+    in computeBounds — final-state extents, wood screws excluded, handles/
+    faceplates/bracket included = the true physical envelope), labels in
+    mm + inches (`.dim-label`, midpoint-tracked + viewport-clamped in
+    updateDims). NOTHING may cover the model (Joey): the lines are
+    depth-tested (they sit outside the box, so occluded = genuinely behind
+    the build; floor lines +1 mm above b.min.y to dodge table z-fighting),
+    and each label anchors to a point ON ITS OWN LINE, walking OUT FROM THE
+    CENTER (0.5, ±1/16, …) to the first spot that (a) doesn't collide with an
+    already-placed dim label and (b) isn't covered by the model — projected-
+    AABB rect as broad-phase, then a RAYCAST for truth (the rect over-covers
+    at 3/4 angles; its empty corners are fine label spots). Whole line
+    covered → least-bad on-line point. THE EDGES ARE CAMERA-PICKED
+    (buildDimLines, rebuilt only when the choice changes): H hops between the
+    4 vertical corners to the screen-OUTERMOST one, offset diagonally outward
+    (gap = max(30, 8% of maxDim) — Joey wanted breathing room), with a 15%
+    hysteresis and a 0.25 score penalty within ~90px of the open desktop
+    parts panel (labels also right-clamp clear of it); W/L flip to the floor
+    edge FACING the camera. Placement is cached per camera pose (raycasts
+    only when the view changes; labels' offsetWidth is 0 on the first hidden
+    pass → cache invalidates itself for one more pass). History: fixed
+    screen-direction push-out detached labels from lines after an orbit;
+    rect-only center-preference fled center too eagerly AND let labels
+    overlap; fixed-left lines sat over the build at some orbits (Joey
+    reports ×3) — center-out walk + raycast + mutual collision + camera-
+    picked edges solved all of it, CAD-style. Rebuilt on every step entry
+    (regenerate-safe).
+  - Drawer focus (dFocus in main.js): selecting a drawer BODY (the deep pull)
+    saves the camera pose, tweens to a front-above 3/4 on the OPEN drawer
+    (floor + back wall readable), hides the build dims, and shows the
+    drawer's INTERIOR W/L/H — lines drawn inside the cavity (W floor-front,
+    L floor-left, H back wall), parented INTO the drawer group so they ride
+    the slide, reusing the dim-label pills. Interior sizes are MEASURED
+    (raycasts: down from mid-height → floor, then walls from floor+6 mm —
+    the decor drawers' front wall is a low lip a mid-height ray overshoots;
+    truly open front falls back to bbox−2), cached per node. Deselect tweens
+    the camera back to the saved pose + restores the build dims; switching
+    drawers re-frames without restoring; camera tweens ride camTweenToken so
+    paging cancels them cleanly; resize() skips its preset re-fit while
+    focused.
 - `GLB Pipeline/` — Blender→GLB batch exporter (`python gen2_batch.py`), see its README.
 - `GLB Library/` — canonical compressed parts + `parts_index.csv` per collection.
 - `Blender Files/` — source .blends ("GEN2 GLB Exporter - *").
@@ -107,12 +162,39 @@ points at `viewer/img/parts/` (copied from the planner's BOM renders — same
 art in both tools). Links + image render in the tap-to-identify card (tap
 highlights the part, draws a thin pointer line to it, empty tap dismisses).
 Instance `rides: "<drawerId>"` marks drawer attachments (faceplate, handle,
-clip, magnet): in assembled scenes, selecting a RIDER (faceplate/handle/clip/
-magnet) of a seated drawer slides the whole set open 40 mm (a peek — enough to
-expose the body for tapping); selecting the drawer BODY pulls it ~90% of the
-safe travel (`(collection − 20) · 0.9` — deep enough to read the body colour/
-interior). A faceplate→body reselect re-pulls the SAME drawer further (prevOpen
-counts as seated); switching drawers shuts the old one; empty tap slides shut.
+clip, magnet): in assembled scenes, selecting a RIDER (handle/clip/magnet) of
+a seated drawer slides the whole set open 40 mm (a peek — enough to expose the
+body for tapping); selecting the drawer BODY pulls it ~90% of the safe travel
+(`(collection − 20) · 0.9` — deep enough to read the body colour/interior).
+**Faceplate focus** (fpFocus in main.js, Joey 2026-07-08): selecting a
+FACEPLATE skips the peek and ISOLATES the plate instead — every other part
+fades to NOTHING (per-mesh clones, `userData.fpFade` guard so step phases/
+applyState can stomp them safely; fully-faded groups get `visible=false` so
+the user can orbit clear around the plate and read its BACK side), EXCEPT the
+plate's own DRESSING (`FP_COMPANIONS` = Handle/Accent/Label/BackCover sharing
+the plate's carrier, or riding the plate itself in the test kit — fpFocus.mates
+Set, Joey 2026-07-08): those stay solid and tappable in isolation (own cards →
+◀▶ swaps + recolor each piece; isolation survives). While isolated the
+identify raycast is whitelisted to plate+dressing — tapping anything else
+counts as empty space = deselect. The table/grid/wall/surface fade to 0 via a render-loop lerp
+(`updateFpEnv` — NOT tween(), killTweens on a page snap would strand a
+half-faded room; flipping `material.transparent` needs `needsUpdate=true` or
+the program keeps rendering opaque), build dims hide, and the camera
+fit-frames the plate near straight-on off its real bbox (both FOVs → 1W-1H
+fills the frame like a 4W-2H; aim biased 15% of view height low so the plate
+clears the identify card; frames the SEAT while a shut-slide is in flight,
+the floating spot on the exploded page; the tween also settles camera.fov to
+the preset's — selecting mid cover→step flight used to strand the telephoto
+9 ≈ 4× overzoom; dFocus got the same fix). The card gains **"Open the drawer
+▸"** (plate OR its handle, only when the drawer is seatable) — the
+discoverable, touch-friendly hand-off the peek used to provide: it re-selects
+the drawer BODY, which runs the normal deep pull + interior dims, with the
+pre-isolation camera pose transferred to dFocus.saved so the final deselect
+restores the original view. Drawer-body focus gains **"✕ Close drawer"**
+(empty tap still works). Switching plates swaps fades without re-saving the
+pose; switching drawers shuts the old one; empty tap slides shut/restores
+everything. NB the tab must be foreground to verify visually — rAF freezes in
+hidden tabs (tweens/env lerp stall; state changes still apply).
 Steps show a LEGO-style number badge; `#note-collapse` (chevron in the note
 panel) folds the step text down to that badge — session-sticky across steps —
 so the model stays visible while recoloring on small screens. Mobile (≤560px):
@@ -131,8 +213,26 @@ mobile bottom-sheet + updates the BOM live) drives it: Drawer close None/Magnets
 (per-drawer `closure`), Drawer stoppers All/None (`build.removedStoppers` — set
 of `"<unitId>:<localCol>"` keys the generator honors in all 3 stopper spots),
 Handle ◀▶ (hot-swap, keeps the BlockBar variant across regenerates via
-`activeHandleStyle`), wall-only Top cover Per-column/Staggered (`wallStagger`),
-and Reset to original (snapshotted `originalBuild`). Selecting a **magnet
+`activeHandleStyle`; the row hides while EdgeLabel plates are active), Faceplate
+◀▶ (family swap via `activeFaceplateStyle`), **Faceplate back cover Off/On**
+(`build.backCover`, 2026-07-08 — generator emits a `BackCover_EdgeLabel_{code}`
+per decor faceplate: z-center 92.795 = mounting plane + 0.225, bottom = fp
+bottom + 7.22 (DERIVED from the EdgeLabel blend @1W-1H — verify on a print),
+rides the drawer, enters the faceplate demo BEFORE the plate + joins the
+push-home/fades, note gains "clip the back cover…"; BOM type `BackCover`
+×drawers, COLORS indigo #5b6ee1. 185 only — a 165 build hides the toggle and
+the generator warns. Family-agnostic (Essential/EdgeLabel/Classic Pro all seat
+the same cover), so it coexists with the plate swap — verified on a constructed
+#build= link, incl. `activeFaceplateStyle` surviving the toggle's regenerate),
+wall-only Top cover Per-column/Staggered (`wallStagger`), and Reset to original
+(snapshotted `originalBuild`). `currentOpts` posts closures/removedStoppers/
+wallStagger/handleStyle/faceStyle/backCover and the incoming handler applies
+`faceStyle` + `backCover`. **Planner side wired 2026-07-08** (gen2-planner-main:
+`state.backCover` + BUILD_FIELDS + sanitize, syncOptionsToViewer posts
+faceStyle+backCover, incoming validates+applies both, an Off/On toggle under
+the faceplate style cards, per-size `P.backCover` BOM rows marked `unreleased`
+"coming soon"; all 65 planner tests pass) — so planner⇄viewer faceplate style
+AND back cover live-sync both ways. Selecting a **magnet
 clip/magnet** or a **stopper** shows a ✕ Remove in the identify card (generator
 stamps `owner`=drawerId / `stopperKey`); magnet → that drawer's closure none,
 stopper → drop its 1W L+R pair. **Bidirectional planner sync**: the planner
@@ -160,7 +260,13 @@ click a part's color chip in the BOM panel — both open the same menu. Picking
 assigns per part TYPE, persists to localStorage
 (`gen2-colors:<kit|custom-build>`), and unlocks the "🎨 My colors /
 Instruction colors" toggle chip. Checklist chips + card follow the active
-palette; "Get filament" link appears on customized parts. **Filament presets**
+palette; "Get filament" link appears on customized parts. **Color mode drops
+the glow** (refreshSelHighlight, Joey 2026-07-07): the selection highlight is
+an emissive orange that SKEWS the color being judged (a blue pick read pink),
+so while the filament menu is open the selected part renders in its plain
+material — identify card + pointer line still mark it; the glow returns when
+the menu closes (all 3 close paths + handle swaps route through the helper).
+**Filament presets**
 (main.js PRESETS, shown in the BOM panel): one click sets a filament per type —
 "The Jerrari" (black shell, prusa-orange faceplates, silver handles, orange-PETG
 hardware) + Stealth / Signal / Sandstone. Colors are PLACEHOLDERS (swap for real
@@ -208,13 +314,30 @@ fullscreen isn't zoomed out, and re-fits on window resize. Per-case / staged-ben
 shots and the exploded checklist skip `fit` (their action sits away from the
 bounds). Wall bench-assembly steps target the bench (Z=`benchFwd`) and pan to the
 wall (`base`) as the case hangs.
-**Page model:** pages = [cover, ...steps, outro]. The cover (synthetic page 0) shows
-the finished build front-on with a telephoto fake-isometric camera (fov 9,
-distance from bounds; framed left for the brand overlay + "Get started"). The
-overlay has a soft light halo (`.cover-right::before` + text-shadows + button
-glow) so the title/button stay legible over any build color.
+**Page model:** pages = [cover, ...steps, outro]. The cover (synthetic page 0) is
+box-art (Joey 2026-07-07): the finished build shot STRAIGHT-ON at mid-height
+(p 90, telephoto fov 9 → flat, near-2D faceplates; framed left for the brand
+overlay + "Get started"), plus LEGO-box dressing (all renderCoverBadges(),
+engine-computed from manifest+assembledBox on every cover entry, regenerate-
+safe): a thick diagonal `#cover-ribbon` corner seal top-left — big collection
+number (`.cr-band b`) over "COLLECTION"; the band is corner-CENTERED
+(`left=(box−width)/2`) — and `#cover-badges` bottom-left (tilted gradient hero
+leading with the STORAGE you get — "N DRAWERS" (or "N CASES" for drawer-less
+builds) so the number reads as value, not the print-labor "N parts" did; the
+raw print count stays on the checklist page — with a pop-in + steps / real
+W×H×L mm chips). `#cover-bg` (a spotlight +
+warm brand glow + edge-vignette gradient composited over the 3D) fades in on
+the cover and out into the normal flat bg on page 2 (goTo toggles `.show`,
+CSS 0.7s). The brand block is tidied — eyebrow → logo → accent rule →
+"Dynamic / Instruction Manual" → arrow button — over a soft light halo
+(`.cover-right::before` + text-shadows) so it stays legible over any build color.
 "Get started" pans to the intro/exploded page while the fov tweens back to 40
-and the parts drift apart (playExploded). The checklist page is the unnumbered
+and the parts drift apart (playExploded). **Finished-build shortcut** (Joey
+2026-07-08, for customizers who skip the build): the final assembly step's
+timeline dot is a bigger ✓ marker (`.dot.finish`, darker gray until reached),
+and the cover carries a quiet "Skip to the finished build →" link under the
+CTA (`#btn-skip-end` → `goTo(PAGES.length - 2, {animate:false})` — snaps, no
+step replay; BOM panel + dims land expanded). The checklist page is the unnumbered
 "Intro"; assembly steps count from Step 1. Logo asset: viewer/img/gen2-logo.png
 (copy of GLB Library/GEN2-QL Logo Main.png). Generated builds get a
 deterministic fun name (generate.js ADJ/NOUN pools) as intro title + header.
@@ -223,8 +346,17 @@ notes) — everything else is ground-truth calibrated.
 
 ## Run / preview
 
-`.claude/launch.json` → "viewer" (python http.server :8123 serving `viewer/`).
-Or: `cd viewer; python -m http.server 8123`. Not a git repo (yet).
+`.claude/launch.json` → "viewer" (`python serve-viewer.py 8123` — a no-store
+http.server serving `viewer/`). Or double-click `serve-viewer.bat` (repo root).
+**Cache-Control: no-store is deliberate** (2026-07-08): plain `python -m
+http.server` sends no cache headers and Chrome's heuristic cache serves STALE
+ES modules — "my generate.js edit does nothing" / half-applied features (bit
+Joey twice). With no-store, hard-refreshes are never needed locally; deploys
+are SHA-stamped so prod never cached wrong. NB the Claude preview server is
+EPHEMERAL — it dies with the session; the planner's local "3D instructions"
+button needs SOMETHING on :8123 (Joey's "viewer won't load but planner does"
+repro = no server). Repo: github.com/Jerrari12/gen2-visual-animator — pushing
+main IS a deploy (Pages action serves viewer/).
 
 ## Planner → generated instructions (BUILT)
 
@@ -343,6 +475,170 @@ generalized from 1H ground truth are marked DERIVED in generate.js (QL/clip y
 by case height, drawer/faceplate/handle sizes, 1W-rail foot slots ±32.5) —
 recalibrate against a training assembly when one exists. Hash-only URL changes
 don't reload the page — force `location.reload()` when testing.
+
+## Decor Faceplates — EdgeLabel (thumbnails + GLB DONE — 2026-07-08)
+
+Source blend: `Blender Files\Decor Faceplates\GEN2 GLB Exporter - GEN2 Faceplates -
+EdgeLabel B.blend`. **18 sizes, one collection per size** named `<W>W-<H>H`
+(1W-05H … 4W-2H; no 3W-3H/4W-3H — matches the planner's illegal sizes). Every part
+is scale 1,1,1 in real mm; widths 87/175/263/351 for 1–4W, depth 26.1.
+
+**Parts per faceplate (physical prints):**
+- **Body** (`BODY` mat) — the faceplate itself, a single **2-color print**. The orange
+  "grip" strips (`GRIP` mat — RENAMED from HANDLE this session; NB the rename is NOT in
+  the saved blend — disk still says `HANDLE` on 80 objects (verified headless
+  2026-07-08), so export scripts must accept either name until re-saved. It's an
+  integrated edge/grip detail, **NOT** a bolt-on handle) are part of the SAME printed piece.
+  **Unlike Essential, EdgeLabel has NO separate handle part** (no handle GLB, no handle
+  step). Objects: `EdgeLabel <size>.stl_1` (body) + `.001–.004/.005/.006` (grip strips).
+- **Accent** (`ACCENT` mat) — a SEPARATE print (designed face-down on a textured bed for
+  holo/texture). **Per-size**, and **absent on the four 05H sizes** (14 total). Shared
+  per-size with the upcoming Classic Pro faceplate. Objects: `<size> Accent`.
+- **Label** (`LABEL` mat) — the universal swappable EdgeLabel label (same part as the
+  EdgeLabel generator). ONE mesh (`Label V1.2`) **linked-duplicated** (Alt+D) into all 18
+  collections → one model, placed per faceplate, exports once.
+- **Back Cover** (`BACK COVER` mat) — **OPTIONAL** part (fills the new Decor drawer's
+  front gap; toggle OFF = backwards-compat with older closed-front drawers). `<size> Back Cover`.
+  **UNIVERSAL across decor faceplate families** (Joey 2026-07-08): Essential, EdgeLabel
+  and future plates all seat the SAME per-size cover — the `BackCover_EdgeLabel_*` GLB
+  name is historical (from this exporter blend), not a compatibility statement.
+  Likewise the **Accent is shared with Classic Pro** (same part, two faceplates).
+
+**Viewer color model (DECIDED, not yet built):** faceplate = ONE library part = ONE
+LEGO-style identification color by default. **On selection**, the identify card should
+offer TWO swatches — Body + Grip — recoloring the two material zones independently. Needs
+a `main.js` enhancement, AND the faceplate GLB must keep body+grip as two primitives.
+**VERIFIED 2026-07-08 (two-slot test cube through the real toolchain):** the split dies
+at the BLENDER export, not meshopt — `export_materials='NONE'` (the worker's law-#2
+setting) merges both slots into ONE primitive. `'PLACEHOLDER'` keeps 2 primitives with
+zero material data (zone identity = primitive order); `'EXPORT'` keeps 2 primitives +
+tiny named `BODY`/`GRIP` material stubs (zone identity = material NAME — robust, and the
+viewer replaces every material anyway). `gltf-transform meshopt` preserves primitives +
+material names in both modes (it's pure compression, no join). → the EdgeLabel job needs
+a per-job `export_materials` option added to `gen2_glb_export.py`; prefer `EXPORT` (law
+#2 relaxes to "materials are zone tags the viewer ignores"). Accent
++ Back Cover are their own parts → independently colorable for free.
+
+**Planner thumbnail render pipeline (DONE):** blend carries `TrueIsoCam` (ORTHO,
+ortho_scale 154.6 base) + `GEN2 Lights`; Cycles, 256×256, `film_transparent`, Standard view.
+Batch loop (bpy, one pass): per size collection → `hide_render` all others → aim the ortho
+cam at the collection's world-bbox center (**translate only**, `cam.loc = orig + center`;
+ortho recentres by translation) → `ortho_scale = max(cam-local x/y span)/0.82` → render to
+`D:\Render Projects\Faceplates\EdgeLabel\EdgeLabel_<size>.png`. **Uniform ~82% fill;
+geometry is NEVER scaled — framing is 100% ortho_scale** (so GLB real-scale is untouched).
+All 18 rendered 2026-07-08. NB: the Blender MCP call may TIME OUT mid-batch while Blender
+keeps rendering to completion — re-check the output folder before re-running.
+
+**Render palette (RENDER ONLY — GLBs are material-free per pipeline law #2):** BODY
+68/68/68 (GEN2 Case Black), GRIP 255/111/27 (185 orange), ACCENT 42/47/110 (holo blue,
+metallic 0.45 / rough 0.30 — a flat stand-in; true holo/texture can't render flat), LABEL
+255/255/255, BACK COVER = body black. Label white + cover black chosen since the cover hides
+behind the plate.
+
+**GLB export DONE 2026-07-08 — the pipeline CODE changed (the earlier "NOT new code"
+assumption was wrong; a 2-zone part needs worker + verifier changes):**
+- **Prep (blend, destructive, saved):** body+GRIP JOINED into one object per size (2
+  material slots → 2 primitives); accents/back covers renamed to `Accent_EdgeLabel_{code}`
+  / `BackCover_EdgeLabel_{code}`; ONE authoritative `Label_EdgeLabel` object (the 18 linked
+  dupes share its mesh, so this prefix matches exactly one). GRIP rename now persisted to
+  disk. Pre-merge backup: `...EdgeLabel B_premerge_backup.blend`.
+- **`gen2_glb_export.py`:** new `export_materials` option (CONFIG + `--export-materials`,
+  NONE|PLACEHOLDER|EXPORT) passed to `export_scene.gltf`. Default NONE = unchanged for
+  every existing part.
+- **`gen2_batch.py`:** forwards `--export-materials`; `world_bounds` now UNIONS ALL
+  primitives (it read only `primitives[0]` before — would miss a 2nd zone);
+  `verify_canonical(allow_materials=)` set per-job from `export_materials != NONE` → rejects
+  only TEXTURED materials, so the tiny BODY/GRIP name stubs pass law #2. Both changes are
+  no-ops for single-primitive material-free parts.
+- **`gen2_jobs.json`:** 4 jobs — `EdgeLabel Faceplates (185)` (`export_materials: EXPORT`)
+  → `GLB Library\Faceplates\EdgeLabel\`; Accents → `…\EdgeLabel\Accents\`; Back Covers →
+  `…\EdgeLabel\BackCovers\`; Label → `…\EdgeLabel\Label\`. No handle job.
+- **Output — verified 51/51 canonical, meshopt ~80%:** 18 faceplates (2 primitives,
+  materials `BODY|GRIP` confirmed preserved THROUGH meshopt), 14 accents, 18 back covers,
+  1 label. Produced via the connected Blender worker + `gltf-transform meshopt` (not a full
+  headless `gen2_batch.py` run); re-running `python gen2_batch.py` regenerates them
+  identically (compression is idempotent) and also writes the global `parts_index.csv` +
+  `run_report.json`.
+- **Viewer two-zone color model (DONE 2026-07-08, verified in-browser):** material
+  ZONES in main.js. `loadTemplates` reads each primitive's material-stub NAME once and
+  stamps it on the mesh (`userData.zone`; the name `BODY` = "the part's main color" →
+  maps to the plain type key so BOM chip/header swatch/presets drive it; clones inherit
+  the tag). Color keys are now type OR `"Type:ZONE"` (`"Faceplate:GRIP"`) everywhere —
+  customColors/localStorage/Save/Upload/userPalette work unchanged. `activeHex` fallback
+  chain: custom zone → manifest zone color → the BODY's active color (so a zone FOLLOWS
+  the body until explicitly picked = one identification color by default; generated
+  builds simply don't define zone colors). `materialFor(inst, hl, zone)` + per-zone
+  shared/highlight materials (`baseMatFor`/`zoneKey`); every traverse site passes
+  `o.userData.zone` (applyState/exploded/ghost/fade/fpFocus fades/highlight — a zoned
+  part keeps two-tone through every animation). Identify card: `#identify-zones` row
+  renders labeled Body/Grip chips (renderZoneChips; hidden for single-zone parts) that
+  open the SAME filament menu on their own key; glow-drop while the menu is open covers
+  both zones. **Test kit `?kit=edgelabel-test`** (viewer/kits/edgelabel-test): the real
+  1W-1H set (plate + accent + back cover + label GLBs copied from the library) placed at
+  offsets derived from the blend's world bounds — reproduces Joey's palette render;
+  faceplate isolation + dims (26.1 deep) all compose with zones. Regression-checked:
+  tabletop-185 has 0 zoned meshes, handle swap + cards unchanged.
+- **Faceplate family swap (DONE 2026-07-08, verified in-browser):** identify-card ◀▶
+  row (`cycleStyle` dispatches by selected type) + a Faceplate row in Build options.
+  `FACEPLATE_STYLES` in main.js: essential (185+165) / edgelabel (185 only — no 165
+  family, so 165 hides the row + the generator warns and falls back). **Generated
+  builds swap through the GENERATOR** (2026-07-08, Joey hit the bare-plate limit):
+  applyFaceplateStyle sets `build.faceStyle` — the PLANNER'S OWN field (ids
+  essential/edgelabel/classicpro, already in BUILD_FIELDS + share links, so a planner
+  link with EdgeLabel picked just works) — regenerates, and re-selects the plate
+  (ids are deterministic). generate.js `FACE_FAMILIES` emits natively: EdgeLabel =
+  plate z 104.62 (mounting plane 92.57 + depth/2) + **Accent** (not on 05H; bottom
+  fp+0.05, z-center plate−7.675, centered; **the accent GLBs exported UPSIDE DOWN**
+  (blend pose) — the viewer counter-rotates `rot:[0,0,180]` (about Z, the depth
+  axis: top↔bottom + left↔right, face still forward — an X flip showed the BACK,
+  Joey) and places at the TOP (bottom + accentH, = fpH − 27.2 label band) so the
+  flip is self-centered; same world volume verified. Fix at the SOURCE someday:
+  flip in the blend + re-export, then drop the rot) + **universal Label** (LEFT-ANCHORED:
+  center = plate LEFT edge + 28.5 on EVERY width — a center-based −15 was off by
+  half a pitch on 2W, Joey measured the 44 mm; bottom fp+plateH−27, z-center
+  plate−6.3) — offsets DERIVED from the EdgeLabel B blend @1W-1H — riding the
+  drawer, entering the demo after the plate + joining fades/push-home; NO handle
+  instance/BOM/step ("Faceplates" title, accent/label note); COLORS Accent deep-navy
+  #25316e, Label near-white #eef0f4. currentOpts posts `faceStyle`; the incoming
+  handler applies it (live planner style changes regenerate). STATIC KITS keep the
+  in-place mutation swap (bare plate + `styleHidden` handle suppression honored by
+  applyState/exploded/phases/computeBounds/checklist/bomRows + `pageVisibility()`
+  reconcile at isolation exit; mounting plane preserved via `nodeDepth` template
+  depths — 0 ↔ −9.55 on edgelabel-test; `row._origFp` restores BOM rows exactly).
+  applyHandleStyle's faceplate-front also uses nodeDepth now (165 Deco round-trips to
+  the exact 99.57). **Label niceties (Joey 2026-07-08):** selecting a LABEL slides it
+  20 mm up out of its window — SEQUENCED: when the tap also triggers the drawer peek,
+  the lift waits 420 ms so the drawer glides out FIRST (Joey); immediate when nothing
+  moves (isolation tap / exploded page / static bench). Back down on deselect/switch —
+  All three dressing parts share ONE
+  "removal ritual" engine (`RITUALS`/`slideRitual`, Joey 2026-07-08): world-space
+  waypoint paths on the group's INNER CHILD (composes with drawer peeks/step motion) —
+  **Label** up 20; **Accent** down 4 → fwd 20 (the fwd-2 unhook was cut); **BackCover**
+  up 4 → back 20 — exact reverse on deselect/switch, interrupted mid-ritual → one clean
+  glide home. Waypoints map through the INVERSE group rotation (accents are
+  group-rotated); cancellation is a PER-INSTANCE token (`inst._ritualTok` — a global
+  one froze the outgoing part's reseat when switching accent→label, both must run
+  concurrently); applyState/applyExploded zero the child as kill-tween self-heal;
+  updatePointerLine maps the child offset through the group quaternion. Sequencing:
+  ritual delays 420 ms only when the drawer is REALLY gliding (measured against the
+  slide target — `drawerGliding`); selecting a **BackCover on an already-open drawer
+  keeps the drawer where it is** (no yank to the 40 mm peek — cover work happens on an
+  open drawer; other dressing taps still normalize to the peek). The label
+  card shows an accent pill "🏷 Design your labels · N ready →"
+  (`labelGenInfo`: LABEL_GEN_URLS by family — edgelabel/classicpro jerrari3d
+  subdomains — + the planner's exact `#labels=<base64 JSON array>` handoff built from
+  build.placed decor `label` texts, which ride the share link already). Wall-build EdgeLabel + back cover verified end-to-end on a
+  constructed 4W-2H #build= link (Joey's repro); swap round-trip keeps the cover
+  (family-agnostic), restores handles/accent/label correctly. GLBs: all EdgeLabel
+  plates + accents + covers + label live in `viewer/parts/185/`; 185 kit folders
+  carry used plate sizes. NB local dev module cache: generate.js edits need a
+  HARD refresh — a stale generator silently ignores new build fields (Joey's
+  "toggle does nothing" repro).
+- **Still TODO (viewer side):** club links for EdgeLabel BOM rows; Classic Pro family
+  when its GLBs exist (shares EdgeLabel's per-size accents); planner-side backCover
+  field (faceStyle needs nothing — it's already theirs).
+
+**Next family:** Classic Pro faceplate — its own unique label, **shares EdgeLabel's per-size accents**.
 
 ## Deferred (designed, not built)
 
