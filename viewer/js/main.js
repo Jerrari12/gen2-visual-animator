@@ -754,16 +754,6 @@ function renderOptions() {
     const stopActive = removed.size === 0 ? 'all' : (keys.length && keys.every(k => removed.has(k))) ? 'none' : null;
     box.appendChild(optSeg('Drawer stoppers', [{ label: 'All', val: 'all' }, { label: 'None', val: 'none' }], stopActive, v => setAllStoppers(v === 'all')));
   }
-  if (currentHandleStyleIndex() >= 0 && currentFaceplateStyle()?.hasHandle !== false) { // EdgeLabel prints its grip in — no handle to style
-    const row = document.createElement('div'); row.className = 'opt-row';
-    const lab = document.createElement('span'); lab.className = 'opt-label'; lab.textContent = 'Handle';
-    const grp = document.createElement('div'); grp.className = 'opt-seg opt-cycle';
-    const prev = document.createElement('button'); prev.textContent = '◀'; prev.onclick = () => cycleHandleStyle(-1);
-    const name = document.createElement('span'); name.className = 'opt-cycle-name';
-    const idx = currentHandleStyleIndex(); name.textContent = idx >= 0 ? HANDLE_STYLES[idx].label.replace(' Handle', '') : '?';
-    const next = document.createElement('button'); next.textContent = '▶'; next.onclick = () => cycleHandleStyle(1);
-    grp.append(prev, name, next); row.append(lab, grp); box.appendChild(row);
-  }
   if (currentFaceplateStyle() && availableFaceplateStyles().length > 1) {
     const row = document.createElement('div'); row.className = 'opt-row';
     const lab = document.createElement('span'); lab.className = 'opt-label'; lab.textContent = 'Faceplate';
@@ -772,6 +762,18 @@ function renderOptions() {
     const name = document.createElement('span'); name.className = 'opt-cycle-name';
     name.textContent = currentFaceplateStyle().label;
     const next = document.createElement('button'); next.textContent = '▶'; next.onclick = () => cycleFaceplateStyle(1);
+    grp.append(prev, name, next); row.append(lab, grp); box.appendChild(row);
+  }
+  // Handle sits under Faceplate (Joey) — it's the plate's accessory, and it
+  // only appears while the active family takes a bolt-on handle at all
+  if (currentHandleStyleIndex() >= 0 && currentFaceplateStyle()?.hasHandle !== false) { // EdgeLabel prints its grip in — no handle to style
+    const row = document.createElement('div'); row.className = 'opt-row';
+    const lab = document.createElement('span'); lab.className = 'opt-label'; lab.textContent = 'Handle';
+    const grp = document.createElement('div'); grp.className = 'opt-seg opt-cycle';
+    const prev = document.createElement('button'); prev.textContent = '◀'; prev.onclick = () => cycleHandleStyle(-1);
+    const name = document.createElement('span'); name.className = 'opt-cycle-name';
+    const idx = currentHandleStyleIndex(); name.textContent = idx >= 0 ? HANDLE_STYLES[idx].label.replace(' Handle', '') : '?';
+    const next = document.createElement('button'); next.textContent = '▶'; next.onclick = () => cycleHandleStyle(1);
     grp.append(prev, name, next); row.append(lab, grp); box.appendChild(row);
   }
   // faceplate back cover — a universal decor-faceplate accessory (every family

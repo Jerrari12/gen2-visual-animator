@@ -607,16 +607,20 @@ assumption was wrong; a 2-zone part needs worker + verifier changes):**
   center = plate LEFT edge + 28.5 on EVERY width — a center-based −15 was off by
   half a pitch on 2W, Joey measured the 44 mm; bottom fp+plateH−27, z-center
   plate−6.3) — offsets DERIVED from the EdgeLabel B blend @1W-1H — riding the
-  drawer. **The EdgeLabel install step is a CINEMATIC** (Joey 2026-07-08, first
-  drawer only): pop +40 → `vanish`+`room:0`+camera to a plate-front preset (t12
-  p82, r=180+plateW·1.5, target = plate center at the popped seat) → plate
-  slides down → accent + label attach with their removal rituals REVERSED
-  (at-offsets + canceling moves) → if backCover, camera swings to t168 BEHIND
-  the plate and the cover attaches (fwd 20, down 4) → `appear`+`room:1`+camera
-  back to `fpStepCam` (hoisted with H_MM ABOVE the drawer loop — it was
-  declared after, TDZ crash on first try) → push home. Camera dip verified
-  (minZ −156); later drawers keep the fade-in; Essential keeps the classic
-  cover-first choreography. NO handle
+  drawer. **The faceplate install step is a CINEMATIC for BOTH families,
+  ASSEMBLY-FIRST** (Joey 2026-07-08, first drawer only): pop +40 →
+  `vanish`+`room:0`+camera to a plate-front preset (t12 p82, r=180+plateW·1.5,
+  target = plate center at the popped seat + HOV 45) → the bare plate floats in
+  at the HOVER (at [0,45,40]) → dressing attaches AT THE HOVER (Essential:
+  handle presses on −15z; EdgeLabel: accent + label with their removal rituals
+  REVERSED — at-offsets + canceling moves) → if backCover, camera swings to
+  t168 BEHIND the plate and the cover attaches (fwd 20, down 4) →
+  `appear`+`room:1`+camera back to `fpStepCam` (hoisted with H_MM ABOVE the
+  drawer loop — declared after = TDZ crash on first try) → the ASSEMBLED unit
+  slides DOWN −45y onto the popped drawer (sync move) → push home. Notes read
+  assembly-first ("Assemble the faceplate first: …"). Verified both families:
+  camera dip (minZ −166), handle hover peak = final+45 exactly, deterministic
+  snap-jump; later drawers keep the fade-in. NO handle
   instance/BOM/step ("Faceplates" title, accent/label note); COLORS Accent deep-navy
   #25316e, Label near-white #eef0f4. currentOpts posts `faceStyle`; the incoming
   handler applies it (live planner style changes regenerate). STATIC KITS keep the
