@@ -858,9 +858,12 @@ export function generateManifest(build) {
       const HOV = 45; // the unit assembles hovering this far above its seat
       const plateW = u.w * PITCH_X - 1;
       const pc = [cx + 0.47, bottom + 3.72 + fpH / 2 + HOV, face.z - dz + 40]; // plate center at the assembly hover
-      const rCam = 180 + plateW * 1.5;
-      const camFront = { t: 12, p: 82, r: rCam, target: pc };
-      const camBack = { t: 168, p: 82, r: rCam, target: pc };
+      // fitR = the plate's half-diagonal (+ dressing depth allowance) × margin —
+      // the VIEWER turns it into an aspect-aware distance (a fixed r overfilled
+      // portrait phones, whose horizontal fov is a third of a desktop's)
+      const fitR = Math.hypot(plateW, fpH, 30) / 2 * 1.5;
+      const camFront = { t: 12, p: 82, fitR, target: pc };
+      const camBack = { t: 168, p: 82, fitR, target: pc };
       const unit = [ // the plate + its dressing — everything that slides down as one
         { id: `fp${i}` },
         ...(face.hasHandle ? [{ id: `h${i}` }] : []),

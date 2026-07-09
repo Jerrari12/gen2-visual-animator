@@ -207,7 +207,19 @@ so the model stays visible while recoloring on small screens. Mobile (≤560px):
 `#step-dots` gets its own full-width row above the buttons (`order:-1` +
 `flex-basis:100%` — squeezed between Back and the tools they used to wrap into
 a tall column when 🎥 Resume cam appeared), and the button paddings are sized
-so Back + 4 tools + Next fit one row on a 360px phone.
+so Back + 4 tools + Next fit one row on a 360px phone. **The step note used to
+sit over the action** (Joey 2026-07-08, phone screenshots): fixed two ways —
+the note panel caps at 34vh with the text scrolling inside, and
+`updateViewInset()` (render loop) pans the camera PROJECTION down by half the
+note's real canvas overlap via `camera.setViewOffset` (a pure pan — every
+framing incl. the cinematic centers itself in the visible band, and projected
+labels ride camera.project() so they track for free; cleared on desktop/cover,
+`viewInsetPx = -1` in resize() re-applies with fresh dims). Camera presets can
+carry **`fitR` (a radius in mm)** instead of `r` — camPos turns it into an
+aspect-aware distance (`fitDistanceFor`); the faceplate cinematic uses it
+(fixed r overfilled portrait phones, whose horizontal fov is ~⅓ desktop's).
+The `vanish` phase also hides the W/H/L dim callouts (they floated over the
+clean stage); `appear` re-evaluates them.
 **Build options (generated builds only, main.js 2026-07-06):** the whole scene
 is regenerate-able — `mountManifest()` (re)builds every manifest-derived thing
 and `regenerate()` re-runs `generateManifest` on the mutated `build`, lazy-

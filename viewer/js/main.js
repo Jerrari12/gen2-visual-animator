@@ -107,6 +107,7 @@ function resize() {
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
+    viewInsetPx = -1; // canvas size changed — re-apply the note-panel view inset with fresh dims
     // re-fit a whole-build shot to the new aspect (skip during the cinema, which
     // drives the camera itself, and during drawer/faceplate focus, which park
     // the camera on the part)
@@ -115,6 +116,27 @@ function resize() {
       camera.position.copy(pos); controls.target.copy(target); controls.update();
     }
   }
+}
+// Mobile: the step-note panel overlays the top of the canvas (long wall notes
+// used to cover half the action — Joey). Pan the camera's PROJECTION down by
+// half the covered height (setViewOffset — a pure pan, same aspect), so every
+// framing (fit presets, the faceplate cinematic, isolation) centers itself in
+// the visible band below the note. Projected labels (dims/pointer/measure) go
+// through camera.project(), so they track the shift for free.
+let viewInsetPx = 0;
+function updateViewInset() {
+  let inset = 0;
+  if (isMobile() && !cinema.on) {
+    const note = $('note-panel');
+    if (note && !note.classList.contains('hidden') && !note.classList.contains('collapsed')) {
+      const nb = note.getBoundingClientRect(), cb = canvas.getBoundingClientRect();
+      inset = Math.max(0, Math.min(nb.bottom - cb.top, cb.height * 0.5));
+    }
+  }
+  if (Math.abs(inset - viewInsetPx) < 1) return;
+  viewInsetPx = inset;
+  if (inset > 0) camera.setViewOffset(canvas.clientWidth, canvas.clientHeight, 0, -inset / 2, canvas.clientWidth, canvas.clientHeight);
+  else camera.clearViewOffset();
 }
 
 // ---------- load manifest + parts ----------
@@ -334,18 +356,18 @@ function computeBounds() {
     buildRadius = box.getSize(new THREE.Vector3()).length() / 2; // ≈ bounding-sphere radius
   }
 }
-// distance at which the bounding sphere (× margin) fits BOTH the vertical and
+// distance at which a bounding sphere of radius R fits BOTH the vertical and
 // horizontal FOV — the max keeps it uncropped on wide (fills height) and narrow
 // (fills width) viewports alike.
-function fitDistance(margin, fovDeg) {
+function fitDistanceFor(R, fovDeg) {
   // frame with the fov the shot will END at (presets default to 40) — reading
   // the live camera.fov here overshot ~4× when dot-jumping from the telephoto
   // cover (fov 9) straight to a fit step.
   const vFov = THREE.MathUtils.degToRad(fovDeg || camera.fov || 40);
   const hFov = 2 * Math.atan(Math.tan(vFov / 2) * (camera.aspect || 1.6));
-  const R = buildRadius * margin;
   return Math.max(R / Math.sin(vFov / 2), R / Math.sin(hFov / 2));
 }
+const fitDistance = (margin, fovDeg) => fitDistanceFor(buildRadius * margin, fovDeg);
 
 // ---------- step state (deterministic jump to any step) ----------
 // After step i: which instances are visible, which stages are settled.
@@ -500,6 +522,7 @@ async function playStep(i) {
     // onDone hide (killTweens drops it) and applyState restores everything.
     if (ph.room !== undefined) fpEnv.target = ph.room;
     if (ph.vanish) {
+      setDims(false); // the W/H/L callouts would float over the clean stage
       for (const inst of instances.values()) {
         if (!inst.group.visible) continue;
         const mats = [];
@@ -518,6 +541,7 @@ async function playStep(i) {
       }
     }
     if (ph.appear) {
+      setDims(!PAGES[cur]?.cover && !PAGES[cur]?.outro && cur - 1 === manifest.steps.length - 1); // callouts return with the world
       for (const id of vanished) {
         const inst = instances.get(id);
         if (!inst) continue;
@@ -634,8 +658,11 @@ function camPos(preset) {
   const t = THREE.MathUtils.degToRad(preset.t), p = THREE.MathUtils.degToRad(preset.p);
   const target = new THREE.Vector3(...preset.target);
   // whole-build presets carry `fit` (a margin) — frame to the actual bounds at
-  // the current aspect instead of a fixed distance; others use their tuned r.
-  const r = preset.fit ? fitDistance(preset.fit, preset.fov || 40) : preset.r;
+  // the current aspect; `fitR` frames a preset-supplied RADIUS in mm the same
+  // aspect-aware way (the faceplate cinematic — a fixed r overfilled portrait
+  // phones, whose horizontal fov is tiny); others use their tuned r.
+  const r = preset.fitR ? fitDistanceFor(preset.fitR, preset.fov || 40)
+    : preset.fit ? fitDistance(preset.fit, preset.fov || 40) : preset.r;
   const pos = new THREE.Vector3(
     r * Math.sin(p) * Math.sin(t),
     r * Math.cos(p),
@@ -2820,6 +2847,7 @@ renderer.setAnimationLoop(now => {
   // same rule for the under-table surface: hide it when the camera rises above
   // its underside, so the rails/screw layout can be inspected from the top.
   if (isUnderTableBuild && !cinema.on) surface.visible = camera.position.y < surfaceUnderY;
+  updateViewInset();
   updatePointerLine();
   updateMeasure();
   updateDims();

@@ -575,7 +575,11 @@ body {
      the top, and the Parts / colors controls become bottom-corner pills — so
      nothing overlaps on a narrow screen. The parts list defaults to minimized on
      mobile (see main.js isMobile()); tap "Parts · N" to slide it up. */
-  #note-panel { max-width: none; left: 8px; right: 8px; top: 8px; padding: 9px 12px; }
+  /* long step notes (wall bench text) used to eat half the phone screen and
+     sit over the action — cap the panel and scroll the text inside instead;
+     main.js also pans the camera down by the note's real height (view inset) */
+  #note-panel { max-width: none; left: 8px; right: 8px; top: 8px; padding: 9px 12px; max-height: 34vh; }
+  #note-panel .note-body { overflow-y: auto; max-height: calc(34vh - 20px); pointer-events: auto; }
   #step-title { font-size: 14.5px; }
   #step-note { font-size: 12.5px; }
 
