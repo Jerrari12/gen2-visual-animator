@@ -82,6 +82,56 @@ part with its color chip + download links.
     focused.
 - `GLB Pipeline/` — Blender→GLB batch exporter (`python gen2_batch.py`), see its README.
 - `GLB Library/` — canonical compressed parts + `parts_index.csv` per collection.
+  **2026-07-10: cases + decor drawers + covers landed for ALL six lengths**
+  (59/115/165/185/240/270 — 189 parts across the touched folders, zero canonical
+  failures). The 59 is a mini collection: 1W/2W × 05H/1H only (4 cases + 4 DDs),
+  covers, and **no foot rails AND no feet slots BY DESIGN** (too shallow to be
+  stable — the planner's `mountBlocksLength()` greys 59 tabletop out entirely;
+  59 is a HANGING-ONLY collection, and generate.js `noTabletop` mirrors that).
+  Foot rails: 115/165/185/240/270 ×1W/2W. New part type:
+  `115-1W-2H_TiltDrawerCase.lib.glb` — **ON HOLD (Joey 2026-07-10): the matching
+  Tilt Drawer model isn't converted to GLB yet; don't reference the case
+  anywhere until the drawer lands** (excluded from viewer pools). Six 185 decor
+  drawers (all 2H/3H sizes) were re-exported 2026-07-09 to strip baked-in print
+  supports (old ones displayed wrong in the viewer) — `viewer/parts/185/` synced
+  2026-07-10; kit folders only use 1H drawers (unaffected). **2026-07-10
+  rotation fix: 11 of the 7/9 exports shipped rotated 90° about Y** (X/Z
+  swapped — `240-2W-1H_Case` + ALL ten `DecorDrawer_240-1W/2W-*`; caught by
+  width≠88·W in parts_index.csv). Fixed at the GLB level (+90° about Y, sign
+  chosen by Z-profile correlation vs known-good same-size parts, 0.99 decisive),
+  stale libs deleted, re-compressed, 44/44 canonical. ⚠ **The source blends
+  (`D:\Render Projects\GEN2 Cases - ALL.blend` / `GEN2 Decor Drawers -
+  ALL.blend`) still carry those 11 objects rotated** — a re-export reproduces
+  the bug; fix the source or re-apply the fix (scratch script pattern: rotate ±90,
+  correlate depth profiles). The thickness-axis orientation check does NOT catch
+  Y-rotations — also compare wbounds X/Z against 88·W / collection depth. CU
+  covers ship upside down in every fresh import from the covers source (print
+  orientation) — always flip-verify against 185 ground truth. Pipeline gotcha:
+  the compressor SKIPS existing `.lib.glb` — delete stale lib+raw before
+  re-export or the old file silently survives.
+  Still no GLBs: Classic Drawers (all lengths) + Case Extenders — **Joey is
+  adding these next** (render meshes live in `D:\Render Projects\<length>
+  <family>\` thumbnail blends). 256px thumbnails: covers + foot rails for ALL
+  SIX lengths rendered 2026-07-10 (44 PNGs, filenames = library part codes) in
+  `D:\Render Projects\Covers\GEN2 Thumbnails\` + `D:\Render Projects\Foot Rails\
+  GEN2 Thumbnails\`, and **WIRED INTO BOTH TOOLS** same day: planner
+  `IMAGE_OVERRIDES` (44 entries, files in `img/parts/<L>/`) + viewer
+  `imgFor()` (CL/CU/FR node name = PNG name, flat in `viewer/img/parts/`) +
+  explicit `img` fields on the three static kits' cover/footrail BOM rows.
+  Viewer also carries the planner's per-length CASE + DECOR DRAWER renders for
+  all six lengths now (151 PNGs copied 2026-07-10 — identify cards show photos
+  everywhere; imgFor's flat `Case <L>-<w>W-<h>H.png` paths resolve).
+  Full run notes:
+  `D:\Render Projects\GEN2_Blender_Render_Setup_CoversFootRails.md`.
+  **2026-07-11 links refresh:** covers + foot rails have their OWN per-length
+  Printables pages now (no longer funneled to the Table Top Kit), every
+  collection's cases/decor pages carry both Printables + Thangs, and classic
+  drawers link per length. Viewer: `LINKS_BY_LEN` in generate.js (per-length
+  cases/decor/classic/covers/fr/kit/wall/rail maps, 185 fallbacks) mirrors the
+  planner's LINK_OVERRIDES — update both together. Wall-mount bracket BOM
+  thumbnails (`WallMount_Lite_{1,2,3}W.png`, 2026-07-11 batch) serve both
+  tools: viewer imgFor per-width rule; planner partImage takes the row's
+  VARIANT ("<w>W section") since bracket rows share one name per length.
 - `Blender Files/` — source .blends ("GEN2 GLB Exporter - *").
 - `GEN2-Part-Orientation-Notes.md` — **evergreen placement/sequencing rules per part.**
   Read it before authoring manifests. Joint grammar: `2026-07-04-gen2-interactive-assembly-instructions.md` §5.
@@ -348,7 +398,10 @@ W×H×L mm chips). `#cover-bg` (a spotlight +
 warm brand glow + edge-vignette gradient composited over the 3D) fades in on
 the cover and out into the normal flat bg on page 2 (goTo toggles `.show`,
 CSS 0.7s). The brand block is tidied — eyebrow → logo → accent rule →
-"Dynamic / Instruction Manual" → arrow button — over a soft light halo
+"3D Build / Studio" (renamed from "Dynamic / Instruction Manual" 2026-07-10 —
+the tool customizes colors/faceplates/hardware, not just instructions; the
+planner's buttons carry the same "3D Build Studio" name) → arrow button — over
+a soft light halo
 (`.cover-right::before` + text-shadows) so it stays legible over any build color.
 "Get started" pans to the intro/exploded page while the fov tweens back to 40
 and the parts drift apart (playExploded). **Finished-build shortcut** (Joey
@@ -385,14 +438,30 @@ main IS a deploy (Pages action serves viewer/).
 Planner's "🧊 3D assembly instructions" button (bom-actions row) opens
 `INSTRUCTIONS_VIEWER_URL + "#build=" + encodeBuildHash()` — update that constant
 in planner app.js when the viewer deploys. Generated builds load parts from a
-per-collection pool `viewer/parts/<L>/` (`165`/`185` — each self-contained: the
-collection GLBs + copies of the shared hardware/faceplate GLBs; lazy per node;
-`PARTS_BASE` in main.js = `parts/${manifest.collection}/`).
-v1 scope: **tabletop + wall + under-table; 165 + 185**; classic drawers = BOM row
-only (no GLB); shelf >1H / cabinet / other lengths → graceful error overlay. Also
+per-collection pool `viewer/parts/<L>/` (`59/115/165/185/240/270` — each
+self-contained: the collection GLBs + copies of the shared hardware/faceplate
+GLBs; lazy per node; `PARTS_BASE` in main.js = `parts/${manifest.collection}/`;
+the 59 pool is trimmed to its 1W/2W × 05H/1H faceplate-family sizes).
+Scope (2026-07-10, ALL SIX lengths): **tabletop + wall for every collection;
+under-table only 165 + 185** (no rail GLBs for the rest — generate.js errors,
+and the planner's updateInstructionsButton greys under-table out for other
+lengths with the reason); **59 is hanging-only** (`COLL[59].noTabletop` +
+maxW/maxHH guards — no foot rails, no feet slots; mirrors the planner's
+mountBlocksLength). classic drawers = BOM row only (no GLB); shelf >1H /
+cabinet → graceful error overlay. Also
 rejected: non-flat tops (mirrors the planner's columnTops() flat-top rule —
 the planner button greys out with the reason via updateInstructionsButton())
 and builds over 80 units (a step per case stops being instructions).
+The four new lengths generate with a runtime warning ("scaled from the 185
+calibration") — every hardware Z is DERIVED via ±dz (sign generic: 240/270
+shift outward), ZERO ground-truth assemblies; verify on printed builds like the
+165. Deep collections get depth-scaled staging (`slideBack`/`wallFwd`/
+`CAM_DEPTH` locals in generate.js); 165/185 output stays byte-identical
+(regression-tested old-vs-new on 11 build shapes, 2026-07-10). Faceplate family
+swap serves all six (main.js FACEPLATE_STYLES.collections). Every collection's
+case/drawer/cover/footrail BOM rows show real photos (2026-07-10 render
+batches, copied from the planner); the new lengths still reuse the 185
+Printables/Thangs links as placeholders.
 **Collections 165 + 185** (generate.js `COLL` table, `build.length`): the 165 is
 the 185 shrunk exactly 20 mm deep. Every part exports re-centered on its own bbox
 (`depth_mode: center`), so in file coords each case face moves `dz = (185−depth)/2`
@@ -669,9 +738,26 @@ assumption was wrong; a 2-zone part needs worker + verifier changes):**
   carry used plate sizes. NB local dev module cache: generate.js edits need a
   HARD refresh — a stale generator silently ignores new build fields (Joey's
   "toggle does nothing" repro).
-- **Still TODO (viewer side):** club links for EdgeLabel BOM rows; Classic Pro family
-  when its GLBs exist (shares EdgeLabel's per-size accents); planner-side backCover
-  field (faceStyle needs nothing — it's already theirs).
+- **EdgeLabel per-size renders + links WIRED (2026-07-10):** the 18 planner
+  thumbnails (`EdgeLabel_<size>.png`, 2026-07-08 batch) now serve BOTH tools —
+  copied flat into planner `img/parts/` + viewer `img/parts/`. Planner:
+  `partImage()` gained a faceplate pattern branch (faceplates are SHARED
+  hardware — one render set for every length, so no length-keyed auto-pattern;
+  EdgeLabel → per-size PNG, Essential/Classic Pro → their hero jpg until
+  per-size batches exist; BOM size tokens drop dots: 0.5H → 05H). Viewer:
+  `imgFor()` maps `Faceplate_EdgeLabel_<size>` → the PNG; `LINKS.fpe` = the
+  EdgeLabel Series Printables/Thangs pages (mirrored from the planner) and
+  FACE_FAMILIES carries per-family `links` (the club-family "no links" gap is
+  closed); main.js FACEPLATE_STYLES carries matching img/links so a STATIC-kit
+  swap dresses its BOM row exactly like a generated build (the old swap DELETED
+  img/links); edgelabel-test's manifest row carries both explicitly. Verified
+  in-browser: planner BOM per-size thumbs (Essential fallback too), generated
+  185 EdgeLabel build rows, static-kit swap round-trip restores `_origFp`
+  exactly. NO renders yet: Accent / BackCover / Label (identify cards hide the
+  missing img) — a future mini render batch.
+- **Still TODO (viewer side):** Classic Pro family when its GLBs exist (shares
+  EdgeLabel's per-size accents; partImage + FACEPLATE_STYLES/FACE_FAMILIES
+  entries are pre-wired for its hero jpg); accent/back-cover/label renders.
 
 **Next family:** Classic Pro faceplate — its own unique label, **shares EdgeLabel's per-size accents**.
 

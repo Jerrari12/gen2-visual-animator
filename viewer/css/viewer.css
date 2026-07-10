@@ -51,15 +51,18 @@ body {
 #step-note { font-size: 13px; color: var(--ink-soft); line-height: 1.45; }
 /* collapse the step text to a small badge pill — reclaims the canvas while
    recoloring/inspecting; the header's "Step x / y" keeps the context */
+/* big enough to FIND — the 24px ghost chevron was invisible next to the text.
+   Expanded = ✕ (dismiss the text), collapsed = ▸ (bring it back). */
 #note-collapse {
   pointer-events: auto; /* the panel itself is pointer-events: none */
   flex: none; align-self: flex-start;
-  font: inherit; font-size: 13px; line-height: 1;
-  width: 24px; height: 24px; margin: 4px -4px 0 0;
-  border: none; background: none; color: var(--ink-soft);
+  display: flex; align-items: center; justify-content: center;
+  font: inherit; font-size: 22px; line-height: 1;
+  width: 36px; height: 36px; margin: 0 -4px 0 0;
+  border: none; background: rgba(0,0,0,.05); color: var(--ink-soft);
   border-radius: 50%; cursor: pointer;
 }
-#note-collapse:hover { color: var(--accent); background: rgba(0,0,0,.05); }
+#note-collapse:hover { color: var(--accent); background: rgba(0,0,0,.09); }
 #note-panel.collapsed { right: auto; } /* shrink to the badge + chevron */
 #note-panel.collapsed .note-body { display: none; }
 
@@ -441,23 +444,24 @@ body {
   filter: blur(8px);
 }
 #cover-logo { width: 100%; height: auto; }
+/* one-line lockup: italic blue "3D" + black all-caps "BUILD STUDIO" */
 .cover-lede {
   margin-top: 22px; padding-top: 18px; position: relative;
-  display: flex; flex-direction: column;
+  display: flex; flex-direction: row; align-items: baseline;
+  gap: 10px; flex-wrap: wrap;
 }
 .cover-lede::before { /* thin accent rule tying the lockup together */
   content: ''; position: absolute; top: 0; left: 2px; width: 46px; height: 3px;
   border-radius: 3px; background: var(--accent);
 }
 .cover-dynamic {
-  font-size: 13px; font-weight: 800; font-style: italic; line-height: 1;
-  letter-spacing: .16em; text-transform: uppercase; color: #2f9be0;
+  font-size: clamp(23px, 2.9vw, 34px); font-weight: 800; font-style: italic; line-height: 1.05;
+  letter-spacing: .02em; text-transform: uppercase; color: #2f9be0;
   text-shadow: 0 1px 10px rgba(244,246,248,.95);
 }
 .cover-manual {
-  margin-top: -1px;
-  font-size: clamp(21px, 2.6vw, 31px); font-weight: 800;
-  letter-spacing: .01em; color: #33363c; line-height: 1.05;
+  font-size: clamp(23px, 2.9vw, 34px); font-weight: 800;
+  letter-spacing: .02em; text-transform: uppercase; color: #33363c; line-height: 1.05;
   text-shadow: 0 1px 12px rgba(244,246,248,.95);
 }
 #btn-start {
@@ -473,14 +477,18 @@ body {
 #btn-start:hover { filter: brightness(1.05); }
 #btn-start:hover i { transform: translateX(4px); }
 #btn-start:active { transform: translateY(1px); }
-/* quiet secondary action under the CTA — for people here to customize, not build */
+/* quiet secondary action under the CTA — for people here to customize, not
+   build. A translucent pill instead of bare text: the model sometimes sits
+   right behind it, and gray-on-gray was unreadable at some camera angles. */
 #btn-skip-end {
-  margin-top: 12px; padding: 4px 2px;
+  margin-top: 12px; padding: 6px 14px;
   font: inherit; font-size: 13px; font-weight: 700;
-  background: none; border: none; cursor: pointer; color: #6a6f78;
-  text-shadow: 0 1px 8px rgba(244,246,248,.9);
+  border: none; cursor: pointer; color: #3f434a;
+  background: rgba(244,246,248,0.78);
+  border-radius: 999px;
+  box-shadow: 0 1px 6px rgba(0,0,0,0.10);
 }
-#btn-skip-end:hover { color: var(--accent); }
+#btn-skip-end:hover { color: var(--accent); background: rgba(244,246,248,0.94); }
 
 /* LEGO-box stat badges (bottom-left): big "ONLY N PARTS" block + drawers /
    steps / real W×H×L chips — all engine-computed (renderCoverBadges) */

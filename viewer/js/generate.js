@@ -4,12 +4,17 @@
 // All placement numbers derive from the ground-truth calibration of
 // 2026-07-04 (see CLAUDE.md "Placement math"). Rules generalized from the
 // 1H ground truth are marked DERIVED; positions Joey tuned by eye are
-// marked TUNED. Scope: 165 + 185 collections — tabletop, wall, and under-table.
+// marked TUNED. Scope: all six collections (59/115/165/185/240/270) — tabletop
+// and wall everywhere; under-table only where rail GLBs exist (165/185). The 59
+// is a mini collection: 1W/2W × 05H/1H only, and NO footrails BY DESIGN (Joey
+// 2026-07-10: too shallow to be stable on rails) — feet go into every bottom
+// case's own underside slots instead.
 
 const PITCH_X = 88, PITCH_HALF_Y = 28;        // 1W column / half-row pitch
 const ROW0_BOTTOM = 17.65;                    // bottom-row case bottom (7.65 + 10.00)
 const FRL_Y = 7.65, FRU_Y = 12.75;
 const DEPTH = 185;                            // staging/framing baseline (slide-in reach, camera size floor) — NOT placement
+let CAM_DEPTH = DEPTH;                        // cam()'s size floor — raised per run for the deeper collections (240/270), set in generateManifest
 
 // Collection depth table. The 165 is the 185 model shortened exactly 20 mm
 // overall; every part is exported re-centered on its own bbox (depth_mode:
@@ -25,6 +30,17 @@ const DEPTH = 185;                            // staging/framing baseline (slide
 const COLL = {
   185: { depth: 185, railDepth: 201 },
   165: { depth: 165, railDepth: 179 },
+  // 2026-07-10: the four remaining lengths (cases/drawers/covers landed in the
+  // library). railDepth absent = no under-table rail GLBs yet → UT builds error.
+  // ALL hardware Z for these lengths is DERIVED from the 185 calibration via
+  // ±dz (same rule that produced the 165) — verify against printed builds.
+  // 59: noTabletop mirrors the planner's mountBlocksLength — the mini collection
+  // has NO foot rails and NO feet slots (too shallow to be stable), so it only
+  // ships as a hanging mount; maxW/maxHH mirror its catalog (1W/2W × 05H/1H).
+  59:  { depth: 59, noTabletop: true, maxW: 2, maxHH: 2 },
+  115: { depth: 115 },
+  240: { depth: 240 },
+  270: { depth: 270 },
 };
 
 // Wall mount — CALIBRATED 2026-07-05 from Joey's case-to-bracket reference
@@ -68,16 +84,80 @@ const UT = {
 
 const H_LABEL = { 1: '05', 2: '1', 3: '15', 4: '2', 6: '3' };
 
+// Shared-hardware pages (same for every collection). Per-length pages live in
+// LINKS_BY_LEN below. All URLs mirror the planner's verified LINK_OVERRIDES
+// (gen2-planner-main/js/data.js is the source of truth — update both together).
 const LINKS = {
-  kit:   { p: 'https://www.printables.com/model/1118906-gen2-table-top-kit-v2-185-standard', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20Table%20Top%20Kit%20V2%20-%20185-1231757' },
-  cases: { p: 'https://www.printables.com/model/1658700-gen2-185-cases-all', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20185%20Cases%20-%20All-1535455' },
   hw:    { p: 'https://www.printables.com/model/1012796-gen2-hardware', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20Hardware-1141439' },
-  decor: { t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20185%20Decor%20Drawers%20-%20All-1116945' },
   fp:    { p: 'https://www.printables.com/model/964559-gen2-decor-faceplates-essential-series', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20Decor%20-%20Faceplates%20-%20Essential%20Series-1116946' },
+  fpe:   { p: 'https://www.printables.com/model/1093933-gen2-decor-faceplates-edgelabel-series', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20Decor%20-%20Faceplate%20-%20EdgeLabel-1215609' },
   h:     { p: 'https://www.printables.com/model/1044972-gen2-decor-handles-deco-series', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20Decor%20Handles%20-%20Deco%20Series-1159960' },
   hb:    { p: 'https://www.printables.com/model/965604-gen2-decor-handles-blockbar-series', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20Decor%20-%20Handles%20-%20BlockBar-1116949' },
-  wall:  { p: 'https://www.printables.com/model/1513322-gen2-wall-mount-kit-lite-59' }, // Wall Mount Kit - Lite (all widths in one download)
-  rail:  { p: 'https://www.printables.com/model/1052357-gen2-rails-185-standard', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20RAILS%20-%20STANDARD-1163830' }, // mirrors the planner's verified "GEN2 Rails - 185" links
+  // fallbacks when a length has no page of its own yet
+  kit:   { p: 'https://www.printables.com/model/1118906-gen2-table-top-kit-v2-185-standard', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20Table%20Top%20Kit%20V2%20-%20185-1231757' },
+  wall:  { p: 'https://www.printables.com/model/1513322-gen2-wall-mount-kit-lite-59' },
+  rail:  { p: 'https://www.printables.com/model/1052357-gen2-rails-185-standard', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20RAILS%20-%20STANDARD-1163830' },
+};
+
+// Per-length product pages (2026-07-11 refresh — every collection has its own
+// cases/decor pages now, and covers + foot rails got dedicated pages instead
+// of funneling to the Table Top Kit bundle).
+const LINKS_BY_LEN = {
+  cases: {
+    59:  { p: 'https://www.printables.com/model/1658749-gen2-59-cases-all', t: 'https://than.gs/m/1535454' },
+    115: { p: 'https://www.printables.com/model/1658744-gen2-115-cases-all', t: 'https://than.gs/m/1535435' },
+    165: { p: 'https://www.printables.com/model/1658722-gen2-165-cases-all', t: 'https://than.gs/m/1535457' },
+    185: { p: 'https://www.printables.com/model/1658700-gen2-185-cases-all', t: 'https://than.gs/m/1535455' },
+    240: { p: 'https://www.printables.com/model/1658608-gen2-240-cases-all', t: 'https://than.gs/m/1535459' },
+    270: { p: 'https://www.printables.com/model/1658688-gen2-270-cases-all', t: 'https://than.gs/m/1535458' },
+  },
+  decor: {
+    59:  { p: 'https://www.printables.com/model/1070454-gen2-59-decor-drawers-all', t: 'https://than.gs/m/1481534' },
+    115: { p: 'https://www.printables.com/model/1307794-gen2-115-decor-drawers-all', t: 'https://than.gs/m/1158598' },
+    165: { p: 'https://www.printables.com/model/1100978-gen2-165-decor-drawers-all', t: 'https://than.gs/m/1493950' },
+    185: { p: 'https://www.printables.com/model/964551-gen2-185-decor-drawers-all', t: 'https://than.gs/m/1116945' },
+    240: { p: 'https://www.printables.com/model/1322479-gen2-240-decor-drawers-all', t: 'https://than.gs/m/1360074' },
+    270: { p: 'https://www.printables.com/model/1062961-gen2-270-decor-drawers-all', t: 'https://than.gs/m/1171387' },
+  },
+  classic: {
+    59:  { p: 'https://www.printables.com/model/234780-gen2-59-classic-drawers-all' },
+    115: { p: 'https://www.printables.com/model/1143243-gen2-115-classic-drawers-all' },
+    165: { p: 'https://www.printables.com/model/625776-gen2-165-classic-drawers-all' },
+    185: { p: 'https://www.printables.com/model/278293-gen2-185-classic-drawers-all' },
+    240: { p: 'https://www.printables.com/model/1324538-gen2-240-classic-drawers-all' },
+    270: { p: 'https://www.printables.com/model/1164306-gen2-270-classic-drawers-all' },
+  },
+  covers: {
+    59:  { p: 'https://www.printables.com/model/1777881-gen2-59-cover' },
+    115: { p: 'https://www.printables.com/model/1777837-gen2-115-cover' },
+    165: { p: 'https://www.printables.com/model/1774498-gen2-165-covers' },
+    185: { p: 'https://www.printables.com/model/1777844-gen2-185-cover' },
+    240: { p: 'https://www.printables.com/model/1777846-gen2-240-cover' },
+    270: { p: 'https://www.printables.com/model/1777849-gen2-270-cover' },
+  },
+  fr: { // no 59 — that collection has no foot rails
+    115: { p: 'https://www.printables.com/model/1777819-gen2-115-foot-rails' },
+    165: { p: 'https://www.printables.com/model/1775386-gen2-165-foot-rails' },
+    185: { p: 'https://www.printables.com/model/1777823-gen2-185-foot-rails' },
+    240: { p: 'https://www.printables.com/model/1777826-gen2-240-foot-rails' },
+    270: { p: 'https://www.printables.com/model/1777830-gen2-270-foot-rails' },
+  },
+  kit: {
+    115: { p: 'https://www.printables.com/model/1146353-gen2-table-top-kit-v2-115-medium', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20Table%20Top%20Kit%20V2%20-%20115-1245167' },
+    165: { p: 'https://www.printables.com/model/1124278-gen2-table-top-kit-v2-165-mini', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20Table%20Top%20Kit%20V2%20-%20165-1233752' },
+    185: { p: 'https://www.printables.com/model/1118906-gen2-table-top-kit-v2-185-standard', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20Table%20Top%20Kit%20V2%20-%20185-1231757' },
+    240: { p: 'https://www.printables.com/model/1324501-gen2-table-top-kit-v2-240', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20Table%20Top%20Kit%20V2%20-%20240-1360073' },
+    270: { p: 'https://www.printables.com/model/1163955-gen2-table-top-kit-v2-270-large', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20Table%20Top%20Kit%20V2%20-%20270-1253780' },
+  },
+  wall: {
+    59:  { p: 'https://www.printables.com/model/1513322-gen2-wall-mount-kit-lite-59' },
+    115: { p: 'https://www.printables.com/model/1537169-gen2-wall-mount-kit-lite-115' },
+    165: { p: 'https://www.printables.com/model/1605963-gen2-wall-mount-kit-lite-165', t: 'https://than.gs/m/1515711' },
+  },
+  rail: {
+    165: { t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20RAILS%20-%20165-1165793' },
+    185: { p: 'https://www.printables.com/model/1052357-gen2-rails-185-standard', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20RAILS%20-%20STANDARD-1163830' },
+  },
 };
 
 // Instruction colors are a K'nex-style identification palette: one distinct
@@ -124,37 +204,55 @@ export function generateManifest(build) {
   // and hung as a unit); false = per-column cover on each top case.
   const isStaggered = isWall && !!build.wallStagger;
   if (build.mount !== 'tabletop' && !hangs)
-    errors.push(`"${build.mount}" mounts aren't supported yet — tabletop, wall, and under-table builds for now.`);
+    errors.push(`"${build.mount}" mounts aren't supported yet · tabletop, wall, and under-table builds for now.`);
   // ---- collection depth (165 vs 185) --------------------------------------
   // node names key off L; depth-referenced SHARED hardware shifts by ±dz. See
   // the COLL table comment for the geometry. coll falls back to 185 so an
   // unknown collection reports the error above without crashing the placement.
   const L = build.length;
   if (!COLL[L])
-    errors.push(`The ${L} collection isn't in the 3D part library yet — 165 and 185 builds for now.`);
+    errors.push(`The ${L} collection isn't in the 3D part library yet · 59, 115, 165, 185, 240 and 270 builds for now.`);
+  else if (COLL[L].depth !== 185 && COLL[L].depth !== 165)
+    warnings.push(`${L} hardware positions are scaled from the 185 calibration · double-check a printed build and report anything that sits off.`);
   const coll = COLL[L] || COLL[185];
   const depth = coll.depth;
-  const dz = (185 - depth) / 2;                       // 0 for 185, 10 for 165 — each case face moves this toward center
+  const dz = (185 - depth) / 2;                       // 0 for 185, 10 for 165 — each case face moves this toward center (negative for 240/270: faces move outward)
+  CAM_DEPTH = Math.max(DEPTH, depth);                 // camera size floor follows the deepest dimension
+  // deep collections need a longer runway than the 185-tuned constants: slide
+  // offsets must clear the part's own depth or the enter starts inside the
+  // final volume. 165/185 keep their calibrated values exactly.
+  const slideBack = -Math.max(170, depth - 15);       // covers/FR-U/settle-from-behind reach
+  const wallFwd = Math.max(WALL.lowerFwd, depth + 40);// wall lower-row slide-in reach
+  if (isUT && COLL[L] && !coll.railDepth)
+    errors.push(`Under-table rails for the ${L} collection aren't in the 3D part library yet · 165 and 185 under-table builds for now.`);
+  // planner mountBlocksLength() greys 59 tabletop out, so this only fires on a
+  // hand-built link — same physical reason as the planner's tooltip.
+  if (!hangs && coll.noTabletop)
+    errors.push(`The ${L} collection can't be table-top mounted · it has no foot rails and no feet slots (too shallow to be stable). Wall-mount builds work.`);
   // Under-table rail: front-aligned with the case front (= depth/2). The rail
   // (railDepth deep) overhangs the case back. Screw rows keep the SAME inset
   // from each rail face as the 185 calibration (DERIVED for 165). front inset
   // 15.43, back inset 32.57 (from the 201-deep 185 rail: front 92.5→77.07,
   // back −108.5→−75.93).
-  const railFrontZ = depth / 2, railBackZ = depth / 2 - coll.railDepth;
+  const railFrontZ = depth / 2, railBackZ = depth / 2 - (coll.railDepth || 201); // fallback only pads the error path (UT without rails errors above)
   const railZ = (railFrontZ + railBackZ) / 2;         // −8 (185) / −7 (165)
   const utScrewFrontZ = railFrontZ - 15.43;           // 77.07 (185) / 67.07 (165)
   const utScrewBackZ = railBackZ + 32.57;             // −75.93 (185) / −63.93 (165)
-  // 165 has its own model pages; override the Thangs (`t`) links Joey provided.
-  // Printables (`p`) for cases/decor and ALL other 165 links (kit/covers/
-  // footrails/rail/hardware/faceplate/handle) still point at the 185 pages —
-  // swap when the 165 URLs exist.
-  const links = L === 165
-    ? { ...LINKS,
-        cases: { ...LINKS.cases, t: 'https://than.gs/m/1535457' },
-        decor: { ...LINKS.decor, t: 'https://than.gs/m/1493950' },
-        wall:  { ...LINKS.wall,  t: 'https://than.gs/m/1515711' },
-      }
-    : LINKS;
+  // Per-length pages where they exist (LINKS_BY_LEN), shared/185 fallbacks
+  // otherwise. covers/fr/classic fall back to the 185 page only for safety —
+  // every supported length has its own now (fr/kit: except the 59, which
+  // never generates foot rails or feet anyway).
+  const links = {
+    ...LINKS,
+    kit:     LINKS_BY_LEN.kit[L] || LINKS.kit,
+    cases:   LINKS_BY_LEN.cases[L] || LINKS_BY_LEN.cases[185],
+    decor:   LINKS_BY_LEN.decor[L] || LINKS_BY_LEN.decor[185],
+    classic: LINKS_BY_LEN.classic[L] || LINKS_BY_LEN.classic[185],
+    covers:  LINKS_BY_LEN.covers[L] || LINKS_BY_LEN.covers[185],
+    fr:      LINKS_BY_LEN.fr[L] || LINKS_BY_LEN.fr[185],
+    wall:    LINKS_BY_LEN.wall[L] || LINKS.wall,
+    rail:    LINKS_BY_LEN.rail[L] || LINKS.rail,
+  };
   // ---- faceplate family (planner `faceStyle`, carried in share links) -----
   // essential: flat 5 mm plate + bolt-on handle. edgelabel: 24.1 mm deep 2-zone
   // plate (grip printed in — NO handle) + accent panel (not on 05H) + the
@@ -162,9 +260,9 @@ export function generateManifest(build) {
   // drawer front, 92.57 − dz): z-center = plane + depth/2.
   const FACE_FAMILIES = {
     essential: { key: 'essential', node: c => `Faceplate_Essential_${c}`, z: 95.07, hasHandle: true,
-                 label: c => `Faceplate Essential ${c}`, extras: false },
+                 label: c => `Faceplate Essential ${c}`, extras: false, links: links.fp },
     edgelabel: { key: 'edgelabel', node: c => `Faceplate_EdgeLabel_${c}`, z: 104.62, hasHandle: false,
-                 label: c => `EdgeLabel Faceplate ${c}`, extras: true }, // no public links yet — club family
+                 label: c => `EdgeLabel Faceplate ${c}`, extras: true, links: links.fpe }, // club family — EdgeLabel Series pages
   };
   // faceplates are SHARED hardware (same GLBs both collections, placed −dz on
   // 165 like every other front-face part) — both families serve 165 and 185
@@ -194,13 +292,14 @@ export function generateManifest(build) {
   // single-case bottom row: no footrails — the case itself takes the feet
   // (rails exist to LINK cases horizontally; one case has nothing to link).
   // Feet then insert into the case's underside slots and the whole stack
-  // sits 10 mm lower (no FR-L/FR-U sandwich).
+  // sits 10 mm lower (no FR-L/FR-U sandwich). NB the 59 never gets here at
+  // all — it has no feet slots either (noTabletop errors above).
   const bottomUnits = units.filter(u => u.rowIdx === 0);
-  const singleBase = !hangs && bottomUnits.length === 1;
+  const caseFeet = !hangs && bottomUnits.length === 1;
   // hanging builds (wall brackets / under-table rails) have no feet/footrail
   // sandwich, so the bottom row sits at Y=0. Tabletop lifts onto footrails
   // (or feet-on-case).
-  const row0 = hangs ? 0 : (singleBase ? 7.65 : ROW0_BOTTOM);
+  const row0 = hangs ? 0 : (caseFeet ? 7.65 : ROW0_BOTTOM);
 
   // handle style from the planner build (crystal not modeled yet -> Deco)
   const HANDLE_STYLES = {
@@ -209,13 +308,15 @@ export function generateManifest(build) {
   };
   const handleStyle = HANDLE_STYLES[build.handleStyle] || HANDLE_STYLES.deco;
   if (build.handleStyle && !HANDLE_STYLES[build.handleStyle])
-    warnings.push(`"${build.handleStyle}" handles aren't modeled yet — showing ${handleStyle.label.replace(' Handle', '')} (swap styles by tapping a handle).`);
+    warnings.push(`"${build.handleStyle}" handles aren't modeled yet · showing ${handleStyle.label.replace(' Handle', '')} (swap styles by tapping a handle).`);
 
   // ---- per-unit validation -------------------------------------------------
   for (const u of units) {
     const H = H_LABEL[u.hh];
     if (!H) { errors.push(`A unit has an unknown height (hh=${u.hh}).`); continue; }
-    if (u.w >= 3 && u.hh === 6) errors.push(`${u.w}W-3H doesn't exist (too large to print) — planner shouldn't allow this.`);
+    if (u.w >= 3 && u.hh === 6) errors.push(`${u.w}W-3H doesn't exist (too large to print) · planner shouldn't allow this.`);
+    if (coll.maxW && u.w > coll.maxW) errors.push(`${u.w}W cases don't exist in the ${L} collection (1W and 2W only).`);
+    if (coll.maxHH && u.hh > coll.maxHH) errors.push(`${H}H cases don't exist in the ${L} collection (05H and 1H only).`);
     if (u.fill === 'cabinet') errors.push('Cabinet units need case-extender models that are not in the 3D library yet.');
     if (u.fill === 'shelf' && u.hh !== 2) errors.push('Shelves taller than 1H use case extenders that are not in the 3D library yet.');
   }
@@ -228,8 +329,8 @@ export function generateManifest(build) {
     for (let c = u.col; c < u.col + u.w; c++)
       if (hangs ? !bottomAt(c, u.topIdx) : !topAt(c, u.rowIdx)) {
         errors.push(hangs
-          ? `A unit has nothing above part of it to hang from — ${isUT ? 'under-table' : 'wall'} builds hang top-down.`
-          : 'A unit is floating (nothing under part of it) — tabletop builds stack bottom-up.');
+          ? `A unit has nothing above part of it to hang from · ${isUT ? 'under-table' : 'wall'} builds hang top-down.`
+          : 'A unit is floating (nothing under part of it) · tabletop builds stack bottom-up.');
         break;
       }
   }
@@ -239,11 +340,11 @@ export function generateManifest(build) {
   for (const u of units) for (let c = u.col; c < u.col + u.w; c++)
     colTop.set(c, Math.max(colTop.get(c) || 0, u.topIdx));
   if (new Set(colTop.values()).size > 1)
-    errors.push(`${isUT ? 'The rails need a flat top row against the surface' : 'The covers need a flat top'} — every column must stack to the same height. Fix the build in the planner first.`);
+    errors.push(`${isUT ? 'The rails need a flat top row against the surface' : 'The covers need a flat top'} · every column must stack to the same height. Fix the build in the planner first.`);
   // sanity cap: each unit becomes ~9 parts and its own step — beyond this the
   // instructions stop being instructions
   if (units.length > 80)
-    errors.push(`This build has ${units.length} units — 3D instructions currently support up to 80. It'll still print and assemble fine; the step-by-step just isn't practical at this size yet.`);
+    errors.push(`This build has ${units.length} units · 3D instructions currently support up to 80. It'll still print and assemble fine; the step-by-step just isn't practical at this size yet.`);
   if (errors.length) return { errors, warnings, manifest: null };
 
   // ---- build instances + steps ---------------------------------------------
@@ -334,7 +435,7 @@ export function generateManifest(build) {
       inst.push({ id, node: 'WoodScrew', pos: [colCenter(c) + dx, pegY, WALL.screwZ + dz] });
       add('WoodScrew', 'Wood Screw', 'Screw', links.wall, 1, true); // purchased hardware
     }
-  } else if (singleBase) {
+  } else if (caseFeet) {
     // feet slide into the bottom case's own underside slots: 4 per 1W, running
     // LENGTHWISE (front feet snap in back->front, rear feet front->back).
     // Slot x per 1W (11.5 / 76.5 from the left edge) ESTIMATED by symmetry with
@@ -358,12 +459,12 @@ export function generateManifest(build) {
       rails.push(...tileOut(r, tilesLower(n)));
       uppers.push(...tileOut(r, tilesUpper(n)));
     }
-    uppers.forEach(r => add(`FR-U_${L}-${r.w}W`, `Footrail Upper ${L}-${r.w}W`, 'FootrailU', links.kit));
+    uppers.forEach(r => add(`FR-U_${L}-${r.w}W`, `Footrail Upper ${L}-${r.w}W`, 'FootrailU', links.fr));
     rails.forEach((r, i) => {
       const id = `frl${i}`;
       frlIds.push(id);
       inst.push({ id, node: `FR-L_${L}-${r.w}W`, pos: [railX(r), FRL_Y, 0], stage: 'base' });
-      add(`FR-L_${L}-${r.w}W`, `Footrail Lower ${L}-${r.w}W`, 'FootrailL', links.kit);
+      add(`FR-L_${L}-${r.w}W`, `Footrail Lower ${L}-${r.w}W`, 'FootrailL', links.fr);
       // foot slots: 2W local x ±76.48 / −0.18, 1W local ±32.5 (DERIVED by symmetry).
       // Junction rule (Joey): where rails meet, install feet on one rail only —
       // a rail with a left neighbor in the same run skips its left slot pair.
@@ -382,7 +483,8 @@ export function generateManifest(build) {
   }
 
   // cases + per-case hardware
-  let firstClipDemo = null, firstDrawerDemo = null, baseCaseStep = null;
+  let firstClipDemo = null, firstDrawerDemo = null;
+  const baseCaseSteps = []; // bench cases (feet-on-case rows) slot into the bench flow before the feet
   // wall steps play top-down (reversed), so the first top case SHOWN is the last
   // one generated — that's the one that gets the ghost+zoom peg demo.
   const ghostTopIdx = units.reduce((acc, v, idx) => v.topIdx === maxTop ? idx : acc, -1);
@@ -400,7 +502,7 @@ export function generateManifest(build) {
     const caseH = u.hh * PITCH_HALF_Y + 3;
     const cx = spanCenter(u);
     const left = cx - u.w * PITCH_X / 2, right = cx + u.w * PITCH_X / 2;
-    const isBase = singleBase && u.rowIdx === 0; // shares the bench stage with its feet
+    const isBase = caseFeet && u.rowIdx === 0; // shares the bench stage with its feet
     const isTop = u.topIdx === maxTop;
     // Stages: tabletop non-base cases settle from behind. Wall TOP cases stage
     // at a forward bench (so the cover can be attached, and the two steps —
@@ -409,7 +511,7 @@ export function generateManifest(build) {
     // enter+move). Staggered top cases share one bench stage ('wtop') so the
     // whole row hangs together; per-column top cases each get their own.
     const st = hangs ? (isWall && isTop ? (isStaggered ? 'wtop' : `w${i}`) : null) : (isBase ? 'base' : `c${i}`);
-    if (st && !isBase) stages[st] = isWall ? [0, WALL.drop, WALL.benchFwd] : [0, 0, -170];
+    if (st && !isBase) stages[st] = isWall ? [0, WALL.drop, WALL.benchFwd] : [0, 0, slideBack];
     const stg = st ? { stage: st } : {};
     inst.push({ id: `case${i}`, node: caseNode, pos: [cx, bottom, 0], ...stg });
     add(caseNode, `Case ${L}-${u.w}W-${H}H`, 'Case', links.cases);
@@ -424,7 +526,7 @@ export function generateManifest(build) {
     const isDrawer = u.fill === 'decor' || u.fill === 'classic';
     const hasMagnet = isDrawer && u.closure === 'magnet'; // planner "Drawer close = Magnets"
     const members = [`case${i}`, `ql${i}L`, `ql${i}R`]; // move together during a wall hang
-    const clipText = 'Magnet closure: snap the clip into the back-wall slot (magnet pressed in back-to-front, clip lowered) — unreachable after assembly, so now is the time.';
+    const clipText = 'Magnet closure: snap the clip into the back-wall slot (magnet pressed in back-to-front, clip lowered) · unreachable after assembly, so now is the time.';
     let mcId, mgId;
     if (hasMagnet) {
       // magnet clip in the case back: one per drawer bay, LEFT slot on 2W,
@@ -441,7 +543,7 @@ export function generateManifest(build) {
       members.push(mcId, mgId);
     }
     const step = {
-      title: isBase ? `Bench: bottom case — ${u.w}W-${H}H` : `Case ${i + 1} — ${u.w}W-${H}H`,
+      title: isBase ? `Bench: bottom case · ${u.w}W-${H}H` : `Case ${i + 1} · ${u.w}W-${H}H`,
       note: null,
       // wall lower rows — and every under-table case — are viewed from a
       // 3/4-below angle so you can watch them slide in under the surface/row
@@ -457,7 +559,7 @@ export function generateManifest(build) {
       const benchCam = { ...cam(0, flatTopY - 10, totalW, gridBottom), target: [0, flatTopY - 10, WALL.benchFwd] };
       const n = topPlacements.length + 1;
       topPlacements.push({
-        title: `Top case ${n} — ${u.w}W-${H}H`,
+        title: `Top case ${n} · ${u.w}W-${H}H`,
         note: 'On the bench, line this top case up with the rest of the top row: QuickLocks into the outer wall slots (L left, R right)'
           + (mcId ? ', magnet clip into the back slot' : '') + '. The cover slides on across the whole row next.',
         camera: benchCam,
@@ -483,12 +585,12 @@ export function generateManifest(build) {
       for (const t of tileOut(run, tilesLower(u.w))) {
         const id = `cl${clIds.length}`; clIds.push(id); clLocal.push(id);
         inst.push({ id, node: `CL-${L}-${t.w}W`, pos: [railX(t), flatTopY, 0], ...stg });
-        add(`CL-${L}-${t.w}W`, `Cover Lower ${L}-${t.w}W`, 'CoverL', links.kit);
+        add(`CL-${L}-${t.w}W`, `Cover Lower ${L}-${t.w}W`, 'CoverL', links.covers);
       }
       for (const t of tileOut(run, tilesUpper(u.w))) {
         const id = `cu${cuIds.length}`; cuIds.push(id); cuLocal.push(id);
         inst.push({ id, node: `CU-${L}-${t.w}W`, pos: [railX(t), flatTopY + 4.3, 0], ...stg });
-        add(`CU-${L}-${t.w}W`, `Cover Upper ${L}-${t.w}W`, 'CoverU', links.kit);
+        add(`CU-${L}-${t.w}W`, `Cover Upper ${L}-${t.w}W`, 'CoverU', links.covers);
       }
       const coverIds = [...clLocal, ...cuLocal];
       // a top-row drawer's own stoppers go into its CL (handled here, so the
@@ -522,14 +624,14 @@ export function generateManifest(build) {
       // the bench assembly sits WALL.benchFwd toward the camera, so frame it there
       const benchCam = { ...cam(cx, bottom + caseH / 2, totalW, gridBottom), target: [cx, bottom + caseH / 2 + WALL.drop, WALL.benchFwd] };
       const benchNote = 'On the bench, before it goes near the wall: QuickLocks in, slide the Cover Lower on'
-        + (isDrawer ? ', drop the drawer stoppers into it,' : ',') + ' then cap it with the Cover Upper — the cover can only slide on now, not once the case is on the wall.'
+        + (isDrawer ? ', drop the drawer stoppers into it,' : ',') + ' then cap it with the Cover Upper · the cover can only slide on now, not once the case is on the wall.'
         + (mcId && firstClipDemo === null ? ' ' + clipText : '');
 
       if (i === ghostTopIdx) {
         // the first top case shown is split into two steps (there's a lot going
         // on), and its hang ghosts the cover + zooms to reveal the pegs.
         const pegCam = { t: 24, p: 40, r: base.r * 0.62, target: [cx, flatTopY - 18, -30] };
-        const assembleStep = { title: `Cover the top case — ${u.w}W-${H}H`, note: benchNote, camera: benchCam, phases: bench };
+        const assembleStep = { title: `Cover the top case · ${u.w}W-${H}H`, note: benchNote, camera: benchCam, phases: bench };
         const hangStep = {
           title: 'Hang the top case on the pegs',
           note: 'Now hang the covered case: push it straight back so the bracket pegs enter the case-back slots, then drop it 16 mm to lock. (The cover is ghosted so you can see the pegs.)',
@@ -543,7 +645,7 @@ export function generateManifest(build) {
         if (mcId && firstClipDemo === null) firstClipDemo = i;
         return;
       }
-      step.title = `Hang the covered top case — ${u.w}W-${H}H`;
+      step.title = `Hang the covered top case · ${u.w}W-${H}H`;
       step.camera = benchCam;                        // start framing the bench…
       step.phases = [...bench, { camera: base, move: back.move }, drop, land]; // …pan to the wall as it hangs
       step.note = benchNote + ' Then hang it: push it straight back onto the pegs and drop 16 mm to lock.';
@@ -552,7 +654,7 @@ export function generateManifest(build) {
       // under-table: EVERY case slides straight back from out front, one piece —
       // the top row's case tops ride into the rail channels; lower rows hang
       // under the row above (front→back, then the QuickLocks click).
-      step.title = isTop ? `Slide the case into the rails — ${u.w}W-${H}H` : `Hang case — ${u.w}W-${H}H`;
+      step.title = isTop ? `Slide the case into the rails · ${u.w}W-${H}H` : `Hang case · ${u.w}W-${H}H`;
       if (i === ghostTopIdx) {
         // the first case shown assembles out front (QuickLocks, clip) before it
         // slides home — enter `at` the forward offset; the move cancels it, so
@@ -571,24 +673,24 @@ export function generateManifest(build) {
           { move: members.map(id => ({ id, by: [0, 0, -UT.fwd] })) },
         ];
         step.note = 'Fit the QuickLocks first (L left, R right)' + (mcId ? ', snap in the magnet clip,' : ',')
-          + ' then slide the case straight back under the surface — its top rails ride into the rail channels until it stops.';
+          + ' then slide the case straight back under the surface · its top rails ride into the rail channels until it stops.';
       } else {
         // pre-assembled one-piece slide-in, same read as wall lower rows
         step.phases = [{ sync: true, enter: members.map(id => ({ id, from: [0, 0, UT.fwd] })) }];
         step.note = isTop
-          ? 'QuickLocks in, then slide the case straight back — its top rails ride into the rail channels until it stops.'
-          : 'Slide the case straight back under the row above — its top rails engage the case above and the QuickLocks click home.';
+          ? 'QuickLocks in, then slide the case straight back · its top rails ride into the rail channels until it stops.'
+          : 'Slide the case straight back under the row above · its top rails engage the case above and the QuickLocks click home.';
       }
-      if (isTop && isDrawer) step.note += ' (No drawer stoppers needed up here — the rail has them built in.)';
+      if (isTop && isDrawer) step.note += ' (No drawer stoppers needed up here · the rail has them built in.)';
       if (mcId && firstClipDemo === null) { firstClipDemo = i; if (i !== ghostTopIdx) step.note += ' ' + clipText; }
     } else if (isWall) {
       // lower rows: the assembled case (with quicklocks + clip) slides straight
       // back from ~40 mm in front — no drop, so it can't clip the case above.
-      step.title = `Hang case — ${u.w}W-${H}H`;
+      step.title = `Hang case · ${u.w}W-${H}H`;
       // sync: the case + its QuickLocks (+ clip) slide in together as one piece,
       // not staggered (they're pre-assembled, not arriving separately).
-      step.phases = [{ sync: true, enter: members.map(id => ({ id, from: [0, 0, WALL.lowerFwd] })) }];
-      step.note = 'Slide the case straight back toward the wall from just in front — its top rails engage the case above and the QuickLocks click home.';
+      step.phases = [{ sync: true, enter: members.map(id => ({ id, from: [0, 0, wallFwd] })) }];
+      step.note = 'Slide the case straight back toward the wall from just in front · its top rails engage the case above and the QuickLocks click home.';
       if (mcId && firstClipDemo === null) { firstClipDemo = i; step.note += ' ' + clipText; }
     } else {
       // tabletop: case + quicklocks drop in on the bench, then settle from behind
@@ -596,7 +698,7 @@ export function generateManifest(build) {
         { enter: [{ id: `case${i}`, from: [0, 60, 0] }] },
         { enter: [{ id: `ql${i}L`, from: [0, 55, 0] }, { id: `ql${i}R`, from: [0, 55, 0] }] },
       ];
-      if (isBase) step.note = 'A single bottom case needs no footrails — it takes the feet directly. Start at the bench: QuickLocks into the outer wall slots, L left, R right.';
+      if (isBase) step.note = 'A single bottom case needs no footrails · it takes the feet directly. Start at the bench: QuickLocks into the outer wall slots, L left, R right.';
       if (mcId && firstClipDemo === null) {
         firstClipDemo = i;
         step.phases.push(
@@ -613,7 +715,7 @@ export function generateManifest(build) {
     }
     if (hangs) steps.push(step);
     else if (!isBase) { step.phases.push({ settle: st }); steps.push(step); }
-    else baseCaseStep = step; // slots into the bench flow before the feet
+    else baseCaseSteps.push(step); // slots into the bench flow before the feet
     caseSteps.push(step);
   });
 
@@ -625,12 +727,12 @@ export function generateManifest(build) {
     for (const t of tileOut(run, tilesLower(totalW))) {
       const id = `cl${clIds.length}`; clIds.push(id); clLocal.push(id);
       inst.push({ id, node: `CL-${L}-${t.w}W`, pos: [railX(t), flatTopY, 0], stage: 'wtop' });
-      add(`CL-${L}-${t.w}W`, `Cover Lower ${L}-${t.w}W`, 'CoverL', links.kit);
+      add(`CL-${L}-${t.w}W`, `Cover Lower ${L}-${t.w}W`, 'CoverL', links.covers);
     }
     for (const t of tileOut(run, tilesUpper(totalW))) {
       const id = `cu${cuIds.length}`; cuIds.push(id); cuLocal.push(id);
       inst.push({ id, node: `CU-${L}-${t.w}W`, pos: [railX(t), flatTopY + 4.3, 0], stage: 'wtop' });
-      add(`CU-${L}-${t.w}W`, `Cover Upper ${L}-${t.w}W`, 'CoverU', links.kit);
+      add(`CU-${L}-${t.w}W`, `Cover Upper ${L}-${t.w}W`, 'CoverU', links.covers);
     }
     // stoppers into the CL for each top-row drawer column (before the CU caps them)
     units.filter(u => u.topIdx === maxTop && (u.fill === 'decor' || u.fill === 'classic')).forEach(u => {
@@ -650,7 +752,7 @@ export function generateManifest(build) {
     stagCoverStep = {
       title: 'Cover the top row',
       note: 'Slide the staggered Cover Lower across the whole top row'
-        + (stopIds.length ? ', drop the drawer stoppers into it,' : ',') + ' then cap it with the staggered Cover Upper — the offset seams tie all the top cases together before it goes on the wall.',
+        + (stopIds.length ? ', drop the drawer stoppers into it,' : ',') + ' then cap it with the staggered Cover Upper · the offset seams tie all the top cases together before it goes on the wall.',
       camera: benchCam,
       phases: [
         { enter: clLocal.map(id => ({ id, from: [0, 0, -WALL.coverSlide] })) },
@@ -708,7 +810,7 @@ export function generateManifest(build) {
       const merged = { enter: s._stoppers.flatMap(e => e.enter) };
       s.phases.push(merged);
       s.note = (s.note || 'QuickLocks in, slide the case on from the back until it clicks.') +
-        ' Then drop the drawer stoppers into its floor slots — they stop the drawer BELOW from being pulled all the way out (optional).';
+        ' Then drop the drawer stoppers into its floor slots · they stop the drawer BELOW from being pulled all the way out (optional).';
     } else if (!s.note) {
       s.note = 'QuickLocks in (L left, R right), then slide the case on from the back until it clicks.';
     }
@@ -737,13 +839,13 @@ export function generateManifest(build) {
       const i = clIds.length;
       inst.push({ id: `cl${i}`, node: `CL-${L}-${t.w}W`, pos: [railX(t), clY, 0] });
       clIds.push(`cl${i}`);
-      add(`CL-${L}-${t.w}W`, `Cover Lower ${L}-${t.w}W`, 'CoverL', links.kit);
+      add(`CL-${L}-${t.w}W`, `Cover Lower ${L}-${t.w}W`, 'CoverL', links.covers);
     }
     for (const t of tileOut(r, tilesUpper(n))) {
       const i = cuIds.length;
       inst.push({ id: `cu${i}`, node: `CU-${L}-${t.w}W`, pos: [railX(t), clY + 4.3, 0] });
       cuIds.push(`cu${i}`);
-      add(`CU-${L}-${t.w}W`, `Cover Upper ${L}-${t.w}W`, 'CoverU', links.kit);
+      add(`CU-${L}-${t.w}W`, `Cover Upper ${L}-${t.w}W`, 'CoverU', links.covers);
     }
   });
 
@@ -758,7 +860,7 @@ export function generateManifest(build) {
   units.forEach((u, i) => {
     if (u.fill === 'classic') {
       classicCount += 1;
-      add(`_classic_${u.w}W_${H_LABEL[u.hh]}H`, `Classic Drawer ${L}-${u.w}W-${H_LABEL[u.hh]}H (3D model coming soon)`, 'Drawer', links.decor ? null : null);
+      add(`_classic_${u.w}W_${H_LABEL[u.hh]}H`, `Classic Drawer ${L}-${u.w}W-${H_LABEL[u.hh]}H (3D model coming soon)`, 'Drawer', links.classic);
       return;
     }
     if (u.fill !== 'decor') return;
@@ -825,7 +927,7 @@ export function generateManifest(build) {
       inst.push({ id: `h${i}`, node: handleStyle.node, pos: [cx + 0.46, bottom + 3.72 + (fpH - handleStyle.h) / 2 - 0.5, 97.57 - dz + handleStyle.d / 2], rides: `drw${i}` });
     }
     add(`DecorDrawer_${L}-${u.w}W-${H}H`, `Decor Drawer ${L}-${u.w}W-${H}H`, 'Drawer', links.decor);
-    add(face.node(code), face.label(code), 'Faceplate', face.key === 'essential' ? links.fp : null);
+    add(face.node(code), face.label(code), 'Faceplate', face.links);
     if (face.hasHandle) add(handleStyle.node, handleStyle.label, 'Handle', handleStyle.links);
     const mag = hasMag ? [{ id: `dc${i}` }, { id: `dm${i}` }] : []; // clip+magnet riders, or none
     if (firstDrawerDemo === null) {
@@ -910,7 +1012,7 @@ export function generateManifest(build) {
   });
 
   if (classicCount) warnings.push(`${classicCount} Classic drawer${classicCount > 1 ? 's are' : ' is'} in the parts list but not shown in 3D yet (model coming soon).`);
-  if (units.some(u => u.fill === 'decor' && u.hh !== 2)) warnings.push('Non-1H drawers use some derived (not-yet-calibrated) sizing — double-check the tall drawers and report anything that looks off.');
+  if (units.some(u => u.fill === 'decor' && u.hh !== 2)) warnings.push('Non-1H drawers use some derived (not-yet-calibrated) sizing · double-check the tall drawers and report anything that looks off.');
 
   // ---- assemble the step list ----------------------------------------------
   // (H_MM is hoisted above the drawer/faceplate loop — the cinematic needs it)
@@ -938,8 +1040,8 @@ export function generateManifest(build) {
   const preSteps = [
     {
       title: funName,
-      note: `Your custom GEN2 build — ${units.length} unit${units.length > 1 ? 's' : ''}, ${drawerCount} drawer${drawerCount === 1 ? '' : 's'}, ${totalW} column${totalW > 1 ? 's' : ''} wide. Drag to orbit, tap any part to identify it. ` +
-        `${printTotal} prints — quantities on the right.` +
+      note: `Your custom GEN2 build · ${units.length} unit${units.length > 1 ? 's' : ''}, ${drawerCount} drawer${drawerCount === 1 ? '' : 's'}, ${totalW} column${totalW > 1 ? 's' : ''} wide. Drag to orbit, tap any part to identify it. ` +
+        `${printTotal} prints · quantities on the right.` +
         (handleTotal ? ` You'll also need ${handleTotal * 2}× M3 screws for the handles` : '') +
         (magnetTotal ? ` and ${magnetTotal}× 10×2 mm disc magnets for the optional magnet closures (hardware store items).` : '.') +
         (warnings.length ? ' ⚠ ' + warnings.join(' ⚠ ') : ''),
@@ -951,7 +1053,7 @@ export function generateManifest(build) {
   if (isUT) {
     preSteps.push({
       title: utIds.length > 1 ? 'Screw the rails to the surface' : 'Screw the rail to the surface',
-      note: 'Hold each rail flat against the underside — channels facing down, the long overhang toward the back — and drive the wood screws up through the plate: one at each end and at every seam line, in the front and back rows. The rail is the stationary part; every case slides into it.',
+      note: 'Hold each rail flat against the underside · channels facing down, the long overhang toward the back · and drive the wood screws up through the plate: one at each end and at every seam line, in the front and back rows. The rail is the stationary part; every case slides into it.',
       camera: { ...camUp(0, flatTopY, totalW, gridBottom), fit: FIT },
       phases: [
         { enter: utIds.map(id => ({ id, from: [0, -70, 0] })) },      // lift the rail up against the surface
@@ -961,15 +1063,15 @@ export function generateManifest(build) {
   } else if (isWall) {
     preSteps.push({
       title: bracketIds.length > 1 ? 'Mount the wall brackets' : 'Mount the wall bracket',
-      note: `Screw the bracket${bracketIds.length > 1 ? 's' : ''} flat to the wall — 2 wood screws per 1W column. The cases hang on the protruding screw-head pegs, so drive them until the heads stand just proud of the bracket.`,
+      note: `Screw the bracket${bracketIds.length > 1 ? 's' : ''} flat to the wall · 2 wood screws per 1W column. The cases hang on the protruding screw-head pegs, so drive them until the heads stand just proud of the bracket.`,
       camera: cam(0, flatTopY, totalW, gridBottom, FIT),
       phases: [
         { enter: bracketIds.map(id => ({ id, from: [0, 0, 70] })) },       // hold the bracket to the wall
         { enter: screwIds.map(id => ({ id, from: [0, 0, 55] })) },          // drive the screws in (−Z into the wall)
       ],
     });
-  } else if (singleBase) {
-    preSteps.push(baseCaseStep);
+  } else if (caseFeet) {
+    preSteps.push(...baseCaseSteps);
     preSteps.push({
       title: `Bench: insert the ${nFeet} feet`,
       note: 'Feet slide into the slots under the case, lengthwise: front feet snap in back-to-front, rear feet front-to-back.' +
@@ -985,13 +1087,13 @@ export function generateManifest(build) {
     preSteps.push(
     {
       title: rails.length > 1 ? 'Bench: lower footrails' : 'Bench: lower footrail',
-      note: 'Start at the bench — the rails are shown raised so you can see the foot slots on the undersides.',
+      note: 'Start at the bench · the rails are shown raised so you can see the foot slots on the undersides.',
       camera: cam(0, 115, totalW, gridBottom, FIT),
       phases: [{ enter: frlIds.map(id => ({ id, from: [0, 90, 0] })) }],
     },
     {
       title: `Bench: insert the ${nFeet} feet`,
-      note: 'Pointy end slides in first — outer feet toward the rail ends, middle feet left to right.' +
+      note: 'Pointy end slides in first · outer feet toward the rail ends, middle feet left to right.' +
         (rails.length > 1 ? ' Where two rails meet, install that slot pair on ONE rail only.' : ''),
       camera: cam(0, 115, totalW, gridBottom, FIT),
       phases: [
@@ -1007,7 +1109,7 @@ export function generateManifest(build) {
       camera: cam(0, 30, totalW, gridBottom, FIT),
       phases: [{ enter: uppers.map((r, i) => {
         inst.push({ id: `fru${i}`, node: `FR-U_${L}-${r.w}W`, pos: [railX(r), FRU_Y, 0] });
-        return { id: `fru${i}`, from: [0, 0, -170] };
+        return { id: `fru${i}`, from: [0, 0, slideBack] };
       }) }],
     });
   }
@@ -1019,11 +1121,11 @@ export function generateManifest(build) {
   if (!hangs) {
     postSteps.push({
       title: clIds.length > 1 ? 'Lower covers' : 'Lower cover',
-      note: 'The lower covers slide over the top from the back — the top cases’ QuickLocks lock them.' +
+      note: 'The lower covers slide over the top from the back · the top cases’ QuickLocks lock them.' +
         (coverStoppers.length ? ' Then drop the remaining stoppers into the covers’ slots to protect the top-row drawers.' : ''),
       camera: cam(0, H_MM, totalW, gridBottom, FIT),
       phases: [
-        { enter: clIds.map(id => ({ id, from: [0, 0, -170] })) },
+        { enter: clIds.map(id => ({ id, from: [0, 0, slideBack] })) },
         ...(coverStoppers.length ? [{ enter: coverStoppers.flatMap(e => e.enter) }] : []),
       ],
     });
@@ -1032,7 +1134,7 @@ export function generateManifest(build) {
       note: 'The upper covers slide in from the back, onto the lower covers’ dovetails.' +
         (cuIds.length > 1 ? ' Their seams are staggered brick-style over the lower covers’ seams, locking the sections together.' : ''),
       camera: cam(0, H_MM, totalW, gridBottom, FIT),
-      phases: [{ enter: cuIds.map(id => ({ id, from: [0, 0, -170] })) }],
+      phases: [{ enter: cuIds.map(id => ({ id, from: [0, 0, slideBack] })) }],
     });
   }
   if (firstDrawerDemo !== null) {
@@ -1062,7 +1164,7 @@ export function generateManifest(build) {
           : `screw on the ${handleStyle.label} (2× M3)`) +
         (bcOn ? ', then clip the back cover in from behind' : '') +
         '. Pop a drawer out about 40 mm, slide the assembled faceplate DOWN onto the drawer front until it snaps, then push the drawer home.' +
-        ' Repeat for every drawer — the build is done. Tap any part to see its name and download links.',
+        ' Repeat for every drawer · the build is done. Tap any part to see its name and download links.',
       camera: fpStepCam,
       phases: [
         ...fpDemo,
@@ -1097,17 +1199,27 @@ export function generateManifest(build) {
 // part image for the identify card / checklist — same renders as the planner BOM
 function imgFor(node) {
   let m;
-  // Case / decor renders are per-collection. 165 has no renders yet — the
-  // identify card's <img> onerror (main.js) hides it if the file 404s, so a 165
-  // part shows no photo rather than a wrong 185 one.
+  // Case / decor renders are per-collection — ALL six lengths copied from the
+  // planner's per-length batches (2026-07-10). The identify card's <img>
+  // onerror (main.js) hides any stray gap rather than showing a wrong photo.
   if ((m = node.match(/^(\d+)-(\d)W-(\w+)H_Case$/))) return `img/parts/Case ${m[1]}-${m[2]}W-${m[3]}H.png`;
   if ((m = node.match(/^DecorDrawer_(\d+)-(\d)W-(\w+)H$/))) return `img/parts/Decor Drawer ${m[1]}-${m[2]}W-${m[3]}H.png`;
   if ((m = node.match(/^_classic_(\d)W_(\w+)H$/))) return 'img/parts/Classic Drawer 185-' + m[1] + 'W-' + m[2] + 'H.png'; // classic node carries no collection → 185 placeholder
+  // covers + foot rails (2026-07-10 batch, all six lengths): the render files
+  // ARE the library part codes, so the node name maps straight to a PNG
+  if (/^C[LU]-\d+-\dW$/.test(node) || /^FR-[LU]_\d+-\dW$/.test(node)) return `img/parts/${node}.png`;
+  // wall brackets: per-width renders (2026-07-11 batch), universal across lengths
+  if ((m = node.match(/^WallMount_Lite_(\dW)$/))) return `img/parts/WallMount_Lite_${m[1]}.png`;
+  // mirror parts: the R render is the L one flipped horizontally (2026-07-10)
+  if (node === 'QuickLock-R') return 'img/parts/QuickLock-R.png';
   if (node.startsWith('QuickLock')) return 'img/parts/QuickLock.png';
   if (node.startsWith('Drawer_Stoppers')) return 'img/parts/Drawer Stopper.png';
   if (node === 'MagnetClip_10x2mm') return 'img/parts/Magnet Clip.png';
   if (node === 'Magnet_10x2mm') return 'img/parts/Magnets.png';
   if (node.startsWith('Faceplate_Essential')) return 'img/parts/Faceplate-Essential.jpg';
+  // EdgeLabel plates have per-size renders (2026-07-08 batch) — shared
+  // hardware, so one 18-file set serves every collection
+  if ((m = node.match(/^Faceplate_EdgeLabel_(\dW-\d+H)$/))) return `img/parts/EdgeLabel_${m[1]}.png`;
   return null;
 }
 
@@ -1116,7 +1228,7 @@ function imgFor(node) {
 // aspect, so 16:9 fullscreen isn't zoomed out (r is the fallback). Leave it off
 // for per-case / staged-bench shots, whose action sits away from the bounds.
 function cam(tx, ty, totalW, gridBottom, fit) {
-  const size = Math.max(totalW * PITCH_X, gridBottom * PITCH_HALF_Y + 30, DEPTH);
+  const size = Math.max(totalW * PITCH_X, gridBottom * PITCH_HALF_Y + 30, CAM_DEPTH);
   const p = { t: 30, p: 58, r: Math.min(1800, Math.max(620, size * 3.1)), target: [tx, ty, 0] };
   if (fit) p.fit = fit;
   return p;

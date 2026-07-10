@@ -19,17 +19,17 @@
     "Magnet": "#c9ccd2"
   },
 
-  "_links": "URLs mirrored from the planner's verified LINK_OVERRIDES (js/data.js) — planner stays the source of truth; update both together.",
+  "_links": "URLs mirrored from the planner's verified LINK_OVERRIDES (js/data.js) · planner stays the source of truth; update both together.",
 
   "parts": [
-    { "node": "FR-L_185-2W",               "label": "Footrail Lower 185-2W",      "type": "FootrailL",  "qty": 1,
-      "links": { "p": "https://www.printables.com/model/1118906-gen2-table-top-kit-v2-185-standard", "t": "https://thangs.com/designer/Jerrari/3d-model/GEN2%20Table%20Top%20Kit%20V2%20-%20185-1231757" } },
-    { "node": "FR-L_185-1W",               "label": "Footrail Lower 185-1W",      "type": "FootrailL",  "qty": 1,
-      "links": { "p": "https://www.printables.com/model/1118906-gen2-table-top-kit-v2-185-standard", "t": "https://thangs.com/designer/Jerrari/3d-model/GEN2%20Table%20Top%20Kit%20V2%20-%20185-1231757" } },
-    { "node": "FR-U_185-2W",               "label": "Footrail Upper 185-2W",      "type": "FootrailU",  "qty": 1,
-      "links": { "p": "https://www.printables.com/model/1118906-gen2-table-top-kit-v2-185-standard", "t": "https://thangs.com/designer/Jerrari/3d-model/GEN2%20Table%20Top%20Kit%20V2%20-%20185-1231757" } },
-    { "node": "FR-U_185-1W",               "label": "Footrail Upper 185-1W",      "type": "FootrailU",  "qty": 1,
-      "links": { "p": "https://www.printables.com/model/1118906-gen2-table-top-kit-v2-185-standard", "t": "https://thangs.com/designer/Jerrari/3d-model/GEN2%20Table%20Top%20Kit%20V2%20-%20185-1231757" } },
+    { "node": "FR-L_185-2W",               "label": "Footrail Lower 185-2W", "img": "img/parts/FR-L_185-2W.png",      "type": "FootrailL",  "qty": 1,
+      "links": { "p": "https://www.printables.com/model/1777823-gen2-185-foot-rails" } },
+    { "node": "FR-L_185-1W",               "label": "Footrail Lower 185-1W", "img": "img/parts/FR-L_185-1W.png",      "type": "FootrailL",  "qty": 1,
+      "links": { "p": "https://www.printables.com/model/1777823-gen2-185-foot-rails" } },
+    { "node": "FR-U_185-2W",               "label": "Footrail Upper 185-2W", "img": "img/parts/FR-U_185-2W.png",      "type": "FootrailU",  "qty": 1,
+      "links": { "p": "https://www.printables.com/model/1777823-gen2-185-foot-rails" } },
+    { "node": "FR-U_185-1W",               "label": "Footrail Upper 185-1W", "img": "img/parts/FR-U_185-1W.png",      "type": "FootrailU",  "qty": 1,
+      "links": { "p": "https://www.printables.com/model/1777823-gen2-185-foot-rails" } },
     { "node": "Tabletop-Kit-Foot",         "label": "Tabletop Kit Foot",          "type": "Foot",      "qty": 8,
       "links": { "p": "https://www.printables.com/model/1118906-gen2-table-top-kit-v2-185-standard", "t": "https://thangs.com/designer/Jerrari/3d-model/GEN2%20Table%20Top%20Kit%20V2%20-%20185-1231757" } },
     { "node": "185-2W-1H_Case",            "label": "Case 185-2W-1H", "img": "img/parts/Case 185-2W-1H.png",             "type": "Case",      "qty": 1,
@@ -38,24 +38,24 @@
       "links": { "p": "https://www.printables.com/model/1658700-gen2-185-cases-all", "t": "https://thangs.com/designer/Jerrari/3d-model/GEN2%20185%20Cases%20-%20All-1535455" } },
     { "node": "QuickLock-L",               "label": "QuickLock L", "img": "img/parts/QuickLock.png",                "type": "QuickLock", "qty": 5,
       "links": { "p": "https://www.printables.com/model/1012796-gen2-hardware", "t": "https://thangs.com/designer/Jerrari/3d-model/GEN2%20Hardware-1141439" } },
-    { "node": "QuickLock-R",               "label": "QuickLock R", "img": "img/parts/QuickLock.png",                "type": "QuickLock", "qty": 5,
+    { "node": "QuickLock-R",               "label": "QuickLock R", "img": "img/parts/QuickLock-R.png",                "type": "QuickLock", "qty": 5,
       "links": { "p": "https://www.printables.com/model/1012796-gen2-hardware", "t": "https://thangs.com/designer/Jerrari/3d-model/GEN2%20Hardware-1141439" } },
     { "node": "Drawer_Stoppers_L",         "label": "Drawer Stopper L", "img": "img/parts/Drawer Stopper.png",           "type": "Stopper",   "qty": 6,
       "links": { "p": "https://www.printables.com/model/1012796-gen2-hardware", "t": "https://thangs.com/designer/Jerrari/3d-model/GEN2%20Hardware-1141439" } },
     { "node": "Drawer_Stoppers_R",         "label": "Drawer Stopper R", "img": "img/parts/Drawer Stopper.png",           "type": "Stopper",   "qty": 6,
       "links": { "p": "https://www.printables.com/model/1012796-gen2-hardware", "t": "https://thangs.com/designer/Jerrari/3d-model/GEN2%20Hardware-1141439" } },
-    { "node": "CL-185-2W",                 "label": "Cover Lower 185-2W",         "type": "CoverL",     "qty": 1,
-      "links": { "p": "https://www.printables.com/model/1118906-gen2-table-top-kit-v2-185-standard", "t": "https://thangs.com/designer/Jerrari/3d-model/GEN2%20Table%20Top%20Kit%20V2%20-%20185-1231757" } },
-    { "node": "CL-185-1W",                 "label": "Cover Lower 185-1W",         "type": "CoverL",     "qty": 1,
-      "links": { "p": "https://www.printables.com/model/1118906-gen2-table-top-kit-v2-185-standard", "t": "https://thangs.com/designer/Jerrari/3d-model/GEN2%20Table%20Top%20Kit%20V2%20-%20185-1231757" } },
-    { "node": "CU-185-2W",                 "label": "Cover Upper 185-2W",         "type": "CoverU",     "qty": 1,
-      "links": { "p": "https://www.printables.com/model/1118906-gen2-table-top-kit-v2-185-standard", "t": "https://thangs.com/designer/Jerrari/3d-model/GEN2%20Table%20Top%20Kit%20V2%20-%20185-1231757" } },
-    { "node": "CU-185-1W",                 "label": "Cover Upper 185-1W",         "type": "CoverU",     "qty": 1,
-      "links": { "p": "https://www.printables.com/model/1118906-gen2-table-top-kit-v2-185-standard", "t": "https://thangs.com/designer/Jerrari/3d-model/GEN2%20Table%20Top%20Kit%20V2%20-%20185-1231757" } },
+    { "node": "CL-185-2W",                 "label": "Cover Lower 185-2W", "img": "img/parts/CL-185-2W.png",         "type": "CoverL",     "qty": 1,
+      "links": { "p": "https://www.printables.com/model/1777844-gen2-185-cover" } },
+    { "node": "CL-185-1W",                 "label": "Cover Lower 185-1W", "img": "img/parts/CL-185-1W.png",         "type": "CoverL",     "qty": 1,
+      "links": { "p": "https://www.printables.com/model/1777844-gen2-185-cover" } },
+    { "node": "CU-185-2W",                 "label": "Cover Upper 185-2W", "img": "img/parts/CU-185-2W.png",         "type": "CoverU",     "qty": 1,
+      "links": { "p": "https://www.printables.com/model/1777844-gen2-185-cover" } },
+    { "node": "CU-185-1W",                 "label": "Cover Upper 185-1W", "img": "img/parts/CU-185-1W.png",         "type": "CoverU",     "qty": 1,
+      "links": { "p": "https://www.printables.com/model/1777844-gen2-185-cover" } },
     { "node": "DecorDrawer_185-2W-1H",     "label": "Decor Drawer 185-2W-1H", "img": "img/parts/Decor Drawer 185-2W-1H.png",     "type": "Drawer",    "qty": 1,
-      "links": { "t": "https://thangs.com/designer/Jerrari/3d-model/GEN2%20185%20Decor%20Drawers%20-%20All-1116945" } },
+      "links": { "p": "https://www.printables.com/model/964551-gen2-185-decor-drawers-all", "t": "https://than.gs/m/1116945" } },
     { "node": "DecorDrawer_185-1W-1H",     "label": "Decor Drawer 185-1W-1H", "img": "img/parts/Decor Drawer 185-1W-1H.png",     "type": "Drawer",    "qty": 4,
-      "links": { "t": "https://thangs.com/designer/Jerrari/3d-model/GEN2%20185%20Decor%20Drawers%20-%20All-1116945" } },
+      "links": { "p": "https://www.printables.com/model/964551-gen2-185-decor-drawers-all", "t": "https://than.gs/m/1116945" } },
     { "node": "Faceplate_Essential_2W-1H", "label": "Faceplate Essential 2W-1H", "img": "img/parts/Faceplate-Essential.jpg",  "type": "Faceplate", "qty": 1,
       "links": { "p": "https://www.printables.com/model/964559-gen2-decor-faceplates-essential-series", "t": "https://thangs.com/designer/Jerrari/3d-model/GEN2%20Decor%20-%20Faceplates%20-%20Essential%20Series-1116946" } },
     { "node": "Faceplate_Essential_1W-1H", "label": "Faceplate Essential 1W-1H", "img": "img/parts/Faceplate-Essential.jpg",  "type": "Faceplate", "qty": 4,
@@ -177,7 +177,7 @@
   "steps": [
     {
       "title": "Print checklist",
-      "note": "68 prints — quantities on the right. You'll also need 10× M3 screws for the handles (2 each) and 10× 10×2 mm disc magnets for the optional magnet closures (hardware store items).",
+      "note": "68 prints · quantities on the right. You'll also need 10× M3 screws for the handles (2 each) and 10× 10×2 mm disc magnets for the optional magnet closures (hardware store items).",
       "camera": { "t": 28, "p": 60, "r": 1450, "target": [0, 95, 60] },
       "checklist": true
     },
@@ -189,7 +189,7 @@
     },
     {
       "title": "Bench: insert the eight feet",
-      "note": "Pointy end slides in first — outer feet toward the rail ends, middle feet left to right. Where the two rails meet, the slots would put feet right next to each other: install that pair on ONE rail only (we use the 2W's).",
+      "note": "Pointy end slides in first · outer feet toward the rail ends, middle feet left to right. Where the two rails meet, the slots would put feet right next to each other: install that pair on ONE rail only (we use the 2W's).",
       "camera": { "t": 30, "p": 55, "r": 780, "target": [0, 115, 0] },
       "phases": [
         { "enter": [
@@ -219,8 +219,8 @@
       "phases": [ { "enter": [ { "id": "fru2w", "from": [0, 0, -170] }, { "id": "fru1w", "from": [0, 0, -170] } ] } ]
     },
     {
-      "title": "Case 1 (2W) — QuickLocks, clip, then slide",
-      "note": "QuickLocks go in the OUTER walls only: L left, R right — one pair per case, whatever its width. Optional magnet closure: on a 2W the clip goes in the LEFT back-wall slot; press the magnet in back-to-front, lower the clip, then slide the case on.",
+      "title": "Case 1 (2W) · QuickLocks, clip, then slide",
+      "note": "QuickLocks go in the OUTER walls only: L left, R right · one pair per case, whatever its width. Optional magnet closure: on a 2W the clip goes in the LEFT back-wall slot; press the magnet in back-to-front, lower the clip, then slide the case on.",
       "camera": { "t": 30, "p": 58, "r": 800, "target": [-44, 45, 0] },
       "phases": [
         { "enter": [ { "id": "caseA", "from": [0, 60, 0] } ] },
@@ -232,7 +232,7 @@
       ]
     },
     {
-      "title": "Case 2 — bottom right",
+      "title": "Case 2 · bottom right",
       "note": "The 1W case finishes the bottom row: QuickLocks and magnet clip in, then slide it forward until it clicks.",
       "camera": { "t": 30, "p": 58, "r": 800, "target": [88, 45, 0] },
       "phases": [
@@ -243,8 +243,8 @@
       ]
     },
     {
-      "title": "Case 3 — second row, left",
-      "note": "Rows always build bottom-up. QuickLocks and clip in, slide it on — then drop its two drawer stoppers. They protect the LEFT half of the 2W drawer below.",
+      "title": "Case 3 · second row, left",
+      "note": "Rows always build bottom-up. QuickLocks and clip in, slide it on · then drop its two drawer stoppers. They protect the LEFT half of the 2W drawer below.",
       "camera": { "t": 30, "p": 55, "r": 820, "target": [-88, 90, 0] },
       "phases": [
         { "enter": [ { "id": "caseC", "from": [0, 60, 0] } ] },
@@ -255,8 +255,8 @@
       ]
     },
     {
-      "title": "Case 4 — second row, middle",
-      "note": "Same again — this case's stoppers protect the RIGHT half of the 2W drawer below (a 2W bay has stopper slots per 1W).",
+      "title": "Case 4 · second row, middle",
+      "note": "Same again · this case's stoppers protect the RIGHT half of the 2W drawer below (a 2W bay has stopper slots per 1W).",
       "camera": { "t": 30, "p": 55, "r": 820, "target": [0, 90, 0] },
       "phases": [
         { "enter": [ { "id": "caseD", "from": [0, 60, 0] } ] },
@@ -267,8 +267,8 @@
       ]
     },
     {
-      "title": "Case 5 — second row, right",
-      "note": "Last case: QuickLocks and clip in, slide it home, then its stoppers — protecting the 1W drawer below.",
+      "title": "Case 5 · second row, right",
+      "note": "Last case: QuickLocks and clip in, slide it home, then its stoppers · protecting the 1W drawer below.",
       "camera": { "t": 30, "p": 55, "r": 820, "target": [88, 90, 0] },
       "phases": [
         { "enter": [ { "id": "caseE", "from": [0, 60, 0] } ] },
@@ -280,7 +280,7 @@
     },
     {
       "title": "Lower covers",
-      "note": "The 2W and 1W lower covers slide over the top row from the back — the top row's QuickLocks lock them. Then drop the last six stoppers into the covers' slots to protect the top-row drawers.",
+      "note": "The 2W and 1W lower covers slide over the top row from the back · the top row's QuickLocks lock them. Then drop the last six stoppers into the covers' slots to protect the top-row drawers.",
       "camera": { "t": 30, "p": 52, "r": 840, "target": [0, 115, 0] },
       "phases": [
         { "enter": [ { "id": "cl2w", "from": [0, 0, -170] }, { "id": "cl1w", "from": [0, 0, -170] } ] },
@@ -317,7 +317,7 @@
     },
     {
       "title": "Faceplates & handles",
-      "note": "Pop a drawer out about 40 mm, slide the faceplate DOWN onto the drawer front until it snaps, screw on the Deco handle (2× M3), then push the drawer home. Repeat for every drawer — the kit is done. Tap any part to see its name and download links.",
+      "note": "Pop a drawer out about 40 mm, slide the faceplate DOWN onto the drawer front until it snaps, screw on the Deco handle (2× M3), then push the drawer home. Repeat for every drawer · the kit is done. Tap any part to see its name and download links.",
       "camera": { "t": 15, "p": 66, "r": 760, "target": [-30, 70, 40] },
       "phases": [
         { "move": [ { "id": "drwA", "by": [0, 0, 40] }, { "id": "dcA", "by": [0, 0, 40], "rides": "drwA" }, { "id": "dmA", "by": [0, 0, 40], "rides": "drwA" } ] },

@@ -20,26 +20,26 @@
     "MagnetClip": "#e2641b",
     "Magnet": "#c9ccd2"
   },
-  "_links": "URLs mirrored from the planner's verified LINK_OVERRIDES (js/data.js) — planner stays the source of truth; update both together.",
+  "_links": "URLs mirrored from the planner's verified LINK_OVERRIDES (js/data.js) · planner stays the source of truth; update both together.",
   "parts": [
     {
       "node": "FR-L_165-2W",
       "label": "Footrail Lower 165-2W",
+      "img": "img/parts/FR-L_165-2W.png",
       "type": "FootrailL",
       "qty": 1,
       "links": {
-        "p": "https://www.printables.com/model/1118906-gen2-table-top-kit-v2-185-standard",
-        "t": "https://thangs.com/designer/Jerrari/3d-model/GEN2%20Table%20Top%20Kit%20V2%20-%20185-1231757"
+        "p": "https://www.printables.com/model/1775386-gen2-165-foot-rails"
       }
     },
     {
       "node": "FR-U_165-2W",
       "label": "Footrail Upper 165-2W",
+      "img": "img/parts/FR-U_165-2W.png",
       "type": "FootrailU",
       "qty": 1,
       "links": {
-        "p": "https://www.printables.com/model/1118906-gen2-table-top-kit-v2-185-standard",
-        "t": "https://thangs.com/designer/Jerrari/3d-model/GEN2%20Table%20Top%20Kit%20V2%20-%20185-1231757"
+        "p": "https://www.printables.com/model/1775386-gen2-165-foot-rails"
       }
     },
     {
@@ -77,7 +77,7 @@
     {
       "node": "QuickLock-R",
       "label": "QuickLock R",
-      "img": "img/parts/QuickLock.png",
+      "img": "img/parts/QuickLock-R.png",
       "type": "QuickLock",
       "qty": 4,
       "links": {
@@ -110,21 +110,21 @@
     {
       "node": "CL-165-2W",
       "label": "Cover Lower 165-2W",
+      "img": "img/parts/CL-165-2W.png",
       "type": "CoverL",
       "qty": 1,
       "links": {
-        "p": "https://www.printables.com/model/1118906-gen2-table-top-kit-v2-185-standard",
-        "t": "https://thangs.com/designer/Jerrari/3d-model/GEN2%20Table%20Top%20Kit%20V2%20-%20185-1231757"
+        "p": "https://www.printables.com/model/1774498-gen2-165-covers"
       }
     },
     {
       "node": "CU-165-2W",
       "label": "Cover Upper 165-2W",
+      "img": "img/parts/CU-165-2W.png",
       "type": "CoverU",
       "qty": 1,
       "links": {
-        "p": "https://www.printables.com/model/1118906-gen2-table-top-kit-v2-185-standard",
-        "t": "https://thangs.com/designer/Jerrari/3d-model/GEN2%20Table%20Top%20Kit%20V2%20-%20185-1231757"
+        "p": "https://www.printables.com/model/1774498-gen2-165-covers"
       }
     },
     {
@@ -134,6 +134,7 @@
       "type": "Drawer",
       "qty": 4,
       "links": {
+        "p": "https://www.printables.com/model/1100978-gen2-165-decor-drawers-all",
         "t": "https://than.gs/m/1493950"
       }
     },
@@ -178,7 +179,7 @@
       "purchased": true
     }
   ],
-  "_datums": "PORTED from tabletop-185 for the 165 collection (20 mm shorter): node names 185→165 and each shared-hardware Z shifted ±10 mm toward center (faceplate/handle/QuickLock/stopper/front-feet −10, magnet/back-feet +10; case/cover/footrail/drawer unchanged, drawer z-center 5.24 holds). DERIVED, no 165 ground-truth — verify vs a printed build. Calibrated 2026-07-04 against Blender Files/Training Examples/GEN2 TableTop Kit Assembly Example.glb (two independent extractions, 0 discrepancies). Chain: foot exposed 7.65 (10.62 - 2.97 insertion) -> FR-L 7.65 -> FR-U +5.10 -> row0 cases +10.00 -> rows +56.00 exact -> CL = top row +56.00 -> CU = CL +4.30. QuickLock bottom = case +35.68, z-center 65.02, handed x (outer L -84.12 / R +84.55, inner R -3.45 / L +3.88). Drawer bottom = case +5.72, z-center 5.24 (front protrudes 2.39 past case face to meet faceplate). Faceplate bottom = case +3.72, z-center 95.07. Handle bottom = faceplate +22.49, z-center 109.57. Stoppers: bottom = covering unit bottom -2.00 (tabs hang into the bay below), z-center 76.5. Feet: x -76.48/-0.18/+76.65, z -73.00 (back) / +81.15 (front).",
+  "_datums": "PORTED from tabletop-185 for the 165 collection (20 mm shorter): node names 185→165 and each shared-hardware Z shifted ±10 mm toward center (faceplate/handle/QuickLock/stopper/front-feet −10, magnet/back-feet +10; case/cover/footrail/drawer unchanged, drawer z-center 5.24 holds). DERIVED, no 165 ground-truth · verify vs a printed build. Calibrated 2026-07-04 against Blender Files/Training Examples/GEN2 TableTop Kit Assembly Example.glb (two independent extractions, 0 discrepancies). Chain: foot exposed 7.65 (10.62 - 2.97 insertion) -> FR-L 7.65 -> FR-U +5.10 -> row0 cases +10.00 -> rows +56.00 exact -> CL = top row +56.00 -> CU = CL +4.30. QuickLock bottom = case +35.68, z-center 65.02, handed x (outer L -84.12 / R +84.55, inner R -3.45 / L +3.88). Drawer bottom = case +5.72, z-center 5.24 (front protrudes 2.39 past case face to meet faceplate). Faceplate bottom = case +3.72, z-center 95.07. Handle bottom = faceplate +22.49, z-center 109.57. Stoppers: bottom = covering unit bottom -2.00 (tabs hang into the bay below), z-center 76.5. Feet: x -76.48/-0.18/+76.65, z -73.00 (back) / +81.15 (front).",
   "instances": [
     {
       "id": "frl",
@@ -786,7 +787,7 @@
   "steps": [
     {
       "title": "Print checklist",
-      "note": "50 prints — quantities on the right. You'll also need 8× M3 screws for the handles (2 each) and 8× 10×2 mm disc magnets for the optional magnet closures (hardware store items). Feet, QuickLocks, stoppers and clips are small; print a spare of each.",
+      "note": "50 prints · quantities on the right. You'll also need 8× M3 screws for the handles (2 each) and 8× 10×2 mm disc magnets for the optional magnet closures (hardware store items). Feet, QuickLocks, stoppers and clips are small; print a spare of each.",
       "camera": {
         "t": 28,
         "p": 60,
@@ -947,8 +948,8 @@
       ]
     },
     {
-      "title": "Case 1 — QuickLocks, clip, then slide",
-      "note": "Drop a QuickLock into each outer wall slot: L in the left wall, R in the right. Optional magnet closure: snap a magnet clip into the back-wall slot and press a 10×2 mm magnet into its pocket — it's unreachable after assembly, so now is the time. Then slide the case on from the back until the QuickLocks click.",
+      "title": "Case 1 · QuickLocks, clip, then slide",
+      "note": "Drop a QuickLock into each outer wall slot: L in the left wall, R in the right. Optional magnet closure: snap a magnet clip into the back-wall slot and press a 10×2 mm magnet into its pocket · it's unreachable after assembly, so now is the time. Then slide the case on from the back until the QuickLocks click.",
       "camera": {
         "t": 30,
         "p": 58,
@@ -1052,7 +1053,7 @@
       ]
     },
     {
-      "title": "Case 2 — QuickLocks, clip, then slide",
+      "title": "Case 2 · QuickLocks, clip, then slide",
       "note": "Same again for the right column: QuickLocks in, magnet clip in the back, then slide the case forward until it clicks.",
       "camera": {
         "t": 30,
@@ -1113,8 +1114,8 @@
       ]
     },
     {
-      "title": "Case 3 — second row, left",
-      "note": "Rows always build bottom-up. QuickLocks and magnet clip in, slide the case on — then drop the two drawer stoppers into its floor slots. Stoppers are optional: they stop the drawer BELOW from being pulled all the way out.",
+      "title": "Case 3 · second row, left",
+      "note": "Rows always build bottom-up. QuickLocks and magnet clip in, slide the case on · then drop the two drawer stoppers into its floor slots. Stoppers are optional: they stop the drawer BELOW from being pulled all the way out.",
       "camera": {
         "t": 30,
         "p": 55,
@@ -1194,8 +1195,8 @@
       ]
     },
     {
-      "title": "Case 4 — second row, right",
-      "note": "Last case: QuickLocks and magnet clip in, slide it home, then its two drawer stoppers — again protecting the drawer below.",
+      "title": "Case 4 · second row, right",
+      "note": "Last case: QuickLocks and magnet clip in, slide it home, then its two drawer stoppers · again protecting the drawer below.",
       "camera": {
         "t": 30,
         "p": 55,
@@ -1276,7 +1277,7 @@
     },
     {
       "title": "Lower cover",
-      "note": "The lower cover slides over the top row from the back — the top row's QuickLocks lock it. Then drop the last four stoppers into the cover's slots to protect the top-row drawers.",
+      "note": "The lower cover slides over the top row from the back · the top row's QuickLocks lock it. Then drop the last four stoppers into the cover's slots to protect the top-row drawers.",
       "camera": {
         "t": 30,
         "p": 52,
@@ -1368,7 +1369,7 @@
     },
     {
       "title": "Drawers",
-      "note": "Before a drawer goes in: snap a magnet clip into its back-wall slot and press in the magnet (optional — it pairs with the clip in the case back to pull the drawer shut). Then slide each drawer in from the front.",
+      "note": "Before a drawer goes in: snap a magnet clip into its back-wall slot and press in the magnet (optional · it pairs with the clip in the case back to pull the drawer shut). Then slide each drawer in from the front.",
       "camera": {
         "t": 12,
         "p": 68,
@@ -1539,7 +1540,7 @@
     },
     {
       "title": "Faceplates & handles",
-      "note": "Pop a drawer out about 40 mm, slide the faceplate DOWN onto the drawer front until it snaps, screw on the Deco handle (2× M3), then push the drawer home. Repeat for every drawer — the kit is done. Tap any part to see its name and download links.",
+      "note": "Pop a drawer out about 40 mm, slide the faceplate DOWN onto the drawer front until it snaps, screw on the Deco handle (2× M3), then push the drawer home. Repeat for every drawer · the kit is done. Tap any part to see its name and download links.",
       "camera": {
         "t": 15,
         "p": 66,

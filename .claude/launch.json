@@ -5,13 +5,15 @@
       "name": "viewer",
       "runtimeExecutable": "python",
       "runtimeArgs": ["serve-viewer.py", "8123"],
-      "port": 8123
+      "port": 8123,
+      "autoPort": false
     },
     {
       "name": "planner",
       "runtimeExecutable": "python",
       "runtimeArgs": ["-m", "http.server", "8124", "--directory", "D:/Code Projects/GEN2 Planner/gen2-planner-main"],
-      "port": 8124
+      "port": 8124,
+      "autoPort": false
     }
   ]
 }

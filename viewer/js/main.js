@@ -152,7 +152,7 @@ if (BUILD_HASH) {
     originalBuild = structuredClone(build); // "Reset to original" restores this exact build
     gen = generateManifest(build);
   } catch (e) {
-    gen = { errors: ['This build link is damaged or truncated — try copying it again from the planner.'], manifest: null };
+    gen = { errors: ['This build link is damaged or truncated · try copying it again from the planner.'], manifest: null };
   }
   if (!gen.manifest) {
     const box = document.getElementById('loading-overlay');
@@ -833,7 +833,7 @@ function renderChecklist() {
     chip.style.background = activeHex(p.type); // reflects custom filament colors
     if (colorLocked(p.type)) { // purchased hardware: no filament picker
       chip.classList.add('locked');
-      chip.title = 'Hardware-store item — shown in its real finish';
+      chip.title = 'Hardware-store item · shown in its real finish';
     } else {
       chip.title = (useCustom && customColors[p.type] ? customColors[p.type].name + ' · ' : '') + 'click to pick a filament color';
       chip.onclick = () => openFilamentMenu(p.type);
@@ -925,9 +925,14 @@ function goTo(i, { animate = true } = {}) {
   $('note-panel').classList.toggle('hidden', isCover || isOutro);
   $('measure-toggle').classList.toggle('hidden', isCover || isOutro);
   setDims(!isCover && !isOutro && cur - 1 === manifest.steps.length - 1); // W/H/L callouts on the fully-assembled final step
-  // the "tap any part" hint only rides the exploded intro page (and only until dismissed)
+  // the "tap any part" hint only rides the exploded intro page — and once it
+  // has been seen there, paging anywhere else counts as dismissal (it never
+  // re-appears on a return visit; ✕ and scene interaction dismiss it too)
   const onChecklist = !isCover && !isOutro && !!manifest.steps[cur - 1]?.checklist;
-  $('tap-hint').classList.toggle('hidden', !onChecklist || tapHintDismissed);
+  const showHint = onChecklist && !tapHintDismissed;
+  if (tapHintShown && !showHint) tapHintDismissed = true;
+  if (showHint) tapHintShown = true;
+  $('tap-hint').classList.toggle('hidden', !showHint);
   dots.forEach((d, n) => d.classList.toggle('on', n <= cur));
   updateColorToggle();
   if (isCover) {
@@ -986,7 +991,8 @@ $('btn-replay').onclick = () => goTo(cur);
 // reclaims the canvas while recoloring/inspecting on small screens
 $('note-collapse').onclick = () => {
   const collapsed = $('note-panel').classList.toggle('collapsed');
-  $('note-collapse').innerHTML = collapsed ? '&#9656;' : '&#9662;';
+  // expanded shows ✕ ("put this text away"), collapsed shows ▸ ("bring it back")
+  $('note-collapse').innerHTML = collapsed ? '&#9656;' : '&#10005;';
   $('note-collapse').title = collapsed ? 'Show the step text' : 'Collapse the step text';
 };
 $('btn-slow').onclick = () => {
@@ -1010,8 +1016,13 @@ $('btn-start').onclick = () => goTo(1); // cover → intro, camera pans + de-zoo
 $('btn-skip-end').onclick = () => goTo(PAGES.length - 2, { animate: false });
 $('checklist-tab').onclick = () => { if (isMobile()) setSelected(null); setChecklist(true); };
 $('checklist-close').onclick = () => setChecklist(false);
-let tapHintDismissed = false;
-$('tap-hint-x').onclick = () => { tapHintDismissed = true; $('tap-hint').classList.add('hidden'); };
+let tapHintDismissed = false, tapHintShown = false;
+const dismissTapHint = () => { if (!tapHintDismissed) { tapHintDismissed = true; $('tap-hint').classList.add('hidden'); } };
+$('tap-hint-x').onclick = dismissTapHint;
+// the moment the user touches the scene — a tap, an orbit, a zoom — they're
+// already doing what the hint teaches, so it bows out (controls fires 'start'
+// for every pointer/wheel interaction on the canvas)
+controls.addEventListener('start', dismissTapHint);
 addEventListener('keydown', e => {
   if (e.key === 'ArrowRight') goTo(cur + 1);
   if (e.key === 'ArrowLeft') goTo(cur - 1, { animate: false });
@@ -1149,7 +1160,7 @@ function setSelected(id) {
   const sw = $('identify-swatch');
   sw.style.background = activeHex(selType);
   sw.classList.toggle('locked', selLocked);
-  sw.title = selLocked ? 'Hardware-store item — shown in its real finish' : 'Pick a filament color';
+  sw.title = selLocked ? 'Hardware-store item · shown in its real finish' : 'Pick a filament color';
   renderZoneChips(inst); // 2-zone parts get Body + Grip swatches; others hide the row
   // the swappable label's card links to the label generator (pre-filled with
   // the build's typed labels — the same #labels= handoff the planner's button
@@ -1729,7 +1740,7 @@ function renderPresets() {
     const order = ['Case', 'Drawer', 'Faceplate', 'Handle', 'CoverU'];
     const hexes = [...new Set([...order.filter(t => userPalette[t]), ...Object.keys(userPalette)])]
       .map(t => userPalette[t].hex).slice(0, 3);
-    const b = chip('My palette', hexes, 'Your own hand-picked filament colors — presets never overwrite these', restoreUserPalette, 'mine');
+    const b = chip('My palette', hexes, 'Your own hand-picked filament colors · presets never overwrite these', restoreUserPalette, 'mine');
     if (cur && cur === palKey(userPalette)) b.classList.add('on');
   }
   for (const p of PRESETS) {
@@ -1791,7 +1802,7 @@ function renderFilamentBrands() {
       for (const f of colors) {
         const b = document.createElement('button');
         b.style.background = f.hex;
-        b.title = f.label + (f.pick ? ' — Joey’s budget pick for cases & drawer bodies' : '');
+        b.title = f.label + (f.pick ? ' · Joey’s budget pick for cases & drawer bodies' : '');
         if (f.pick) b.classList.add('pick');
         if (customColors[fmType]?.name === f.label) b.classList.add('active');
         b.onclick = () => {
@@ -1956,10 +1967,17 @@ async function cycleHandleStyle(dir) {
 // applyState/exploded/phases/computeBounds/checklist/bomRows); switching back
 // restores them untouched (their cfg was never edited).
 const FACEPLATE_STYLES = [
-  // faceplates are SHARED hardware — the same GLBs serve 165 and 185 (both
-  // pools + kit folders carry copies; placement shifts −dz on 165)
-  { key: 'essential', label: 'Essential', node: c => `Faceplate_Essential_${c}`, hasHandle: true,  collections: ['185', '165'] },
-  { key: 'edgelabel', label: 'EdgeLabel', node: c => `Faceplate_EdgeLabel_${c}`, hasHandle: false, collections: ['185', '165'] },
+  // faceplates are SHARED hardware — the same GLBs serve every collection
+  // (each parts/<L> pool carries copies; placement shifts −dz per collection,
+  // sign included: 240/270 shift outward)
+  // img/links mirror generate.js (imgFor + LINKS.fp/fpe) so a static-kit swap
+  // dresses its BOM row exactly like a generated build's
+  { key: 'essential', label: 'Essential', node: c => `Faceplate_Essential_${c}`, hasHandle: true,  collections: ['185', '165', '59', '115', '240', '270'],
+    img: c => 'img/parts/Faceplate-Essential.jpg',
+    links: { p: 'https://www.printables.com/model/964559-gen2-decor-faceplates-essential-series', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20Decor%20-%20Faceplates%20-%20Essential%20Series-1116946' } },
+  { key: 'edgelabel', label: 'EdgeLabel', node: c => `Faceplate_EdgeLabel_${c}`, hasHandle: false, collections: ['185', '165', '59', '115', '240', '270'],
+    img: c => `img/parts/EdgeLabel_${c}.png`, // per-size renders, 2026-07-08 batch
+    links: { p: 'https://www.printables.com/model/1093933-gen2-decor-faceplates-edgelabel-series', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20Decor%20-%20Faceplate%20-%20EdgeLabel-1215609' } },
 ];
 const fpSizeCode = node => (node.match(/_(\dW-\d+H)$/) || [])[1] || null;
 const availableFaceplateStyles = () => FACEPLATE_STYLES.filter(s => s.collections.includes(manifest.collection || '185'));
@@ -2057,7 +2075,8 @@ async function applyFaceplateStyle(style) {
     else {
       row.node = newNode;
       row.label = `${style.label} Faceplate ${code}`;
-      delete row.links; delete row.img; // club family — no public links/renders yet
+      row.img = style.img(code);       // per-size renders + Series pages follow
+      row.links = style.links;         // the family (public since 2026-07-10)
     }
     partInfoByNode[row.node] = row;
   }
