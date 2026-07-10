@@ -223,6 +223,12 @@ export function generateManifest(build) {
   // final volume. 165/185 keep their calibrated values exactly.
   const slideBack = -Math.max(170, depth - 15);       // covers/FR-U/settle-from-behind reach
   const wallFwd = Math.max(WALL.lowerFwd, depth + 40);// wall lower-row slide-in reach
+  // tight per-case framing for wall work: size the shot by THE CASE and its
+  // hardware, never the whole build — on a wide build cam()'s totalW scaling
+  // shrank the actual action to a thumbnail (Joey 2026-07-11: don't crop the
+  // wall into view, get close to the small bits being inserted). The wide
+  // FIT shots that bookend each step still restore full-build context.
+  const caseR = (w, h) => Math.max(430, Math.hypot(w * PITCH_X, h, depth) / 2 * 3.0);
   if (isUT && COLL[L] && !coll.railDepth)
     errors.push(`Under-table rails for the ${L} collection aren't in the 3D part library yet · 165 and 185 under-table builds for now.`);
   // planner mountBlocksLength() greys 59 tabletop out, so this only fires on a
@@ -547,9 +553,11 @@ export function generateManifest(build) {
       note: null,
       // wall lower rows — and every under-table case — are viewed from a
       // 3/4-below angle so you can watch them slide in under the surface/row
-      // above; everything else is the standard preset.
+      // above; everything else is the standard preset. Wall shots frame THE
+      // CASE (caseR), not the whole build.
       camera: isBase ? cam(cx, 125, totalW, gridBottom)
-        : (isUT || (isWall && !isTop)) ? camUp(cx, bottom + caseH / 2, totalW, gridBottom)
+        : isUT ? camUp(cx, bottom + caseH / 2, totalW, gridBottom)
+        : isWall && !isTop ? { ...camUp(cx, bottom + caseH / 2, totalW, gridBottom), r: caseR(u.w, caseH) }
         : cam(cx, bottom + caseH / 2, totalW, gridBottom),
       _stoppers: [], // stoppers hosted by THIS case's floor (filled below)
     };
@@ -621,8 +629,9 @@ export function generateManifest(build) {
       const drop = { move: members.map(id => ({ id, by: [0, -WALL.drop, 0] })) };     // drop onto the pegs
       const land = { land: st };
       const base = cam(cx, bottom + caseH / 2, totalW, gridBottom, FIT); // frames the hung (final) build
-      // the bench assembly sits WALL.benchFwd toward the camera, so frame it there
-      const benchCam = { ...cam(cx, bottom + caseH / 2, totalW, gridBottom), target: [cx, bottom + caseH / 2 + WALL.drop, WALL.benchFwd] };
+      // the bench assembly sits WALL.benchFwd toward the camera — frame THAT
+      // case up close (caseR), not the whole build
+      const benchCam = { t: 30, p: 58, r: caseR(u.w, caseH), target: [cx, bottom + caseH / 2 + WALL.drop, WALL.benchFwd] };
       const benchNote = 'On the bench, before it goes near the wall: QuickLocks in, slide the Cover Lower on'
         + (isDrawer ? ', drop the drawer stoppers into it,' : ',') + ' then cap it with the Cover Upper · the cover can only slide on now, not once the case is on the wall.'
         + (mcId && firstClipDemo === null ? ' ' + clipText : '');
@@ -630,7 +639,7 @@ export function generateManifest(build) {
       if (i === ghostTopIdx) {
         // the first top case shown is split into two steps (there's a lot going
         // on), and its hang ghosts the cover + zooms to reveal the pegs.
-        const pegCam = { t: 24, p: 40, r: base.r * 0.62, target: [cx, flatTopY - 18, -30] };
+        const pegCam = { t: 24, p: 40, r: Math.max(380, caseR(u.w, caseH) * 0.7), target: [cx, flatTopY - 18, -30] };
         const assembleStep = { title: `Cover the top case · ${u.w}W-${H}H`, note: benchNote, camera: benchCam, phases: bench };
         const hangStep = {
           title: 'Hang the top case on the pegs',
