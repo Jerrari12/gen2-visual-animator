@@ -533,7 +533,11 @@ the slide-in reads clearly; no drop, so they can't clip the row above) as one
 piece — the enter phase is `sync: true` so the case + its QuickLocks move in
 unison (engine skips the per-item stagger delay). They're shot from a 3/4-below
 **camUp** preset (p=116; needs the wall
-build's relaxed `controls.maxPolarAngle` = 0.85π). CALIBRATED 2026-07-05 (WALL constants; bracket
+build's relaxed `controls.maxPolarAngle` = 0.85π). **Every per-case wall shot
+(bench, peg zoom, lower-row slide-in) is sized by `caseR` — the CASE + its
+hardware, never the whole build** (Joey 2026-07-11: on wide builds cam()'s
+totalW scaling shrank the action to a thumbnail; don't crop the wall into
+view). The wide FIT shots bookending each step still restore full context. CALIBRATED 2026-07-05 (WALL constants; bracket
 Z −89.45, peg Y = flatTop − 15.1) against the case-to-bracket reference — see
 GEN2-Part-Orientation-Notes.md. Wall builds swap the table+grid for a
 `wall` backdrop plane (main.js `isWallBuild`, toggled on manifest load; the
