@@ -109,8 +109,39 @@ part with its color chip + download links.
   orientation) — always flip-verify against 185 ground truth. Pipeline gotcha:
   the compressor SKIPS existing `.lib.glb` — delete stale lib+raw before
   re-export or the old file silently survives.
-  Still no GLBs: Classic Drawers (all lengths) + Case Extenders — **Joey is
-  adding these next** (render meshes live in `D:\Render Projects\<length>
+  **2026-07-11: Classic Drawer GLBs + thumbnails landed for ALL SIX lengths**
+  (88 parts — 59:4 / 115:16 / 165:18 / 185:18 / 240:16 / 270:16, `ClassicDrawer_{code}`,
+  all canonical_ok; six `collection:<L>` jobs appended to gen2_jobs.json; run notes:
+  `D:\Render Projects\GEN2_Blender_Render_Setup_ClassicDrawers_AllLengths.md`).
+  Source blend is `GLB Library\GEN2 GLB Exporter - GEN2 Classic Drawers.blend` —
+  ⚠ it received in-session fixes (240-4W rotations zeroed, 115-4W-15H/2H restored
+  from disk, 185-4W-05H/1H appended from the old 185 thumbnail blend, spec-order
+  renames) that **must be saved** before any headless re-run. All 88 matching 256²
+  thumbnails re-rendered as ONE batch (replaces the 14 old 185s), copied flat into
+  `viewer/img/parts/`; `.lib.glb` synced into `viewer/parts/<L>/`.
+  **2026-07-11 (same day): classics are REAL 3D PARTS in generate.js** — the
+  `_classic_`/"coming soon" placeholder is gone. Closed Z is DERIVED from
+  measured GLB geometry (decompressed classic vs decor 1W-1H, vertex-profile
+  compare): the classic back wall (same 2.6 mm wall + magnet-clip slot as the
+  decor) back-aligns with the CALIBRATED decor back, which lands its main
+  front wall within 0.3 mm of the decor's — same box, back-aligned; the
+  integrated pull lip runs ~18 mm proud of the case face. `classicZ = 5.24 +
+  (classicDepth − (depth − 5.7))/2` = 13.09 (13.035 on 59/115, whose exports
+  run 0.11 shy of case+10 → `COLL.classicDepth`). Same bottom (case + 5.72),
+  same drawer-side clip/magnet Z (backs align), NO faceplate/handle/dressing
+  (the front is printed in), no 2H forward nudge (that was a decor-model
+  quirk). Demo owners split: `firstDrawerDemo` (either fill) runs the
+  Drawers-step pop-in + clip demo; `firstFpDemo` (first DECOR) keys the
+  faceplate cinematic — classic-first builds keep it, classic-ONLY builds skip
+  the Faceplates step (the Drawers note gains the "build is done" outro line).
+  imgFor: `ClassicDrawer_<L>-…` → per-length `Classic Drawer <L>-<code>.png`.
+  Type 'Drawer' → deep pull/interior dims/cinema glides/planner closure sync
+  all work unchanged. Regression-tested old-vs-new: decor-only output
+  byte-identical across 5 mount/length combos (+50 behavior checks); verified
+  in-browser on a mixed 185 #build= (world bboxes: classic back −84.41 = decor
+  back exactly). Runtime warning "placement derived — verify on a printed
+  build" replaces the old one; no calibrated classic assembly exists yet.
+  Still no GLBs: Case Extenders (render meshes live in `D:\Render Projects\<length>
   <family>\` thumbnail blends). 256px thumbnails: covers + foot rails for ALL
   SIX lengths rendered 2026-07-10 (44 PNGs, filenames = library part codes) in
   `D:\Render Projects\Covers\GEN2 Thumbnails\` + `D:\Render Projects\Foot Rails\
@@ -447,7 +478,8 @@ under-table only 165 + 185** (no rail GLBs for the rest — generate.js errors,
 and the planner's updateInstructionsButton greys under-table out for other
 lengths with the reason); **59 is hanging-only** (`COLL[59].noTabletop` +
 maxW/maxHH guards — no foot rails, no feet slots; mirrors the planner's
-mountBlocksLength). classic drawers = BOM row only (no GLB); shelf >1H /
+mountBlocksLength). classic drawers are full 3D parts (2026-07-11 — see the
+GLB Library section for the derived placement); shelf >1H /
 cabinet → graceful error overlay. Also
 rejected: non-flat tops (mirrors the planner's columnTops() flat-top rule —
 the planner button greys out with the reason via updateInstructionsButton())

@@ -37,8 +37,12 @@ const COLL = {
   // 59: noTabletop mirrors the planner's mountBlocksLength — the mini collection
   // has NO foot rails and NO feet slots (too shallow to be stable), so it only
   // ships as a hanging mount; maxW/maxHH mirror its catalog (1W/2W × 05H/1H).
-  59:  { depth: 59, noTabletop: true, maxW: 2, maxHH: 2 },
-  115: { depth: 115 },
+  // classicDepth: the Classic Drawer's overall depth (body + integrated pull
+  // lip). It's case depth + 10 everywhere except 59/115, whose exports run
+  // 0.11 shy (parts_index.csv ground truth) — generateManifest defaults the
+  // rest to depth + 10.
+  59:  { depth: 59, noTabletop: true, maxW: 2, maxHH: 2, classicDepth: 68.89 },
+  115: { depth: 115, classicDepth: 124.89 },
   240: { depth: 240 },
   270: { depth: 270 },
 };
@@ -244,6 +248,12 @@ export function generateManifest(build) {
   const railZ = (railFrontZ + railBackZ) / 2;         // −8 (185) / −7 (165)
   const utScrewFrontZ = railFrontZ - 15.43;           // 77.07 (185) / 67.07 (165)
   const utScrewBackZ = railBackZ + 32.57;             // −75.93 (185) / −63.93 (165)
+  // Classic drawer closed Z — DERIVED 2026-07-11 from measured part geometry
+  // (no assembled ground truth): the classic's back wall (same 2.6 mm wall +
+  // magnet clip slot as the decor) aligns with the calibrated decor back,
+  // which lands its main front wall within 0.3 mm of the decor's — same box,
+  // back-aligned; the integrated pull lip runs ~18 mm proud of the case face.
+  const classicZ = 5.24 + ((coll.classicDepth || depth + 10) - (depth - 5.7)) / 2; // 13.09 on 185
   // Per-length pages where they exist (LINKS_BY_LEN), shared/185 fallbacks
   // otherwise. covers/fr/classic fall back to the 185 page only for safety —
   // every supported length has its own now (fr/kit: except the 59, which
@@ -858,21 +868,22 @@ export function generateManifest(build) {
     }
   });
 
-  // drawers + faceplates + handles (decor only; classic has no model yet)
+  // drawers + faceplates + handles (decor gets a plate + dressing; the classic
+  // prints its front + pull lip into the body — drawer instance only)
   const drawerPhases = [], drawerFades = [], fpDemo = [], fpFades = [];
   // overall build height (also used by the step-list cameras below) + the
   // faceplate step's own camera — hoisted so the EdgeLabel cinematic's final
   // phase can glide back to exactly this preset
   const H_MM = row0 + maxTop * PITCH_HALF_Y + 10;
   const fpStepCam = { ...cam(0, H_MM * 0.5, totalW, gridBottom, FIT), t: 15, p: isUT ? 99 : 66 };
-  let classicCount = 0;
+  // demo owners: the first drawer of EITHER fill runs the pop-in (+ clip/magnet)
+  // demo in the Drawers step; the faceplate cinematic keys off the first DECOR
+  // drawer separately, so a classic-first build doesn't lose it.
+  let classicCount = 0, firstFpDemo = null;
   units.forEach((u, i) => {
-    if (u.fill === 'classic') {
-      classicCount += 1;
-      add(`_classic_${u.w}W_${H_LABEL[u.hh]}H`, `Classic Drawer ${L}-${u.w}W-${H_LABEL[u.hh]}H (3D model coming soon)`, 'Drawer', links.classic);
-      return;
-    }
-    if (u.fill !== 'decor') return;
+    if (u.fill !== 'decor' && u.fill !== 'classic') return;
+    const isClassic = u.fill === 'classic';
+    if (isClassic) classicCount += 1;
     const H = H_LABEL[u.hh];
     const bottom = row0 + u.rowIdx * PITCH_HALF_Y;
     const cx = spanCenter(u);
@@ -885,14 +896,33 @@ export function generateManifest(build) {
     // ground-truth at 1H) — leaving a gap behind the correctly-placed faceplate.
     // Push the 2H drawer (and its back-wall clip/magnet) forward 2mm to close it
     // (Joey-verified 2026-07-06). Other non-1H heights are still derived (warned).
-    const drwFwd = u.hh === 4 ? 2 : 0;
-    inst.push({ id: `drw${i}`, node: `DecorDrawer_${L}-${u.w}W-${H}H`, pos: [cx + 0.16, bottom + 5.72, 5.24 + drwFwd] });
+    // Classic bodies are their own exports placed off their measured back — no nudge.
+    const drwFwd = !isClassic && u.hh === 4 ? 2 : 0;
+    const drwNode = `${isClassic ? 'ClassicDrawer' : 'DecorDrawer'}_${L}-${u.w}W-${H}H`;
+    inst.push({ id: `drw${i}`, node: drwNode, pos: [cx + 0.16, bottom + 5.72, (isClassic ? classicZ : 5.24) + drwFwd] });
+    add(drwNode, `${isClassic ? 'Classic' : 'Decor'} Drawer ${L}-${u.w}W-${H}H`, 'Drawer', isClassic ? links.classic : links.decor);
     if (hasMag) {
       // the clip + magnet are already counted once per magnet drawer in the case
       // loop (qty 2 covers this drawer-side clip and the case-back clip); no add.
+      // Backs align across both fills, so the clip Z holds for the classic too.
       inst.push({ id: `dc${i}`, node: 'MagnetClip_10x2mm', pos: [dx, bottom + 5.72 + drwH - 20, -83 + dz + drwFwd], yaw: 180, rides: `drw${i}`, owner: u.id });
       inst.push({ id: `dm${i}`, node: 'Magnet_10x2mm', pos: [dx, bottom + 5.72 + drwH - 15, -84 + dz + drwFwd], rides: `drw${i}`, owner: u.id });
     }
+    const magIds = hasMag ? [{ id: `dc${i}` }, { id: `dm${i}` }] : []; // clip+magnet riders, or none
+    if (firstDrawerDemo === null) {
+      firstDrawerDemo = i;
+      drawerPhases.push({ enter: [{ id: `drw${i}`, at: [0, 0, 190], from: [0, 0, 60] }] });
+      if (hasMag) drawerPhases.push(
+        { enter: [{ id: `dc${i}`, at: [0, 35, 190], from: [0, 30, 0] }] },
+        { enter: [{ id: `dm${i}`, at: [0, 35, 190], from: [0, 0, 30] }] },
+        { move: [{ id: `dc${i}`, by: [0, -35, 0] }, { id: `dm${i}`, by: [0, -35, 0] }] },
+      );
+      drawerPhases.push({ move: [{ id: `drw${i}`, by: [0, 0, -190] }, ...magIds.map(m => ({ id: m.id, by: [0, 0, -190] }))] });
+    } else {
+      if (hasMag) drawerFades.push({ id: `dc${i}` }, { id: `dm${i}` });
+      drawerPhases._laterDrawers = (drawerPhases._laterDrawers || []).concat({ id: `drw${i}`, from: [0, 0, 200] });
+    }
+    if (isClassic) return; // the classic drawer IS its own front — no plate, no dressing
     // faceplate: Essential ground-truth z-center 95.07 (front face 97.57, where
     // the handle mounts); EdgeLabel 104.62 — both = mounting plane + depth/2.
     // Correct at every height — the faceplate does NOT move with the above
@@ -935,22 +965,13 @@ export function generateManifest(build) {
       // EdgeLabel prints its grip into the plate — no bolt-on handle at all.
       inst.push({ id: `h${i}`, node: handleStyle.node, pos: [cx + 0.46, bottom + 3.72 + (fpH - handleStyle.h) / 2 - 0.5, 97.57 - dz + handleStyle.d / 2], rides: `drw${i}` });
     }
-    add(`DecorDrawer_${L}-${u.w}W-${H}H`, `Decor Drawer ${L}-${u.w}W-${H}H`, 'Drawer', links.decor);
     add(face.node(code), face.label(code), 'Faceplate', face.links);
     if (face.hasHandle) add(handleStyle.node, handleStyle.label, 'Handle', handleStyle.links);
-    const mag = hasMag ? [{ id: `dc${i}` }, { id: `dm${i}` }] : []; // clip+magnet riders, or none
-    if (firstDrawerDemo === null) {
-      firstDrawerDemo = i;
-      drawerPhases.push({ enter: [{ id: `drw${i}`, at: [0, 0, 190], from: [0, 0, 60] }] });
-      if (hasMag) drawerPhases.push(
-        { enter: [{ id: `dc${i}`, at: [0, 35, 190], from: [0, 30, 0] }] },
-        { enter: [{ id: `dm${i}`, at: [0, 35, 190], from: [0, 0, 30] }] },
-        { move: [{ id: `dc${i}`, by: [0, -35, 0] }, { id: `dm${i}`, by: [0, -35, 0] }] },
-      );
-      drawerPhases.push({ move: [{ id: `drw${i}`, by: [0, 0, -190] }, ...mag.map(m => ({ id: m.id, by: [0, 0, -190] }))] });
+    if (firstFpDemo === null) {
+      firstFpDemo = i;
       const hasAccent = face.extras && u.hh !== 1;
       const homeMove = { move: [ // everyone glides home together at the end
-        { id: `drw${i}`, by: [0, 0, -40] }, ...mag.map(m => ({ id: m.id, by: [0, 0, -40] })),
+        { id: `drw${i}`, by: [0, 0, -40] }, ...magIds.map(m => ({ id: m.id, by: [0, 0, -40] })),
         ...(bcOn ? [{ id: `bc${i}`, by: [0, 0, -40] }] : []),
         { id: `fp${i}`, by: [0, 0, -40] },
         ...(hasAccent ? [{ id: `fa${i}`, by: [0, 0, -40] }] : []),
@@ -983,7 +1004,7 @@ export function generateManifest(build) {
         ...(bcOn ? [{ id: `bc${i}` }] : []),
       ];
       fpDemo.push(
-        { move: [{ id: `drw${i}`, by: [0, 0, 40] }, ...mag.map(m => ({ id: m.id, by: [0, 0, 40] }))] },
+        { move: [{ id: `drw${i}`, by: [0, 0, 40] }, ...magIds.map(m => ({ id: m.id, by: [0, 0, 40] }))] },
         { vanish: true, room: 0, camera: camFront },                              // world away → the assembly stage
         { enter: [{ id: `fp${i}`, at: [0, HOV, 40], from: [0, 30, 0] }] },        // the bare plate floats in
         ...(face.hasHandle ? [
@@ -1010,8 +1031,6 @@ export function generateManifest(build) {
         homeMove,
       );
     } else {
-      if (hasMag) drawerFades.push({ id: `dc${i}` }, { id: `dm${i}` });
-      drawerPhases._laterDrawers = (drawerPhases._laterDrawers || []).concat({ id: `drw${i}`, from: [0, 0, 200] });
       if (bcOn) fpFades.push({ id: `bc${i}` });
       fpFades.push({ id: `fp${i}` });
       if (face.extras && u.hh !== 1) fpFades.push({ id: `fa${i}` });
@@ -1020,7 +1039,7 @@ export function generateManifest(build) {
     }
   });
 
-  if (classicCount) warnings.push(`${classicCount} Classic drawer${classicCount > 1 ? 's are' : ' is'} in the parts list but not shown in 3D yet (model coming soon).`);
+  if (classicCount) warnings.push('Classic drawers are placed from measured part geometry (back-aligned with the calibrated Decor drawer) — no assembled ground truth yet · verify the fit on a printed build.');
   if (units.some(u => u.fill === 'decor' && u.hh !== 2)) warnings.push('Non-1H drawers use some derived (not-yet-calibrated) sizing · double-check the tall drawers and report anything that looks off.');
 
   // ---- assemble the step list ----------------------------------------------
@@ -1030,7 +1049,7 @@ export function generateManifest(build) {
   const magnetTotal = bom.get('Magnet_10x2mm')?.qty || 0;
   const handleTotal = bom.get(handleStyle.node)?.qty || 0;
   let printTotal = 0;
-  for (const p of bom.values()) if (!p.purchased) printTotal += p.qty; // classic drawers print too — they just lack a 3D model
+  for (const p of bom.values()) if (!p.purchased) printTotal += p.qty;
 
   const nFeet = feetIds.back.length + feetIds.front.length;
   const setDownStep = {
@@ -1154,7 +1173,9 @@ export function generateManifest(build) {
       title: 'Drawers',
       note: (anyMagnet
         ? 'Before a magnet-closure drawer goes in: snap a clip into its back-wall slot and press in the magnet, front to back. Then slide each drawer in from the front.'
-        : 'Slide each drawer in from the front.'),
+        : 'Slide each drawer in from the front.') +
+        // classic-only builds end here — no faceplate step follows
+        (firstFpDemo === null ? ' The build is done · tap any part to see its name and download links.' : ''),
       // under-table drawers live below eye level — shoot from just under the horizon
       camera: { ...cam(0, H_MM * 0.45, totalW, gridBottom, FIT), t: 12, p: isUT ? 97 : 68 },
       phases: [
@@ -1163,6 +1184,8 @@ export function generateManifest(build) {
         ...(later.length ? [{ enter: later }] : []),
       ],
     });
+  }
+  if (firstFpDemo !== null) {
     postSteps.push({
       title: face.hasHandle ? 'Faceplates & handles' : 'Faceplates',
       // assembly-first (Joey): build the plate unit, THEN slide it onto the
@@ -1173,7 +1196,7 @@ export function generateManifest(build) {
           : `screw on the ${handleStyle.label} (2× M3)`) +
         (bcOn ? ', then clip the back cover in from behind' : '') +
         '. Pop a drawer out about 40 mm, slide the assembled faceplate DOWN onto the drawer front until it snaps, then push the drawer home.' +
-        ' Repeat for every drawer · the build is done. Tap any part to see its name and download links.',
+        ` Repeat for every ${classicCount ? 'Decor drawer' : 'drawer'} · the build is done. Tap any part to see its name and download links.`,
       camera: fpStepCam,
       phases: [
         ...fpDemo,
@@ -1213,7 +1236,8 @@ function imgFor(node) {
   // onerror (main.js) hides any stray gap rather than showing a wrong photo.
   if ((m = node.match(/^(\d+)-(\d)W-(\w+)H_Case$/))) return `img/parts/Case ${m[1]}-${m[2]}W-${m[3]}H.png`;
   if ((m = node.match(/^DecorDrawer_(\d+)-(\d)W-(\w+)H$/))) return `img/parts/Decor Drawer ${m[1]}-${m[2]}W-${m[3]}H.png`;
-  if ((m = node.match(/^_classic_(\d)W_(\w+)H$/))) return 'img/parts/Classic Drawer 185-' + m[1] + 'W-' + m[2] + 'H.png'; // classic node carries no collection → 185 placeholder
+  // classic drawers: per-length renders for all six lengths (2026-07-11 batch)
+  if ((m = node.match(/^ClassicDrawer_(\d+)-(\d)W-(\w+)H$/))) return `img/parts/Classic Drawer ${m[1]}-${m[2]}W-${m[3]}H.png`;
   // covers + foot rails (2026-07-10 batch, all six lengths): the render files
   // ARE the library part codes, so the node name maps straight to a PNG
   if (/^C[LU]-\d+-\dW$/.test(node) || /^FR-[LU]_\d+-\dW$/.test(node)) return `img/parts/${node}.png`;

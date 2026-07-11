@@ -239,6 +239,62 @@
       "code_regex": "",
       "name_template": "{name}",
       "depth_mode": "center"
+    },
+
+    {
+      "name": "Classic Drawers (59)",
+      "_note": "All-lengths consolidated exporter blend (lives in GLB Library\\, not Blender Files\\). 2026-07-11: all six lengths exported in-session (88 parts, all canonical_ok). The blend must carry the 2026-07-11 fixes (240-4W rotations zeroed, 115-4W-15H/2H restored, 185-4W-05H/1H appended, spec-order 'Classic Drawer <code>' names) — save it before any headless re-run or the bugs come back.",
+      "blend": "D:\\Code Projects\\GEN2 Visual Animator\\GLB Library\\GEN2 GLB Exporter - GEN2 Classic Drawers.blend",
+      "out": "D:\\Code Projects\\GEN2 Visual Animator\\GLB Library\\59",
+      "select": "collection:59",
+      "code_regex": "59-\\d+W-\\d+H",
+      "name_template": "ClassicDrawer_{code}",
+      "depth_mode": "center"
+    },
+    {
+      "name": "Classic Drawers (115)",
+      "blend": "D:\\Code Projects\\GEN2 Visual Animator\\GLB Library\\GEN2 GLB Exporter - GEN2 Classic Drawers.blend",
+      "out": "D:\\Code Projects\\GEN2 Visual Animator\\GLB Library\\115",
+      "select": "collection:115",
+      "code_regex": "115-\\d+W-\\d+H",
+      "name_template": "ClassicDrawer_{code}",
+      "depth_mode": "center"
+    },
+    {
+      "name": "Classic Drawers (165)",
+      "blend": "D:\\Code Projects\\GEN2 Visual Animator\\GLB Library\\GEN2 GLB Exporter - GEN2 Classic Drawers.blend",
+      "out": "D:\\Code Projects\\GEN2 Visual Animator\\GLB Library\\165",
+      "select": "collection:165",
+      "code_regex": "165-\\d+W-\\d+H",
+      "name_template": "ClassicDrawer_{code}",
+      "depth_mode": "center"
+    },
+    {
+      "name": "Classic Drawers (185)",
+      "blend": "D:\\Code Projects\\GEN2 Visual Animator\\GLB Library\\GEN2 GLB Exporter - GEN2 Classic Drawers.blend",
+      "out": "D:\\Code Projects\\GEN2 Visual Animator\\GLB Library\\185",
+      "select": "collection:185",
+      "code_regex": "185-\\d+W-\\d+H",
+      "name_template": "ClassicDrawer_{code}",
+      "depth_mode": "center"
+    },
+    {
+      "name": "Classic Drawers (240)",
+      "blend": "D:\\Code Projects\\GEN2 Visual Animator\\GLB Library\\GEN2 GLB Exporter - GEN2 Classic Drawers.blend",
+      "out": "D:\\Code Projects\\GEN2 Visual Animator\\GLB Library\\240",
+      "select": "collection:240",
+      "code_regex": "240-\\d+W-\\d+H",
+      "name_template": "ClassicDrawer_{code}",
+      "depth_mode": "center"
+    },
+    {
+      "name": "Classic Drawers (270)",
+      "blend": "D:\\Code Projects\\GEN2 Visual Animator\\GLB Library\\GEN2 GLB Exporter - GEN2 Classic Drawers.blend",
+      "out": "D:\\Code Projects\\GEN2 Visual Animator\\GLB Library\\270",
+      "select": "collection:270",
+      "code_regex": "270-\\d+W-\\d+H",
+      "name_template": "ClassicDrawer_{code}",
+      "depth_mode": "center"
     }
   ]
 }
