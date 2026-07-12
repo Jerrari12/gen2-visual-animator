@@ -594,8 +594,9 @@ sizes it to the assembled build + 90 mm margin, just behind the case backs (a
 camera orbits behind it (`camera.z < wall.z`) so pegs/case-backs stay inspectable. Screws sit
 at flatTop − 18.1 (3 mm below the measured peg, to line up with the bracket
 holes). DERIVED/unverified: taller-than-1H top rows (peg height assumes slots
-~18 mm below the case top); LINKS.wall points at the -59 Printables page as a
-placeholder (needs the 185 wall-kit URL).
+~18 mm below the case top). LINKS.wall = the UNIVERSAL wall-mount brackets
+page (2026-07-12, Joey retired the per-length pages — the 1W/2W/3W sections
+are shared hardware; planner LINK_OVERRIDES matches for all six lengths).
 **Single-case bottom row → no footrails**: feet go into the case's own
 underside slots (lengthwise, 4/1W, middle dedup) and the stack sits at 7.65.
 **Handle styles are swappable** (identify card ◀ ▶ on any handle): all styles

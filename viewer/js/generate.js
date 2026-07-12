@@ -99,7 +99,7 @@ const LINKS = {
   hb:    { p: 'https://www.printables.com/model/965604-gen2-decor-handles-blockbar-series', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20Decor%20-%20Handles%20-%20BlockBar-1116949' },
   // fallbacks when a length has no page of its own yet
   kit:   { p: 'https://www.printables.com/model/1118906-gen2-table-top-kit-v2-185-standard', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20Table%20Top%20Kit%20V2%20-%20185-1231757' },
-  wall:  { p: 'https://www.printables.com/model/1513322-gen2-wall-mount-kit-lite-59' },
+  wall:  { p: 'https://www.printables.com/model/1777719-gen2-wall-mount-brackets', t: 'https://than.gs/m/1574321' }, // universal brackets page (2026-07-12 — replaced the old -59 placeholder)
   rail:  { p: 'https://www.printables.com/model/1052357-gen2-rails-185-standard', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20RAILS%20-%20STANDARD-1163830' },
 };
 
@@ -123,28 +123,28 @@ const LINKS_BY_LEN = {
     240: { p: 'https://www.printables.com/model/1322479-gen2-240-decor-drawers-all', t: 'https://than.gs/m/1360074' },
     270: { p: 'https://www.printables.com/model/1062961-gen2-270-decor-drawers-all', t: 'https://than.gs/m/1171387' },
   },
-  classic: {
+  classic: { // Thangs pages mirrored from the planner 2026-07-12 (240 new; 59 has none yet)
     59:  { p: 'https://www.printables.com/model/234780-gen2-59-classic-drawers-all' },
-    115: { p: 'https://www.printables.com/model/1143243-gen2-115-classic-drawers-all' },
-    165: { p: 'https://www.printables.com/model/625776-gen2-165-classic-drawers-all' },
-    185: { p: 'https://www.printables.com/model/278293-gen2-185-classic-drawers-all' },
-    240: { p: 'https://www.printables.com/model/1324538-gen2-240-classic-drawers-all' },
-    270: { p: 'https://www.printables.com/model/1164306-gen2-270-classic-drawers-all' },
+    115: { p: 'https://www.printables.com/model/1143243-gen2-115-classic-drawers-all', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20115%20Classic%20Drawers-1069181' },
+    165: { p: 'https://www.printables.com/model/625776-gen2-165-classic-drawers-all', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20165%20Classic%20Drawers-1044262' },
+    185: { p: 'https://www.printables.com/model/278293-gen2-185-classic-drawers-all', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20185%20-%20Classic%20Drawers-1042322' },
+    240: { p: 'https://www.printables.com/model/1324538-gen2-240-classic-drawers-all', t: 'https://than.gs/m/1360091' },
+    270: { p: 'https://www.printables.com/model/1164306-gen2-270-classic-drawers-all', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20Drawers%20-%20Large-1093398' },
   },
-  covers: {
-    59:  { p: 'https://www.printables.com/model/1777881-gen2-59-cover' },
-    115: { p: 'https://www.printables.com/model/1777837-gen2-115-cover' },
-    165: { p: 'https://www.printables.com/model/1774498-gen2-165-covers' },
-    185: { p: 'https://www.printables.com/model/1777844-gen2-185-cover' },
-    240: { p: 'https://www.printables.com/model/1777846-gen2-240-cover' },
-    270: { p: 'https://www.printables.com/model/1777849-gen2-270-cover' },
+  covers: { // Thangs pages added 2026-07-12
+    59:  { p: 'https://www.printables.com/model/1777881-gen2-59-cover', t: 'https://than.gs/m/1574324' },
+    115: { p: 'https://www.printables.com/model/1777837-gen2-115-cover', t: 'https://than.gs/m/1574330' },
+    165: { p: 'https://www.printables.com/model/1774498-gen2-165-covers', t: 'https://than.gs/m/1574320' },
+    185: { p: 'https://www.printables.com/model/1777844-gen2-185-cover', t: 'https://than.gs/m/1574319' },
+    240: { p: 'https://www.printables.com/model/1777846-gen2-240-cover', t: 'https://than.gs/m/1574326' },
+    270: { p: 'https://www.printables.com/model/1777849-gen2-270-cover', t: 'https://than.gs/m/1574325' },
   },
-  fr: { // no 59 — that collection has no foot rails
-    115: { p: 'https://www.printables.com/model/1777819-gen2-115-foot-rails' },
-    165: { p: 'https://www.printables.com/model/1775386-gen2-165-foot-rails' },
-    185: { p: 'https://www.printables.com/model/1777823-gen2-185-foot-rails' },
-    240: { p: 'https://www.printables.com/model/1777826-gen2-240-foot-rails' },
-    270: { p: 'https://www.printables.com/model/1777830-gen2-270-foot-rails' },
+  fr: { // no 59 — that collection has no foot rails. Thangs pages added 2026-07-12
+    115: { p: 'https://www.printables.com/model/1777819-gen2-115-foot-rails', t: 'https://than.gs/m/1574331' },
+    165: { p: 'https://www.printables.com/model/1775386-gen2-165-foot-rails', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20165%20Foot%20Rails-1574329' },
+    185: { p: 'https://www.printables.com/model/1777823-gen2-185-foot-rails', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20185%20Foot%20Rails-1574328' },
+    240: { p: 'https://www.printables.com/model/1777826-gen2-240-foot-rails', t: 'https://than.gs/m/1574322' },
+    270: { p: 'https://www.printables.com/model/1777830-gen2-270-foot-rails', t: 'https://than.gs/m/1574327' },
   },
   kit: {
     115: { p: 'https://www.printables.com/model/1146353-gen2-table-top-kit-v2-115-medium', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20Table%20Top%20Kit%20V2%20-%20115-1245167' },
@@ -153,14 +153,25 @@ const LINKS_BY_LEN = {
     240: { p: 'https://www.printables.com/model/1324501-gen2-table-top-kit-v2-240', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20Table%20Top%20Kit%20V2%20-%20240-1360073' },
     270: { p: 'https://www.printables.com/model/1163955-gen2-table-top-kit-v2-270-large', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20Table%20Top%20Kit%20V2%20-%20270-1253780' },
   },
+  // Wall mount: ONE universal brackets page serves every length (2026-07-12,
+  // Joey — the 1W/2W/3W sections are shared hardware; per-length pages retired).
+  // Kept per-length for shape consistency; LINKS.wall carries the same page.
   wall: {
-    59:  { p: 'https://www.printables.com/model/1513322-gen2-wall-mount-kit-lite-59' },
-    115: { p: 'https://www.printables.com/model/1537169-gen2-wall-mount-kit-lite-115' },
-    165: { p: 'https://www.printables.com/model/1605963-gen2-wall-mount-kit-lite-165', t: 'https://than.gs/m/1515711' },
+    59:  { p: 'https://www.printables.com/model/1777719-gen2-wall-mount-brackets', t: 'https://than.gs/m/1574321' },
+    115: { p: 'https://www.printables.com/model/1777719-gen2-wall-mount-brackets', t: 'https://than.gs/m/1574321' },
+    165: { p: 'https://www.printables.com/model/1777719-gen2-wall-mount-brackets', t: 'https://than.gs/m/1574321' },
+    185: { p: 'https://www.printables.com/model/1777719-gen2-wall-mount-brackets', t: 'https://than.gs/m/1574321' },
+    240: { p: 'https://www.printables.com/model/1777719-gen2-wall-mount-brackets', t: 'https://than.gs/m/1574321' },
+    270: { p: 'https://www.printables.com/model/1777719-gen2-wall-mount-brackets', t: 'https://than.gs/m/1574321' },
   },
-  rail: {
-    165: { t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20RAILS%20-%20165-1165793' },
+  rail: { // all six lengths have real pages now (2026-07-12) — UT still only
+          // GENERATES for 165/185 (no rail GLBs elsewhere), but the links are ready
+    59:  { p: 'https://www.printables.com/model/1053797-gen2-rails-59-small', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20RAILS%20-%20SMALL-1165763' },
+    115: { p: 'https://www.printables.com/model/1053795-gen2-rails-115-medium', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20RAILS%20-%20MEDIUM-1165720' },
+    165: { p: 'https://www.printables.com/model/1053557-gen2-rails-165-mini', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20RAILS%20-%20165-1165793' },
     185: { p: 'https://www.printables.com/model/1052357-gen2-rails-185-standard', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20RAILS%20-%20STANDARD-1163830' },
+    240: { p: 'https://www.printables.com/model/1322484-gen2-rails-240', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20RAILS%20-%20240%20Lite-1360077' },
+    270: { p: 'https://www.printables.com/model/1053793-gen2-rails-270-large', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20RAILS%20-%20LARGE-1165816' },
   },
 };
 
