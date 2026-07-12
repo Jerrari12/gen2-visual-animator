@@ -103,6 +103,24 @@ const LINKS = {
   rail:  { p: 'https://www.printables.com/model/1052357-gen2-rails-185-standard', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20RAILS%20-%20STANDARD-1163830' },
 };
 
+// Amazon affiliate buy links for purchased hardware (Joey's, 2026-07-12) —
+// rendered as extra chips after Printables/Thangs in the BOM checklist +
+// identify card (links.buy, main.js). Standard magnets suit most builds; the
+// N52s hold noticeably harder (people found the standard ones weak) but can
+// be too strong for small drawers. Mirrors the planner's HARDWARE_BUY.
+const BUY = {
+  magnets: [
+    { label: '10×2 mm', url: 'https://amzn.to/4sesPKm' },
+    { label: '6×2 mm', url: 'https://amzn.to/4aH1ASw' },
+    { label: 'N52 10×2 strong', url: 'https://amzn.to/4q4JX3Z' },
+    { label: 'N52 6×2 strong', url: 'https://amzn.to/49BZyC0' },
+  ],
+  woodScrews: [
+    { label: 'Buy #6', url: 'https://amzn.to/4s487gc' },
+    { label: 'Buy #8', url: 'https://amzn.to/4pTWDuq' },
+  ],
+};
+
 // Per-length product pages (2026-07-11 refresh — every collection has its own
 // cases/decor pages now, and covers + foot rails got dedicated pages instead
 // of funneling to the Table Top Kit bundle).
@@ -438,7 +456,7 @@ export function generateManifest(build) {
         const sid = `uts${utScrewIds.length}`;
         utScrewIds.push(sid);
         inst.push({ id: sid, node: 'WoodScrew', pos: [railX(t) + lx, flatTopY + UT.screwY, z], rot: [90, 0, 0] });
-        add('WoodScrew', 'Wood Screw', 'Screw', links.rail, 1, true); // purchased hardware
+        add('WoodScrew', 'Wood Screw', 'Screw', { ...links.rail, buy: BUY.woodScrews }, 1, true); // purchased hardware
       }
       c += w;
     }
@@ -460,7 +478,7 @@ export function generateManifest(build) {
       const id = `sc${screwIds.length}`;
       screwIds.push(id);
       inst.push({ id, node: 'WoodScrew', pos: [colCenter(c) + dx, pegY, WALL.screwZ + dz] });
-      add('WoodScrew', 'Wood Screw', 'Screw', links.wall, 1, true); // purchased hardware
+      add('WoodScrew', 'Wood Screw', 'Screw', { ...links.wall, buy: BUY.woodScrews }, 1, true); // purchased hardware
     }
   } else if (caseFeet) {
     // feet slide into the bottom case's own underside slots: 4 per 1W, running
@@ -566,7 +584,7 @@ export function generateManifest(build) {
       inst.push({ id: mcId, node: 'MagnetClip_10x2mm', pos: [mx, mcy, -85.7 + dz], owner: u.id, ...stg });
       inst.push({ id: mgId, node: 'Magnet_10x2mm', pos: [mx, mcy + 4.2, -86 + dz], owner: u.id, ...stg });
       add('MagnetClip_10x2mm', 'Magnet Clip 10×2', 'MagnetClip', links.hw, 2);
-      add('Magnet_10x2mm', 'Magnet 10×2 mm', 'Magnet', null, 2, true);
+      add('Magnet_10x2mm', 'Magnet 10×2 mm', 'Magnet', { buy: BUY.magnets }, 2, true);
       members.push(mcId, mgId);
     }
     const step = {

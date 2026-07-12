@@ -847,6 +847,8 @@ function renderChecklist() {
       const lnks = document.createElement('span');
       if (p.links.p) lnks.appendChild(linkEl('Printables', p.links.p));
       if (p.links.t) lnks.appendChild(linkEl('Thangs', p.links.t));
+      // purchased hardware: Amazon affiliate buy options (generate.js BUY)
+      for (const b of p.links.buy || []) lnks.appendChild(linkEl(b.label, b.url));
       mid.appendChild(lnks);
     }
     const qty = document.createElement('span');
@@ -854,6 +856,14 @@ function renderChecklist() {
     qty.textContent = '×' + p.qty + (p.purchased ? ' · buy' : '');
     row.append(chip, mid, qty);
     rows.appendChild(row);
+  }
+  // Amazon buy chips are affiliate links → the panel carries the disclosure
+  // (same wording as the filament menu's)
+  if (manifest.parts.some(p => !p.styleHidden && p.links?.buy)) {
+    const aff = document.createElement('div');
+    aff.className = 'fm-note';
+    aff.textContent = 'Amazon links are affiliate links — buying through them supports the project at no extra cost.';
+    rows.appendChild(aff);
   }
   $('checklist-title').textContent = build ? 'Your build' : 'Parts list';
   $('parts-head').textContent = `🧩 Parts to print · ${total} print${total === 1 ? '' : 's'}`;
@@ -1194,6 +1204,15 @@ function setSelected(id) {
   linksEl.innerHTML = '';
   if (info.links?.p) linksEl.appendChild(linkEl('Printables', info.links.p));
   if (info.links?.t) linksEl.appendChild(linkEl('Thangs', info.links.t));
+  // purchased hardware: Amazon affiliate buy options (generate.js BUY) + the
+  // required affiliate disclosure right in the card
+  for (const b of info.links?.buy || []) linksEl.appendChild(linkEl(b.label, b.url));
+  if (info.links?.buy?.length) {
+    const aff = document.createElement('div');
+    aff.className = 'fm-note';
+    aff.textContent = 'Affiliate links — they support the project at no extra cost.';
+    linksEl.appendChild(aff);
+  }
   if (!selLocked && customColors[selType]) linksEl.appendChild(linkEl('Get filament', customColors[selType].url));
   // handles get a style switcher (Deco / BlockBar A–F); faceplates get the
   // family switcher (Essential / EdgeLabel) when this collection has >1 family

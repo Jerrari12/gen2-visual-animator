@@ -259,7 +259,16 @@ both together). `purchased: true` marks hardware-store items (magnets, screws
 would-be) — excluded from the print count, shown "×N · buy", and **color-locked**
 (main.js `colorLocked`: a type whose rows are all purchased gets no filament
 picker — BOM chip + identify swatch inert, presets/saved tints ignored by
-activeHex — it always renders its manifest color). Per-part `img`
+activeHex — it always renders its manifest color). Purchased rows also carry
+**Amazon affiliate buy chips** (2026-07-12, Joey's links): `links.buy`
+[{label,url}] arrays — generate.js `BUY` (magnets ×4: standard 10×2/6×2 +
+N52 strong variants, people found the standard ones weak; wood screws #6/#8)
+mirrors the planner's `HARDWARE_BUY` in data.js (which adds M3 screws
+stainless/steel; the M3 hex nut has no link yet). Rendered after the
+Printables/Thangs chips in the checklist + identify card, EACH surface with
+an affiliate disclosure (`.fm-note` in the viewer, `.affiliate-note` under
+the planner BOM; planner buttons carry rel="sponsored"). Update both tools
+together. Per-part `img`
 points at `viewer/img/parts/` (copied from the planner's BOM renders — same
 art in both tools). Links + image render in the tap-to-identify card (tap
 highlights the part, draws a thin pointer line to it, empty tap dismisses).
