@@ -116,7 +116,22 @@ part with its color chip + download links.
   Source blend is `GLB Library\GEN2 GLB Exporter - GEN2 Classic Drawers.blend` —
   ⚠ it received in-session fixes (240-4W rotations zeroed, 115-4W-15H/2H restored
   from disk, 185-4W-05H/1H appended from the old 185 thumbnail blend, spec-order
-  renames) that **must be saved** before any headless re-run. All 88 matching 256²
+  renames) that **must be saved** before any headless re-run.
+  **2026-07-12: ClassicDrawer_240-3W-05H + 240-3W-1H shipped rotated 90° about
+  Y** (Joey caught it in the viewer — drawers faced right). 240-3W is the ONE
+  size the width≠88·W−13 check can't see: 3W width 251 vs 240 classic depth
+  250 differ by 1 mm (sweep with tolerance <0.5 mm to catch it; 15H/2H were
+  fine). Fixed at the GLB level (exact quantized component swap x,z→−z,x —
+  the quantization node scale is uniform so the swap is lossless; sign chosen
+  by a two-invariant geometry gate validated on 4 known-good parts: dense
+  full-width full-height back wall at −Z + pull-lip tip at +Z inset ~16 mm
+  per side (<95 % width), plus Z-profile correlation as tie-breaker; scratch
+  script pattern in this fix: decompress lib → swap → meshopt recompress),
+  parts_index.csv rows updated, synced to viewer/parts/240/. NB the front-lip
+  HEIGHT is not a valid orientation invariant — 1H carries the grip low
+  (y≤7) but 15H carries it high (y≈62/78). ⚠ **The source blend still
+  carries these two rotated** — same story as the case/decor blends; fix at
+  the source or re-apply on re-export. All 88 matching 256²
   thumbnails re-rendered as ONE batch (replaces the 14 old 185s), copied flat into
   `viewer/img/parts/`; `.lib.glb` synced into `viewer/parts/<L>/`.
   **2026-07-11 (same day): classics are REAL 3D PARTS in generate.js** — the
