@@ -354,9 +354,17 @@ wallStagger/handleStyle/faceStyle/backCover and the incoming handler applies
 `faceStyle` + `backCover`. **Planner side wired 2026-07-08** (gen2-planner-main:
 `state.backCover` + BUILD_FIELDS + sanitize, syncOptionsToViewer posts
 faceStyle+backCover, incoming validates+applies both, an Off/On toggle under
-the faceplate style cards, per-size `P.backCover` BOM rows marked `unreleased`
-"coming soon"; all 65 planner tests pass) — so planner⇄viewer faceplate style
-AND back cover live-sync both ways. Selecting a **magnet
+the faceplate style cards, per-size `P.backCover` BOM rows; all planner tests
+pass) — so planner⇄viewer faceplate style
+AND back cover live-sync both ways. Back covers were RELEASED 2026-07-12
+(the files ship inside every faceplate series download since v2602): planner
+rows linkAs the chosen style's series page, viewer rows carry `face.links` —
+no more "coming soon". Same day the planner dropped the LENGTH prefix from
+faceplate + back-cover BOM names ("GEN2 240 EdgeLabel Decor Faceplate…" →
+"GEN2 EdgeLabel Decor Faceplate…") — they're universal shared hardware
+(width × height only) and the prefix read as length-specific; viewer labels
+never carried one. Planner partImage/COLLECTION_RULES regexes updated to the
+unprefixed names. Selecting a **magnet
 clip/magnet** or a **stopper** shows a ✕ Remove in the identify card (generator
 stamps `owner`=drawerId / `stopperKey`); magnet → that drawer's closure none,
 stopper → drop its 1W L+R pair. **Bidirectional planner sync**: the planner

@@ -964,7 +964,9 @@ export function generateManifest(build) {
       // + 7.22 (DERIVED from the EdgeLabel B blend @1W-1H — verify on a print;
       // works under every plate family since the mounting plane never moves)
       inst.push({ id: `bc${i}`, node: `BackCover_EdgeLabel_${u.w}W-${H}H`, pos: [cx + 0.47, bottom + 3.72 + 7.22, 92.795 - dz], rides: `drw${i}` });
-      add(`BackCover_EdgeLabel_${u.w}W-${H}H`, `Faceplate Back Cover ${u.w}W-${H}H`, 'BackCover', null);
+      // the cover files ship inside every faceplate series download (v2602+),
+      // so the row links the active family's page — mirrors the planner's linkAs
+      add(`BackCover_EdgeLabel_${u.w}W-${H}H`, `Faceplate Back Cover ${u.w}W-${H}H`, 'BackCover', face.links);
     }
     if (face.extras) {
       // EdgeLabel dressing (offsets DERIVED from the EdgeLabel B blend @1W-1H,
