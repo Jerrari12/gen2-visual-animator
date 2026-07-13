@@ -2,7 +2,6 @@
   "blender_exe": "auto",
   "compress": true,
   "index": "D:\\Code Projects\\GEN2 Visual Animator\\GLB Library\\parts_index.csv",
-
   "_help": {
     "blender_exe": "'auto' = newest C:\\Program Files\\Blender Foundation install, or $BLENDER, or a full path",
     "select": "'prefix:TEXT' matches object names; 'collection:NAME'; or 'all'",
@@ -11,7 +10,6 @@
     "depth_mode": "center (locked default) | front | back",
     "skip": "true = leave this job out of the run"
   },
-
   "jobs": [
     {
       "name": "185 Decor Drawers",
@@ -22,7 +20,6 @@
       "name_template": "DecorDrawer_{code}",
       "depth_mode": "center"
     },
-
     {
       "name": "185 Cases",
       "_note": "Objects named '185-XW-XH Case'. Seam print-bridges (islands <80 verts AND <2mm thick) are dropped at export; source .blend is untouched.",
@@ -35,7 +32,6 @@
       "drop_islands_max_verts": 80,
       "drop_islands_max_thick": 2.0
     },
-
     {
       "name": "185 Covers + Footrails",
       "_note": "CL/CU covers + FR-L/FR-U footrails, 185, 1W+2W. Modeled at assembly height; rebased to Y=0 per part. Clean meshes, no bridges. select:all = only these 8 meshes in the file.",
@@ -46,7 +42,6 @@
       "name_template": "{name}",
       "depth_mode": "center"
     },
-
     {
       "name": "Quicklocks (universal hardware)",
       "_note": "Handed L/R pair, shared across all collections. Clean single meshes, no supports to drop.",
@@ -57,7 +52,6 @@
       "name_template": "{name}",
       "depth_mode": "center"
     },
-
     {
       "name": "Tabletop Kit Foot (hardware)",
       "_note": "Dovetail rail on top; pointy end (+X) leads insertion. Rotate 90/180 per slot at placement time -- see GEN2-Part-Orientation-Notes.md. GLB stays canonical.",
@@ -68,7 +62,6 @@
       "name_template": "{name}",
       "depth_mode": "center"
     },
-
     {
       "name": "Drawer Stoppers (universal hardware)",
       "_note": "Handed L/R pair. Clean single meshes, no supports.",
@@ -79,7 +72,6 @@
       "name_template": "{name}",
       "depth_mode": "center"
     },
-
     {
       "name": "Magnet Clip (universal hardware)",
       "_note": "Posed -90X in source (back-facing = case orientation); worker bakes the world orientation. Case=yaw0, drawer=yaw180. See GEN2-Part-Orientation-Notes.md.",
@@ -90,7 +82,6 @@
       "name_template": "MagnetClip_10x2mm",
       "depth_mode": "center"
     },
-
     {
       "name": "Essential Faceplates (185 Decor Drawers)",
       "_note": "Posed -90X; worker bakes orientation. Snap onto Decor Drawer fronts (1:1 by W-H). Handle screws on via 2 centered holes. regex \\d+W-\\d+ + template re-adds H, normalizing the '2W-05' source typo.",
@@ -101,7 +92,6 @@
       "name_template": "Faceplate_Essential_{code}H",
       "depth_mode": "center"
     },
-
     {
       "name": "Deco Handle (self-tapping)",
       "_note": "Screws onto the faceplate front via 2 centered holes. Identity transform. Source mesh 'Deco Handle - Self-Tapping' -- other mount variants may follow as separate GLBs.",
@@ -112,7 +102,6 @@
       "name_template": "Handle_Deco",
       "depth_mode": "center"
     },
-
     {
       "name": "Wall Mount Lite brackets",
       "_note": "3W tilt fixed in source (now flat, 264x6.9x56), so all 3 brackets export cleanly via this job. The WoodScrew is separate -- it needs decimating ~62k->1.5k tris (worker has no decimate option yet), exported manually to WallMount/. select:'Wall Mount Lite' matches the 3 brackets, not the screw.",
@@ -123,7 +112,6 @@
       "name_template": "WallMount_Lite_{code}",
       "depth_mode": "center"
     },
-
     {
       "name": "Under-Table Rails (185)",
       "_note": "185 under-table mount rails, 1W-4W. Posed 180X in source (female channels face down); worker bakes it. Clean single meshes, no bridges.",
@@ -134,7 +122,6 @@
       "name_template": "UnderTableRail_{code}",
       "depth_mode": "center"
     },
-
     {
       "name": "Under-Table Rails (165)",
       "_note": "165 under-table rails, 1W-4W (179mm deep). Mixed source poses (1W/2W net-180Y, 3W/4W 180X) all bake to the same world orientation -- verified via depth-asymmetry sign check.",
@@ -145,7 +132,6 @@
       "name_template": "UnderTableRail_{code}",
       "depth_mode": "center"
     },
-
     {
       "name": "165 Cases",
       "_note": "165 collection (165mm deep) cases, 1W-4W. Same seam print-bridges as the 185 cases -> dropped at export. Mirror of the 185 Cases job with 165 depth/naming.",
@@ -158,7 +144,6 @@
       "drop_islands_max_verts": 80,
       "drop_islands_max_thick": 2.0
     },
-
     {
       "name": "165 Decor Drawers",
       "_note": "165 collection decor drawers, 1W-4W. Mirror of the 185 Decor Drawers job with 165 depth (159.3mm).",
@@ -169,7 +154,6 @@
       "name_template": "DecorDrawer_{code}",
       "depth_mode": "center"
     },
-
     {
       "name": "165 Covers CL",
       "_note": "165 cover source objects use a SPACE ('CL 165-1W'), so these CL/CU passes rename to hyphen (CL-165-1W) to match the 185 covers. If you rename the source objects to hyphen, all 8 collapse into one 'select:all' job like the 185 Covers+Footrails.",
@@ -198,7 +182,6 @@
       "name_template": "{name}",
       "depth_mode": "center"
     },
-
     {
       "name": "EdgeLabel Faceplates (185)",
       "_note": "18 sizes. Body+GRIP MERGED into one object per size = 2 material slots -> 2 primitives. export_materials=EXPORT keeps tiny named BODY/GRIP zone stubs so the viewer tints each zone (law #2 relaxed to zone tags). NO handle part -- the grip is integral to the print. Object names are already part-code -> name_template {name}.",
@@ -240,10 +223,30 @@
       "name_template": "{name}",
       "depth_mode": "center"
     },
-
+    {
+      "name": "ClassicPro Faceplates (185)",
+      "_note": "18 sizes. Body + 2 grip pieces + integral grip-accent rod MERGED into one object per size = 3 material slots -> 3 primitives (BODY/GRIP/GRIP ACCENT zone tags, law #2 relaxed). Grip accent is PART OF THE PRINT, not a separate part. Shares EdgeLabel's per-size Accents and universal BackCovers -- do NOT re-export those. Object names already part-code -> name_template {name}.",
+      "blend": "D:\\Code Projects\\GEN2 Visual Animator\\Blender Files\\Decor Faceplates\\GEN2 GLB Exporter - GEN2 Faceplates - Classic Pro.blend",
+      "out": "D:\\Code Projects\\GEN2 Visual Animator\\GLB Library\\Faceplates\\ClassicPro",
+      "select": "prefix:Faceplate_ClassicPro",
+      "code_regex": "",
+      "name_template": "{name}",
+      "depth_mode": "center",
+      "export_materials": "EXPORT"
+    },
+    {
+      "name": "ClassicPro Label (universal)",
+      "_note": "ONE universal swappable Classic Pro label (unique to this family, centered horizontally). All 18 collections share one linked mesh; authoritative object Label_ClassicPro -> exports once.",
+      "blend": "D:\\Code Projects\\GEN2 Visual Animator\\Blender Files\\Decor Faceplates\\GEN2 GLB Exporter - GEN2 Faceplates - Classic Pro.blend",
+      "out": "D:\\Code Projects\\GEN2 Visual Animator\\GLB Library\\Faceplates\\ClassicPro\\Label",
+      "select": "prefix:Label_ClassicPro",
+      "code_regex": "",
+      "name_template": "{name}",
+      "depth_mode": "center"
+    },
     {
       "name": "Classic Drawers (59)",
-      "_note": "All-lengths consolidated exporter blend (lives in GLB Library\\, not Blender Files\\). 2026-07-11: all six lengths exported in-session (88 parts, all canonical_ok). The blend must carry the 2026-07-11 fixes (240-4W rotations zeroed, 115-4W-15H/2H restored, 185-4W-05H/1H appended, spec-order 'Classic Drawer <code>' names) — save it before any headless re-run or the bugs come back.",
+      "_note": "All-lengths consolidated exporter blend (lives in GLB Library\\, not Blender Files\\). 2026-07-11: all six lengths exported in-session (88 parts, all canonical_ok). The blend must carry the 2026-07-11 fixes (240-4W rotations zeroed, 115-4W-15H/2H restored, 185-4W-05H/1H appended, spec-order 'Classic Drawer <code>' names) \u2014 save it before any headless re-run or the bugs come back.",
       "blend": "D:\\Code Projects\\GEN2 Visual Animator\\GLB Library\\GEN2 GLB Exporter - GEN2 Classic Drawers.blend",
       "out": "D:\\Code Projects\\GEN2 Visual Animator\\GLB Library\\59",
       "select": "collection:59",

@@ -1997,6 +1997,12 @@ const FACEPLATE_STYLES = [
   { key: 'edgelabel', label: 'EdgeLabel', node: c => `Faceplate_EdgeLabel_${c}`, hasHandle: false, collections: ['185', '165', '59', '115', '240', '270'],
     img: c => `img/parts/EdgeLabel_${c}.png`, // per-size renders, 2026-07-08 batch
     links: { p: 'https://www.printables.com/model/1093933-gen2-decor-faceplates-edgelabel-series', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20Decor%20-%20Faceplate%20-%20EdgeLabel-1215609' } },
+  // 3-zone plate (BODY/GRIP/GRIP ACCENT — the identify card grows a third
+  // swatch via the generic renderZoneChips); grip scoop at the top with the
+  // tilted label riding its slope
+  { key: 'classicpro', label: 'Classic Pro', node: c => `Faceplate_ClassicPro_${c}`, hasHandle: false, collections: ['185', '165', '59', '115', '240', '270'],
+    img: c => `img/parts/ClassicPro_${c}.png`, // per-size renders, 2026-07-13 batch
+    links: { p: 'https://www.printables.com/model/1291210-gen2-decor-faceplates-classic-pro-series', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20Decor%20-%20Faceplates%20-%20Classic%20Pro%20Series-1332444' } },
 ];
 const fpSizeCode = node => (node.match(/_(\dW-\d+H)$/) || [])[1] || null;
 const availableFaceplateStyles = () => FACEPLATE_STYLES.filter(s => s.collections.includes(manifest.collection || '185'));

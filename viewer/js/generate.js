@@ -95,6 +95,7 @@ const LINKS = {
   hw:    { p: 'https://www.printables.com/model/1012796-gen2-hardware', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20Hardware-1141439' },
   fp:    { p: 'https://www.printables.com/model/964559-gen2-decor-faceplates-essential-series', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20Decor%20-%20Faceplates%20-%20Essential%20Series-1116946' },
   fpe:   { p: 'https://www.printables.com/model/1093933-gen2-decor-faceplates-edgelabel-series', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20Decor%20-%20Faceplate%20-%20EdgeLabel-1215609' },
+  fpc:   { p: 'https://www.printables.com/model/1291210-gen2-decor-faceplates-classic-pro-series', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20Decor%20-%20Faceplates%20-%20Classic%20Pro%20Series-1332444' },
   h:     { p: 'https://www.printables.com/model/1044972-gen2-decor-handles-deco-series', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20Decor%20Handles%20-%20Deco%20Series-1159960' },
   hb:    { p: 'https://www.printables.com/model/965604-gen2-decor-handles-blockbar-series', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20Decor%20-%20Handles%20-%20BlockBar-1116949' },
   // fallbacks when a length has no page of its own yet
@@ -301,16 +302,43 @@ export function generateManifest(build) {
   // ---- faceplate family (planner `faceStyle`, carried in share links) -----
   // essential: flat 5 mm plate + bolt-on handle. edgelabel: 24.1 mm deep 2-zone
   // plate (grip printed in — NO handle) + accent panel (not on 05H) + the
-  // universal label card. Both mount their BACK FACE on the same plane (the
-  // drawer front, 92.57 − dz): z-center = plane + depth/2.
+  // universal label card. classicpro (2026-07-13): 29.5 mm deep 3-zone plate
+  // (BODY/GRIP/GRIP ACCENT — grip scoop at the TOP with the label TILTED onto
+  // its slope) + the same SHARED accents + its own universal label. ALL mount
+  // their BACK FACE on the same plane (the drawer front, 92.57 − dz):
+  // z-center = plane + depth/2. Extras families carry their label/accent
+  // placement as functions so EdgeLabel's expressions stay byte-identical:
+  // labelX(cx, plateW) / labelY(bottom, fpH) / labelZ(faceZ, dz) /
+  // accentZ(faceZ, dz). The shared accent seats at mounting plane + 4.375 in
+  // BOTH families (same window stop). Classic Pro offsets DERIVED 2026-07-13
+  // from its exporter blend @1W/2W, EVALUATED meshes (bound_box lies — the
+  // label's modifier trims ~0.9 mm off its top): the label is top-anchored —
+  // same world spot for every height, top FLUSH with the plate top — and
+  // horizontally centered (−0.08 = the label mesh's own bbox skew).
   const FACE_FAMILIES = {
     essential: { key: 'essential', node: c => `Faceplate_Essential_${c}`, z: 95.07, hasHandle: true,
                  label: c => `Faceplate Essential ${c}`, extras: false, links: links.fp },
     edgelabel: { key: 'edgelabel', node: c => `Faceplate_EdgeLabel_${c}`, z: 104.62, hasHandle: false,
-                 label: c => `EdgeLabel Faceplate ${c}`, extras: true, links: links.fpe }, // club family — EdgeLabel Series pages
+                 label: c => `EdgeLabel Faceplate ${c}`, extras: true, links: links.fpe, // club family — EdgeLabel Series pages
+                 labelNode: 'Label_EdgeLabel', labelName: 'EdgeLabel Label (universal)',
+                 // the EdgeLabel window is LEFT-ANCHORED: center 28.5 from the plate's left edge on every width
+                 labelX: (cx, plateW) => cx + 0.47 - (plateW - 1) / 2 + 28.5,
+                 labelY: (bottom, fpH) => bottom + 3.72 + fpH - 27,
+                 labelZ: (faceZ, dz) => faceZ - 6.3 - dz,
+                 accentZ: (faceZ, dz) => faceZ - 7.675 - dz },
+    classicpro: { key: 'classicpro', node: c => `Faceplate_ClassicPro_${c}`, z: 107.32, hasHandle: false,
+                 label: c => `Classic Pro Faceplate ${c}`, extras: true, links: links.fpc, // club family — Classic Pro Series pages
+                 labelNode: 'Label_ClassicPro', labelName: 'Classic Pro Label (universal)',
+                 // pos.y is the part's BOTTOM (exports are bottom-anchored); the
+                 // 18.14-tall tilted label sits TOP-FLUSH with the plate
+                 labelX: cx => cx + 0.47 - 0.08,
+                 labelY: (bottom, fpH) => bottom + 3.72 + fpH - 18.16,
+                 labelZ: (faceZ, dz) => faceZ - 0.71 - dz,
+                 accentZ: (faceZ, dz) => faceZ - 10.375 - dz },
   };
-  // faceplates are SHARED hardware (same GLBs both collections, placed −dz on
-  // 165 like every other front-face part) — both families serve 165 and 185
+  // faceplates are SHARED hardware (same GLBs, every collection pool carries
+  // copies, placed −dz like every other front-face part) — all families serve
+  // all six lengths
   const face = FACE_FAMILIES[build.faceStyle] || FACE_FAMILIES.essential;
   if (build.faceStyle && !FACE_FAMILIES[build.faceStyle])
     warnings.push(`Faceplates are shown in the Essential style (your "${build.faceStyle}" style isn't modeled yet).`);
@@ -983,11 +1011,11 @@ export function generateManifest(build) {
         // (an X flip showed the accent's BACK — Joey). Bottom-anchored parts hang
         // below their origin when flipped, so place at their TOP (bottom + accent
         // height, = fpH − 27.2 label band) to keep the flip centered on itself.
-        inst.push({ id: `fa${i}`, node: `Accent_EdgeLabel_${code}`, rot: [0, 0, 180], pos: [cx + 0.47, bottom + 3.77 + (fpH - 27.2), face.z - 7.675 - dz], rides: `drw${i}` });
+        inst.push({ id: `fa${i}`, node: `Accent_EdgeLabel_${code}`, rot: [0, 0, 180], pos: [cx + 0.47, bottom + 3.77 + (fpH - 27.2), face.accentZ(face.z, dz)], rides: `drw${i}` });
         add(`Accent_EdgeLabel_${code}`, `EdgeLabel Accent ${code}`, 'Accent', null);
       }
-      inst.push({ id: `fl${i}`, node: 'Label_EdgeLabel', pos: [cx + 0.47 - (u.w * PITCH_X - 1) / 2 + 28.5, bottom + 3.72 + fpH - 27, face.z - 6.3 - dz], rides: `drw${i}` });
-      add('Label_EdgeLabel', 'EdgeLabel Label (universal)', 'Label', null);
+      inst.push({ id: `fl${i}`, node: face.labelNode, pos: [face.labelX(cx, u.w * PITCH_X), face.labelY(bottom, fpH), face.labelZ(face.z, dz)], rides: `drw${i}` });
+      add(face.labelNode, face.labelName, 'Label', null);
     }
     if (face.hasHandle) {
       // handle: back face against the faceplate front, vertically centered on
@@ -1223,7 +1251,9 @@ export function generateManifest(build) {
       // drawer — the note follows each family's dressing in demo order
       note: 'Assemble the faceplate first: ' +
         (face.extras
-          ? 'press the accent panel into the face and slide the label into its window'
+          ? (face.key === 'classicpro'
+            ? 'press the accent panel into the face and lay the label onto the grip slope'
+            : 'press the accent panel into the face and slide the label into its window')
           : `screw on the ${handleStyle.label} (2× M3)`) +
         (bcOn ? ', then clip the back cover in from behind' : '') +
         '. Pop a drawer out about 40 mm, slide the assembled faceplate DOWN onto the drawer front until it snaps, then push the drawer home.' +
@@ -1284,6 +1314,8 @@ function imgFor(node) {
   // EdgeLabel plates have per-size renders (2026-07-08 batch) — shared
   // hardware, so one 18-file set serves every collection
   if ((m = node.match(/^Faceplate_EdgeLabel_(\dW-\d+H)$/))) return `img/parts/EdgeLabel_${m[1]}.png`;
+  // Classic Pro plates have per-size renders too (2026-07-13 batch)
+  if ((m = node.match(/^Faceplate_ClassicPro_(\dW-\d+H)$/))) return `img/parts/ClassicPro_${m[1]}.png`;
   return null;
 }
 

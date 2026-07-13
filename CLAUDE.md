@@ -824,11 +824,79 @@ assumption was wrong; a 2-zone part needs worker + verifier changes):**
   185 EdgeLabel build rows, static-kit swap round-trip restores `_origFp`
   exactly. NO renders yet: Accent / BackCover / Label (identify cards hide the
   missing img) — a future mini render batch.
-- **Still TODO (viewer side):** Classic Pro family when its GLBs exist (shares
-  EdgeLabel's per-size accents; partImage + FACEPLATE_STYLES/FACE_FAMILIES
-  entries are pre-wired for its hero jpg); accent/back-cover/label renders.
+- **Still TODO (viewer side):** accent/back-cover/label renders. (Classic Pro is
+  fully wired into both tools as of 2026-07-13 — see the Classic Pro section below.)
 
-**Next family:** Classic Pro faceplate — its own unique label, **shares EdgeLabel's per-size accents**.
+## Decor Faceplates — Classic Pro (thumbnails + GLB DONE — 2026-07-13)
+
+Source blend: `Blender Files\Decor Faceplates\GEN2 GLB Exporter - GEN2 Faceplates -
+Classic Pro.blend`. Same 18-size collection layout as EdgeLabel (`<W>W-<H>H`, no
+3W-3H/4W-3H), all scale 1,1,1 real mm, widths 87/175/263/351, assembled depth 29.5
+(the classic grip scoop is deep — 23 mm — unlike EdgeLabel's 26.1 flat plate).
+Emulates the classic-drawers style as a Decor-compatible faceplate; **label is centered
+horizontally** (vs EdgeLabel's edge label).
+
+**Parts (per Joey 2026-07-13):**
+- **Faceplate** — ONE printed piece = body + 2 grip pieces + the thin grip-accent rod
+  (2.8×2.8 mm bar, 4 lengths by width: 48/136/224/312). **The rod is PART OF THE PRINT,
+  NOT a separate part** → merged into one object per size = **3 material slots → 3
+  primitives**: `BODY` / `GRIP` / `GRIP ACCENT` (material `Grip Accent` RENAMED →
+  `GRIP ACCENT` this session, persisted). Objects now `Faceplate_ClassicPro_<size>`.
+- **Accent + Back Cover — NOT in this blend and NOT re-exported:** Classic Pro seats
+  EdgeLabel's per-size Accents (14, none on 05H) and the universal BackCovers verbatim.
+  Manifests must point at the existing `Accent_EdgeLabel_*` / `BackCover_EdgeLabel_*` GLBs.
+- **Label** (`CLASSIC PRO LABEL` mat) — unique to this family, universal across its 18
+  sizes; ONE mesh linked-duplicated ×18, authoritative object `Label_ClassicPro` → exports
+  once. **Exports TILTED** (as-installed on the sloped grip face — bbox 47×18×19, not flat
+  like EdgeLabel's vertical 57×27×4.5 label). Correct per the translate-only pipeline law.
+
+**Viewer color model:** extends the EdgeLabel decision — on selection the identify card
+needs **THREE swatches** (Body / Grip / Grip Accent) for this family; zone identity by
+material-stub name, same as EdgeLabel's two.
+
+**Thumbnails (DONE):** 18 × `ClassicPro_<size>.png` in `D:\Render Projects\Faceplates\
+ClassicPro\` — same pipeline (isolate collection → translate-only cam aim → ortho_scale
+= span/0.82, geometry never scaled; Cycles 256×256 transparent). Palette as-found in the
+blend (Joey approved): BODY 15/15/15, GRIP 255/41/3, GRIP ACCENT 94/94/94 metallic 1.0,
+LABEL white. NB the join batch gotcha: hidden LAYER collections (`LayerCollection.hide_viewport`,
+the outliner eye) silently block `select_set` → `bpy.ops.object.join` no-ops with only a
+console warning — un-hide the layer collection first, not just object flags.
+
+**GLB export (DONE — 19/19 canonical, meshopt ~79%):** 2 jobs added to `gen2_jobs.json`
+(`ClassicPro Faceplates (185)` with `export_materials: EXPORT` → `GLB Library\Faceplates\
+ClassicPro\`; `ClassicPro Label (universal)` → `…\ClassicPro\Label\`). 18 faceplates
+each 3 primitives `BODY|GRIP|GRIP ACCENT` confirmed preserved through meshopt + 1 label.
+Produced via the connected Blender worker + `gltf-transform meshopt` (same as EdgeLabel;
+`python gen2_batch.py` regenerates identically). Per-folder `parts_index.csv` written.
+NB when hand-verifying meshopt GLBs: POSITION accessors are `normalized` SHORTs — world
+= node.translation + node.scale × (v/32767); reading accessor min/max raw looks like
+±32767 garbage. Pre-merge backup: `...Classic Pro_premerge_backup.blend`.
+
+**WIRED INTO BOTH TOOLS (2026-07-13):** generate.js `FACE_FAMILIES.classicpro` —
+plate z 107.32 (mounting plane 92.57 + 29.5/2), extras (shared EdgeLabel accents,
+none on 05H, + `Label_ClassicPro`), no handle. Extras families now carry their
+label/accent placement as FUNCTIONS (labelX/labelY/labelZ/accentZ) so EdgeLabel's
+expressions stay byte-identical (regression-proved across 5 mount/length builds).
+The shared accent seats at mounting plane + 4.375 in BOTH families (raw-GLB face
+profiles match: lower face at mounting + 5.3, accent front 1.4 mm proud —
+raycast-verified frontmost). Classic Pro label: pos.y is a BOTTOM (exports are
+bottom-anchored) — bottom = fp bottom + fpH − 18.16 → the 18.14-tall tilted label
+sits TOP-FLUSH with the plate (0.02 mm), horizontally centered (dx −0.08 = the
+label mesh's bbox skew), z-center = plate z − 0.71. Offsets DERIVED from the
+blend's EVALUATED meshes — `bound_box` LIES here (the label's modifier trims
+~0.9 mm off its top; headless `evaluated_get` + `to_mesh()` per vertex is the
+pattern). Faceplates-step note says "lay the label onto the grip slope".
+main.js FACEPLATE_STYLES gained the classicpro entry (per-size PNGs, series
+links, all six collections; static-kit swap verified round-trip on
+tabletop-185); **renderZoneChips needed ZERO changes** — the third swatch
+(Body/Grip/"Grip accent") falls out of the generic zone discovery. imgFor +
+planner partImage map `Faceplate_ClassicPro_<size>`/"GEN2 Classic Pro Decor
+Faceplate - <size>" → `ClassicPro_<size>.png` (18 renders copied flat into BOTH
+tools' img/parts/). GLB copies: all 18 plates + `Label_ClassicPro` in
+parts/115..270/, the four 1W/2W × 05H/1H sizes + label in parts/59/, 1W-1H (+
+2W-1H for -3w) in the four kit folders. Verified in-browser: 185 classicpro
+#build= (accents/labels/covers place correctly, 3-zone identify card, family
+swap round-trips both generated + static); planner partImage per-size renders.
 
 ## Deferred (designed, not built)
 
