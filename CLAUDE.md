@@ -842,8 +842,11 @@ assumption was wrong; a 2-zone part needs worker + verifier changes):**
   185 EdgeLabel build rows, static-kit swap round-trip restores `_origFp`
   exactly. NO renders yet: Accent / BackCover / Label (identify cards hide the
   missing img) — a future mini render batch.
-- **Still TODO (viewer side):** accent/back-cover/label renders. (Classic Pro is
-  fully wired into both tools as of 2026-07-13 — see the Classic Pro section below.)
+- **Still TODO (viewer side):** accent/label renders. Back-cover renders landed
+  2026-07-13 (`BackCover_<size>.png` ×18, copied into BOTH tools' img/parts/;
+  viewer imgFor + planner partImage map the universal covers to them — the
+  node's `_EdgeLabel_` family name is historical). (Classic Pro is fully wired
+  into both tools as of 2026-07-13 — see the Classic Pro section below.)
 
 ## Decor Faceplates — Classic Pro (thumbnails + GLB DONE — 2026-07-13)
 

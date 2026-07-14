@@ -1328,6 +1328,9 @@ function imgFor(node) {
   if ((m = node.match(/^Faceplate_EdgeLabel_(\dW-\d+H)$/))) return `img/parts/EdgeLabel_${m[1]}.png`;
   // Classic Pro plates have per-size renders too (2026-07-13 batch)
   if ((m = node.match(/^Faceplate_ClassicPro_(\dW-\d+H)$/))) return `img/parts/ClassicPro_${m[1]}.png`;
+  // universal faceplate back covers: per-size renders (2026-07-13 batch) —
+  // the node's family name is historical, the render set serves every family
+  if ((m = node.match(/^BackCover_EdgeLabel_(\dW-\d+H)$/))) return `img/parts/BackCover_${m[1]}.png`;
   return null;
 }
 

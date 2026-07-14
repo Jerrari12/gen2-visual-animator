@@ -13,7 +13,7 @@
     { "node": "Faceplate_EdgeLabel_1W-1H", "label": "EdgeLabel Faceplate 1W-1H", "img": "img/parts/EdgeLabel_1W-1H.png", "type": "Faceplate", "qty": 1,
       "links": { "p": "https://www.printables.com/model/1093933-gen2-decor-faceplates-edgelabel-series", "t": "https://thangs.com/designer/Jerrari/3d-model/GEN2%20Decor%20-%20Faceplate%20-%20EdgeLabel-1215609" } },
     { "node": "Accent_EdgeLabel_1W-1H", "label": "EdgeLabel Accent 1W-1H", "type": "Accent", "qty": 1 },
-    { "node": "BackCover_EdgeLabel_1W-1H", "label": "EdgeLabel Back Cover 1W-1H (optional)", "type": "BackCover", "qty": 1 },
+    { "node": "BackCover_EdgeLabel_1W-1H", "label": "EdgeLabel Back Cover 1W-1H (optional)", "img": "img/parts/BackCover_1W-1H.png", "type": "BackCover", "qty": 1 },
     { "node": "Label_EdgeLabel", "label": "EdgeLabel Label (universal)", "type": "Label", "qty": 1 }
   ],
   "instances": [
