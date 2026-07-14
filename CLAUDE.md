@@ -885,7 +885,14 @@ sits TOP-FLUSH with the plate (0.02 mm), horizontally centered (dx −0.08 = the
 label mesh's bbox skew), z-center = plate z − 0.71. Offsets DERIVED from the
 blend's EVALUATED meshes — `bound_box` LIES here (the label's modifier trims
 ~0.9 mm off its top; headless `evaluated_get` + `to_mesh()` per vertex is the
-pattern). Faceplates-step note says "lay the label onto the grip slope".
+pattern). Faceplates-step note says "lay the label onto the grip slope". **The label
+animates ALONG ITS ANGLED SLOT (Joey 2026-07-13):** FACE_FAMILIES carries
+`labelIn {rise, back}` — EdgeLabel {20, 0} keeps its exact vertical window
+drop (byte-identical), Classic Pro {16, 16} enters up-and-behind then glides
+45° down + back-to-front in the cinematic; main.js `NODE_RITUALS`
+(checked before the type-keyed RITUALS in slideRitual) mirrors the same
+diagonal for the tap ritual — Label_ClassicPro removes [0, 16, −16] up the
+slope and reseats in reverse.
 main.js FACEPLATE_STYLES gained the classicpro entry (per-size PNGs, series
 links, all six collections; static-kit swap verified round-trip on
 tabletop-185); **renderZoneChips needed ZERO changes** — the third swatch

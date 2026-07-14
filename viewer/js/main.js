@@ -1094,9 +1094,16 @@ const RITUALS = {
   Accent:    { path: [[0, -4, 0], [0, -4, 20]],  durs: [260, 380] }, // drop off its clips, pull away
   BackCover: { path: [[0, 4, 0], [0, 4, -20]],   durs: [240, 380] }, // lift off its hooks, draw back
 };
+// per-NODE overrides where a family's seat differs from the type default:
+// the Classic Pro label lives in an ANGLED slot on the grip slope — it
+// removes by sliding 45° up-and-back along the slope (front → back), and
+// reseats down-and-forward, matching the cinematic's diagonal (Joey 2026-07-13)
+const NODE_RITUALS = {
+  Label_ClassicPro: { path: [[0, 16, -16]], durs: [420] },
+};
 let ritualInst = null; // the part the CURRENT selection popped (selection is single)
 async function slideRitual(inst, out, delay = 0) {
-  const r = RITUALS[typeByNode[inst.cfg.node]];
+  const r = NODE_RITUALS[inst.cfg.node] || RITUALS[typeByNode[inst.cfg.node]];
   const child = inst.group.children[0];
   if (!r || !child) return;
   const my = inst._ritualTok = (inst._ritualTok || 0) + 1;

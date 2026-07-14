@@ -325,6 +325,8 @@ export function generateManifest(build) {
                  labelX: (cx, plateW) => cx + 0.47 - (plateW - 1) / 2 + 28.5,
                  labelY: (bottom, fpH) => bottom + 3.72 + fpH - 27,
                  labelZ: (faceZ, dz) => faceZ - 6.3 - dz,
+                 // vertical window: the label drops straight down into it
+                 labelIn: { rise: 20, back: 0 },
                  accentZ: (faceZ, dz) => faceZ - 7.675 - dz },
     classicpro: { key: 'classicpro', node: c => `Faceplate_ClassicPro_${c}`, z: 107.32, hasHandle: false,
                  label: c => `Classic Pro Faceplate ${c}`, extras: true, links: links.fpc, // club family — Classic Pro Series pages
@@ -334,6 +336,10 @@ export function generateManifest(build) {
                  labelX: cx => cx + 0.47 - 0.08,
                  labelY: (bottom, fpH) => bottom + 3.72 + fpH - 18.16,
                  labelZ: (faceZ, dz) => faceZ - 0.71 - dz,
+                 // ANGLED slot on the grip slope: the label slides in at 45°,
+                 // down + back-to-front (Joey 2026-07-13) — main.js
+                 // NODE_RITUALS mirrors the same diagonal for the tap ritual
+                 labelIn: { rise: 16, back: 16 },
                  accentZ: (faceZ, dz) => faceZ - 10.375 - dz },
   };
   // faceplates are SHARED hardware (same GLBs, every collection pool carries
@@ -1076,8 +1082,11 @@ export function generateManifest(build) {
           { move: [{ id: `fa${i}`, by: [0, 4, 0] }] },                            // …up 4 onto its clips
         ] : []),
         ...(face.extras ? [
-          { enter: [{ id: `fl${i}`, at: [0, HOV + 20, 40], from: [0, 25, 0] }] }, // label hovers over its window…
-          { move: [{ id: `fl${i}`, by: [0, -20, 0] }] },                          // …and slides in
+          // label hovers over its seat (up `rise`, and `back` behind it for the
+          // Classic Pro slope slot)… then slides in — straight down for the
+          // EdgeLabel window, a 45° down-and-forward glide for Classic Pro
+          { enter: [{ id: `fl${i}`, at: [0, HOV + face.labelIn.rise, 40 - face.labelIn.back], from: [0, 25, 0] }] },
+          { move: [{ id: `fl${i}`, by: [0, -face.labelIn.rise, face.labelIn.back] }] },
         ] : []),
         ...(bcOn ? [
           { camera: camBack },                                                    // swing behind the plate
