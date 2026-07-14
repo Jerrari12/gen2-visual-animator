@@ -216,11 +216,18 @@ function baseMatFor(type, zone = '') { // shared material per (type, zone) — z
 // re-derive from the active palette (instruction OR custom filament colors).
 const TILED_TYPES = new Set(['FootrailL', 'FootrailU', 'CoverL', 'CoverU', 'Bracket', 'Rail']);
 const ALT_LIGHTEN = 0.16;
+// The lighter alternate-tile shade is an INSTRUCTION-palette readability aid —
+// once the user picks a real filament for the type (hand pick or preset), the
+// tiles render UNIFORM in that color (Joey 2026-07-13: his all-black covers
+// showed one black + one grey tile). Gate = the same test activeHex uses to
+// resolve a custom color, so a type still on instruction colors keeps its
+// two-shade tiling even while other types are customized.
+const altLerp = type => (useCustom && customColors[type] && !colorLocked(type)) ? 0 : ALT_LIGHTEN;
 const altMaterials = {};
 function altMatFor(type) {
   if (!altMaterials[type]) {
     const m = (materials[type] || fallbackMat).clone();
-    m.color.lerp(new THREE.Color('#ffffff'), ALT_LIGHTEN);
+    m.color.set(activeHex(type)).lerp(new THREE.Color('#ffffff'), altLerp(type));
     altMaterials[type] = m;
   }
   return altMaterials[type];
@@ -1653,34 +1660,50 @@ const FILAMENT_DB = [
 // pairs are single types, so setting e.g. QuickLock covers both.
 const _f = (name, hex, url = '#') => ({ name, hex, url });
 const _blk = _f('Black', '#232427'), _pro = _f('Prusa Orange', '#f5820a'),
-      _proP = _f('Prusa Orange PETG', '#f5820a'), _sil = _f('Silver', '#c7ccd2');
+      _proP = _f('Prusa Orange PETG', '#f5820a'), _sil = _f('Silver', '#c7ccd2'),
+      _wht = _f('White', '#eef0f4'), _navy = _f('Holo Blue', '#25316e');
+// Every preset themes the WHOLE build (Joey 2026-07-13): faceplate zones
+// ('Faceplate:GRIP' drives the EdgeLabel/Classic Pro printed-in grip,
+// ':GRIP ACCENT' the Classic Pro rod) + the dressing (Accent/Label/BackCover)
+// + Rail. L/U pairs (covers, footrails) share ONE color per preset — the
+// two-tone look belongs to the instruction palette only (see applyPalette's
+// alt-shade gate).
 const PRESETS = [
   { name: 'The Jerrari', swatches: ['#232427', '#f5820a', '#c7ccd2'], colors: {
     Case: _blk, Drawer: _blk, CoverL: _blk, CoverU: _blk, Bracket: _blk,
-    FootrailL: _blk, FootrailU: _blk, Foot: _blk,
-    Faceplate: _pro, Handle: _sil,
+    FootrailL: _blk, FootrailU: _blk, Foot: _blk, Rail: _blk,
+    Faceplate: _blk, 'Faceplate:GRIP': _pro, 'Faceplate:GRIP ACCENT': _sil,
+    Accent: _navy, Label: _wht, BackCover: _blk,
+    Handle: _sil,
     QuickLock: _proP, MagnetClip: _proP, Stopper: _proP, Magnet: _sil, Screw: _sil,
   } },
   { name: 'Stealth', swatches: ['#232427', '#4a4c51', '#6e7178'], colors: {
     Case: _blk, Drawer: _f('Dark Grey', '#4a4c51'), CoverL: _blk, CoverU: _blk,
-    Bracket: _blk, FootrailL: _blk, FootrailU: _blk, Foot: _blk,
-    Faceplate: _f('Steel Grey', '#6e7178'), Handle: _sil,
+    Bracket: _blk, FootrailL: _blk, FootrailU: _blk, Foot: _blk, Rail: _blk,
+    Faceplate: _f('Steel Grey', '#6e7178'), 'Faceplate:GRIP': _f('Dark Grey', '#4a4c51'), 'Faceplate:GRIP ACCENT': _sil,
+    Accent: _blk, Label: _wht, BackCover: _blk,
+    Handle: _sil,
     QuickLock: _f('Dark Grey', '#4a4c51'), MagnetClip: _f('Dark Grey', '#4a4c51'),
     Stopper: _f('Dark Grey', '#4a4c51'), Magnet: _sil, Screw: _sil,
   } },
   { name: 'Signal', swatches: ['#232427', '#d23a2e', '#00a5a5'], colors: {
     Case: _blk, Drawer: _f('Red', '#d23a2e'),
-    CoverL: _f('Green', '#3f9b4f'), CoverU: _f('Lime Green', '#9ccb3b'),
-    FootrailL: _f('Blue', '#2f6fbe'), FootrailU: _f('Aqua Blue', '#5cc6e0'), Foot: _f('Purple', '#7a4fb0'),
-    Bracket: _f('Steel Grey', '#6e7178'), Faceplate: _pro, Handle: _f('Yellow', '#f5c542'),
+    CoverL: _f('Green', '#3f9b4f'), CoverU: _f('Green', '#3f9b4f'),
+    FootrailL: _f('Blue', '#2f6fbe'), FootrailU: _f('Blue', '#2f6fbe'), Foot: _f('Purple', '#7a4fb0'), Rail: _f('Blue', '#2f6fbe'),
+    Bracket: _f('Steel Grey', '#6e7178'),
+    Faceplate: _pro, 'Faceplate:GRIP': _f('Yellow', '#f5c542'), 'Faceplate:GRIP ACCENT': _f('Polymaker Teal', '#00a5a5'),
+    Accent: _f('Aqua Blue', '#5cc6e0'), Label: _wht, BackCover: _f('Steel Grey', '#6e7178'),
+    Handle: _f('Yellow', '#f5c542'),
     QuickLock: _f('Polymaker Teal', '#00a5a5'), MagnetClip: _f('Brown', '#7a5236'),
     Stopper: _f('Magenta', '#d4308f'), Magnet: _sil, Screw: _sil,
   } },
   { name: 'Sandstone', swatches: ['#7a5236', '#c8a97e', '#f1e7cf'], colors: {
     Case: _f('Brown', '#7a5236'), Drawer: _f('Tan', '#c8a97e'),
-    CoverL: _f('Beige', '#ddc9a3'), CoverU: _f('Cream', '#f1e7cf'),
-    Bracket: _f('Brown', '#7a5236'), FootrailL: _f('Brown', '#7a5236'), FootrailU: _f('Tan', '#c8a97e'), Foot: _f('Brown', '#7a5236'),
-    Faceplate: _pro, Handle: _f('Steel Grey', '#6e7178'),
+    CoverL: _f('Cream', '#f1e7cf'), CoverU: _f('Cream', '#f1e7cf'),
+    Bracket: _f('Brown', '#7a5236'), FootrailL: _f('Brown', '#7a5236'), FootrailU: _f('Brown', '#7a5236'), Foot: _f('Brown', '#7a5236'), Rail: _f('Brown', '#7a5236'),
+    Faceplate: _pro, 'Faceplate:GRIP': _f('Brown', '#7a5236'), 'Faceplate:GRIP ACCENT': _f('Steel Grey', '#6e7178'),
+    Accent: _f('Tan', '#c8a97e'), Label: _f('Cream', '#f1e7cf'), BackCover: _f('Brown', '#7a5236'),
+    Handle: _f('Steel Grey', '#6e7178'),
     QuickLock: _f('Tan', '#c8a97e'), MagnetClip: _f('Brown', '#7a5236'),
     Stopper: _f('Tan', '#c8a97e'), Magnet: _sil, Screw: _sil,
   } },
@@ -1725,9 +1748,11 @@ const activeHex = key => {
 function applyPalette() {
   for (const [type, mat] of Object.entries(materials)) mat.color.set(activeHex(type));
   for (const [type, mat] of Object.entries(highlightMats)) mat.color.set(activeHex(type));
-  // lightened alternate-tile variants track the active palette too
-  for (const [type, mat] of Object.entries(altMaterials)) mat.color.set(activeHex(type)).lerp(new THREE.Color('#ffffff'), ALT_LIGHTEN);
-  for (const [type, mat] of Object.entries(altHighlightMats)) mat.color.set(activeHex(type)).lerp(new THREE.Color('#ffffff'), ALT_LIGHTEN);
+  // lightened alternate-tile variants track the active palette too — and fall
+  // to lerp 0 (identical to base) for types with a custom filament pick, so a
+  // preset's covers/footrails render uniform without any material reassignment
+  for (const [type, mat] of Object.entries(altMaterials)) mat.color.set(activeHex(type)).lerp(new THREE.Color('#ffffff'), altLerp(type));
+  for (const [type, mat] of Object.entries(altHighlightMats)) mat.color.set(activeHex(type)).lerp(new THREE.Color('#ffffff'), altLerp(type));
   renderChecklist();
   updateColorToggle();
   renderPresets(); // keep the active preset / My-palette chip highlight in step
@@ -1778,17 +1803,22 @@ function renderPresets() {
     return b;
   };
   // the user's own hand-built palette leads (only once they've picked something)
+  let activeName = '';
   if (Object.keys(userPalette).length) {
     const order = ['Case', 'Drawer', 'Faceplate', 'Handle', 'CoverU'];
     const hexes = [...new Set([...order.filter(t => userPalette[t]), ...Object.keys(userPalette)])]
       .map(t => userPalette[t].hex).slice(0, 3);
     const b = chip('My palette', hexes, 'Your own hand-picked filament colors · presets never overwrite these', restoreUserPalette, 'mine');
-    if (cur && cur === palKey(userPalette)) b.classList.add('on');
+    if (cur && cur === palKey(userPalette)) { b.classList.add('on'); activeName = 'My palette'; }
   }
   for (const p of PRESETS) {
     const b = chip(p.name, p.swatches, `Apply the "${p.name}" filament preset`, () => applyPreset(p));
-    if (cur && cur === palKey(p.colors)) b.classList.add('on');
+    if (cur && cur === palKey(p.colors)) { b.classList.add('on'); activeName = p.name; }
   }
+  // name the active palette in the section head, so the state still reads
+  // while the block is collapsed
+  $('preset-active').textContent = activeName ? `· ${activeName}`
+    : useCustom && Object.keys(customColors).length ? '· custom' : '';
 }
 function savePreset() {
   const blob = new Blob([JSON.stringify({ gen2Filaments: 1, colors: customColors }, null, 2)], { type: 'application/json' });
@@ -1815,6 +1845,18 @@ function loadPresetFile(file) {
 $('preset-save').onclick = savePreset;
 $('preset-load').onclick = () => $('preset-file').click();
 $('preset-file').onchange = e => { if (e.target.files[0]) loadPresetFile(e.target.files[0]); e.target.value = ''; };
+// the preset block collapses (chevron, session-remembered) so a growing preset
+// library never crowds the parts panel — the head keeps naming the active
+// palette while folded (Joey 2026-07-13)
+const setPresetsOpen = open => {
+  sessionStorage.setItem('gen2-presets-open', open ? '1' : '0');
+  $('preset-chips').classList.toggle('hidden', !open);
+  $('preset-io').classList.toggle('hidden', !open);
+  $('preset-head').classList.toggle('collapsed', !open);
+  $('preset-head').setAttribute('aria-expanded', String(open));
+};
+$('preset-head').onclick = () => setPresetsOpen($('preset-chips').classList.contains('hidden'));
+setPresetsOpen(sessionStorage.getItem('gen2-presets-open') !== '0');
 renderPresets();
 
 let fmType = null;     // the part type the filament menu is editing

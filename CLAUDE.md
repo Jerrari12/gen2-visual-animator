@@ -239,6 +239,11 @@ engine auto-paces 1.6× any enter phase landing ≥2 tiles of a TILED_TYPES part
 tiles alternate a lighter shade (TILED_TYPES + ALT_LIGHTEN 0.16 — instance
 `alt` flag, altMaterials/altHighlightMats track the active palette, so a 2W
 next to a 1W never fuses visually; materialFor is instance-keyed for this).
+The two-shade tiling is INSTRUCTION-palette-only (Joey 2026-07-13: his black
+preset covers showed one black + one grey tile): `altLerp(type)` drops to 0
+whenever the type has a custom filament pick, recoloring the SAME alt
+materials — no mesh reassignment; a type still on instruction colors keeps
+its tiling even in a mixed palette.
 🐢 `#btn-slow` toggles slow-motion (tween() stretches all step/camera tweens
 2.5×; never the cinema). ⏸ `#btn-pause` freezes the tween clock (stepTweens
 shifts pending t0s while paused, so everything resumes mid-motion exactly);
@@ -405,8 +410,16 @@ material — identify card + pointer line still mark it; the glow returns when
 the menu closes (all 3 close paths + handle swaps route through the helper).
 **Filament presets**
 (main.js PRESETS, shown in the BOM panel): one click sets a filament per type —
-"The Jerrari" (black shell, prusa-orange faceplates, silver handles, orange-PETG
-hardware) + Stealth / Signal / Sandstone. Colors are PLACEHOLDERS (swap for real
+"The Jerrari" (black shell INCLUDING the faceplate body + black back cover,
+prusa-orange GRIP, silver grip-accent rod + handles, holo-blue Accent, white
+Label, orange-PETG hardware — Joey's 2026-07-13 spec) + Stealth / Signal /
+Sandstone. Every preset themes the FULL build now: faceplate zone keys
+('Faceplate:GRIP', ':GRIP ACCENT'), Accent/Label/BackCover, Rail — and L/U
+pairs (covers, footrails) share ONE color per preset (the two-tone pair look
+belongs to the instruction palette; see the alt-shade gate above). The preset
+block is COLLAPSIBLE (`#preset-head` chevron, sessionStorage
+'gen2-presets-open', head names the active palette while folded) so a growing
+preset library never crowds the panel. Colors are PLACEHOLDERS (swap for real
 Panchroma/Prusa variants + affiliate links later). **Preset-proof "My
 palette"** (Joey 2026-07-06): every HAND edit (swatch pick / per-type reset /
 Upload) snapshots the whole working palette into `userPalette` (stored as
