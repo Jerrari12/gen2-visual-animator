@@ -1072,27 +1072,30 @@ export function generateManifest(build) {
         { move: [{ id: `drw${i}`, by: [0, 0, 40] }, ...magIds.map(m => ({ id: m.id, by: [0, 0, 40] }))] },
         { vanish: true, room: 0, camera: camFront },                              // world away → the assembly stage
         { enter: [{ id: `fp${i}`, at: [0, HOV, 40], from: [0, 30, 0] }] },        // the bare plate floats in
+        // Each dressing piece is ONE continuous swoop (enter + `via` waypoints,
+        // arc-length eased in main.js): approach and press-on used to be
+        // separate phases, and easing to a dead stop between them read as a
+        // weird mid-air stall (Joey 2026-07-13). The `at` + via net still
+        // lands each piece exactly at the unit hover, so nothing downstream
+        // (unit slide-down, homeMove) changes.
         ...(face.hasHandle ? [
-          { enter: [{ id: `h${i}`, at: [0, HOV, 55], from: [0, 0, 30] }] },       // handle arrives out front…
-          { move: [{ id: `h${i}`, by: [0, 0, -15] }] },                           // …and presses on (2× M3)
+          // handle arrives out front and presses on (2× M3)
+          { enter: [{ id: `h${i}`, at: [0, HOV, 55], from: [0, 0, 30], via: [[0, 0, -15]] }] },
         ] : []),
         ...(hasAccent ? [
-          { enter: [{ id: `fa${i}`, at: [0, HOV - 4, 60], from: [0, 0, 30] }] },  // accent arrives riding low…
-          { move: [{ id: `fa${i}`, by: [0, 0, -20] }] },                          // …in 20 (its removal ritual, reversed)
-          { move: [{ id: `fa${i}`, by: [0, 4, 0] }] },                            // …up 4 onto its clips
+          // accent arrives riding low, in 20 (its removal ritual, reversed), up 4 onto its clips
+          { enter: [{ id: `fa${i}`, at: [0, HOV - 4, 60], from: [0, 0, 30], via: [[0, 0, -20], [0, 4, -20]] }] },
         ] : []),
         ...(face.extras ? [
           // label hovers over its seat (up `rise`, and `back` behind it for the
-          // Classic Pro slope slot)… then slides in — straight down for the
+          // Classic Pro slope slot), then slides in — straight down for the
           // EdgeLabel window, a 45° down-and-forward glide for Classic Pro
-          { enter: [{ id: `fl${i}`, at: [0, HOV + face.labelIn.rise, 40 - face.labelIn.back], from: [0, 25, 0] }] },
-          { move: [{ id: `fl${i}`, by: [0, -face.labelIn.rise, face.labelIn.back] }] },
+          { enter: [{ id: `fl${i}`, at: [0, HOV + face.labelIn.rise, 40 - face.labelIn.back], from: [0, 25, 0], via: [[0, -face.labelIn.rise, face.labelIn.back]] }] },
         ] : []),
         ...(bcOn ? [
           { camera: camBack },                                                    // swing behind the plate
-          { enter: [{ id: `bc${i}`, at: [0, HOV + 4, 20], from: [0, 0, -35] }] }, // cover arrives behind, riding high…
-          { move: [{ id: `bc${i}`, by: [0, 0, 20] }] },                           // …forward 20 against the plate back
-          { move: [{ id: `bc${i}`, by: [0, -4, 0] }] },                           // …down 4 onto its hooks
+          // cover arrives behind riding high, forward 20 against the plate back, down 4 onto its hooks
+          { enter: [{ id: `bc${i}`, at: [0, HOV + 4, 20], from: [0, 0, -35], via: [[0, 0, 20], [0, -4, 20]] }] },
         ] : []),
         { appear: true, room: 1, camera: fpStepCam },                             // world returns, camera glides home
         { move: unit.map(p => ({ id: p.id, by: [0, -HOV, 0] })), sync: true },    // the ASSEMBLED unit slides DOWN onto the drawer

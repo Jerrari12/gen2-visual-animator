@@ -497,7 +497,7 @@ function renderCoverBadges() {
 }
 
 // ---------- step animation ----------
-const DUR = { enter: 750, settle: 850, move: 600, fade: 650, stagger: 130, camera: 750 };
+const DUR = { enter: 750, settle: 850, move: 600, fade: 650, stagger: 130, camera: 750, via: 300 };
 let animToken = 0;
 
 async function playStep(i) {
@@ -594,9 +594,25 @@ async function playStep(i) {
       const fromV = to.clone().add(new THREE.Vector3(...e.from));
       inst.group.visible = !inst.styleHidden;
       inst.group.position.copy(fromV);
+      // `via`: cumulative deltas from the landing point, glided through as ONE
+      // arc-length-continuous motion — an approach + press-on reads as a single
+      // swoop instead of easing to a dead stop at every phase boundary (the
+      // faceplate dressing looked like it stalled mid-air, Joey 2026-07-13).
+      // The eased k maps to distance along the polyline, so the path bends
+      // still read as deliberate direction changes — there's just no stop.
+      const pts = [fromV, to, ...(e.via || []).map(d => to.clone().add(new THREE.Vector3(...d)))];
+      const legs = []; let total = 0;
+      for (let s = 1; s < pts.length; s++) { total += pts[s].distanceTo(pts[s - 1]); legs.push(total); }
       jobs.push(tween({
-        duration: DUR.enter * pace, delay: ph.sync ? 0 : n * DUR.stagger * pace,
-        onUpdate: k => inst.group.position.lerpVectors(fromV, to, k)
+        duration: (DUR.enter + DUR.via * (e.via?.length || 0)) * pace, delay: ph.sync ? 0 : n * DUR.stagger * pace,
+        onUpdate: k => {
+          if (!total) { inst.group.position.copy(pts[pts.length - 1]); return; }
+          const d = k * total;
+          let s = legs.findIndex(L => d <= L); if (s === -1) s = legs.length - 1;
+          const prev = s === 0 ? 0 : legs[s - 1];
+          const t = legs[s] === prev ? 1 : (d - prev) / (legs[s] - prev);
+          inst.group.position.lerpVectors(pts[s], pts[s + 1], t);
+        }
       }));
     });
     // move: nudge already-placed instances by a delta (net deltas must cancel

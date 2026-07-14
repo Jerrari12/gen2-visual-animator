@@ -211,7 +211,12 @@ discrepancies). Full numbers live in the kit manifest's `_datums` string.
 
 `instances` (id, node, pos, yaw, stage) + `stages` (named world-offset for bench
 subassemblies) + `steps` with `phases`: `enter` (from = start-offset delta;
-optional `at` = temporary landing offset, e.g. onto a popped-out drawer),
+optional `at` = temporary landing offset, e.g. onto a popped-out drawer;
+optional `via` = cumulative deltas past the landing point, glided through as
+ONE arc-length-continuous eased motion — an approach + press-on as separate
+phases eased to a dead stop at each boundary and read as a mid-air stall
+(Joey 2026-07-13, the faceplate dressing) — the enter's net = at + last via,
+duration DUR.enter + 300/waypoint),
 `settle` (stage name → members tween from staged to final), `move`
 (nudge placed instances by a delta — **net deltas must cancel by the end of the
 step** so prev/jump's computed after-state stays true; used for the per-drawer
