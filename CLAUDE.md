@@ -391,10 +391,19 @@ drawer) — no manifest data, works for generated builds too.
 entry per brand `{brand, line, url, colors[]}`, rendered as collapsible
 sections (session-remembered expansion, count badge) under a live search box
 (filters across brand+line+label; matches force-open; empty state). Adding
-Prusa / Polar / Printed Solids later = appending one DB entry. Today: Elegoo
+Prusa / Polar later = appending one DB entry. Today: Elegoo
 PETG (★ "Elegoo PETG Black", amzn.to affiliate, Joey's budget pick for
 cases/drawer bodies) + Polymaker Panchroma™ PLA (all 28 real 1kg variants,
-Shopify variant ids scraped 2026-07-05, hexes approximated) — swap for
+Shopify variant ids scraped 2026-07-05, hexes approximated) + Printed Solid
+(Jessie) PLA (2026-07-15: 21 solid Basic/Premium colors, hexes + printedsolid.com
+product links scraped from 3dfilamentprofiles.com/filaments/printed-solid;
+PLA-only, solids-only, links-only per Joey — glitter/marble/silk/multicolor +
+Mix Tape/linkless rows excluded; ★ "Printed Solid Mystery Orange" is Joey's
+Handle orange, carries a per-color `pickNote`). Non-Elegoo `pick` swatches use
+`f.pickNote` (falls back to the Elegoo budget-pick text). Viewer-only by design:
+the planner has NO filament-color picker (it delegates color entirely to this 3D
+viewer — syncOptionsToViewer posts faceStyle/handleStyle/backCover/stoppers only,
+never colors), so there is nothing to mirror there. Swap for
 affiliate URLs when Joey has them. Color `label` must stay UNIQUE across
 brands (it's the customColors identity key). Menu carries an affiliate
 disclosure line. Tap a part → swatch in the identify card → filament menu; OR

@@ -1652,6 +1652,32 @@ const FILAMENT_DB = [
     { name: 'Stone Blue',      hex: '#4a6a8a', id: 44863271370809 },
     { name: 'Purple',          hex: '#7a4fb0', id: 44863271600185 },
   ].map(f => ({ ...f, label: `Panchroma ${f.name}`, url: PM(f.id) })) },
+  // Printed Solid (Jessie) PLA — real solid Basic/Premium colors with printedsolid.com
+  // product links (hexes = the flat swatches from 3dfilamentprofiles.com/filaments/printed-solid;
+  // Pure Magenta/Natural read pale — kept as-sourced). Mystery Orange is Joey's Handle orange.
+  { brand: 'Printed Solid', line: 'PLA', url: 'https://www.printedsolid.com/collections/1-75mm-jessie', colors: [
+    { name: 'Mystery Orange',   hex: '#F56233', url: 'https://www.printedsolid.com/products/jessie-pla-1-75mm-x-1kg-mystery-orange', pick: true, pickNote: ' · Joey’s orange for the Handles' },
+    { name: 'Blue Whale Grey',  hex: '#35608E', url: 'https://www.printedsolid.com/collections/filament/products/jessie-pla-1-75mm-x-1kg-blue-whale-grey' },
+    { name: 'Purple Ice',       hex: '#C965EA', url: 'https://www.printedsolid.com/products/jessie-pla-1-75mm-x-1kg-purple-ice' },
+    { name: 'Red Ice',          hex: '#862E26', url: 'https://www.printedsolid.com/collections/jessie/products/jessie-pla-1-75mm-x-1kg-red-ice' },
+    { name: 'White',            hex: '#EFEFEA', url: 'https://www.printedsolid.com/collections/jessie/products/jessie-pla-1-75mm-x-1kg-white' },
+    { name: 'Black',            hex: '#2A242D', url: 'https://www.printedsolid.com/products/jessie-pla-1-75mm-x-1kg-black' },
+    { name: 'Natural',          hex: '#FFFFCC', url: 'https://www.printedsolid.com/products/jessie-pla-1-75mm-x-1kg-natural' },
+    { name: 'PS Red',           hex: '#EC2F26', url: 'https://www.printedsolid.com/products/jessie-pla-1-75mm-x-1kg-ps-red' },
+    { name: 'Safety Orange',    hex: '#F04000', url: 'https://www.printedsolid.com/products/jessie-pla-1-75mm-x-1kg-safety-orange' },
+    { name: 'Yellow Bird',      hex: '#FDC230', url: 'https://www.printedsolid.com/products/jessie-pla-1-75mm-x-1kg-yellow-bird' },
+    { name: 'Neon Green',       hex: '#B1DA00', url: 'https://www.printedsolid.com/products/jessie-pla-1-75mm-x-1kg-neon-green' },
+    { name: 'Bold Blue',        hex: '#0251A7', url: 'https://www.printedsolid.com/products/jessie-pla-1-75mm-x-1kg-bold-blue' },
+    { name: 'Blue Ice',         hex: '#201E8A', url: 'https://www.printedsolid.com/products/jessie-pla-1-75mm-x-1kg-blue-ice' },
+    { name: 'Blue Moon',        hex: '#022679', url: 'https://www.printedsolid.com/products/jessie-pla-1-75mm-x-1kg-blue-moon' },
+    { name: 'Deep Purple',      hex: '#2E073E', url: 'https://www.printedsolid.com/products/jessie-pla-1-75mm-x-1kg-deep-purple' },
+    { name: 'Purple Eater',     hex: '#8E4FB0', url: 'https://www.printedsolid.com/products/jessie-pla-1-75mm-x-1kg-purple-eater' },
+    { name: 'Pure Magenta',     hex: '#FFE0F8', url: 'https://www.printedsolid.com/products/jessie-pla-1-75mm-x-1kg-pure-magenta' },
+    { name: 'Elixir Aquamarine',hex: '#2E8FFF', url: 'https://www.printedsolid.com/products/jessie-premium-elixir-1-75mm-x-aquamarine-1kg' },
+    { name: 'Elixir Gold Rush', hex: '#F0C838', url: 'https://www.printedsolid.com/products/jessie-premium-elixir-1-75mm-x-gold-rush-1kg' },
+    { name: 'Elixir Nightshade',hex: '#501282', url: 'https://www.printedsolid.com/products/jessie-premium-elixir-1-75mm-x-nightshade-1kg' },
+    { name: 'Elixir Royal Ruby',hex: '#A91E16', url: 'https://www.printedsolid.com/products/jessie-premium-elixir-1-75mm-x-royal-ruby-1kg' },
+  ].map(f => ({ ...f, label: `Printed Solid ${f.name}` })) },
 ];
 
 // ---------- filament presets ----------
@@ -1886,7 +1912,7 @@ function renderFilamentBrands() {
       for (const f of colors) {
         const b = document.createElement('button');
         b.style.background = f.hex;
-        b.title = f.label + (f.pick ? ' · Joey’s budget pick for cases & drawer bodies' : '');
+        b.title = f.label + (f.pick ? (f.pickNote || ' · Joey’s budget pick for cases & drawer bodies') : '');
         if (f.pick) b.classList.add('pick');
         if (customColors[fmType]?.name === f.label) b.classList.add('active');
         b.onclick = () => {
