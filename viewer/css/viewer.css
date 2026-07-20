@@ -572,8 +572,13 @@ body.embed #note-panel .note-body { overflow-y: auto; max-height: calc(34vh - 20
    OPEN parts panel owns the pane — the note returns when it closes (✕, or
    tapping a part folds the panel) */
 body.embed.panel-open #note-panel { display: none; }
-#btn-preview { display: none; }                    /* embed-only: the way back to the preview landing */
-body.embed #btn-preview { display: flex; }         /* flex (not inline-flex) — keeps the tool group's column icon/caption layout */
+/* embed-only: the way back to the preview landing. Needs the double-id
+   specificity — a bare #btn-preview{display:none} LOSES to the
+   `#ctl-tools button{display:flex}` base rule, which shipped the Preview
+   tool to the standalone viewer and wrapped the mobile controls bar
+   (Joey's phone repro, 2026-07-19). */
+#controls #btn-preview { display: none; }
+body.embed #controls #btn-preview { display: flex; } /* flex (not inline-flex) — keeps the tool group's column icon/caption layout */
 body.embed-preview #controls { display: none; }
 body.embed-preview #note-panel { display: none; }
 #embed-begin { display: none; }
@@ -582,11 +587,18 @@ body.embed-preview #embed-begin {
   position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%);
   z-index: 30;
   font: inherit; font-weight: 700; font-size: 14px;
-  padding: 11px 20px; border-radius: 999px;
+  padding: 11px 20px; border-radius: 8px; /* the planner's button shape (Joey) */
   border: 1px solid var(--accent); background: var(--accent); color: #fff;
   cursor: pointer; box-shadow: 0 6px 20px rgba(0,0,0,.22);
 }
 body.embed-preview #embed-begin:hover { filter: brightness(1.07); }
+/* the Begin pill owns bottom-center on the preview — lift the identify card
+   clear of it (Joey: tapping a part buried the card's style arrows under the
+   pill). Desktop widths only: the ≤560 bottom-sheet card layers ABOVE the
+   pill already (z 32 vs 30). */
+@media (min-width: 561px) {
+  body.embed-preview #identify-card { bottom: 72px; }
+}
 #embed-hint { display: none; }
 body.embed-preview.embed-hint-on #embed-hint {
   display: block;
@@ -626,8 +638,10 @@ body.embed-preview.embed-hint-on #embed-hint {
   background: #fff; border-top: 1px solid var(--panel-border);
 }
 #controls button {
-  font: inherit; font-weight: 600; font-size: 14px;
-  padding: 10px 18px; border-radius: 10px;
+  /* radius 8 + weight 700 = the planner's button vocabulary (2026-07-19,
+     Joey: the two tools should read as one app; same accent + font already) */
+  font: inherit; font-weight: 700; font-size: 14px;
+  padding: 10px 18px; border-radius: 8px;
   border: 1px solid var(--panel-border); background: #fff; color: var(--ink);
   cursor: pointer;
 }
@@ -751,6 +765,14 @@ body.embed-preview.embed-hint-on #embed-hint {
   #controls button { padding: 11px 8px; }
   #ctl-tools { gap: 3px; }
   #ctl-tools button { padding: 5px 5px 4px; min-width: 0; }
+  /* the embed adds a FIFTH tool (Preview) — slim Back/Next, the tools and
+     the gaps so Back + 5 tools + Next hold ONE row even at the 380px dock
+     floor (measured: the six-button row ran 389px at the old paddings) */
+  body.embed #controls { gap: 8px 4px; }
+  body.embed #ctl-tools { gap: 4px; }
+  body.embed #controls button { padding: 8px 6px; font-size: 13px; }
+  body.embed #ctl-tools button { padding: 4px 4px 3px; }
+  body.embed #ctl-tools button span { font-size: 8px; }
   #ctl-tools button span { font-size: 8.5px; }
   /* the step dots get their own full-width row ABOVE the buttons — squeezed
      between Back and the tool group they used to wrap into a tall vertical

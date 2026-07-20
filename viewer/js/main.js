@@ -2070,10 +2070,15 @@ const HANDLE_STYLES = [
   { node: 'Handle_BlockBar_D', label: 'BlockBar D', planner: 'blockbar', h: 9,  d: 9 },
   { node: 'Handle_BlockBar_E', label: 'BlockBar E', planner: 'blockbar', h: 10, d: 24 },
   { node: 'Handle_BlockBar_F', label: 'BlockBar F', planner: 'blockbar', h: 9,  d: 24 },
+  // Crystal series (2026-07-20 GLB batch): A standard + B wide, same 44 mm
+  // mount spacing; dims from Handles/Crystal/parts_index.csv.
+  { node: 'Handle_Crystal_A', label: 'Crystal A',      planner: 'crystal', h: 11.78, d: 19.07 },
+  { node: 'Handle_Crystal_B', label: 'Crystal B Wide', planner: 'crystal', h: 11.78, d: 19.07 },
 ];
 const HANDLE_LINKS = {
   deco:     { p: 'https://www.printables.com/model/1044972-gen2-decor-handles-deco-series', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20Decor%20Handles%20-%20Deco%20Series-1159960' },
   blockbar: { p: 'https://www.printables.com/model/965604-gen2-decor-handles-blockbar-series', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20Decor%20-%20Handles%20-%20BlockBar-1116949' },
+  crystal:  { p: 'https://www.printables.com/model/1001155-gen2-decor-handles-crystal', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20Decor%20-%20Handles%20-%20Crystal-1134382' },
 };
 const currentHandleStyleIndex = () => {
   const inst = [...instances.values()].find(i => typeByNode[i.cfg.node] === 'Handle');

@@ -5,7 +5,7 @@
 // 2026-07-04 (see CLAUDE.md "Placement math"). Rules generalized from the
 // 1H ground truth are marked DERIVED; positions Joey tuned by eye are
 // marked TUNED. Scope: all six collections (59/115/165/185/240/270) — tabletop
-// and wall everywhere; under-table everywhere (all six rail GLB sets landed 2026-07-19). The 59
+// and wall everywhere; under-table only where rail GLBs exist (165/185). The 59
 // is a mini collection: 1W/2W × 05H/1H only, and NO footrails BY DESIGN (Joey
 // 2026-07-10: too shallow to be stable on rails) — feet go into every bottom
 // case's own underside slots instead.
@@ -28,11 +28,8 @@ let CAM_DEPTH = DEPTH;                        // cam()'s size floor — raised p
 // Assembly Example): QuickLock / stopper / feet / under-table-screw Z. Verify by
 // eye against a printed 165 build, same as the non-1H drawers.
 const COLL = {
-  // railScrewBack = the rail's rear screw-hole row, inset from the rail BACK
-  // face (MEASURED per length 2026-07-19, all widths agree; default 36 = the
-  // 185 calibration, which 270 matches exactly). See utScrewBackZ below.
   185: { depth: 185, railDepth: 201 },
-  165: { depth: 165, railDepth: 179, railScrewBack: 34 },
+  165: { depth: 165, railDepth: 179 },
   // 2026-07-10: the four remaining lengths (cases/drawers/covers landed in the
   // library). railDepth absent = no under-table rail GLBs yet → UT builds error.
   // ALL hardware Z for these lengths is DERIVED from the 185 calibration via
@@ -44,20 +41,10 @@ const COLL = {
   // lip). It's case depth + 10 everywhere except 59/115, whose exports run
   // 0.11 shy (parts_index.csv ground truth) — generateManifest defaults the
   // rest to depth + 10.
-  59:  { depth: 59, noTabletop: true, maxW: 2, maxHH: 2, classicDepth: 68.89, railDepth: 74.89, railScrewBack: 16.89 },
-  // 2026-07-19: 115 + 270 + 240 rail GLBs landed (exported from D:\Render
-  // Projects\GEN2 Under-table Rails.blend — facing verified against the
-  // canonical 185 front-ridge signature). Depths from parts_index.csv:
-  // 115 = 130.9 (115 + 15.9 back overhang), 270 = 286 (270 + 16) — railZ
-  // derives to −7.95 / −8.0, matching the 185 calibration. The 240 Lite rail
-  // is exactly 240 deep (NO back overhang — Joey's fixed models, later same
-  // day) → railZ derives to 0: front-aligned and back-flush. The 59 rails
-  // (gen2-ql-rail-*-small, renamed GEN2 Rail - 59-<w>W) landed last: 74.89
-  // deep (59 + 15.9 back overhang, railZ −7.945) — EVERY collection has rail
-  // GLBs now.
-  115: { depth: 115, classicDepth: 124.89, railDepth: 130.9, railScrewBack: 42.4 },
-  240: { depth: 240, railDepth: 240, railScrewBack: 20 },
-  270: { depth: 270, railDepth: 286 },
+  59:  { depth: 59, noTabletop: true, maxW: 2, maxHH: 2, classicDepth: 68.89 },
+  115: { depth: 115, classicDepth: 124.89 },
+  240: { depth: 240 },
+  270: { depth: 270 },
 };
 
 // Wall mount — CALIBRATED 2026-07-05 from Joey's case-to-bracket reference
@@ -111,6 +98,7 @@ const LINKS = {
   fpc:   { p: 'https://www.printables.com/model/1291210-gen2-decor-faceplates-classic-pro-series', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20Decor%20-%20Faceplates%20-%20Classic%20Pro%20Series-1332444' },
   h:     { p: 'https://www.printables.com/model/1044972-gen2-decor-handles-deco-series', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20Decor%20Handles%20-%20Deco%20Series-1159960' },
   hb:    { p: 'https://www.printables.com/model/965604-gen2-decor-handles-blockbar-series', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20Decor%20-%20Handles%20-%20BlockBar-1116949' },
+  hc:    { p: 'https://www.printables.com/model/1001155-gen2-decor-handles-crystal', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20Decor%20-%20Handles%20-%20Crystal-1134382' },
   // fallbacks when a length has no page of its own yet
   kit:   { p: 'https://www.printables.com/model/1118906-gen2-table-top-kit-v2-185-standard', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20Table%20Top%20Kit%20V2%20-%20185-1231757' },
   wall:  { p: 'https://www.printables.com/model/1777719-gen2-wall-mount-brackets', t: 'https://than.gs/m/1574321' }, // universal brackets page (2026-07-12 — replaced the old -59 placeholder)
@@ -196,8 +184,8 @@ const LINKS_BY_LEN = {
     240: { p: 'https://www.printables.com/model/1777719-gen2-wall-mount-brackets', t: 'https://than.gs/m/1574321' },
     270: { p: 'https://www.printables.com/model/1777719-gen2-wall-mount-brackets', t: 'https://than.gs/m/1574321' },
   },
-  rail: { // all six lengths have real pages (2026-07-12) AND real GLBs — UT
-          // GENERATES for every collection (2026-07-19 batches)
+  rail: { // all six lengths have real pages now (2026-07-12) — UT still only
+          // GENERATES for 165/185 (no rail GLBs elsewhere), but the links are ready
     59:  { p: 'https://www.printables.com/model/1053797-gen2-rails-59-small', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20RAILS%20-%20SMALL-1165763' },
     115: { p: 'https://www.printables.com/model/1053795-gen2-rails-115-medium', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20RAILS%20-%20MEDIUM-1165720' },
     165: { p: 'https://www.printables.com/model/1053557-gen2-rails-165-mini', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20RAILS%20-%20165-1165793' },
@@ -277,25 +265,20 @@ export function generateManifest(build) {
   // FIT shots that bookend each step still restore full-build context.
   const caseR = (w, h) => Math.max(430, Math.hypot(w * PITCH_X, h, depth) / 2 * 3.0);
   if (isUT && COLL[L] && !coll.railDepth)
-    errors.push(`Under-table rails for the ${L} collection aren't in the 3D part library yet.`);
+    errors.push(`Under-table rails for the ${L} collection aren't in the 3D part library yet · 165 and 185 under-table builds for now.`);
   // planner mountBlocksLength() greys 59 tabletop out, so this only fires on a
   // hand-built link — same physical reason as the planner's tooltip.
   if (!hangs && coll.noTabletop)
     errors.push(`The ${L} collection can't be table-top mounted · it has no foot rails and no feet slots (too shallow to be stable). Wall-mount builds work.`);
   // Under-table rail: front-aligned with the case front (= depth/2). The rail
-  // (railDepth deep) overhangs the case back. Screw rows sit on MEASURED hole
-  // rows (2026-07-19, evaluated meshes in the rails render blend — hole-bore
-  // face clustering; Joey caught the 59 back screws floating ~18 mm off):
-  // FRONT row is 12 mm from the rail front on every length (screw pos = axis
-  // − 3.43, the radial offset the pitched WoodScrew GLB carries → 15.43).
-  // BACK row inset from the rail back varies per collection (railScrewBack in
-  // COLL, default 36 = the 185 calibration; 270 measured 36 too, 165 measured
-  // 34 — 2 mm off the old derived value, 115 = 42.4, 240 = 20, 59 = 16.89).
-  // Every measured back row carries holes exactly at the end + seam screw Xs.
+  // (railDepth deep) overhangs the case back. Screw rows keep the SAME inset
+  // from each rail face as the 185 calibration (DERIVED for 165). front inset
+  // 15.43, back inset 32.57 (from the 201-deep 185 rail: front 92.5→77.07,
+  // back −108.5→−75.93).
   const railFrontZ = depth / 2, railBackZ = depth / 2 - (coll.railDepth || 201); // fallback only pads the error path (UT without rails errors above)
   const railZ = (railFrontZ + railBackZ) / 2;         // −8 (185) / −7 (165)
   const utScrewFrontZ = railFrontZ - 15.43;           // 77.07 (185) / 67.07 (165)
-  const utScrewBackZ = railBackZ + (coll.railScrewBack || 36) - 3.43; // −75.93 (185) / −65.93 (165)
+  const utScrewBackZ = railBackZ + 32.57;             // −75.93 (185) / −63.93 (165)
   // Classic drawer closed Z — DERIVED 2026-07-11 from measured part geometry
   // (no assembled ground truth): the classic's back wall (same 2.6 mm wall +
   // magnet clip slot as the decor) aligns with the calibrated decor back,
@@ -398,10 +381,13 @@ export function generateManifest(build) {
   // (or feet-on-case).
   const row0 = hangs ? 0 : (caseFeet ? 7.65 : ROW0_BOTTOM);
 
-  // handle style from the planner build (crystal not modeled yet -> Deco)
+  // handle style from the planner build — all three series modeled (Crystal
+  // GLBs landed 2026-07-20; starts at Crystal A, B Wide cycles in the studio
+  // like the BlockBar variants). Unknown future families still warn + Deco.
   const HANDLE_STYLES = {
-    deco:     { node: 'Handle_Deco',       label: 'Deco Handle',        h: 9, d: 24, links: links.h },
-    blockbar: { node: 'Handle_BlockBar_A', label: 'BlockBar Handle',    h: 9, d: 9,  links: links.hb },
+    deco:     { node: 'Handle_Deco',       label: 'Deco Handle',     h: 9,     d: 24,    links: links.h },
+    blockbar: { node: 'Handle_BlockBar_A', label: 'BlockBar Handle', h: 9,     d: 9,     links: links.hb },
+    crystal:  { node: 'Handle_Crystal_A',  label: 'Crystal Handle',  h: 11.78, d: 19.07, links: links.hc },
   };
   const handleStyle = HANDLE_STYLES[build.handleStyle] || HANDLE_STYLES.deco;
   if (build.handleStyle && !HANDLE_STYLES[build.handleStyle])
@@ -1334,9 +1320,9 @@ function imgFor(node) {
   if (/^C[LU]-\d+-\dW$/.test(node) || /^FR-[LU]_\d+-\dW$/.test(node)) return `img/parts/${node}.png`;
   // wall brackets: per-width renders (2026-07-11 batch), universal across lengths
   if ((m = node.match(/^WallMount_Lite_(\dW)$/))) return `img/parts/WallMount_Lite_${m[1]}.png`;
-  // under-table rails: per-length + per-width renders (2026-07-19 batch, all six
-  // lengths) — flat "Rails <L>-<w>W.png", same art as the planner's BOM rows
-  if ((m = node.match(/^UnderTableRail_(\d+)-(\d)W$/))) return `img/parts/Rails ${m[1]}-${m[2]}W.png`;
+  // decor handles: per-variant renders named by node (2026-07-20 batch —
+  // Deco, BlockBar A–F, Crystal A/B) — lights up the handle BOM rows
+  if (node.startsWith('Handle_')) return `img/parts/${node}.png`;
   // mirror parts: the R render is the L one flipped horizontally (2026-07-10)
   if (node === 'QuickLock-R') return 'img/parts/QuickLock-R.png';
   if (node.startsWith('QuickLock')) return 'img/parts/QuickLock.png';

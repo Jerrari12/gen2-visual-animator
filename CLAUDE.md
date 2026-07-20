@@ -437,7 +437,21 @@ rule — setChecklist stamps body.panel-open, `body.embed.panel-open
 still underlapped at narrow dock widths, Joey's 2nd repro). The tap-hint
 retires on the FIRST pointerdown anywhere (capture-phase document listener —
 canvas, pills, panel, controls all count as "got it"; not embed-scoped, the
-✕-hunt annoyed on every layout). The
+✕-hunt annoyed on every layout). Button vocabulary matches the planner
+(2026-07-19): #controls buttons + #embed-begin radius 8 + weight 700 —
+accent (#ff8a40) and font stack were already identical; the light stage
+stays deliberately (filament colors read true against it, vs the planner's
+dark app chrome). ⚠ #btn-preview's embed-only hiding needs DOUBLE-ID
+specificity (`#controls #btn-preview`) — a bare id rule loses to
+`#ctl-tools button{display:flex}` and shipped the Preview tool to the
+standalone viewer, wrapping the mobile controls row (Joey's phone).
+Narrow-embed squeeze in the 560px block (`body.embed #controls…`): Back +
+FIVE tools + Next measured 389px at old paddings — slimmed to ~367 so one
+row holds at the 380px dock floor. On the embed preview the identify card
+lifts to bottom:72px (>560px widths only) clear of the Begin pill — a
+selected part's card used to bury its style arrows under it (Joey).
+NB planner handleStyles[0] is now DECO (its default + sanitize fallback);
+the generator's own `|| HANDLE_STYLES.deco` fallback already matched. The
 preview rides the FINAL STEP's state (dims, identify, colors all free), so
 `regenerate()` re-lands on `steps.length` while previewMode (min(cur,…)
 would strand it a step short when the layout grows) and a user's orbit
@@ -738,9 +752,14 @@ mount back-face against the faceplate front (= fp z-center + 2.5 — 97.57/185,
 87.57/165; derived from the faceplate instance, never hardcoded — a hardcoded
 97.57 once left 165 handles floating 10 mm out), vertically centered on the
 faceplate — registry in
-main.js HANDLE_STYLES (Deco + BlockBar A–F); swaps postMessage
+main.js HANDLE_STYLES (Deco + BlockBar A–F + Crystal A/B Wide — Crystal GLBs
+landed 2026-07-20, dims 11.78×19.07 from GLB Library/Handles/Crystal
+parts_index.csv, copies in all six pools); swaps postMessage
 {gen2:"handleStyle"} back to the planner opener tab, which updates
-state.handleStyle live. Generator honors build.handleStyle (blockbar → A).
+state.handleStyle live. Generator honors build.handleStyle (blockbar → A,
+crystal → Crystal A; unknown ids fall back to Deco + a warning). All nine
+handles have node-named 256p renders flat in viewer/img/parts/ (imgFor
+`Handle_*` → `img/parts/<node>.png`) serving BOM rows + identify cards.
 **Brick stagger (planner `brickTiling()` in data.js, mirrored in generate.js):**
 FR-U over FR-L and CU over CL must have offset seams so the layers tie sections
 together — odd runs: 1W on opposite ends (upper-left / lower-right); even ≥4:
