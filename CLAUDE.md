@@ -382,8 +382,26 @@ opens the viewer WITHOUT noopener and both post `{gen2:'buildOptions', opts}`
 (closures/removedStoppers/wallStagger/handleStyle) on change; echo-guarded
 (applyingRemote + ignore-if-unchanged). Planner mirrors the model
 (`state.removedStoppers` in BUILD_FIELDS, sanitized, in share links; stopper BOM
-subtracts removed pairs). Local dev needs a hard-refresh after JS edits (module
-cache; deploys are SHA-stamped so prod is immune).
+subtracts removed pairs). **Live LAYOUT sync (2026-07-19, Joey's ask):** the
+planner also posts `{gen2:'layout', build}` (the FULL serializeBuild, debounced
+350 ms + sig-guarded so option-only changes never ride it) whenever units are
+placed/moved/removed — main.js `applyRemoteLayout` replaces `build` +
+`originalBuild` wholesale and regenerates in place (layoutKey compare drops
+echoes/no-ops; steps follow the layout live). Mount OR length change instead
+rewrites `location.hash` + `location.reload()` (backdrop + PARTS_BASE pool are
+page-lifetime). While the planner's layout is instructions-blocked it posts
+`{gen2:'layoutBlocked', reason}` → `#blocked-overlay` veils the stage ("Fix
+the build in the planner" + the reason, scene stays mounted dimmed behind);
+the next legal layout hides it. A layout the planner allows but the generator
+can't show (its errors) veils the same way and keeps the old scene. Handshake:
+the viewer posts `{gen2:'viewerReady'}` to its opener after boot; the planner
+(re)captures `viewerWin` from ANY incoming gen2 message's `e.source` and
+answers viewerReady with an immediate layout post — so sync survives a
+planner reload (once the viewer speaks) AND a viewer self-reload. `booted`
+gate drops layout messages during boot; a layout arriving mid-regenerate
+retries in 250 ms so the newest state is never dropped. Local dev needs a
+hard-refresh after JS edits (module cache; deploys are SHA-stamped so prod is
+immune).
 The checklist step shows an engine-computed **exploded parts preview** (radial
 spread from assembly center + per-type pushes; riders explode with their
 drawer) — no manifest data, works for generated builds too.
@@ -532,10 +550,17 @@ per-collection pool `viewer/parts/<L>/` (`59/115/165/185/240/270` — each
 self-contained: the collection GLBs + copies of the shared hardware/faceplate
 GLBs; lazy per node; `PARTS_BASE` in main.js = `parts/${manifest.collection}/`;
 the 59 pool is trimmed to its 1W/2W × 05H/1H faceplate-family sizes).
-Scope (2026-07-10, ALL SIX lengths): **tabletop + wall for every collection;
-under-table only 165 + 185** (no rail GLBs for the rest — generate.js errors,
-and the planner's updateInstructionsButton greys under-table out for other
-lengths with the reason); **59 is hanging-only** (`COLL[59].noTabletop` +
+Scope (2026-07-19): **ALL THREE MOUNTS for ALL SIX collections** — the last
+gap closed when the 2026-07-19 rails batch landed rail GLBs for 59/115/240/270
+(`2026-07-19-under-table-rails-batch.md` is the run log; `COLL[L].railDepth`
+per length: 59=74.89 / 115=130.9 / 165=179 / 185=201 / 240=240 flush-back /
+270=286; a length WITHOUT railDepth still errors gracefully, and the planner's
+`VIEWER_UT_LENGTHS` + updateInstructionsButton machinery — visible reason line,
+board note, length-card "no 3D guide yet" badges, 2026-07-19 — stands ready to
+grey any future capability gap). Rail BOM rows show the per-length renders
+(imgFor `UnderTableRail_<L>-<w>W` → flat `Rails <L>-<w>W.png`, 24 copied from
+`D:\Render Projects\GEN2 Thumbnails`; planner partImage serves the same art
+from `img/parts/<L>/`); **59 is hanging-only** (`COLL[59].noTabletop` +
 maxW/maxHH guards — no foot rails, no feet slots; mirrors the planner's
 mountBlocksLength). classic drawers are full 3D parts (2026-07-11 — see the
 GLB Library section for the derived placement); shelf >1H /
@@ -566,10 +591,19 @@ stopper/front-feet `−dz`, magnet clip+magnet/back-feet `+dz`. Wall mount is
 BACK-aligned (case back meets the bracket) → the bracket + wood screws shift
 `+dz` forward to meet the shorter back; front hardware is unchanged from tabletop.
 Under-table rail front-aligns with the case front (`railZ = depth/2 − railDepth/2`
-→ −8/185, −7/165); its screw rows keep the same inset from each rail face.
+→ −8/185, −7/165); its screw rows sit on **MEASURED hole rows (2026-07-19)** —
+front 12 mm from the rail front on EVERY length, back per-length
+(`COLL[L].railScrewBack`, inset from the rail back: 59=16.89 / 115=42.4 /
+165=34 / 240=20; default 36 = the 185 calibration, 270 matches it). Measured by
+hole-bore face-clustering on the rails blend's evaluated meshes after Joey
+caught the 59 back screws floating ~18 mm off (the old one-size-fits-all 36
+was wrong on three lengths, incl. 165 by 2 mm); every measured back row carries
+holes exactly at the end+seam screw Xs on all widths. Screw pos = hole axis
+− 3.43 (the radial offset the pitched WoodScrew GLB carries).
 **DERIVED, no 165 ground-truth assembly** (185 was calibrated against the TableTop
-Assembly Example): QuickLock / stopper / feet / UT-screw Z — verify by eye on a
-printed 165 build, like the non-1H drawers. 165 has no BOM renders yet (imgFor
+Assembly Example): QuickLock / stopper / feet Z — verify by eye on a
+printed 165 build, like the non-1H drawers (UT-screw Z graduated to MEASURED,
+see above). 165 has no BOM renders yet (imgFor
 reuses the 185 render); LINKS still point at the 185 Printables/Thangs pages
 (swap when 165 URLs exist). Verified 2026-07-06: all 3 mounts generate, every
 GLB resolves in `parts/165/`, 185 output byte-identical (no regression).

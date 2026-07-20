@@ -2882,9 +2882,50 @@ let syncBuildToPlanner = () => {
   if (applyingRemote || !build || !window.opener) return;
   try { window.opener.postMessage({ gen2: 'buildOptions', opts: currentOpts() }, '*'); } catch (e) { /* cross-origin opener gone */ }
 };
+// ---- live layout sync (planner → viewer, 2026-07-19) ----
+// The planner posts its FULL serialized build (same shape as the #build= hash)
+// whenever units are placed / moved / removed there; options keep riding the
+// buildOptions channel below. While the planner reports the layout blocked
+// (floating case, non-flat top, … — its own greyed-button reasons), the page
+// pauses under #blocked-overlay with the reason; the old scene stays mounted
+// so the next legal layout regenerates in place. Mount/length changes reload
+// onto the new hash instead (backdrop + parts pool are page-lifetime).
+let booted = false, layoutRetryTimer = 0;
+const showBlocked = r => { $('blocked-reason').textContent = r; $('blocked-overlay').classList.remove('hidden'); };
+const hideBlocked = () => $('blocked-overlay').classList.add('hidden');
+const layoutKey = b => JSON.stringify([b.mount, +b.length, (b.placed || []).map(u =>
+  [u.id, u.x, u.y, u.w, u.hh, u.fill, u.shelves || 0, u.label || '', u.closure || '', JSON.stringify(u.interior ?? null)])]);
+async function applyRemoteLayout(nb) {
+  if (!booted || !nb || !Array.isArray(nb.placed) || !nb.placed.length) return;
+  if (regenBusy) { // mid-regenerate from an earlier message — retry, never drop the newest state
+    clearTimeout(layoutRetryTimer);
+    layoutRetryTimer = setTimeout(() => applyRemoteLayout(nb), 250);
+    return;
+  }
+  hideBlocked();
+  if (layoutKey(nb) === layoutKey(build)) return; // no-op/echo (e.g. the viewerReady handshake)
+  if (nb.mount !== build.mount || +nb.length !== +build.length) {
+    location.hash = '#build=' + btoa(unescape(encodeURIComponent(JSON.stringify(nb))));
+    location.reload(); // hash-only changes don't navigate — force it
+    return;
+  }
+  let gen;
+  try { gen = generateManifest(nb); }
+  catch (err) { showBlocked('This layout can’t be shown: ' + ((err && err.message) || err)); return; }
+  if (!gen.manifest) { showBlocked((gen.errors || []).join(' · ') || 'This layout can’t be shown.'); return; }
+  applyingRemote = true;
+  try {
+    build = nb;
+    originalBuild = structuredClone(nb); // the Reset-to-original baseline follows the planner
+    await regenerate();
+  } finally { applyingRemote = false; }
+}
 addEventListener('message', async (e) => {
   const d = e.data;
-  if (!d || d.gen2 !== 'buildOptions' || !d.opts || !build || regenBusy) return;
+  if (!d || !build) return;
+  if (d.gen2 === 'layoutBlocked' && typeof d.reason === 'string') { showBlocked(d.reason); return; }
+  if (d.gen2 === 'layout' && d.build) { await applyRemoteLayout(d.build); return; }
+  if (d.gen2 !== 'buildOptions' || !d.opts || regenBusy) return;
   const o = d.opts;
   // ignore a message that matches our current state — this is what breaks the
   // planner↔viewer echo loop (an applied change bounces back identical → dropped)
@@ -2971,6 +3012,11 @@ await mountManifest(manifest);
 applyPalette(); // restore any saved filament colors
 $('loading-overlay').remove();
 goTo(0); // open on the cover
+booted = true;
+// introduce this tab to the opener planner so live layout sync works even
+// after a planner reload (it re-captures our window from any gen2 message)
+// — the planner replies with the current layout, which no-ops if unchanged.
+if (build && window.opener) { try { window.opener.postMessage({ gen2: 'viewerReady' }, '*'); } catch (e) { /* opener gone */ } }
 
 renderer.setAnimationLoop(now => {
   resize();

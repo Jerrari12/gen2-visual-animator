@@ -541,6 +541,28 @@ body {
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
+/* Live-sync blocked veil: the planner reported an un-instruction-able layout.
+   Sits over the whole stage (scene stays mounted, dimmed behind) and eats
+   pointer events so nothing is interactable until a legal layout arrives. */
+#blocked-overlay {
+  position: absolute; inset: 0; z-index: 60;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(24, 25, 28, 0.55);
+  backdrop-filter: blur(2px);
+}
+#blocked-overlay.hidden { display: none; }
+.blocked-card {
+  max-width: 420px; margin: 16px;
+  background: #fff; border-radius: 14px;
+  padding: 22px 26px;
+  box-shadow: 0 12px 40px rgba(0,0,0,.35);
+  text-align: center;
+}
+.blocked-icon { font-size: 30px; line-height: 1; }
+.blocked-card h2 { margin: 10px 0 8px; font-size: 17px; color: var(--ink); }
+#blocked-reason { margin: 0 0 10px; font-size: 13.5px; line-height: 1.5; color: var(--ink); }
+.blocked-hint { margin: 0; font-size: 12px; line-height: 1.5; color: var(--ink-soft); }
+
 #controls {
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
   padding: 10px 14px;

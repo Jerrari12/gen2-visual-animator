@@ -137,6 +137,17 @@
       </div>
 
       <div id="loading-overlay"><div class="spinner"></div><div id="loading-text">Loading parts…</div></div>
+      <!-- Live-sync guard: while the planner reports an instructions-blocked
+           layout (floating case, non-flat top, …) the scene pauses under this
+           veil; the next legal layout hides it and regenerates. -->
+      <div id="blocked-overlay" class="hidden">
+        <div class="blocked-card">
+          <div class="blocked-icon">⚠</div>
+          <h2>Fix the build in the planner</h2>
+          <p id="blocked-reason"></p>
+          <p class="blocked-hint">This 3D guide pauses while the layout has a problem · it catches up automatically the moment the planner board is fixed.</p>
+        </div>
+      </div>
     </div>
 
     <footer id="controls">

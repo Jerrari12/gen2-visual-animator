@@ -298,6 +298,50 @@
       "code_regex": "270-\\d+W-\\d+H",
       "name_template": "ClassicDrawer_{code}",
       "depth_mode": "center"
+    },
+    {
+      "name": "Under-Table Rails (115)",
+      "_note": "115 under-table rails, 1W-4W (130.9mm deep), exported 2026-07-19 from the Render Projects blend (collections 115/165/240/270 + 185 at top level). Facing verified via the front-ridge signature vs the canonical 185 GLBs. Report: raw\\_export_report_115.json.",
+      "blend": "D:\\Render Projects\\GEN2 Under-table Rails.blend",
+      "out": "D:\\Code Projects\\GEN2 Visual Animator\\GLB Library\\UnderTable",
+      "select": "collection:115",
+      "code_regex": "115-\\dW",
+      "name_template": "UnderTableRail_{code}",
+      "depth_mode": "center",
+      "report": "_export_report_115.json"
+    },
+    {
+      "name": "Under-Table Rails (270)",
+      "_note": "270 under-table rails, 1W-4W (286mm deep), exported 2026-07-19, same source + verification as the 115 job. Report: raw\\_export_report_270.json.",
+      "blend": "D:\\Render Projects\\GEN2 Under-table Rails.blend",
+      "out": "D:\\Code Projects\\GEN2 Visual Animator\\GLB Library\\UnderTable",
+      "select": "collection:270",
+      "code_regex": "270-\\dW",
+      "name_template": "UnderTableRail_{code}",
+      "depth_mode": "center",
+      "report": "_export_report_270.json"
+    },
+    {
+      "name": "Under-Table Rails (240)",
+      "_note": "240 Lite under-table rails, 1W-4W, exactly 240mm deep (NO back overhang -- railZ derives to 0). Joey replaced the four models 2026-07-19; verified upright/8.9mm/front-ridge-correct and exported same day. SOURCE MESHES ARE DENSE (57k-114k verts, CAD tessellation): the shipped library GLBs were exported IN-SESSION with a decimate pass on the export duplicates (planar dissolve 3deg + collapse to ~2.5k+1.5k*W verts -> 91-187KB libs, bounds byte-identical). A HEADLESS RERUN OF THIS JOB REPRODUCES THE DENSE 1.2-2.3MB LIBS (the worker has no decimate option) -- decimate the source models first, or re-run the in-session pass. Report: raw\\_export_report_240.json (superseded by the decimated export).",
+      "blend": "D:\\Render Projects\\GEN2 Under-table Rails.blend",
+      "out": "D:\\Code Projects\\GEN2 Visual Animator\\GLB Library\\UnderTable",
+      "select": "collection:240",
+      "code_regex": "240-\\dW",
+      "name_template": "UnderTableRail_{code}",
+      "depth_mode": "center",
+      "report": "_export_report_240.json"
+    },
+    {
+      "name": "Under-Table Rails (59)",
+      "_note": "59 under-table rails, 1W-4W, 74.89mm deep (59 + 15.9 back overhang, railZ -7.945). Added by Joey 2026-07-19 as gen2-ql-rail-single/double/triple/quad-small, renamed in-session to 'GEN2 Rail - 59-<w>W' (object + mesh datablock) so this job's select/regex work headlessly -- REQUIRES the blend saved with those renames. Source pose rot 0 but already channels-down + front ridge correct in world space (verified vs the 185 signature). Report: raw\\_export_report_59.json.",
+      "blend": "D:\\Render Projects\\GEN2 Under-table Rails.blend",
+      "out": "D:\\Code Projects\\GEN2 Visual Animator\\GLB Library\\UnderTable",
+      "select": "collection:59",
+      "code_regex": "59-\\dW",
+      "name_template": "UnderTableRail_{code}",
+      "depth_mode": "center",
+      "report": "_export_report_59.json"
     }
   ]
 }
