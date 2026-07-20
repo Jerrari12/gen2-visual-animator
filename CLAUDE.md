@@ -399,9 +399,65 @@ the viewer posts `{gen2:'viewerReady'}` to its opener after boot; the planner
 answers viewerReady with an immediate layout post — so sync survives a
 planner reload (once the viewer speaks) AND a viewer self-reload. `booted`
 gate drops layout messages during boot; a layout arriving mid-regenerate
-retries in 250 ms so the newest state is never dropped. Local dev needs a
-hard-refresh after JS edits (module cache; deploys are SHA-stamped so prod is
-immune).
+retries in 250 ms so the newest state is never dropped.
+**Embed mode `?embed=1` (2026-07-19, the planner's docked split view):**
+`IS_EMBED` (requires a #build= hash) adds body.embed — no `#topbar`, no BOM
+export buttons (`#checklist-actions`; the planner owns exports) — and boots
+onto the **preview landing** instead of the cover: `goTo(last assembly step)`
++ `setChecklist(false)` + `setPreview(true)` (body.embed-preview hides
+`#controls`/`#note-panel` and floats `#embed-begin` "▶ Begin the
+instructions" → setPreview(false) + goTo(0) = normal cover→steps flow;
+the way BACK is `enterPreview()` — re-runs the boot landing: goTo(final
+step, no animate) + setChecklist(false) + setPreview(true) — wired to
+`#btn-preview`, an embed-only 🧪 tool in the controls bar (display:flex —
+inline-flex would break the tool group's column layout — first in
+#ctl-tools) AND to `#cover-preview` on the cover ("← Back to the live
+preview", which REPLACES `#btn-skip-end` in embed — the skip link's job IS
+the preview there). Embed cover framing: applyCover()'s landscape box-art
+composition (fixed telephoto r + build framed left of the brand overlay)
+shoved the model off-frame in the narrow dock — IS_EMBED gets a centered
+aspect-aware fit instead (fov 12, fitDistanceFor(R·1.15), capped 7500 clear
+of the 8000 far plane). And the cover snap now records `curCamPreset` like
+tweenCamera would — without it, the resize that ALWAYS fires entering the
+flow (the controls footer appears → canvas reshapes) re-fit the camera to
+the PREVIOUS page's preset and stranded the cover on a mis-aimed telephoto
+(Joey's dock repro; latent standalone bug too, masked because the cover is
+page 0 at boot). Embed narrow-layout rules (the dock sits ABOVE the 560px
+mobile break but below desktop room — Joey's overlap repro on the intro):
+`body.embed #note-panel` caps at min(420px, 100%−170px) clear of the
+top-right pills AND at 34vh with the text scrolling inside (the mobile
+treatment, Joey's ask — long intro/bench notes); the checklist/final/outro
+auto-expand is gated `!IS_EMBED` (the planner's own BOM sits alongside —
+the panel stays one tap away on its pill, and regenerate's panelOpen
+restore still honors a user-opened panel); part taps fold the panel like
+mobile (`isMobile() || IS_EMBED` in setSelected) so the identify card never
+fights it; and an OPEN panel hides the note entirely (mobile's one-sheet
+rule — setChecklist stamps body.panel-open, `body.embed.panel-open
+#note-panel{display:none}` — the note returns on close; a width cap alone
+still underlapped at narrow dock widths, Joey's 2nd repro). The tap-hint
+retires on the FIRST pointerdown anywhere (capture-phase document listener —
+canvas, pills, panel, controls all count as "got it"; not embed-scoped, the
+✕-hunt annoyed on every layout). The
+preview rides the FINAL STEP's state (dims, identify, colors all free), so
+`regenerate()` re-lands on `steps.length` while previewMode (min(cur,…)
+would strand it a step short when the layout grows) and a user's orbit
+survives regenerates via camOverride. `plannerWin()` = opener OR parent —
+the same sync serves popped-out tabs and the iframe. Embed extras: one-time
+orbit hint (`#embed-hint`, localStorage gen2-embed-hint), and a 4 s FPS
+sample posts `{gen2:'perfSlow'}` to the planner when <20 fps (its dock
+offers a collapse). The partitioned-storage color problem is SOLVED by the
+**palette relay (2026-07-19)**: every `saveColors()` stamps `colorsT` and
+posts `{gen2:'colors', t, colors, on, user}` to `plannerWin()`; the planner
+caches the newest in ITS first-party storage and replays it after every
+viewerReady, and `applyRemoteColors` applies an incoming palette only when
+its stamp is newer (adopting the stamp so the exchange converges; a viewer
+holding a NEWER palette answers back once to teach the cache). Remote
+persists via `persistColors()` (no re-stamp, no echo); payloads pass
+`cleanPalette` (hex must be a color, urls http(s) — they end up in material
+colors + identify-card hrefs). Dock, pop-out and reloads all converge on the
+latest picks regardless of storage partitioning.
+Local dev needs a hard-refresh after JS edits (module cache; deploys are
+SHA-stamped so prod is immune).
 The checklist step shows an engine-computed **exploded parts preview** (radial
 spread from assembly center + per-type pushes; riders explode with their
 drawer) — no manifest data, works for generated builds too.

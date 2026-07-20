@@ -11,6 +11,13 @@ const KIT = new URLSearchParams(location.search).get('kit') || 'tabletop-185';
 const KIT_URL = `kits/${KIT}/`;
 // #build=<base64> — the planner's own share-link encoding, generated at runtime
 const BUILD_HASH = (location.hash || '').match(/build=([^&]+)/);
+// ?embed=1 — docked inside the planner's split view: slimmer chrome (no top
+// bar, no BOM exports — the planner owns those), and a live "preview" landing
+// (the finished build, orbitable/colorable) instead of the box-art cover; a
+// "Begin the instructions" pill enters the normal page flow. The flag rides
+// location.search, so the mount/length-change self-reload keeps it.
+const IS_EMBED = new URLSearchParams(location.search).has('embed') && !!BUILD_HASH;
+document.body.classList.toggle('embed', IS_EMBED);
 
 // ---------- tiny tween runner (no lib) ----------
 const tweens = new Set();
@@ -478,6 +485,15 @@ function applyCover() {
   for (const inst of instances.values()) if (inst.group.visible) box.expandByObject(inst.group);
   const size = box.getSize(new THREE.Vector3()), c = box.getCenter(new THREE.Vector3());
   const spread = Math.max(size.x, size.y * 1.9, size.z);
+  if (IS_EMBED) {
+    // the dock is a narrow portrait-ish pane: the landscape composition below
+    // (fixed telephoto distance + build pushed left to clear the brand
+    // overlay) shoves the model off-frame there. Center it and fit for real
+    // at the live aspect instead — fov 12 keeps the flat box-art look while
+    // halving the telephoto pull-back (capped clear of the 8000 far plane).
+    const R = size.length() / 2;
+    return { t: 0, p: 90, r: Math.min(7500, fitDistanceFor(R * 1.15, 12)), target: [c.x, c.y, 0], fov: 12 };
+  }
   return { t: 0, p: 90, r: spread * 7.2, target: [c.x + size.x * 0.33, c.y, 0], fov: 9 };
 }
 // LEGO-box dressing: a thick corner ribbon (collection number + "COLLECTION")
@@ -903,6 +919,19 @@ const isMobile = () => matchMedia('(max-width: 560px)').matches;
 function setChecklist(open) {
   $('checklist-panel').classList.toggle('hidden', !open);
   $('checklist-tab').classList.toggle('hidden', open);
+  document.body.classList.toggle('panel-open', open); // narrow embed: the note yields while the panel is open (CSS one-sheet rule)
+}
+
+// Embed "preview" landing (docked split view only): the finished build as a
+// live model — orbit, tap-to-identify, recolor — with the step chrome hidden
+// (body.embed-preview CSS). It rides the FINAL assembly step's state rather
+// than being a new page, so dims/identify/colors all just work; regenerate()
+// re-lands on the (new) final step while it's active. One-way for now: "Begin
+// the instructions" enters the normal cover → steps flow.
+let previewMode = false;
+function setPreview(on) {
+  previewMode = !!on && IS_EMBED;
+  document.body.classList.toggle('embed-preview', previewMode);
 }
 
 // ---------- BOM export (mirrors the planner's Copy / CSV actions) ----------
@@ -977,6 +1006,11 @@ function goTo(i, { animate = true } = {}) {
     animToken++;
     camTweenToken++;
     const preset = applyCover();
+    // record it like tweenCamera would — otherwise resize() (which ALWAYS
+    // fires entering the flow in the embed: the controls footer appears and
+    // reshapes the canvas) re-fits to the PREVIOUS page's preset and strands
+    // the cover on a mis-aimed telephoto (Joey's dock repro, 2026-07-19)
+    curCamPreset = preset;
     const { pos, target } = camPos(preset);
     camera.position.copy(pos);
     controls.target.copy(target);
@@ -988,7 +1022,7 @@ function goTo(i, { animate = true } = {}) {
     $('step-counter').textContent = 'Thanks for building';
     setCamOverride(false); // the cinema owns the camera
     $('btn-pause').disabled = true; // the cinema runs its own clock — not pausable
-    setChecklist(!isMobile()); // desktop finale shows the full list; mobile keeps it one tap away (less clutter)
+    setChecklist(!isMobile() && !IS_EMBED); // desktop finale shows the full list; mobile AND the narrow dock keep it one tap away (less clutter)
     $('btn-prev').disabled = false;
     $('btn-next').disabled = true;
     animToken++;
@@ -1005,7 +1039,10 @@ function goTo(i, { animate = true } = {}) {
   $('step-num').classList.toggle('hidden', !numbered);
   $('step-num').textContent = numbered ? stepIdx : '';
   $('step-counter').textContent = numbered ? `Step ${stepIdx} / ${manifest.steps.length - 1}` : 'Intro';
-  setChecklist((!!step.checklist || stepIdx === manifest.steps.length - 1) && !isMobile());
+  // the checklist/final auto-expand is a WIDE-desktop luxury: mobile and the
+  // narrow embed dock keep the panel folded to its tab (in the dock the
+  // planner's own BOM sits right alongside anyway — Joey's overlap repro)
+  setChecklist((!!step.checklist || stepIdx === manifest.steps.length - 1) && !isMobile() && !IS_EMBED);
   $('btn-prev').disabled = false;
   $('btn-next').disabled = cur === PAGES.length - 1;
   $('btn-pause').disabled = false;
@@ -1047,11 +1084,43 @@ $('btn-start').onclick = () => goTo(1); // cover → intro, camera pans + de-zoo
 // customizers' shortcut: straight to the finished build (final assembly step —
 // dims + expanded BOM), skipping the step-by-step. Snap, don't replay the step.
 $('btn-skip-end').onclick = () => goTo(PAGES.length - 2, { animate: false });
+// embed preview ⇄ the instruction flow: "Begin" enters at the cover;
+// the 🧪 Preview tool (embed-only, controls bar — hidden on the preview
+// itself since the whole bar is) re-runs the boot landing from any step.
+$('embed-begin').onclick = () => { setPreview(false); goTo(0); };
+const enterPreview = () => {
+  goTo(PAGES.length - 2, { animate: false }); // the finished build, snapped
+  setChecklist(false);
+  setPreview(true);
+};
+$('btn-preview').onclick = enterPreview;   // controls-bar tool (any step)
+$('cover-preview').onclick = enterPreview; // the cover's way back (replaces the skip link in embed)
+// one-time orbit hint on the embed preview (the tap-hint's quieter cousin);
+// dismissed by first touch or a few seconds, remembered per device
+if (IS_EMBED) {
+  let hintSeen = false;
+  try { hintSeen = !!localStorage.getItem('gen2-embed-hint'); } catch (e) { /* private mode */ }
+  if (!hintSeen) {
+    document.body.classList.add('embed-hint-on');
+    const hintOff = () => {
+      document.body.classList.remove('embed-hint-on');
+      try { localStorage.setItem('gen2-embed-hint', '1'); } catch (e) { /* private mode */ }
+      canvas.removeEventListener('pointerdown', hintOff);
+    };
+    canvas.addEventListener('pointerdown', hintOff);
+    setTimeout(hintOff, 9000);
+  }
+}
 $('checklist-tab').onclick = () => { if (isMobile()) setSelected(null); setChecklist(true); };
 $('checklist-close').onclick = () => setChecklist(false);
 let tapHintDismissed = false, tapHintShown = false;
 const dismissTapHint = () => { if (!tapHintDismissed) { tapHintDismissed = true; $('tap-hint').classList.add('hidden'); } };
 $('tap-hint-x').onclick = dismissTapHint;
+// any interaction with the viewer counts as "got it": the first pointerdown
+// anywhere — canvas orbit, the Parts/colors/Measure pills, the panel, the
+// controls bar — retires the hint for the session (Joey: it lingered over
+// the parts panel in the dock until its ✕ was hunted down)
+document.addEventListener('pointerdown', () => { if (tapHintShown) dismissTapHint(); }, { capture: true });
 // the moment the user touches the scene — a tap, an orbit, a zoom — they're
 // already doing what the hint teaches, so it bows out (controls fires 'start'
 // for every pointer/wheel interaction on the canvas)
@@ -1190,7 +1259,7 @@ function setSelected(id) {
     ritualInst = null;
   }
   if (!id) { if (prevOpen) slideDrawer(prevOpen, false); exitFaceplateFocus(); exitDrawerFocus(); card.classList.add('hidden'); $('pointer-line').classList.add('hidden'); return; }
-  if (isMobile()) setChecklist(false); // mobile: parts list & identify sheet are mutually exclusive
+  if (isMobile() || IS_EMBED) setChecklist(false); // mobile + narrow dock: parts list & identify card are mutually exclusive
   const inst = instances.get(id);
   inst.group.traverse(o => { if (o.isMesh) o.material = materialFor(inst, true, o.userData.zone); });
   selAnchor = new THREE.Box3().setFromObject(inst.group).getCenter(new THREE.Vector3()).sub(inst.group.position);
@@ -1742,6 +1811,7 @@ let customColors = {}, useCustom = false; // customColors: type -> {name, hex, u
 // state into it; presets never touch it — so one preset click can't destroy
 // hours of picking. A "★ My palette" chip (renderPresets) restores it.
 let userPalette = {};
+let colorsT = 0; // stamp of the last palette save — newest-wins when the planner relays palettes between viewer contexts
 try {
   const saved = JSON.parse(localStorage.getItem(COLOR_STORE_KEY) || 'null');
   if (saved) {
@@ -1749,9 +1819,16 @@ try {
     useCustom = !!saved.on;
     // migration: pre-userPalette saves treat the current colors as hand-picked
     userPalette = saved.user || structuredClone(customColors);
+    colorsT = saved.t || 0;
   }
 } catch (e) { /* corrupt storage — start fresh */ }
-const saveColors = () => localStorage.setItem(COLOR_STORE_KEY, JSON.stringify({ colors: customColors, on: useCustom, user: userPalette }));
+// persist without re-stamping (remote applies adopt the sender's stamp so the
+// exchange converges); saveColors = a LOCAL edit → new stamp + tell the planner
+const persistColors = () => {
+  try { localStorage.setItem(COLOR_STORE_KEY, JSON.stringify({ colors: customColors, on: useCustom, user: userPalette, t: colorsT })); }
+  catch (e) { /* storage unavailable (private mode) — the planner relay still works */ }
+};
+const saveColors = () => { colorsT = Date.now(); persistColors(); postColorsToPlanner(); };
 // call after any HAND edit to the palette (never after a preset)
 const snapshotUserPalette = () => { userPalette = structuredClone(customColors); };
 // purchased hardware (wood screws, magnets — every row of the type is `purchased`)
@@ -2878,9 +2955,54 @@ function currentOpts() {
   for (const u of build.placed) if (u.fill === 'decor' || u.fill === 'classic') closures[u.id] = u.closure === 'magnet' ? 'magnet' : 'none';
   return { closures, removedStoppers: build.removedStoppers || [], wallStagger: !!build.wallStagger, handleStyle: build.handleStyle, faceStyle: build.faceStyle, backCover: !!build.backCover };
 }
+// The planner window, wherever we live: a popped-out tab talks to its opener,
+// the docked split-view iframe talks to its parent.
+const plannerWin = () => window.opener || (window.parent !== window ? window.parent : null);
+
+// ---- palette relay (2026-07-19) ----
+// Filament colors persist in VIEWER localStorage, which browsers PARTITION
+// when the viewer runs as the planner's cross-site dock iframe — a popped-out
+// tab can't see the dock's picks. The planner (first-party storage) relays:
+// every local save posts the stamped palette to it; it caches the newest and
+// replays it on every viewerReady. Newest-wins by stamp; a viewer holding a
+// NEWER palette answers back once so the cache converges (adopting the
+// sender's stamp makes the next comparison equal, ending the exchange).
+let applyingRemoteColors = false;
+function postColorsToPlanner() {
+  const pw = plannerWin();
+  if (applyingRemoteColors || !build || !pw) return;
+  try { pw.postMessage({ gen2: 'colors', t: colorsT, colors: customColors, on: useCustom, user: userPalette }, '*'); } catch (e) { /* planner gone */ }
+}
+// keep only well-formed entries — hex must be a color, urls must be http(s)
+// (palette values end up in material colors and identify-card link hrefs)
+function cleanPalette(o) {
+  const out = {};
+  if (!o || typeof o !== 'object') return out;
+  for (const [k, v] of Object.entries(o)) {
+    if (!v || typeof v.hex !== 'string' || !/^#[0-9a-fA-F]{3,8}$/.test(v.hex)) continue;
+    const e = { name: String(v.name || ''), hex: v.hex };
+    if (typeof v.url === 'string' && /^https?:\/\//.test(v.url)) e.url = v.url;
+    out[k] = e;
+  }
+  return out;
+}
+function applyRemoteColors(d) {
+  if (typeof d.t !== 'number' || !d.colors || typeof d.colors !== 'object') return;
+  if (d.t <= colorsT) { if (colorsT > d.t) postColorsToPlanner(); return; } // ours is newer — teach the cache instead
+  applyingRemoteColors = true;
+  try {
+    customColors = cleanPalette(d.colors);
+    useCustom = !!d.on;
+    userPalette = d.user && typeof d.user === 'object' ? cleanPalette(d.user) : structuredClone(customColors);
+    colorsT = d.t;
+    persistColors();
+    applyPalette();
+  } finally { applyingRemoteColors = false; }
+}
 let syncBuildToPlanner = () => {
-  if (applyingRemote || !build || !window.opener) return;
-  try { window.opener.postMessage({ gen2: 'buildOptions', opts: currentOpts() }, '*'); } catch (e) { /* cross-origin opener gone */ }
+  const pw = plannerWin();
+  if (applyingRemote || !build || !pw) return;
+  try { pw.postMessage({ gen2: 'buildOptions', opts: currentOpts() }, '*'); } catch (e) { /* cross-origin opener gone */ }
 };
 // ---- live layout sync (planner → viewer, 2026-07-19) ----
 // The planner posts its FULL serialized build (same shape as the #build= hash)
@@ -2925,6 +3047,7 @@ addEventListener('message', async (e) => {
   if (!d || !build) return;
   if (d.gen2 === 'layoutBlocked' && typeof d.reason === 'string') { showBlocked(d.reason); return; }
   if (d.gen2 === 'layout' && d.build) { await applyRemoteLayout(d.build); return; }
+  if (d.gen2 === 'colors') { applyRemoteColors(d); return; }
   if (d.gen2 !== 'buildOptions' || !d.opts || regenBusy) return;
   const o = d.opts;
   // ignore a message that matches our current state — this is what breaks the
@@ -2981,7 +3104,9 @@ async function regenerate() {
   if (!gen.manifest) return; // valid toggles can't make an unbuildable build; ignore defensively
   regenBusy = true;
   setSelected(null);
-  const keep = Math.min(cur, gen.manifest.steps.length); // step indices are stable (deterministic gen)
+  // preview mode always re-lands on the FINISHED build (the new final step) —
+  // min(cur, …) would strand it one step short whenever the layout GREW
+  const keep = previewMode ? gen.manifest.steps.length : Math.min(cur, gen.manifest.steps.length); // step indices are stable (deterministic gen)
   // every options toggle lives INSIDE the parts panel, so it's open right now —
   // keep it open through goTo(), whose default policy would close it whenever a
   // toggle changes the step count (e.g. wallStagger restructures the step list
@@ -3011,12 +3136,40 @@ if (YT_URL) { const a = $('outro-yt'); a.href = YT_URL; a.classList.remove('hidd
 await mountManifest(manifest);
 applyPalette(); // restore any saved filament colors
 $('loading-overlay').remove();
-goTo(0); // open on the cover
+if (IS_EMBED && build) {
+  // docked split view: land on the live PREVIEW (finished build, dims on,
+  // parts panel minimized to its tab) instead of the box-art cover
+  goTo(PAGES.length - 2, { animate: false });
+  setChecklist(false);
+  setPreview(true);
+} else {
+  goTo(0); // open on the cover
+}
 booted = true;
-// introduce this tab to the opener planner so live layout sync works even
-// after a planner reload (it re-captures our window from any gen2 message)
-// — the planner replies with the current layout, which no-ops if unchanged.
-if (build && window.opener) { try { window.opener.postMessage({ gen2: 'viewerReady' }, '*'); } catch (e) { /* opener gone */ } }
+// introduce this tab to the planner (opener tab OR split-view parent) so live
+// layout sync works even after a planner reload (it re-captures our window
+// from any gen2 message) — the planner replies with the current layout,
+// which no-ops if unchanged.
+if (build && plannerWin()) {
+  try { plannerWin().postMessage({ gen2: 'viewerReady' }, '*'); } catch (e) { /* opener gone */ }
+  // …and teach the planner's palette cache our local colors (it keeps the
+  // newest; its viewerReady reply may in turn carry something newer for us)
+  if (colorsT) postColorsToPlanner();
+}
+// Potato guard, embed only: if we render badly (software GPU, ancient
+// hardware) tell the planner once — it offers to collapse the dock. Sampled
+// after the boot settle so load-time jank doesn't false-positive.
+if (IS_EMBED && build) setTimeout(() => {
+  let frames = 0; const t0 = performance.now();
+  const tick = () => {
+    frames++;
+    const dt = performance.now() - t0;
+    if (dt < 4000) { requestAnimationFrame(tick); return; }
+    const fps = frames / (dt / 1000);
+    if (fps < 20 && plannerWin()) { try { plannerWin().postMessage({ gen2: 'perfSlow' }, '*'); } catch (e) { /* gone */ } }
+  };
+  requestAnimationFrame(tick);
+}, 2000);
 
 renderer.setAnimationLoop(now => {
   resize();

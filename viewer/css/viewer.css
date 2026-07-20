@@ -501,6 +501,20 @@ body {
   box-shadow: 0 1px 6px rgba(0,0,0,0.10);
 }
 #btn-skip-end:hover { color: var(--accent); background: rgba(244,246,248,0.94); }
+/* embed cover: the skip link's job is done better by the preview landing —
+   swap it for the way back (same quiet-pill look) */
+#cover-preview {
+  display: none;
+  margin-top: 12px; padding: 6px 14px;
+  font: inherit; font-size: 13px; font-weight: 700;
+  border: none; cursor: pointer; color: #3f434a;
+  background: rgba(244,246,248,0.78);
+  border-radius: 999px;
+  box-shadow: 0 1px 6px rgba(0,0,0,0.10);
+}
+#cover-preview:hover { color: var(--accent); background: rgba(244,246,248,0.94); }
+body.embed #btn-skip-end { display: none; }
+body.embed #cover-preview { display: inline-block; }
 
 /* LEGO-box stat badges (bottom-left): big "ONLY N PARTS" block + drawers /
    steps / real W×H×L chips — all engine-computed (renderCoverBadges) */
@@ -540,6 +554,49 @@ body {
   animation: spin 0.9s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* ---- Embed mode (?embed=1 — docked inside the planner's split view) ----
+   Slimmer chrome: the planner supplies the title + BOM exports, so the top
+   bar and export buttons go; the "preview" landing additionally hides the
+   step chrome and floats a Begin pill + a one-time orbit hint. All of it is
+   class-driven (body.embed / body.embed-preview / body.embed-hint-on) so
+   re-renders and regenerates can't undo it. */
+body.embed #topbar { display: none; }
+body.embed #checklist-actions { display: none; }   /* Copy/CSV live in the planner's BOM */
+/* the dock is narrower than a desktop but wider than the 560px mobile break:
+   cap the note clear of the top-right pills, and give LONG notes the mobile
+   treatment — capped height, text scrolls inside (Joey's ask) */
+body.embed #note-panel { max-width: min(420px, calc(100% - 170px)); max-height: 34vh; }
+body.embed #note-panel .note-body { overflow-y: auto; max-height: calc(34vh - 20px); pointer-events: auto; }
+/* one sheet at a time (mobile's rule, panel-open set by setChecklist): an
+   OPEN parts panel owns the pane — the note returns when it closes (✕, or
+   tapping a part folds the panel) */
+body.embed.panel-open #note-panel { display: none; }
+#btn-preview { display: none; }                    /* embed-only: the way back to the preview landing */
+body.embed #btn-preview { display: flex; }         /* flex (not inline-flex) — keeps the tool group's column icon/caption layout */
+body.embed-preview #controls { display: none; }
+body.embed-preview #note-panel { display: none; }
+#embed-begin { display: none; }
+body.embed-preview #embed-begin {
+  display: inline-flex; align-items: center; gap: 8px;
+  position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%);
+  z-index: 30;
+  font: inherit; font-weight: 700; font-size: 14px;
+  padding: 11px 20px; border-radius: 999px;
+  border: 1px solid var(--accent); background: var(--accent); color: #fff;
+  cursor: pointer; box-shadow: 0 6px 20px rgba(0,0,0,.22);
+}
+body.embed-preview #embed-begin:hover { filter: brightness(1.07); }
+#embed-hint { display: none; }
+body.embed-preview.embed-hint-on #embed-hint {
+  display: block;
+  position: absolute; left: 50%; bottom: 64px; transform: translateX(-50%);
+  z-index: 29; pointer-events: none;
+  font-size: 12px; color: var(--ink-soft);
+  background: rgba(255,255,255,.92); border: 1px solid var(--panel-border);
+  border-radius: 999px; padding: 6px 14px;
+  box-shadow: 0 4px 14px rgba(0,0,0,.12);
+}
 
 /* Live-sync blocked veil: the planner reported an un-instruction-able layout.
    Sits over the whole stage (scene stays mounted, dimmed behind) and eats

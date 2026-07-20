@@ -127,6 +127,7 @@
           </div>
           <button id="btn-start">Get started <i>&rarr;</i></button>
           <button id="btn-skip-end" title="Jump straight to the completed model — tap parts to recolor or customize">Skip to the finished build &rarr;</button>
+          <button id="cover-preview" title="Back to the live preview of your build">&larr; Back to the live preview</button>
         </div>
         <div id="cover-badges"></div>
       </div>
@@ -135,6 +136,11 @@
         <span>👆 Tap any part to see its name &amp; download links — or click its color chip to try filament colors.</span>
         <button id="tap-hint-x" title="Got it">&times;</button>
       </div>
+
+      <!-- Embed (docked split view) only: the live-preview landing's chrome.
+           Shown/hidden purely by body.embed-preview / .embed-hint-on classes. -->
+      <button id="embed-begin" title="Step-by-step assembly for this exact build">&#9654; Begin the instructions</button>
+      <div id="embed-hint"><span>🖱 Drag to orbit &middot; scroll to zoom &middot; tap parts to color them</span></div>
 
       <div id="loading-overlay"><div class="spinner"></div><div id="loading-text">Loading parts…</div></div>
       <!-- Live-sync guard: while the planner reports an instructions-blocked
@@ -154,6 +160,7 @@
       <button id="btn-prev" title="Previous step">&#8592; Back</button>
       <div id="step-dots"></div>
       <div id="ctl-tools">
+        <button id="btn-preview" title="Back to the live preview of the finished build"><i>&#129514;</i><span>Preview</span></button>
         <button id="btn-pause" title="Pause the animation (everything holds mid-motion)"><i>&#9208;</i><span>Pause</span></button>
         <button id="btn-slow" title="Slow motion &mdash; watch each step at study speed"><i>&#128034;</i><span>Slow-mo</span></button>
         <button id="btn-replay" title="Replay this step"><i>&#8635;</i><span>Replay</span></button>
