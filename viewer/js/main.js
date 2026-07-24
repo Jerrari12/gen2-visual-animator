@@ -949,8 +949,12 @@ function renderOptions() {
 // as two different ideas (Joey 2026-07-24), so keep these in sync. Head is a
 // C-ring rather than a circle-minus-notch — see the planner comment for why a
 // notch leaves a stray filled square.
+// NB the viewBox is the artwork's ROTATED bounds, not 0 0 24 24: the wrench is
+// drawn upright then turned −45°, so inside a square box it only spans ~13.6 of
+// 24 units and rendered ~40% smaller than the text beside it (Joey saw it as
+// invisible padding). Cropping to the real bounds makes 1em mean 1em of wrench.
 const HW_ICON =
-  '<svg class="hw-ico" viewBox="0 0 24 24" aria-hidden="true"><g transform="rotate(-45 12 12)"><path d="' +
+  '<svg class="hw-ico" viewBox="3.5 3.5 14.4 14.4" aria-hidden="true"><g transform="rotate(-45 12 12)"><path d="' +
   'M14.02 2.87A4.6 4.6 0 1 1 9.98 2.87L10.95 4.84A2.4 2.4 0 1 0 13.05 4.84Z' +
   'M10.1 9.5L13.9 9.5L13.9 17.1A1.9 1.9 0 0 1 10.1 17.1Z' +
   'M10.65 17.2a1.35 1.35 0 1 0 2.7 0a1.35 1.35 0 1 0 -2.7 0Z"/></g></svg>';
