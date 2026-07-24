@@ -707,7 +707,7 @@ viewer so the kits double as a demo of Build options. Essential faceplates +
 Deco handles (nothing club-gated required on day one). Gallery `dims` are the
 TRUE physical envelope read from the viewer's assembledBox (matches the cover
 badge — 240 = 176×140×269), NOT the planner's grid math.
-**Second tier — the 3W kit (2026-07-24):** `{185,240}-tabletop-3w2h`
+**Second tier — the 3W kit (2026-07-24):** `{115,165,185,240,270}-tabletop-3w2h`
 — top row 2W-1H + 1W-1H over three 1W-1H (5 drawers / 68 prints / 14 steps).
 **Naming: every kit is a "Tabletop Kit", differentiated ONLY by footprint**
 (`GEN2 240 Tabletop Kit 3W-2H`, id `<L>-tabletop-<w>w<h>h`) — Joey rejected a
@@ -724,6 +724,12 @@ generator's own notes already narrate it ("staggered brick-style… tying the
 base together"). Measured tradeoff before choosing this layout: 2W = 3 drawers/
 42 prints; 3W single-row = 2/38 (CHEAPER than the starter but poor value);
 3W 4-unit = 4/60; this 5-unit = 5/68 (best drawers-per-print of all four).
+Both tiers now cover all five lengths (10 kits). **Taglines describe the unit
+on its own terms**, never by comparison ("one column wider" had nothing to
+compare to on a standalone Printables image, Joey 2026-07-24) — and index.json
+is the SOURCE OF TRUTH for title+tagline: the per-kit files were re-synced from
+it (they had kept em-dashes when the hyphen pass only touched the index, so the
+viewer's intro step and the gallery card disagreed).
 Tiers are a PROGRESSION, not a choice — each kit gets its own Printables page,
 so a beginner only ever meets one link; the gallery is the only place both
 appear, grouped "Start here" / "Go bigger" via each index.json row's `tier`

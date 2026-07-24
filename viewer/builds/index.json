@@ -55,9 +55,31 @@
     "dims": "176 × 140 × 299 mm"
   },
   {
+    "id": "115-tabletop-3w2h",
+    "title": "GEN2 115 Tabletop Kit 3W-2H",
+    "tagline": "Five drawers across three columns - pens, cables, tape and small tins.",
+    "mount": "tabletop",
+    "tier": "next",
+    "length": 115,
+    "drawers": 5,
+    "units": 5,
+    "dims": "264 × 140 × 144 mm"
+  },
+  {
+    "id": "165-tabletop-3w2h",
+    "title": "GEN2 165 Tabletop Kit 3W-2H",
+    "tagline": "Five drawers across three columns - sockets, calipers and hobby bits.",
+    "mount": "tabletop",
+    "tier": "next",
+    "length": 165,
+    "drawers": 5,
+    "units": 5,
+    "dims": "264 × 140 × 194 mm"
+  },
+  {
     "id": "185-tabletop-3w2h",
     "title": "GEN2 185 Tabletop Kit 3W-2H",
-    "tagline": "Five drawers across a wider frame - same build, one column wider.",
+    "tagline": "Five drawers across three columns - the everyday all-rounder.",
     "mount": "tabletop",
     "tier": "next",
     "length": 185,
@@ -68,12 +90,23 @@
   {
     "id": "240-tabletop-3w2h",
     "title": "GEN2 240 Tabletop Kit 3W-2H",
-    "tagline": "Five deep drawers across a wider frame - same build, one column wider.",
+    "tagline": "Five deep drawers across three columns - power tools, spray cans and tall bottles.",
     "mount": "tabletop",
     "tier": "next",
     "length": 240,
     "drawers": 5,
     "units": 5,
     "dims": "264 × 140 × 269 mm"
+  },
+  {
+    "id": "270-tabletop-3w2h",
+    "title": "GEN2 270 Tabletop Kit 3W-2H",
+    "tagline": "Five large drawers across three columns - long tools, cordless kits and big spools.",
+    "mount": "tabletop",
+    "tier": "next",
+    "length": 270,
+    "drawers": 5,
+    "units": 5,
+    "dims": "264 × 140 × 299 mm"
   }
 ]
