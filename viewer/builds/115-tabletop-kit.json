@@ -1,0 +1,59 @@
+{
+  "gen2OfficialBuild": 1,
+  "id": "115-tabletop-kit",
+  "title": "GEN2 115 Tabletop Kit",
+  "tagline": "Three drawers for pens, cables and small parts — the compact starter build.",
+  "buildVersion": 1,
+  "build": {
+    "mount": "tabletop",
+    "length": 115,
+    "printer": "any",
+    "customBed": {
+      "x": null,
+      "y": null
+    },
+    "spaceW": null,
+    "spaceH": null,
+    "faceStyle": "essential",
+    "doorStyle": "essential",
+    "handleStyle": "deco",
+    "wallStagger": false,
+    "backCover": false,
+    "removedStoppers": [],
+    "gridW": 6,
+    "gridH": 4,
+    "placed": [
+      {
+        "id": 1,
+        "x": 2,
+        "y": 6,
+        "w": 1,
+        "hh": 2,
+        "fill": "decor",
+        "shelves": 0,
+        "closure": "magnet"
+      },
+      {
+        "id": 2,
+        "x": 3,
+        "y": 6,
+        "w": 1,
+        "hh": 2,
+        "fill": "decor",
+        "shelves": 0,
+        "closure": "magnet"
+      },
+      {
+        "id": 3,
+        "x": 2,
+        "y": 4,
+        "w": 2,
+        "hh": 2,
+        "fill": "decor",
+        "shelves": 0,
+        "closure": "magnet"
+      }
+    ],
+    "nextId": 4
+  }
+}

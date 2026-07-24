@@ -2,7 +2,7 @@
   "gen2OfficialBuild": 1,
   "id": "240-tabletop-kit",
   "title": "GEN2 240 Tabletop Kit",
-  "tagline": "Four deep drawers for the desktop — the classic first GEN2 build.",
+  "tagline": "Three deep drawers for the desktop — the classic first GEN2 build.",
   "buildVersion": 1,
   "build": {
     "mount": "tabletop",
@@ -20,11 +20,10 @@
     "gridW": 6,
     "gridH": 4,
     "placed": [
-      { "id": 1, "x": 2, "y": 6, "w": 1, "hh": 2, "fill": "decor", "shelves": 0 },
-      { "id": 2, "x": 3, "y": 6, "w": 1, "hh": 2, "fill": "decor", "shelves": 0 },
-      { "id": 3, "x": 2, "y": 4, "w": 1, "hh": 2, "fill": "decor", "shelves": 0 },
-      { "id": 4, "x": 3, "y": 4, "w": 1, "hh": 2, "fill": "decor", "shelves": 0 }
+      { "id": 1, "x": 2, "y": 6, "w": 1, "hh": 2, "fill": "decor", "shelves": 0, "closure": "magnet" },
+      { "id": 2, "x": 3, "y": 6, "w": 1, "hh": 2, "fill": "decor", "shelves": 0, "closure": "magnet" },
+      { "id": 3, "x": 2, "y": 4, "w": 2, "hh": 2, "fill": "decor", "shelves": 0, "closure": "magnet" }
     ],
-    "nextId": 5
+    "nextId": 4
   }
 }

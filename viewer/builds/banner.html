@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Kit banner generator (dev)</title>
+<style>
+  body { margin: 0; background: #2c2d31; color: #ececee;
+         font-family: "Segoe UI", system-ui, sans-serif; padding: 24px; }
+  h1 { font-size: 1.1rem; margin: 0 0 4px; }
+  p  { font-size: 0.85rem; color: #a6a8ad; margin: 0 0 18px; max-width: 760px; }
+  .row { display: flex; gap: 10px; align-items: center; margin-bottom: 18px; flex-wrap: wrap; }
+  button { font: inherit; font-weight: 700; font-size: 0.85rem; cursor: pointer;
+           background: #ff8a40; color: #1d1e20; border: none; border-radius: 8px; padding: 9px 16px; }
+  button.ghost { background: transparent; color: #d7d8db; border: 1px solid #4a4b50; }
+  canvas { max-width: 100%; height: auto; border: 1px solid #4a4b50; border-radius: 8px; display: block; margin-bottom: 14px; }
+  .cap { font-size: 0.78rem; color: #a6a8ad; margin-bottom: 22px; }
+  a { color: #ff8a40; }
+</style>
+</head>
+<body>
+<h1>Printables description banners</h1>
+<p>Dev tool. Composites each kit's 3/4 render (<code>img/&lt;id&gt;.jpg</code>, captured with the viewer's
+<code>?shot=1</code> mode) into a 1600×900 banner tinted with that length's planner color. Right-click →
+Save image, or hit “Download all”. Re-run after re-capturing a render.</p>
+<div class="row">
+  <button id="dl">⬇ Download all banners</button>
+  <a class="ghost" href="./" style="text-decoration:none"><button class="ghost">← Back to the kit gallery</button></a>
+</div>
+<div id="out"></div>
+
+<script>
+// Planner length palette (js/data.js GEN2.lengths) — the banner accent per collection.
+const LENGTH_COLORS = { 59: '#f2f2f2', 115: '#9ea3a8', 165: '#3aa0e8', 185: '#ff8a40', 240: '#3ecfa0', 270: '#e8453c' };
+const SHORT_LINK = 'gen2build.jerrari3d.com';
+const W = 1600, H = 900;
+
+const loadImg = src => new Promise(res => {
+  const i = new Image();
+  i.onload = () => res(i);
+  i.onerror = () => res(null);
+  i.src = src;
+});
+
+function roundRect(c, x, y, w, h, r) {
+  c.beginPath();
+  c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r);
+  c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r);
+  c.arcTo(x, y, x + w, y, r); c.closePath();
+}
+
+async function drawBanner(kit, logo) {
+  const cv = document.createElement('canvas');
+  cv.width = W; cv.height = H;
+  const c = cv.getContext('2d');
+  const accent = LENGTH_COLORS[kit.length] || '#ff8a40';
+
+  // Backdrop = the SAME panel gray the renders were captured on (#3a3b3f), so the
+  // model art blends in seamlessly with no keying/compositing tricks — then a
+  // soft accent glow behind the model and a vignette to seat the text side.
+  c.fillStyle = '#3a3b3f'; c.fillRect(0, 0, W, H);
+  const glow = c.createRadialGradient(W * 0.72, H * 0.5, 40, W * 0.72, H * 0.5, W * 0.55);
+  glow.addColorStop(0, accent + '33'); glow.addColorStop(1, '#3a3b3f00');
+  c.fillStyle = glow; c.fillRect(0, 0, W, H);
+
+  // the kit render, right side, contain-fit
+  const shot = await loadImg('img/' + kit.id + '.jpg');
+  if (shot) {
+    const boxW = W * 0.56, boxH = H * 0.9;
+    const s = Math.min(boxW / shot.width, boxH / shot.height);
+    const dw = shot.width * s, dh = shot.height * s;
+    c.drawImage(shot, W - dw + dw * 0.04, (H - dh) / 2, dw, dh);
+  }
+
+  // darken the text side so the copy always reads, whatever the render shows
+  const shade = c.createLinearGradient(0, 0, W * 0.62, 0);
+  shade.addColorStop(0, '#26272b'); shade.addColorStop(0.55, '#26272bee'); shade.addColorStop(1, '#26272b00');
+  c.fillStyle = shade; c.fillRect(0, 0, W * 0.62, H);
+
+  // left accent spine (matches the gallery card) — AFTER the shade, or it's buried
+  c.fillStyle = accent; c.fillRect(0, 0, 16, H);
+
+  const L = 84;                       // left text margin
+  let y = 132;
+
+  if (logo) {                          // JERRARI mark
+    const lh = 64, lw = logo.width * (lh / logo.height);
+    c.drawImage(logo, L, y - lh, lw, lh);
+    y += 22;
+  }
+
+  // eyebrow: the collection, in its own color
+  c.fillStyle = accent;
+  c.font = '800 30px "Segoe UI", system-ui, sans-serif';
+  c.letterSpacing = '3px';
+  c.fillText('GEN2 ' + kit.length + ' COLLECTION', L, y + 30);
+  c.letterSpacing = '0px';
+  y += 96;
+
+  // headline
+  c.fillStyle = '#ffffff';
+  c.font = '800 86px "Segoe UI", system-ui, sans-serif';
+  c.fillText('Interactive 3D', L, y);
+  c.fillText('Build Guide', L, y + 92);
+  y += 168;
+
+  // subhead: which kit
+  c.fillStyle = '#d7d8db';
+  c.font = '400 34px "Segoe UI", system-ui, sans-serif';
+  c.fillText(kit.title, L, y);
+  y += 62;
+
+  // feature bullets
+  c.font = '600 27px "Segoe UI", system-ui, sans-serif';
+  for (const line of ['Step-by-step 3D assembly — rotate & zoom',
+                      'Full parts list with download links',
+                      'Try your own filament colors']) {
+    c.fillStyle = accent; c.fillText('✓', L, y);
+    c.fillStyle = '#c9cbd0'; c.fillText(line, L + 40, y);
+    y += 44;
+  }
+
+  // the link, as a pill — the whole point of the banner
+  y += 26;
+  c.font = '700 30px "Segoe UI", system-ui, sans-serif';
+  const label = SHORT_LINK + '/?build=' + kit.id;
+  const tw = c.measureText(label).width;
+  c.fillStyle = accent;
+  roundRect(c, L, y - 34, tw + 52, 60, 30); c.fill();
+  c.fillStyle = '#1d1e20';
+  c.fillText(label, L + 26, y + 6);
+
+  return cv;
+}
+
+(async () => {
+  const [kits, logo] = await Promise.all([
+    fetch('index.json').then(r => r.json()),
+    loadImg('../img/jerrari-logo.svg'),
+  ]);
+  const out = document.getElementById('out');
+  const made = [];
+  for (const kit of kits) {
+    const cv = await drawBanner(kit, logo);
+    const cap = document.createElement('div');
+    cap.className = 'cap';
+    cap.textContent = 'banner-' + kit.id + '.jpg — 1600×900';
+    out.append(cv, cap);
+    made.push([kit.id, cv]);
+  }
+  document.getElementById('dl').onclick = () => {
+    for (const [id, cv] of made) {
+      const a = document.createElement('a');
+      a.href = cv.toDataURL('image/jpeg', 0.92);
+      a.download = 'banner-' + id + '.jpg';
+      a.click();
+    }
+  };
+  window.__BANNERS = made;   // for automated capture
+})();
+</script>
+</body>
+</html>

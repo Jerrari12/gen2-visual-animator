@@ -1,6 +1,6 @@
 {
- "title": "The Nimble Stack Machine · GEN2 Custom · 240",
- "collection": "240",
+ "title": "The Nimble Stack Machine · GEN2 Custom · 270",
+ "collection": "270",
  "generated": true,
  "mount": "tabletop",
  "pitch": {
@@ -30,26 +30,26 @@
  },
  "parts": [
   {
-   "node": "FR-U_240-2W",
-   "label": "Footrail Upper 240-2W",
+   "node": "FR-U_270-2W",
+   "label": "Footrail Upper 270-2W",
    "type": "FootrailU",
    "qty": 1,
    "links": {
-    "p": "https://www.printables.com/model/1777826-gen2-240-foot-rails",
-    "t": "https://than.gs/m/1574322"
+    "p": "https://www.printables.com/model/1777830-gen2-270-foot-rails",
+    "t": "https://than.gs/m/1574327"
    },
-   "img": "img/parts/FR-U_240-2W.png"
+   "img": "img/parts/FR-U_270-2W.png"
   },
   {
-   "node": "FR-L_240-2W",
-   "label": "Footrail Lower 240-2W",
+   "node": "FR-L_270-2W",
+   "label": "Footrail Lower 270-2W",
    "type": "FootrailL",
    "qty": 1,
    "links": {
-    "p": "https://www.printables.com/model/1777826-gen2-240-foot-rails",
-    "t": "https://than.gs/m/1574322"
+    "p": "https://www.printables.com/model/1777830-gen2-270-foot-rails",
+    "t": "https://than.gs/m/1574327"
    },
-   "img": "img/parts/FR-L_240-2W.png"
+   "img": "img/parts/FR-L_270-2W.png"
   },
   {
    "node": "Tabletop-Kit-Foot",
@@ -57,20 +57,20 @@
    "type": "Foot",
    "qty": 6,
    "links": {
-    "p": "https://www.printables.com/model/1324501-gen2-table-top-kit-v2-240",
-    "t": "https://thangs.com/designer/Jerrari/3d-model/GEN2%20Table%20Top%20Kit%20V2%20-%20240-1360073"
+    "p": "https://www.printables.com/model/1163955-gen2-table-top-kit-v2-270-large",
+    "t": "https://thangs.com/designer/Jerrari/3d-model/GEN2%20Table%20Top%20Kit%20V2%20-%20270-1253780"
    }
   },
   {
-   "node": "240-1W-1H_Case",
-   "label": "Case 240-1W-1H",
+   "node": "270-1W-1H_Case",
+   "label": "Case 270-1W-1H",
    "type": "Case",
    "qty": 2,
    "links": {
-    "p": "https://www.printables.com/model/1658608-gen2-240-cases-all",
-    "t": "https://than.gs/m/1535459"
+    "p": "https://www.printables.com/model/1658688-gen2-270-cases-all",
+    "t": "https://than.gs/m/1535458"
    },
-   "img": "img/parts/Case 240-1W-1H.png"
+   "img": "img/parts/Case 270-1W-1H.png"
   },
   {
    "node": "QuickLock-L",
@@ -134,15 +134,15 @@
    "purchased": true
   },
   {
-   "node": "240-2W-1H_Case",
-   "label": "Case 240-2W-1H",
+   "node": "270-2W-1H_Case",
+   "label": "Case 270-2W-1H",
    "type": "Case",
    "qty": 1,
    "links": {
-    "p": "https://www.printables.com/model/1658608-gen2-240-cases-all",
-    "t": "https://than.gs/m/1535459"
+    "p": "https://www.printables.com/model/1658688-gen2-270-cases-all",
+    "t": "https://than.gs/m/1535458"
    },
-   "img": "img/parts/Case 240-2W-1H.png"
+   "img": "img/parts/Case 270-2W-1H.png"
   },
   {
    "node": "Drawer_Stoppers_L",
@@ -167,37 +167,37 @@
    "img": "img/parts/Drawer Stopper.png"
   },
   {
-   "node": "CL-240-2W",
-   "label": "Cover Lower 240-2W",
+   "node": "CL-270-2W",
+   "label": "Cover Lower 270-2W",
    "type": "CoverL",
    "qty": 1,
    "links": {
-    "p": "https://www.printables.com/model/1777846-gen2-240-cover",
-    "t": "https://than.gs/m/1574326"
+    "p": "https://www.printables.com/model/1777849-gen2-270-cover",
+    "t": "https://than.gs/m/1574325"
    },
-   "img": "img/parts/CL-240-2W.png"
+   "img": "img/parts/CL-270-2W.png"
   },
   {
-   "node": "CU-240-2W",
-   "label": "Cover Upper 240-2W",
+   "node": "CU-270-2W",
+   "label": "Cover Upper 270-2W",
    "type": "CoverU",
    "qty": 1,
    "links": {
-    "p": "https://www.printables.com/model/1777846-gen2-240-cover",
-    "t": "https://than.gs/m/1574326"
+    "p": "https://www.printables.com/model/1777849-gen2-270-cover",
+    "t": "https://than.gs/m/1574325"
    },
-   "img": "img/parts/CU-240-2W.png"
+   "img": "img/parts/CU-270-2W.png"
   },
   {
-   "node": "DecorDrawer_240-1W-1H",
-   "label": "Decor Drawer 240-1W-1H",
+   "node": "DecorDrawer_270-1W-1H",
+   "label": "Decor Drawer 270-1W-1H",
    "type": "Drawer",
    "qty": 2,
    "links": {
-    "p": "https://www.printables.com/model/1322479-gen2-240-decor-drawers-all",
-    "t": "https://than.gs/m/1360074"
+    "p": "https://www.printables.com/model/1062961-gen2-270-decor-drawers-all",
+    "t": "https://than.gs/m/1171387"
    },
-   "img": "img/parts/Decor Drawer 240-1W-1H.png"
+   "img": "img/parts/Decor Drawer 270-1W-1H.png"
   },
   {
    "node": "Faceplate_Essential_1W-1H",
@@ -222,15 +222,15 @@
    "img": "img/parts/Handle_Deco.png"
   },
   {
-   "node": "DecorDrawer_240-2W-1H",
-   "label": "Decor Drawer 240-2W-1H",
+   "node": "DecorDrawer_270-2W-1H",
+   "label": "Decor Drawer 270-2W-1H",
    "type": "Drawer",
    "qty": 1,
    "links": {
-    "p": "https://www.printables.com/model/1322479-gen2-240-decor-drawers-all",
-    "t": "https://than.gs/m/1360074"
+    "p": "https://www.printables.com/model/1062961-gen2-270-decor-drawers-all",
+    "t": "https://than.gs/m/1171387"
    },
-   "img": "img/parts/Decor Drawer 240-2W-1H.png"
+   "img": "img/parts/Decor Drawer 270-2W-1H.png"
   },
   {
    "node": "Faceplate_Essential_2W-1H",
@@ -247,7 +247,7 @@
  "instances": [
   {
    "id": "frl0",
-   "node": "FR-L_240-2W",
+   "node": "FR-L_270-2W",
    "pos": [
     0,
     7.65,
@@ -261,7 +261,7 @@
    "pos": [
     -76.48,
     0,
-    -100.5
+    -115.5
    ],
    "yaw": 180,
    "stage": "base"
@@ -272,7 +272,7 @@
    "pos": [
     -76.48,
     0,
-    108.65
+    123.65
    ],
    "yaw": 180,
    "stage": "base"
@@ -283,7 +283,7 @@
    "pos": [
     -0.18,
     0,
-    -100.5
+    -115.5
    ],
    "yaw": 0,
    "stage": "base"
@@ -294,7 +294,7 @@
    "pos": [
     -0.18,
     0,
-    108.65
+    123.65
    ],
    "yaw": 0,
    "stage": "base"
@@ -305,7 +305,7 @@
    "pos": [
     76.65,
     0,
-    -100.5
+    -115.5
    ],
    "yaw": 0,
    "stage": "base"
@@ -316,14 +316,14 @@
    "pos": [
     76.65,
     0,
-    108.65
+    123.65
    ],
    "yaw": 0,
    "stage": "base"
   },
   {
    "id": "case0",
-   "node": "240-1W-1H_Case",
+   "node": "270-1W-1H_Case",
    "pos": [
     -44,
     17.65,
@@ -337,7 +337,7 @@
    "pos": [
     -84.12,
     53.330000000000005,
-    92.52
+    107.52
    ],
    "stage": "c0"
   },
@@ -347,7 +347,7 @@
    "pos": [
     -3.45,
     53.330000000000005,
-    92.52
+    107.52
    ],
    "stage": "c0"
   },
@@ -357,7 +357,7 @@
    "pos": [
     -44,
     53.45,
-    -113.2
+    -128.2
    ],
    "owner": 1,
    "stage": "c0"
@@ -368,14 +368,14 @@
    "pos": [
     -44,
     57.650000000000006,
-    -113.5
+    -128.5
    ],
    "owner": 1,
    "stage": "c0"
   },
   {
    "id": "case1",
-   "node": "240-1W-1H_Case",
+   "node": "270-1W-1H_Case",
    "pos": [
     44,
     17.65,
@@ -389,7 +389,7 @@
    "pos": [
     3.88,
     53.330000000000005,
-    92.52
+    107.52
    ],
    "stage": "c1"
   },
@@ -399,7 +399,7 @@
    "pos": [
     84.55,
     53.330000000000005,
-    92.52
+    107.52
    ],
    "stage": "c1"
   },
@@ -409,7 +409,7 @@
    "pos": [
     44,
     53.45,
-    -113.2
+    -128.2
    ],
    "owner": 2,
    "stage": "c1"
@@ -420,14 +420,14 @@
    "pos": [
     44,
     57.650000000000006,
-    -113.5
+    -128.5
    ],
    "owner": 2,
    "stage": "c1"
   },
   {
    "id": "case2",
-   "node": "240-2W-1H_Case",
+   "node": "270-2W-1H_Case",
    "pos": [
     0,
     73.65,
@@ -441,7 +441,7 @@
    "pos": [
     -84.12,
     109.33000000000001,
-    92.52
+    107.52
    ],
    "stage": "c2"
   },
@@ -451,7 +451,7 @@
    "pos": [
     84.55,
     109.33000000000001,
-    92.52
+    107.52
    ],
    "stage": "c2"
   },
@@ -461,7 +461,7 @@
    "pos": [
     -44,
     109.45,
-    -113.2
+    -128.2
    ],
    "owner": 3,
    "stage": "c2"
@@ -472,7 +472,7 @@
    "pos": [
     -44,
     113.65,
-    -113.5
+    -128.5
    ],
    "owner": 3,
    "stage": "c2"
@@ -483,7 +483,7 @@
    "pos": [
     -56.6,
     71.65,
-    104
+    119
    ],
    "stopperKey": "1:0"
   },
@@ -493,7 +493,7 @@
    "pos": [
     -31.6,
     71.65,
-    104
+    119
    ],
    "stopperKey": "1:0"
   },
@@ -503,7 +503,7 @@
    "pos": [
     31.4,
     71.65,
-    104
+    119
    ],
    "stopperKey": "2:0"
   },
@@ -513,7 +513,7 @@
    "pos": [
     56.4,
     71.65,
-    104
+    119
    ],
    "stopperKey": "2:0"
   },
@@ -523,7 +523,7 @@
    "pos": [
     -56.6,
     127.65,
-    104
+    119
    ],
    "stopperKey": "3:0"
   },
@@ -533,7 +533,7 @@
    "pos": [
     -31.6,
     127.65,
-    104
+    119
    ],
    "stopperKey": "3:0"
   },
@@ -543,7 +543,7 @@
    "pos": [
     31.4,
     127.65,
-    104
+    119
    ],
    "stopperKey": "3:1"
   },
@@ -553,13 +553,13 @@
    "pos": [
     56.4,
     127.65,
-    104
+    119
    ],
    "stopperKey": "3:1"
   },
   {
    "id": "cl0",
-   "node": "CL-240-2W",
+   "node": "CL-270-2W",
    "pos": [
     0,
     129.65,
@@ -568,7 +568,7 @@
   },
   {
    "id": "cu0",
-   "node": "CU-240-2W",
+   "node": "CU-270-2W",
    "pos": [
     0,
     133.95000000000002,
@@ -577,7 +577,7 @@
   },
   {
    "id": "drw0",
-   "node": "DecorDrawer_240-1W-1H",
+   "node": "DecorDrawer_270-1W-1H",
    "pos": [
     -43.84,
     23.369999999999997,
@@ -590,7 +590,7 @@
    "pos": [
     -43.84,
     53.370000000000005,
-    -110.5
+    -125.5
    ],
    "yaw": 180,
    "rides": "drw0",
@@ -602,7 +602,7 @@
    "pos": [
     -43.84,
     58.370000000000005,
-    -111.5
+    -126.5
    ],
    "rides": "drw0",
    "owner": 1
@@ -613,7 +613,7 @@
    "pos": [
     -43.53,
     21.369999999999997,
-    122.57
+    137.57
    ],
    "rides": "drw0"
   },
@@ -623,13 +623,13 @@
    "pos": [
     -43.54,
     43.87,
-    137.07
+    152.07
    ],
    "rides": "drw0"
   },
   {
    "id": "drw1",
-   "node": "DecorDrawer_240-1W-1H",
+   "node": "DecorDrawer_270-1W-1H",
    "pos": [
     44.16,
     23.369999999999997,
@@ -642,7 +642,7 @@
    "pos": [
     44.16,
     53.370000000000005,
-    -110.5
+    -125.5
    ],
    "yaw": 180,
    "rides": "drw1",
@@ -654,7 +654,7 @@
    "pos": [
     44.16,
     58.370000000000005,
-    -111.5
+    -126.5
    ],
    "rides": "drw1",
    "owner": 2
@@ -665,7 +665,7 @@
    "pos": [
     44.47,
     21.369999999999997,
-    122.57
+    137.57
    ],
    "rides": "drw1"
   },
@@ -675,13 +675,13 @@
    "pos": [
     44.46,
     43.87,
-    137.07
+    152.07
    ],
    "rides": "drw1"
   },
   {
    "id": "drw2",
-   "node": "DecorDrawer_240-2W-1H",
+   "node": "DecorDrawer_270-2W-1H",
    "pos": [
     0.16,
     79.37,
@@ -694,7 +694,7 @@
    "pos": [
     -43.84,
     109.37,
-    -110.5
+    -125.5
    ],
    "yaw": 180,
    "rides": "drw2",
@@ -706,7 +706,7 @@
    "pos": [
     -43.84,
     114.37,
-    -111.5
+    -126.5
    ],
    "rides": "drw2",
    "owner": 3
@@ -717,7 +717,7 @@
    "pos": [
     0.47,
     77.37,
-    122.57
+    137.57
    ],
    "rides": "drw2"
   },
@@ -727,13 +727,13 @@
    "pos": [
     0.46,
     99.87,
-    137.07
+    152.07
    ],
    "rides": "drw2"
   },
   {
    "id": "fru0",
-   "node": "FR-U_240-2W",
+   "node": "FR-U_270-2W",
    "pos": [
     0,
     12.75,
@@ -750,27 +750,27 @@
   "c0": [
    0,
    0,
-   -225
+   -255
   ],
   "c1": [
    0,
    0,
-   -225
+   -255
   ],
   "c2": [
    0,
    0,
-   -225
+   -255
   ]
  },
  "steps": [
   {
    "title": "The Nimble Stack Machine",
-   "note": "Your custom GEN2 build · 3 units, 3 drawers, 2 columns wide. Drag to orbit, tap any part to identify it. 42 prints · quantities on the right. You'll also need 6× M3 screws for the handles and 6× 10×2 mm disc magnets for the optional magnet closures (hardware store items). ⚠ 240 hardware positions are scaled from the 185 calibration · double-check a printed build and report anything that sits off.",
+   "note": "Your custom GEN2 build · 3 units, 3 drawers, 2 columns wide. Drag to orbit, tap any part to identify it. 42 prints · quantities on the right. You'll also need 6× M3 screws for the handles and 6× 10×2 mm disc magnets for the optional magnet closures (hardware store items). ⚠ 270 hardware positions are scaled from the 185 calibration · double-check a printed build and report anything that sits off.",
    "camera": {
     "t": 30,
     "p": 58,
-    "r": 1062.99,
+    "r": 1129.95,
     "target": [
      0,
      76.8075,
@@ -785,7 +785,7 @@
    "camera": {
     "t": 30,
     "p": 58,
-    "r": 787.4,
+    "r": 837,
     "target": [
      0,
      115,
@@ -814,7 +814,7 @@
    "camera": {
     "t": 30,
     "p": 58,
-    "r": 787.4,
+    "r": 837,
     "target": [
      0,
      115,
@@ -887,7 +887,7 @@
    "camera": {
     "t": 30,
     "p": 58,
-    "r": 787.4,
+    "r": 837,
     "target": [
      0,
      50,
@@ -907,7 +907,7 @@
    "camera": {
     "t": 30,
     "p": 58,
-    "r": 787.4,
+    "r": 837,
     "target": [
      0,
      30,
@@ -923,7 +923,7 @@
        "from": [
         0,
         0,
-        -225
+        -255
        ]
       }
      ]
@@ -936,7 +936,7 @@
    "camera": {
     "t": 30,
     "p": 58,
-    "r": 787.4,
+    "r": 837,
     "target": [
      -44,
      47.15,
@@ -1041,7 +1041,7 @@
    "camera": {
     "t": 30,
     "p": 58,
-    "r": 787.4,
+    "r": 837,
     "target": [
      44,
      47.15,
@@ -1102,7 +1102,7 @@
    "camera": {
     "t": 30,
     "p": 58,
-    "r": 787.4,
+    "r": 837,
     "target": [
      0,
      103.15,
@@ -1199,7 +1199,7 @@
    "camera": {
     "t": 30,
     "p": 58,
-    "r": 787.4,
+    "r": 837,
     "target": [
      0,
      139.65,
@@ -1215,7 +1215,7 @@
        "from": [
         0,
         0,
-        -225
+        -255
        ]
       }
      ]
@@ -1264,7 +1264,7 @@
    "camera": {
     "t": 30,
     "p": 58,
-    "r": 787.4,
+    "r": 837,
     "target": [
      0,
      139.65,
@@ -1280,7 +1280,7 @@
        "from": [
         0,
         0,
-        -225
+        -255
        ]
       }
      ]
@@ -1293,7 +1293,7 @@
    "camera": {
     "t": 12,
     "p": 68,
-    "r": 787.4,
+    "r": 837,
     "target": [
      0,
      62.8425,
@@ -1445,7 +1445,7 @@
    "camera": {
     "t": 15,
     "p": 66,
-    "r": 787.4,
+    "r": 837,
     "target": [
      0,
      69.825,
@@ -1492,7 +1492,7 @@
       "target": [
        -43.53,
        93.87,
-       162.57
+       177.57
       ]
      }
     },
@@ -1543,7 +1543,7 @@
      "camera": {
       "t": 15,
       "p": 66,
-      "r": 787.4,
+      "r": 837,
       "target": [
        0,
        69.825,
