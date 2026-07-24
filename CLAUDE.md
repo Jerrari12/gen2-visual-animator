@@ -654,7 +654,20 @@ decodeURIComponent and silently fails on encoded hashes). **Gallery:**
 `viewer/builds/index.html` (standalone page, no three.js) — styled as a
 SECONDARY PAGE OF THE PLANNER (Joey 2026-07-23): its dark :root tokens,
 hero-bar brand ("GEN2 KITS" wordmark + "← Open the GEN2 Planner" ghost pill),
-and footer mirror gen2-planner css/style.css. Cards render from
+and footer mirror gen2-planner css/style.css. The page wears the PLANNER'S CHROME (Joey 2026-07-24 — "it needs to feel
+like a different page on the same website"): the same parallax hero photo
+(`viewer/img/page/GEN2-Background-A.jpg`, copied from the planner repo), shade
+gradient, brand bar and tagline/chips block, with js/hero.js's slow pan ported
+inline. **Cross-site nav both ways:** a "← GEN2 Planner" pill + footer link
+here, and a "🧩 Official kits" pill + footer link in the planner (its `KITS_URL`
+= INSTRUCTIONS_VIEWER_URL + "builds/", so local dev walks between the tools).
+Narrow screens drop jerrari3d.com from both bars, and the planner also sheds
+its PLANNER sub-word ≤430px. ⚠ The planner's new hero-bar media rules sit
+AFTER the `.hero-bar`/`.brand-*` base rules on purpose — the older 560px block
+near the top of style.css cannot override them (same specificity, later rule
+wins regardless of media query). Planner dev now has `serve-planner.py`
+(no-store, mirrors serve-viewer.py) — a plain `python -m http.server` served
+stale css/js and made a fresh edit look broken. Cards render from
 `builds/index.json` (stats + `length` precomputed at authoring): each card is
 the planner mount-card pattern — dark panel, the kit's 3/4 render as a
 right-side background under a left legibility gradient, and the planner's
