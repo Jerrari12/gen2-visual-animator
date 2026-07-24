@@ -11,7 +11,7 @@
     {
       "name": "planner",
       "runtimeExecutable": "python",
-      "runtimeArgs": ["-m", "http.server", "8124", "--directory", "D:/Code Projects/GEN2 Planner/gen2-planner-main"],
+      "runtimeArgs": ["D:/Code Projects/GEN2 Planner/gen2-planner-main/serve-planner.py", "8124"],
       "port": 8124,
       "autoPort": false
     }

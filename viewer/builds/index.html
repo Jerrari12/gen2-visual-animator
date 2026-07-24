@@ -6,8 +6,9 @@
 <title>Official GEN2 Kits — 3D Build Studio</title>
 <meta name="description" content="Preconfigured GEN2 builds with interactive LEGO-style 3D assembly instructions. Pick a kit, follow the steps, make it yours.">
 <style>
-/* A secondary page of the GEN2 Planner — same dark chrome, brand tokens and
-   footer (mirrors gen2-planner css/style.css :root). */
+/* A secondary page of the GEN2 Planner — the :root tokens, parallax hero,
+   brand bar and footer are all mirrored from gen2-planner css/style.css so the
+   two sites read as one. Keep them in sync when the planner's chrome changes. */
 :root {
   --bg: #2c2d31;
   --panel: #3a3b3f;
@@ -30,40 +31,103 @@ body {
 }
 a { color: var(--accent); }
 
-/* ---- planner-style top bar ---- */
-.hero-bar {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 18px 28px;
+/* ---------- hero (mirrors the planner) ---------- */
+.hero {
+  position: relative;
+  height: 250px;
+  overflow: hidden;
   border-bottom: 1px solid var(--line);
+  flex-shrink: 0;
 }
+.hero-bg {
+  position: absolute;
+  inset: 0;
+  background: url("../img/page/GEN2-Background-A.jpg") center top / cover no-repeat;
+  will-change: background-position;
+}
+.hero-shade {
+  position: absolute; inset: 0;
+  background: linear-gradient(to bottom,
+    rgba(20,21,23,0.55) 0%, rgba(20,21,23,0.10) 42%,
+    rgba(44,45,49,0.85) 86%, var(--bg) 100%);
+  pointer-events: none;
+}
+.hero-bar {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 28px;
+  gap: 12px;
+}
+.hero .brand-mark,
+.hero .brand-sub,
+.hero .brand-link { text-shadow: 0 1px 6px rgba(0,0,0,0.7); }
+.hero .brand-sub,
+.hero .brand-link { color: #d7d8db; }
+.hero .brand-link:hover { color: var(--accent); }
 .brand { display: flex; align-items: center; gap: 11px; text-decoration: none; }
 .brand-logo { height: 44px; width: auto; flex-shrink: 0; filter: drop-shadow(0 1px 4px rgba(0,0,0,0.55)); }
-.brand-mark { font-weight: 800; font-size: 1.5rem; letter-spacing: 0.05em; color: var(--accent); }
-.brand-sub { margin-left: 8px; font-weight: 300; letter-spacing: 0.35em; color: var(--muted); }
+.brand-mark {
+  font-weight: 800;
+  font-size: 1.5rem;
+  letter-spacing: 0.05em;
+  color: var(--accent);
+}
+.brand-sub {
+  margin-left: 8px;
+  font-weight: 300;
+  letter-spacing: 0.35em;
+  color: var(--muted);
+}
+.brand-link { font-size: 0.85rem; text-decoration: none; color: var(--muted); white-space: nowrap; }
+.brand-link:hover { color: var(--accent); }
 .hero-bar-actions { display: flex; align-items: center; gap: 16px; }
-.back-planner {
-  font-size: 0.82rem; font-weight: 600; text-decoration: none;
+/* cross-site nav, styled like the planner's #start-fresh ghost pill */
+.nav-pill {
+  font: inherit; font-size: 0.82rem; font-weight: 600; text-decoration: none;
   color: #d7d8db; background: rgba(0,0,0,0.35);
   border: 1px solid rgba(255,255,255,0.22); border-radius: 999px;
-  padding: 6px 14px;
+  padding: 6px 14px; white-space: nowrap;
+  text-shadow: 0 1px 6px rgba(0,0,0,0.7);
 }
-.back-planner:hover { color: var(--accent); border-color: var(--accent); }
-.brand-link { font-size: 0.85rem; text-decoration: none; color: var(--muted); }
-.brand-link:hover { color: var(--accent); }
+.nav-pill:hover { color: var(--accent); border-color: var(--accent); }
 
-/* ---- intro ---- */
-.lede { max-width: 1180px; margin: 0 auto; padding: 26px 28px 4px; }
-.lede h1 { margin: 0 0 6px; font-size: 1.5rem; line-height: 1.2; }
-.lede p { margin: 0; max-width: 640px; font-size: 0.92rem; color: var(--muted); }
+.hero-tagline {
+  position: absolute;
+  left: 28px; right: 28px; bottom: 18px;
+  z-index: 2;
+}
+.hero-tagline h1 {
+  margin: 0 0 6px;
+  font-size: 1.5rem;
+  line-height: 1.2;
+  text-shadow: 0 1px 8px rgba(0,0,0,0.8);
+}
+.hero-tagline p {
+  margin: 0 0 10px;
+  max-width: 620px;
+  font-size: 0.92rem;
+  color: #d7d8db;
+  text-shadow: 0 1px 6px rgba(0,0,0,0.8);
+}
+.hero-chips { display: flex; gap: 18px; flex-wrap: wrap; }
+.hero-chips span {
+  font-size: 0.82rem; font-weight: 600;
+  color: #d7d8db;
+  text-shadow: 0 1px 6px rgba(0,0,0,0.8);
+}
+.hero-chips span::before { content: "✓ "; color: var(--accent); font-weight: 700; }
 
-/* ---- kit cards ---- */
-#kits { flex: 1; width: 100%; max-width: 1180px; margin: 0 auto; padding: 8px 28px 50px; }
+/* ---------- kit cards ---------- */
+#kits { flex: 1; width: 100%; max-width: 1180px; margin: 0 auto; padding: 12px 28px 50px; }
 /* Tiers are a PROGRESSION, not a choice: "Start here" then "Go bigger". Each kit
    has its own Printables page, so a beginner only ever meets one link — this
    page is the only place both tiers appear together. */
 .tier-head {
   display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
-  margin: 26px 0 4px;
+  margin: 30px 0 4px;
 }
 .tier-head h2 { font-size: 1.05rem; margin: 0; }
 .tier-head span { font-size: 0.85rem; color: var(--muted); }
@@ -71,8 +135,6 @@ a { color: var(--accent); }
   display: grid; grid-template-columns: repeat(auto-fill, minmax(480px, 1fr)); gap: 20px;
   align-content: start; margin-top: 14px;
 }
-/* Card = the planner's mount-card pattern: dark panel, 3/4 render as a
-   right-side background bleeding under a left gradient, length-colored spine. */
 .kit-card {
   position: relative;
   display: flex; flex-direction: column; justify-content: flex-end;
@@ -123,9 +185,9 @@ a { color: var(--accent); }
   background: var(--accent); border-radius: 8px; padding: 9px 16px;
 }
 .kit-card:hover .kit-open { filter: brightness(1.06); }
-#empty { grid-column: 1 / -1; text-align: center; color: var(--muted); font-size: 0.9rem; padding: 40px 0; }
+#empty { text-align: center; color: var(--muted); font-size: 0.9rem; padding: 40px 0; }
 
-/* ---- planner footer ---- */
+/* ---------- planner footer ---------- */
 .footer {
   text-align: center; padding: 24px;
   color: var(--muted); font-size: 0.85rem;
@@ -134,49 +196,88 @@ a { color: var(--accent); }
 .footer a { color: var(--accent); }
 
 @media (max-width: 560px) {
+  .hero { height: 300px; }
+  .hero-tagline h1 { font-size: 1.2rem; }
   .hero-bar { padding: 14px 18px; }
+  .hero-tagline { left: 18px; right: 18px; }
+  /* the bar runs out of room with brand + 2 links; jerrari3d.com also lives in
+     the footer, so it's the one that goes */
+  .hero-bar-actions .brand-link { display: none; }
   .brand-logo { height: 34px; }
   .brand-mark { font-size: 1.2rem; }
-  .lede, main { padding-left: 18px; padding-right: 18px; }
-  main { grid-template-columns: 1fr; }
+  .brand-sub { letter-spacing: 0.2em; font-size: 0.8rem; }
+  #kits { padding-left: 18px; padding-right: 18px; }
+  .tier-grid { grid-template-columns: 1fr; }
   .kit-body { max-width: 100%; }
 }
 </style>
 </head>
 <body>
+
+<header class="hero" id="hero">
+  <div class="hero-bg" id="hero-bg"></div>
+  <div class="hero-shade"></div>
   <div class="hero-bar">
-    <a class="brand" href="https://gen2planner.jerrari3d.com/">
-      <img class="brand-logo" src="../img/jerrari-logo.svg" alt="Jerrari Design" onerror="this.remove()">
+    <a class="brand" id="brand-home" href="https://gen2planner.jerrari3d.com/">
+      <img class="brand-logo" src="../img/jerrari-logo.svg" alt="Jerrari Design" width="26" height="44" onerror="this.remove()">
       <span class="brand-word"><span class="brand-mark">GEN2</span><span class="brand-sub">KITS</span></span>
     </a>
     <span class="hero-bar-actions">
-      <a class="back-planner" href="https://gen2planner.jerrari3d.com/">&#8592; Open the GEN2 Planner</a>
-      <a class="brand-link" href="https://www.jerrari3d.com/gen2-modular-system" target="_blank" rel="noopener">JERRARI3D.com &rarr;</a>
+      <a class="nav-pill planner-link" href="https://gen2planner.jerrari3d.com/">&#8592; GEN2 Planner</a>
+      <a class="brand-link" href="https://www.jerrari3d.com/gen2-modular-system" target="_blank" rel="noopener">JERRARI3D.com →</a>
     </span>
   </div>
-
-  <div class="lede">
-    <h1>Official GEN2 Kits</h1>
-    <p>Proven builds with interactive, LEGO-style 3D assembly instructions - follow along step by step, swap faceplates, handles and colors, then customize the build in the planner when you're ready.</p>
+  <div class="hero-tagline">
+    <h1>Official GEN2 kits &middot; proven builds, ready to print.</h1>
+    <p>Pick a kit and follow the interactive 3D guide step by step - every part, quantity and download link included. Open it in the planner whenever you want to make it your own.</p>
+    <div class="hero-chips"><span>Proven layouts</span><span>Interactive 3D guide</span><span>Full parts list</span></div>
   </div>
+</header>
 
-  <div id="kits"><div id="empty">Loading kits…</div></div>
+<div id="kits"><div id="empty">Loading kits…</div></div>
 
-  <footer class="footer">
-    GEN2 QuickLock Modular System by <a href="https://www.jerrari3d.com" target="_blank" rel="noopener">JERRARI3D</a>
-    · Models on <a href="https://www.printables.com/@Jerrari" target="_blank" rel="noopener">Printables</a>
-    and <a href="https://thangs.com/designer/Jerrari" target="_blank" rel="noopener">Thangs</a>
-    · <a href="https://gen2planner.jerrari3d.com/">GEN2 Planner</a>
-  </footer>
+<footer class="footer">
+  GEN2 QuickLock Modular System by <a href="https://www.jerrari3d.com" target="_blank" rel="noopener">JERRARI3D</a>
+  · Models on <a href="https://www.printables.com/@Jerrari" target="_blank" rel="noopener">Printables</a>
+  and <a href="https://thangs.com/designer/Jerrari" target="_blank" rel="noopener">Thangs</a>
+  · <a class="planner-link" href="https://gen2planner.jerrari3d.com/">GEN2 Planner</a>
+</footer>
 
 <script>
+// Cross-site nav: point every .planner-link at the LOCAL planner when this page
+// is itself served locally, so the two tools can be walked end-to-end before
+// deploying (mirrors IS_LOCAL_DEV / INSTRUCTIONS_VIEWER_URL in planner app.js —
+// keep the port in step with .claude/launch.json's "planner" entry).
+const IS_LOCAL_DEV = location.protocol === 'file:' || ['localhost', '127.0.0.1'].includes(location.hostname);
+const PLANNER_URL = IS_LOCAL_DEV ? 'http://localhost:8124/' : 'https://gen2planner.jerrari3d.com/';
+for (const a of document.querySelectorAll('.planner-link, #brand-home')) a.href = PLANNER_URL;
+
+// Parallax hero — a straight port of the planner's js/hero.js: the photo starts
+// at its top and drifts only a fraction of the way down across the banner's
+// scroll, so it moves slower than the page.
+(function () {
+  const hero = document.getElementById('hero'), bg = document.getElementById('hero-bg');
+  if (!hero || !bg) return;
+  let ticking = false;
+  function update() {
+    const y = window.pageYOffset || document.documentElement.scrollTop || 0;
+    const range = hero.offsetHeight || 1;
+    const PAN = 0.25;
+    const p = Math.max(0, Math.min(1, y / range)) * PAN;
+    bg.style.backgroundPositionY = (p * 100).toFixed(1) + '%';
+    ticking = false;
+  }
+  window.addEventListener('scroll', () => {
+    if (!ticking) { ticking = true; requestAnimationFrame(update); }
+  }, { passive: true });
+  update();
+})();
+
 // The kit list is data (builds/index.json, stats precomputed at authoring
 // time) — this page just renders cards. Card background = the kit's ?shot=1
-// render (builds/img/<id>.jpg, captured on the same --panel gray so it blends
-// seamlessly); a card without one stays a plain panel. Length colors mirror
-// the planner's GEN2.lengths palette exactly.
+// render (builds/img/<id>.jpg). Length colors mirror the planner's
+// GEN2.lengths palette exactly.
 const LENGTH_COLORS = { 59: '#f2f2f2', 115: '#9ea3a8', 165: '#3aa0e8', 185: '#ff8a40', 240: '#3ecfa0', 270: '#e8453c' };
-
 const TIERS = [
   { key: 'starter', title: 'Start here', blurb: '2W-2H · your first GEN2 build - 3 drawers, about 42 printed parts.' },
   { key: 'next',    title: 'Go bigger',  blurb: '3W-2H · the same assembly one column wider - 5 drawers, and the covers stagger brick-style.' },
