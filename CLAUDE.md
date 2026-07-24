@@ -665,8 +665,26 @@ durability guarantee):** repo-root `npm test` → `test/official-builds.test.mjs
 runs every builds/*.json through migrate+generateManifest (pure JS, plain node)
 and diffs against `test/golden/<id>.manifest.json` — a generator change that
 alters an official kit fails before it can deploy over a printed link;
-intentional changes refresh via `UPDATE_GOLDEN=1 npm test`. Seed kit:
-`240-tabletop-kit` (2×2 240 tabletop decor). Rollback tag in both repos:
+intentional changes refresh via `UPDATE_GOLDEN=1 npm test`.
+**The five starter kits (2026-07-23):** `{115,165,185,240,270}-tabletop-kit` —
+ONE layout for all (2W-1H on top, two 1W-1H below = 3 drawers / 42 prints /
+12 steps) so the collection DEPTH is the only variable across the family. 59
+is excluded (hanging-only). **Magnet closures are ON by default and that's
+deliberate** (Joey): it adds the clip/magnet install steps and puts the
+hardware-store magnets in the BOM with their affiliate buy chips — a beginner
+sees exactly what to order; stoppers ship too, and both are ✕-removable in the
+viewer so the kits double as a demo of Build options. Essential faceplates +
+Deco handles (nothing club-gated required on day one). Gallery `dims` are the
+TRUE physical envelope read from the viewer's assembledBox (matches the cover
+badge — 240 = 176×140×269), NOT the planner's grid math.
+**Printables banners:** `viewer/builds/banner.html` (dev tool, same folder as
+the gallery) composites a 1600×900 banner per kit from its `?shot=1` render —
+length-colored accent spine + eyebrow, "Interactive 3D Build Guide" headline,
+feature bullets, and the permanent short link as a pill. The banner's backdrop
+is the SAME panel gray (#3a3b3f) the renders are captured on, so the model
+blends with no keying; the accent spine must be drawn AFTER the text-side
+shade gradient or it's buried. Output: `builds/img/banner-<id>.jpg` ("Download
+all" button, or POST the canvases). Rollback tag in both repos:
 `pre-official-kits`.
 
 ## Planner → generated instructions (BUILT)
