@@ -957,6 +957,24 @@ Positive θ reads clockwise from behind, which is where the driver is.
 GLBs live in all six `viewer/parts/<L>/`; the STATIC kit manifests don't carry
 them (hand-authored — generated builds only).
 
+## "Can I build this today?" — required-hardware marker (2026-07-24)
+
+Purchased BOM rows now split two ways: `purchased` (you buy it) and
+`required` (you CANNOT finish without it). Required = handle screws +
+wall/under-table wood screws. Magnets are purchased but NOT required — they're
+an opt-in closure with "None" beside them, so a magnet build is still
+print-and-build-today; counting them would make the signal mean "something
+costs money" instead of "this stops you finishing" (Joey's call).
+`add(node,label,type,links,n,purchased,required)` in generate.js carries it.
+Surfacing it costs NO new layout (Joey's constraint):
+- viewer checklist head: `🧩 N to print · 🔩 N to buy` — the buy half renders
+  only when required hardware exists, so a print-only build looks CLEANER
+  (renderChecklist reads `p.purchased && p.required`).
+- viewer Build options: the Faceplate ◀▶ name suffixes 🔩 on bolt-on families
+  (`hasHandle`), so flipping styles shows which ones you can finish today.
+- planner: a corner `🔩` (`.needs-hw`) on faceplate cards without
+  `integratedHandle` and on the Wall / Under-Table mount cards.
+
 ## Decor Faceplates — EdgeLabel (thumbnails + GLB DONE — 2026-07-08)
 
 Source blend: `Blender Files\Decor Faceplates\GEN2 GLB Exporter - GEN2 Faceplates -

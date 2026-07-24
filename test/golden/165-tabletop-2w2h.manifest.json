@@ -235,7 +235,8 @@
     ]
    },
    "img": "img/parts/ButtonHeadScrew_M3-6.png",
-   "purchased": true
+   "purchased": true,
+   "required": true
   },
   {
    "node": "DecorDrawer_165-2W-1H",

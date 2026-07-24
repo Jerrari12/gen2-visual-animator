@@ -908,7 +908,12 @@ function renderOptions() {
     const grp = document.createElement('div'); grp.className = 'opt-seg opt-cycle';
     const prev = document.createElement('button'); prev.textContent = '◀'; prev.onclick = () => cycleFaceplateStyle(-1);
     const name = document.createElement('span'); name.className = 'opt-cycle-name';
-    name.textContent = currentFaceplateStyle().label;
+    // 🔩 marks a family whose handle BOLTS ON — i.e. picking it means ordering
+    // screws before you can finish. Integrated-grip families print complete, so
+    // flipping through the styles shows which ones you can build today.
+    const bolts = currentFaceplateStyle().hasHandle;
+    name.textContent = currentFaceplateStyle().label + (bolts ? ' 🔩' : '');
+    name.title = bolts ? 'Bolt-on handle — needs 2× M3×6 screws per drawer' : 'Handle is printed in — no hardware needed';
     const next = document.createElement('button'); next.textContent = '▶'; next.onclick = () => cycleFaceplateStyle(1);
     grp.append(prev, name, next); row.append(lab, grp); box.appendChild(row);
   }
@@ -987,7 +992,12 @@ function renderChecklist() {
     rows.appendChild(aff);
   }
   $('checklist-title').textContent = build ? 'Your build' : 'Parts list';
-  $('parts-head').textContent = `🧩 Parts to print · ${total} print${total === 1 ? '' : 's'}`;
+  // "can I build this today?" rides the counter that was already here rather
+  // than adding a row (Joey 2026-07-24): only REQUIRED buys count, so a
+  // print-only build simply shows nothing extra — the cleaner line IS the
+  // reward. Opt-in magnets never trip it.
+  const toBuy = manifest.parts.filter(p => p.purchased && p.required).reduce((n, p) => n + p.qty, 0);
+  $('parts-head').textContent = `🧩 ${total} to print` + (toBuy ? ` · 🔩 ${toBuy} to buy` : '');
   $('checklist-tab').textContent = `Parts · ${total}`;
 }
 

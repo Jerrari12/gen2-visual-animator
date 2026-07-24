@@ -460,10 +460,16 @@ export function generateManifest(build) {
   // ---- build instances + steps ---------------------------------------------
   const inst = [], stages = { base: [0, 110, 0] }, steps = [];
   const bom = new Map(); // node -> {label,type,qty,links,img,purchased}
-  const add = (node, label, type, links, n = 1, purchased = false) => {
+  // `required` (purchased rows only) = you CANNOT finish the build without it:
+  // handle screws, wall/under-table mounting screws. Magnets are excluded on
+  // purpose — they're an opt-in closure with "None" right beside it, so a
+  // magnet build is still print-and-build-today. That distinction is what the
+  // "· N to buy" counter reports (main.js renderChecklist).
+  const add = (node, label, type, links, n = 1, purchased = false, required = false) => {
     if (!bom.has(node)) {
       const img = imgFor(node);
-      bom.set(node, { node, label, type, qty: 0, ...(links ? { links } : {}), ...(img ? { img } : {}), ...(purchased ? { purchased } : {}) });
+      bom.set(node, { node, label, type, qty: 0, ...(links ? { links } : {}), ...(img ? { img } : {}),
+        ...(purchased ? { purchased } : {}), ...(required ? { required } : {}) });
     }
     bom.get(node).qty += n;
   };
@@ -521,7 +527,7 @@ export function generateManifest(build) {
         const sid = `uts${utScrewIds.length}`;
         utScrewIds.push(sid);
         inst.push({ id: sid, node: 'WoodScrew', pos: [railX(t) + lx, flatTopY + UT.screwY, z], rot: [90, 0, 0] });
-        add('WoodScrew', 'Wood Screw', 'Screw', { ...links.rail, buy: BUY.woodScrews }, 1, true); // purchased hardware
+        add('WoodScrew', 'Wood Screw', 'Screw', { ...links.rail, buy: BUY.woodScrews }, 1, true, true); // purchased + REQUIRED (the rail can't mount without them)
       }
       c += w;
     }
@@ -543,7 +549,7 @@ export function generateManifest(build) {
       const id = `sc${screwIds.length}`;
       screwIds.push(id);
       inst.push({ id, node: 'WoodScrew', pos: [colCenter(c) + dx, pegY, WALL.screwZ + dz] });
-      add('WoodScrew', 'Wood Screw', 'Screw', { ...links.wall, buy: BUY.woodScrews }, 1, true); // purchased hardware
+      add('WoodScrew', 'Wood Screw', 'Screw', { ...links.wall, buy: BUY.woodScrews }, 1, true, true); // purchased + REQUIRED (nothing hangs without them)
     }
   } else if (caseFeet) {
     // feet slide into the bottom case's own underside slots: 4 per 1W, running
@@ -649,7 +655,7 @@ export function generateManifest(build) {
       inst.push({ id: mcId, node: 'MagnetClip_10x2mm', pos: [mx, mcy, -85.7 + dz], owner: u.id, ...stg });
       inst.push({ id: mgId, node: 'Magnet_10x2mm', pos: [mx, mcy + 4.2, -86 + dz], owner: u.id, ...stg });
       add('MagnetClip_10x2mm', 'Magnet Clip 10×2', 'MagnetClip', links.hw, 2);
-      add('Magnet_10x2mm', 'Magnet 10×2 mm', 'Magnet', { buy: BUY.magnets }, 2, true);
+      add('Magnet_10x2mm', 'Magnet 10×2 mm', 'Magnet', { buy: BUY.magnets }, 2, true); // purchased but NOT required — an opt-in closure
       members.push(mcId, mgId);
     }
     const step = {
@@ -1080,7 +1086,7 @@ export function generateManifest(build) {
       add(handleStyle.node, handleStyle.label, 'Handle', handleStyle.links);
       // purchased hardware: excluded from the print count, "×N · buy",
       // color-locked steel (main.js colorLocked) — mirrors WoodScrew/magnets
-      add(SCREW_M3.node, SCREW_M3.label, 'Screw', { buy: BUY.handleScrews }, 2, true);
+      add(SCREW_M3.node, SCREW_M3.label, 'Screw', { buy: BUY.handleScrews }, 2, true, true); // REQUIRED: no screws, no handle
     }
     if (firstFpDemo === null) {
       firstFpDemo = i;
