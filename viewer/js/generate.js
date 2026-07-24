@@ -1225,7 +1225,11 @@ export function generateManifest(build) {
     {
       title: uppers.length > 1 ? 'Upper footrails' : 'Upper footrail',
       note: 'Each upper footrail slides on from the back, all the way forward until it stops.' +
-        (uppers.length > 1 ? ' The upper sections are staggered brick-style over the lower ones, tying the base together.' : ''),
+        (uppers.length > 1 ? ' The upper sections are staggered brick-style over the lower ones, tying the base together.'
+        // narrow builds tile ONE piece per layer, so the two-layer design reads as
+        // pointless doubling-up ("why not one thick rail?" — Joey's most-asked
+        // question). Name the real reason instead of leaving it unexplained.
+          : ' The two layers are one system: the lower rail holds the feet, the upper caps them and carries the case dovetails — and on wider builds their seams offset brick-style to tie sections together.'),
       camera: cam(0, 30, totalW, gridBottom, FIT),
       phases: [{ enter: uppers.map((r, i) => {
         inst.push({ id: `fru${i}`, node: `FR-U_${L}-${r.w}W`, pos: [railX(r), FRU_Y, 0] });
@@ -1252,7 +1256,10 @@ export function generateManifest(build) {
     postSteps.push({
       title: cuIds.length > 1 ? 'Upper covers' : 'Upper cover',
       note: 'The upper covers slide in from the back, onto the lower covers’ dovetails.' +
-        (cuIds.length > 1 ? ' Their seams are staggered brick-style over the lower covers’ seams, locking the sections together.' : ''),
+        (cuIds.length > 1 ? ' Their seams are staggered brick-style over the lower covers’ seams, locking the sections together.'
+        // same rule as the upper footrail note above — at ≤2W both layers are a
+        // single tile, so spell out why the cover is two parts
+          : ' They’re not a doubling-up: the lower cover carries the stopper slots and dovetails, and this one locks them in — on wider builds the two layers’ seams also offset to tie sections together.'),
       camera: cam(0, H_MM, totalW, gridBottom, FIT),
       phases: [{ enter: cuIds.map(id => ({ id, from: [0, 0, slideBack] })) }],
     });

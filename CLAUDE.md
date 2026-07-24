@@ -677,6 +677,22 @@ viewer so the kits double as a demo of Build options. Essential faceplates +
 Deco handles (nothing club-gated required on day one). Gallery `dims` are the
 TRUE physical envelope read from the viewer's assembledBox (matches the cover
 badge — 240 = 176×140×269), NOT the planner's grid math.
+**Second tier — the 3W "Workbench Kit" (2026-07-24):** `{185,240}-workbench-kit`
+— top row 2W-1H + 1W-1H over three 1W-1H (5 drawers / 68 prints / 14 steps).
+It exists to TEACH THE BRICK STAGGER: at ≤2W both cover/footrail layers are a
+single tile, so the two-layer design reads as pointless doubling-up (Joey's
+most-asked question); at 3W the seams offset (CL 2W+1W over CU 1W+2W) and the
+generator's own notes already narrate it ("staggered brick-style… tying the
+base together"). Measured tradeoff before choosing this layout: 2W = 3 drawers/
+42 prints; 3W single-row = 2/38 (CHEAPER than the starter but poor value);
+3W 4-unit = 4/60; this 5-unit = 5/68 (best drawers-per-print of all four).
+Tiers are a PROGRESSION, not a choice — each kit gets its own Printables page,
+so a beginner only ever meets one link; the gallery is the only place both
+appear, grouped "Start here" / "Go bigger" via each index.json row's `tier`
+(missing tier → first group). **The non-staggered notes now explain WHY there
+are two layers** (upper footrail + upper cover steps in generate.js): the
+lower cover carries the stopper slots and dovetails, the upper locks them in.
+That fires on every ≤2W build, planner-generated ones included.
 **Printables banners:** `viewer/builds/banner.html` (dev tool, same folder as
 the gallery) composites a 1600×900 banner per kit from its `?shot=1` render —
 length-colored accent spine + eyebrow, "Interactive 3D Build Guide" headline,

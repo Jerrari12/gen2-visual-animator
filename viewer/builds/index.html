@@ -57,11 +57,19 @@ a { color: var(--accent); }
 .lede p { margin: 0; max-width: 640px; font-size: 0.92rem; color: var(--muted); }
 
 /* ---- kit cards ---- */
-main {
-  flex: 1; width: 100%; max-width: 1180px; margin: 0 auto;
-  padding: 22px 28px 50px;
+#kits { flex: 1; width: 100%; max-width: 1180px; margin: 0 auto; padding: 8px 28px 50px; }
+/* Tiers are a PROGRESSION, not a choice: "Start here" then "Go bigger". Each kit
+   has its own Printables page, so a beginner only ever meets one link — this
+   page is the only place both tiers appear together. */
+.tier-head {
+  display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
+  margin: 26px 0 4px;
+}
+.tier-head h2 { font-size: 1.05rem; margin: 0; }
+.tier-head span { font-size: 0.85rem; color: var(--muted); }
+.tier-grid {
   display: grid; grid-template-columns: repeat(auto-fill, minmax(480px, 1fr)); gap: 20px;
-  align-content: start;
+  align-content: start; margin-top: 14px;
 }
 /* Card = the planner's mount-card pattern: dark panel, 3/4 render as a
    right-side background bleeding under a left gradient, length-colored spine. */
@@ -152,7 +160,7 @@ main {
     <p>Proven builds with interactive, LEGO-style 3D assembly instructions — follow along step by step, try filament colors, then customize the build in the planner when you're ready.</p>
   </div>
 
-  <main id="kits"><div id="empty">Loading kits…</div></main>
+  <div id="kits"><div id="empty">Loading kits…</div></div>
 
   <footer class="footer">
     GEN2 QuickLock Modular System by <a href="https://www.jerrari3d.com" target="_blank" rel="noopener">JERRARI3D</a>
@@ -169,6 +177,11 @@ main {
 // the planner's GEN2.lengths palette exactly.
 const LENGTH_COLORS = { 59: '#f2f2f2', 115: '#9ea3a8', 165: '#3aa0e8', 185: '#ff8a40', 240: '#3ecfa0', 270: '#e8453c' };
 
+const TIERS = [
+  { key: 'starter', title: 'Start here', blurb: 'Your first GEN2 build — 3 drawers, about 42 printed parts.' },
+  { key: 'next',    title: 'Go bigger',  blurb: 'Ready for more? 5 drawers on a wider frame, with brick-staggered covers.' },
+];
+
 fetch('index.json').then(r => r.json()).then(kits => {
   const main = document.getElementById('kits');
   main.innerHTML = '';
@@ -176,6 +189,28 @@ fetch('index.json').then(r => r.json()).then(kits => {
     main.innerHTML = '<div id="empty">No kits published yet — check back soon!</div>';
     return;
   }
+  // group into tiers; anything with an unknown/missing tier lands in the first
+  const groups = TIERS.map(t => ({ ...t, kits: kits.filter(k => (k.tier || TIERS[0].key) === t.key) }))
+    .filter(g => g.kits.length);
+  for (const g of groups) {
+    if (groups.length > 1) {
+      const head = document.createElement('div');
+      head.className = 'tier-head';
+      const h = document.createElement('h2'); h.textContent = g.title;
+      const s = document.createElement('span'); s.textContent = g.blurb;
+      head.append(h, s);
+      main.appendChild(head);
+    }
+    const grid = document.createElement('div');
+    grid.className = 'tier-grid';
+    main.appendChild(grid);
+    renderCards(g.kits, grid);
+  }
+}).catch(() => {
+  document.getElementById('kits').innerHTML = '<div id="empty">Couldn’t load the kit list — try refreshing.</div>';
+});
+
+function renderCards(kits, main) {
   for (const k of kits) {
     const card = document.createElement('a');
     card.className = 'kit-card';
@@ -215,9 +250,7 @@ fetch('index.json').then(r => r.json()).then(kits => {
     card.appendChild(body);
     main.appendChild(card);
   }
-}).catch(() => {
-  document.getElementById('kits').innerHTML = '<div id="empty">Couldn’t load the kit list — try refreshing.</div>';
-});
+}
 </script>
 </body>
 </html>
