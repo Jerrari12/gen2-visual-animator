@@ -105,6 +105,11 @@ const LINKS = {
   rail:  { p: 'https://www.printables.com/model/1052357-gen2-rails-185-standard', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20RAILS%20-%20STANDARD-1163830' },
 };
 
+// The handle fastener. GLB is canonical like WoodScrew (shank along depth,
+// base at Y=0), 5.09 × 5.08 × 7.67 mm — `h` is used to convert the handoff's
+// centre-relative height offset into the bottom-anchored `pos.y`.
+const SCREW_M3 = { node: 'ButtonHeadScrew_M3-6', label: 'M3×6mm Button Head Screw', h: 5.08 };
+
 // Amazon affiliate buy links for purchased hardware (Joey's, 2026-07-12) —
 // rendered as extra chips after Printables/Thangs in the BOM checklist +
 // identify card (links.buy, main.js). Standard magnets suit most builds; the
@@ -120,6 +125,11 @@ const BUY = {
   woodScrews: [
     { label: 'Buy #6', url: 'https://amzn.to/4s487gc' },
     { label: 'Buy #8', url: 'https://amzn.to/4pTWDuq' },
+  ],
+  // fastens a bolt-on handle to its faceplate — the one REQUIRED buy on an
+  // Essential-faceplate build (integrated-grip families need none)
+  handleScrews: [
+    { label: 'Buy M3×6 button head', url: 'https://amzn.to/4x4opHK' },
   ],
 };
 
@@ -1050,9 +1060,26 @@ export function generateManifest(build) {
       // ground truth: bottom = fp + 22.49, z-center 109.57 for h9 × d24).
       // EdgeLabel prints its grip into the plate — no bolt-on handle at all.
       inst.push({ id: `h${i}`, node: handleStyle.node, pos: [cx + 0.46, bottom + 3.72 + (fpH - handleStyle.h) / 2 - 0.5, 97.57 - dz + handleStyle.d / 2], rides: `drw${i}` });
+      // 2× M3-6 button head, driven in from BEHIND the plate to fasten the
+      // handle. Offsets are faceplate-CENTRE-relative, DERIVED from the posed
+      // Essential 1W-1H reference (2026-07-24 handoff): ±22 mm apart (the
+      // handle's mount-hole pitch), vertically centred +0.49, and 1.88 mm
+      // behind the plate's depth centre so the heads sit proud of the back
+      // face — where the optional back cover then hides them. `pos` is
+      // [x-centre, y-BOTTOM, z-centre] and the GLB carries its shank along
+      // depth like WoodScrew, so no rotation is needed.
+      const fpMidY = bottom + 3.72 + fpH / 2, fpMidZ = face.z - dz;
+      for (const [n, sx] of [[0, -21.99], [1, 22.02]])
+        inst.push({ id: `hs${i}_${n}`, node: SCREW_M3.node,
+          pos: [cx + 0.47 + sx, fpMidY + 0.49 - SCREW_M3.h / 2, fpMidZ - 1.88], rides: `drw${i}` });
     }
     add(face.node(code), face.label(code), 'Faceplate', face.links);
-    if (face.hasHandle) add(handleStyle.node, handleStyle.label, 'Handle', handleStyle.links);
+    if (face.hasHandle) {
+      add(handleStyle.node, handleStyle.label, 'Handle', handleStyle.links);
+      // purchased hardware: excluded from the print count, "×N · buy",
+      // color-locked steel (main.js colorLocked) — mirrors WoodScrew/magnets
+      add(SCREW_M3.node, SCREW_M3.label, 'Screw', { buy: BUY.handleScrews }, 2, true);
+    }
     if (firstFpDemo === null) {
       firstFpDemo = i;
       const hasAccent = face.extras && u.hh !== 1;
@@ -1062,7 +1089,8 @@ export function generateManifest(build) {
         { id: `fp${i}`, by: [0, 0, -40] },
         ...(hasAccent ? [{ id: `fa${i}`, by: [0, 0, -40] }] : []),
         ...(face.extras ? [{ id: `fl${i}`, by: [0, 0, -40] }] : []),
-        ...(face.hasHandle ? [{ id: `h${i}`, by: [0, 0, -40] }] : []),
+        ...(face.hasHandle ? [{ id: `h${i}`, by: [0, 0, -40] },
+          ...[0, 1].map(n => ({ id: `hs${i}_${n}`, by: [0, 0, -40] }))] : []),
       ] };
       // Joey's faceplate cinematic (2026-07-08, BOTH families — assembly-first):
       // pop the drawer, fade the WHOLE WORLD away (vanish + room 0 — the step
@@ -1084,7 +1112,7 @@ export function generateManifest(build) {
       const camBack = { t: 168, p: 82, fitR, target: pc };
       const unit = [ // the plate + its dressing — everything that slides down as one
         { id: `fp${i}` },
-        ...(face.hasHandle ? [{ id: `h${i}` }] : []),
+        ...(face.hasHandle ? [{ id: `h${i}` }, ...[0, 1].map(n => ({ id: `hs${i}_${n}` }))] : []),
         ...(hasAccent ? [{ id: `fa${i}` }] : []),
         ...(face.extras ? [{ id: `fl${i}` }] : []),
         ...(bcOn ? [{ id: `bc${i}` }] : []),
@@ -1113,8 +1141,19 @@ export function generateManifest(build) {
           // EdgeLabel window, a 45° down-and-forward glide for Classic Pro
           { enter: [{ id: `fl${i}`, at: [0, HOV + face.labelIn.rise, 40 - face.labelIn.back], from: [0, 25, 0], via: [[0, -face.labelIn.rise, face.labelIn.back]] }] },
         ] : []),
+        // Behind the plate: the handle screws go in, then the back cover that
+        // hides their heads. One camera swing serves both (Joey 2026-07-24) —
+        // the screws are the reason a bolt-on handle needs bought hardware, so
+        // the step shows them rather than leaving the handle magically fixed.
+        ...(face.hasHandle || bcOn ? [{ camera: camBack }] : []),
+        ...(face.hasHandle ? [
+          // both screws drive forward 30 mm into the plate, together. `at` is
+          // the same [0, HOV, 40] every other dressing piece lands on (the
+          // drawer is popped 40 forward while the unit assembles) — miss it and
+          // the step's net stops cancelling and prev/jump lands them 40 back.
+          { enter: [0, 1].map(n => ({ id: `hs${i}_${n}`, at: [0, HOV, 40], from: [0, 0, -30] })), sync: true },
+        ] : []),
         ...(bcOn ? [
-          { camera: camBack },                                                    // swing behind the plate
           // cover arrives behind riding high, forward 20 against the plate back, down 4 onto its hooks
           { enter: [{ id: `bc${i}`, at: [0, HOV + 4, 20], from: [0, 0, -35], via: [[0, 0, 20], [0, -4, 20]] }] },
         ] : []),
@@ -1127,7 +1166,10 @@ export function generateManifest(build) {
       fpFades.push({ id: `fp${i}` });
       if (face.extras && u.hh !== 1) fpFades.push({ id: `fa${i}` });
       if (face.extras) fpFades.push({ id: `fl${i}` });
-      if (face.hasHandle) fpFades.push({ id: `h${i}` });
+      if (face.hasHandle) {
+        fpFades.push({ id: `h${i}` });
+        for (const n of [0, 1]) fpFades.push({ id: `hs${i}_${n}` });
+      }
     }
   });
 
@@ -1294,7 +1336,8 @@ export function generateManifest(build) {
           ? (face.key === 'classicpro'
             ? 'press the accent panel into the face and lay the label onto the grip slope'
             : 'press the accent panel into the face and slide the label into its window')
-          : `screw on the ${handleStyle.label} (2× M3)`) +
+          // the screws are shown going in from behind, so the note says where
+          : `hold the ${handleStyle.label} against the front and drive 2× M3×6 button head screws in from behind the plate`) +
         (bcOn ? ', then clip the back cover in from behind' : '') +
         '. Pop a drawer out about 40 mm, slide the assembled faceplate DOWN onto the drawer front until it snaps, then push the drawer home.' +
         ` Repeat for every ${classicCount ? 'Decor drawer' : 'drawer'} · the build is done. Tap any part to see its name and download links.`,
@@ -1353,6 +1396,9 @@ function imgFor(node) {
   if (node.startsWith('Drawer_Stoppers')) return 'img/parts/Drawer Stopper.png';
   if (node === 'MagnetClip_10x2mm') return 'img/parts/Magnet Clip.png';
   if (node === 'Magnet_10x2mm') return 'img/parts/Magnets.png';
+  // handle fastener (2026-07-24) — rendered at full thread detail, unlike the
+  // deliberately decimated GLB
+  if (node === 'ButtonHeadScrew_M3-6') return 'img/parts/ButtonHeadScrew_M3-6.png';
   if (node.startsWith('Faceplate_Essential')) return 'img/parts/Faceplate-Essential.jpg';
   // EdgeLabel plates have per-size renders (2026-07-08 batch) — shared
   // hardware, so one 18-file set serves every collection

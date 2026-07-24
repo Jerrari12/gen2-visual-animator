@@ -222,6 +222,22 @@
    "img": "img/parts/Handle_Deco.png"
   },
   {
+   "node": "ButtonHeadScrew_M3-6",
+   "label": "M3×6mm Button Head Screw",
+   "type": "Screw",
+   "qty": 6,
+   "links": {
+    "buy": [
+     {
+      "label": "Buy M3×6 button head",
+      "url": "https://amzn.to/4x4opHK"
+     }
+    ]
+   },
+   "img": "img/parts/ButtonHeadScrew_M3-6.png",
+   "purchased": true
+  },
+  {
    "node": "DecorDrawer_240-2W-1H",
    "label": "Decor Drawer 240-2W-1H",
    "type": "Drawer",
@@ -628,6 +644,26 @@
    "rides": "drw0"
   },
   {
+   "id": "hs0_0",
+   "node": "ButtonHeadScrew_M3-6",
+   "pos": [
+    -65.52,
+    46.82,
+    120.69
+   ],
+   "rides": "drw0"
+  },
+  {
+   "id": "hs0_1",
+   "node": "ButtonHeadScrew_M3-6",
+   "pos": [
+    -21.51,
+    46.82,
+    120.69
+   ],
+   "rides": "drw0"
+  },
+  {
    "id": "drw1",
    "node": "DecorDrawer_240-1W-1H",
    "pos": [
@@ -680,6 +716,26 @@
    "rides": "drw1"
   },
   {
+   "id": "hs1_0",
+   "node": "ButtonHeadScrew_M3-6",
+   "pos": [
+    22.48,
+    46.82,
+    120.69
+   ],
+   "rides": "drw1"
+  },
+  {
+   "id": "hs1_1",
+   "node": "ButtonHeadScrew_M3-6",
+   "pos": [
+    66.49,
+    46.82,
+    120.69
+   ],
+   "rides": "drw1"
+  },
+  {
    "id": "drw2",
    "node": "DecorDrawer_240-2W-1H",
    "pos": [
@@ -728,6 +784,26 @@
     0.46,
     99.87,
     137.07
+   ],
+   "rides": "drw2"
+  },
+  {
+   "id": "hs2_0",
+   "node": "ButtonHeadScrew_M3-6",
+   "pos": [
+    -21.52,
+    102.82,
+    120.69
+   ],
+   "rides": "drw2"
+  },
+  {
+   "id": "hs2_1",
+   "node": "ButtonHeadScrew_M3-6",
+   "pos": [
+    22.49,
+    102.82,
+    120.69
    ],
    "rides": "drw2"
   },
@@ -1441,7 +1517,7 @@
   },
   {
    "title": "Faceplates & handles",
-   "note": "Assemble the faceplate first: screw on the Deco Handle (2× M3). Pop a drawer out about 40 mm, slide the assembled faceplate DOWN onto the drawer front until it snaps, then push the drawer home. Repeat for every drawer · the build is done. Tap any part to see its name and download links.",
+   "note": "Assemble the faceplate first: hold the Deco Handle against the front and drive 2× M3×6 button head screws in from behind the plate. Pop a drawer out about 40 mm, slide the assembled faceplate DOWN onto the drawer front until it snaps, then push the drawer home. Repeat for every drawer · the build is done. Tap any part to see its name and download links.",
    "camera": {
     "t": 15,
     "p": 66,
@@ -1538,6 +1614,49 @@
      ]
     },
     {
+     "camera": {
+      "t": 168,
+      "p": 82,
+      "fitR": 80.4075556151286,
+      "target": [
+       -43.53,
+       93.87,
+       162.57
+      ]
+     }
+    },
+    {
+     "enter": [
+      {
+       "id": "hs0_0",
+       "at": [
+        0,
+        45,
+        40
+       ],
+       "from": [
+        0,
+        0,
+        -30
+       ]
+      },
+      {
+       "id": "hs0_1",
+       "at": [
+        0,
+        45,
+        40
+       ],
+       "from": [
+        0,
+        0,
+        -30
+       ]
+      }
+     ],
+     "sync": true
+    },
+    {
      "appear": true,
      "room": 1,
      "camera": {
@@ -1564,6 +1683,22 @@
       },
       {
        "id": "h0",
+       "by": [
+        0,
+        -45,
+        0
+       ]
+      },
+      {
+       "id": "hs0_0",
+       "by": [
+        0,
+        -45,
+        0
+       ]
+      },
+      {
+       "id": "hs0_1",
        "by": [
         0,
         -45,
@@ -1614,6 +1749,22 @@
         0,
         -40
        ]
+      },
+      {
+       "id": "hs0_0",
+       "by": [
+        0,
+        0,
+        -40
+       ]
+      },
+      {
+       "id": "hs0_1",
+       "by": [
+        0,
+        0,
+        -40
+       ]
       }
      ]
     },
@@ -1626,10 +1777,22 @@
        "id": "h1"
       },
       {
+       "id": "hs1_0"
+      },
+      {
+       "id": "hs1_1"
+      },
+      {
        "id": "fp2"
       },
       {
        "id": "h2"
+      },
+      {
+       "id": "hs2_0"
+      },
+      {
+       "id": "hs2_1"
       }
      ]
     }

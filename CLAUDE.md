@@ -919,6 +919,31 @@ by case height, drawer/faceplate/handle sizes, 1W-rail foot slots ±32.5) —
 recalibrate against a training assembly when one exists. Hash-only URL changes
 don't reload the page — force `location.reload()` when testing.
 
+## Handle screws — M3-6 button head (2026-07-24)
+
+`ButtonHeadScrew_M3-6` fastens a BOLT-ON handle to its faceplate — the one
+REQUIRED bought item on an Essential build (EdgeLabel / Classic Pro print their
+grip in and emit none; generate.js gates on `face.hasHandle`, the planner on
+`decorExtras[].boltOnOnly` + `faceDef.integratedHandle`). **2 per handle.**
+Asset handoff + provenance: `2026-07-24-m3-screw-asset-handoff.md`.
+Placement (faceplate-CENTRE-relative, DERIVED from one posed Essential 1W-1H —
+no printed ground truth): x ±21.99/+22.02 (the handle's mount-hole pitch),
+y +0.49, z −1.88. `pos` is [x-centre, y-BOTTOM, z-centre] so the height offset
+converts via `SCREW_M3.h/2`; the GLB carries its shank along depth like
+WoodScrew, so NO rotation — verified in-viewer 2026-07-24: head slice 5.09 mm
+at the back vs 2.96 mm shank at the front, protruding 3.21 mm behind the plate
+(where the optional back cover hides it). BOM: `purchased` (out of the print
+count, "×N · buy", colour-locked steel) + affiliate `BUY.handleScrews` /
+planner `HARDWARE_BUY["M3×6mm button head screw"]`. Renders: full-detail 256²
+PNG in both tools' `img/parts/` (the GLB is deliberately decimated; the PNG is
+not). ⚠ In the faceplate cinematic the screws enter at **`at: [0, HOV, 40]`**
+like every other dressing piece — the drawer is popped 40 forward while the
+unit assembles, and a `0` there breaks the step's net-cancels-to-zero rule so
+prev/jump strands them 40 mm back (caught by the net check, not by eye). One
+`camera: camBack` swing now serves the screws AND the back cover.
+GLBs live in all six `viewer/parts/<L>/`; the STATIC kit manifests don't carry
+them (hand-authored — generated builds only).
+
 ## Decor Faceplates — EdgeLabel (thumbnails + GLB DONE — 2026-07-08)
 
 Source blend: `Blender Files\Decor Faceplates\GEN2 GLB Exporter - GEN2 Faceplates -
