@@ -928,7 +928,10 @@ grip in and emit none; generate.js gates on `face.hasHandle`, the planner on
 Asset handoff + provenance: `2026-07-24-m3-screw-asset-handoff.md`.
 Placement (faceplate-CENTRE-relative, DERIVED from one posed Essential 1W-1H —
 no printed ground truth): x ±21.99/+22.02 (the handle's mount-hole pitch),
-y +0.49, z −1.88. `pos` is [x-centre, y-BOTTOM, z-centre] so the height offset
+y −1.01, z +2.12 (the handoff's +0.49/−1.88 nudged 1.5 down + 4 forward onto
+the holes by eye, Joey 2026-07-24 — which also RECESSES the head 0.79 mm inside
+the plate's back face, so the optional back cover clears it by more than
+before). `pos` is [x-centre, y-BOTTOM, z-centre] so the height offset
 converts via `SCREW_M3.h/2`; the GLB carries its shank along depth like
 WoodScrew, so NO rotation — verified in-viewer 2026-07-24: head slice 5.09 mm
 at the back vs 2.96 mm shank at the front, protruding 3.21 mm behind the plate
@@ -940,7 +943,17 @@ not). ⚠ In the faceplate cinematic the screws enter at **`at: [0, HOV, 40]`**
 like every other dressing piece — the drawer is popped 40 forward while the
 unit assembles, and a `0` there breaks the step's net-cancels-to-zero rule so
 prev/jump strands them 40 mm back (caught by the net check, not by eye). One
-`camera: camBack` swing now serves the screws AND the back cover.
+`camera: camBack` swing serves the screws AND the back cover, and it's a 3/4
+angle (t 143, p 76, fitR ×0.72) rather than the old near-straight-on t 168 —
+head-on flattened the screws into discs and hid the threads (Joey).
+**`spin: <turns>` on an enter item** (main.js, added for this): rotates the
+part about its own depth axis as it travels, so a screw reads as THREADING in.
+Parts are bottom-anchored and only X/Z-centred, so a plain `group.rotation.z`
+would swing the screw around its base — the runner rotates the INNER CHILD
+about the mesh's own centre with a compensating translation (p → R(p−c)+c),
+lands on a whole number of turns so the resting pose is identity, and
+applyState clears child rotation like it already cleared child position.
+Positive θ reads clockwise from behind, which is where the driver is.
 GLBs live in all six `viewer/parts/<L>/`; the STATIC kit manifests don't carry
 them (hand-authored — generated builds only).
 

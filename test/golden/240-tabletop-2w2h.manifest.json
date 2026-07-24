@@ -648,8 +648,8 @@
    "node": "ButtonHeadScrew_M3-6",
    "pos": [
     -65.52,
-    46.82,
-    120.69
+    45.32,
+    124.69
    ],
    "rides": "drw0"
   },
@@ -658,8 +658,8 @@
    "node": "ButtonHeadScrew_M3-6",
    "pos": [
     -21.51,
-    46.82,
-    120.69
+    45.32,
+    124.69
    ],
    "rides": "drw0"
   },
@@ -720,8 +720,8 @@
    "node": "ButtonHeadScrew_M3-6",
    "pos": [
     22.48,
-    46.82,
-    120.69
+    45.32,
+    124.69
    ],
    "rides": "drw1"
   },
@@ -730,8 +730,8 @@
    "node": "ButtonHeadScrew_M3-6",
    "pos": [
     66.49,
-    46.82,
-    120.69
+    45.32,
+    124.69
    ],
    "rides": "drw1"
   },
@@ -792,8 +792,8 @@
    "node": "ButtonHeadScrew_M3-6",
    "pos": [
     -21.52,
-    102.82,
-    120.69
+    101.32,
+    124.69
    ],
    "rides": "drw2"
   },
@@ -802,8 +802,8 @@
    "node": "ButtonHeadScrew_M3-6",
    "pos": [
     22.49,
-    102.82,
-    120.69
+    101.32,
+    124.69
    ],
    "rides": "drw2"
   },
@@ -1517,7 +1517,7 @@
   },
   {
    "title": "Faceplates & handles",
-   "note": "Assemble the faceplate first: hold the Deco Handle against the front and drive 2× M3×6 button head screws in from behind the plate. Pop a drawer out about 40 mm, slide the assembled faceplate DOWN onto the drawer front until it snaps, then push the drawer home. Repeat for every drawer · the build is done. Tap any part to see its name and download links.",
+   "note": "Assemble the faceplate first: hold the Deco Handle against the front and thread 2× M3×6 button head screws in from behind the plate · go gently and stop as soon as they seat, the screws bite straight into plastic and will strip if you overtighten. Pop a drawer out about 40 mm, slide the assembled faceplate DOWN onto the drawer front until it snaps, then push the drawer home. Repeat for every drawer · the build is done. Tap any part to see its name and download links.",
    "camera": {
     "t": 15,
     "p": 66,
@@ -1615,9 +1615,9 @@
     },
     {
      "camera": {
-      "t": 168,
-      "p": 82,
-      "fitR": 80.4075556151286,
+      "t": 143,
+      "p": 76,
+      "fitR": 57.89344004289259,
       "target": [
        -43.53,
        93.87,
@@ -1638,7 +1638,8 @@
         0,
         0,
         -30
-       ]
+       ],
+       "spin": 3
       },
       {
        "id": "hs0_1",
@@ -1651,7 +1652,8 @@
         0,
         0,
         -30
-       ]
+       ],
+       "spin": 3
       }
      ],
      "sync": true

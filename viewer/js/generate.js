@@ -1068,10 +1068,12 @@ export function generateManifest(build) {
       // face — where the optional back cover then hides them. `pos` is
       // [x-centre, y-BOTTOM, z-centre] and the GLB carries its shank along
       // depth like WoodScrew, so no rotation is needed.
+      // …then nudged onto the holes by eye in the viewer (Joey 2026-07-24):
+      // 1.5 down, 4 forward from the handoff's derived numbers.
       const fpMidY = bottom + 3.72 + fpH / 2, fpMidZ = face.z - dz;
       for (const [n, sx] of [[0, -21.99], [1, 22.02]])
         inst.push({ id: `hs${i}_${n}`, node: SCREW_M3.node,
-          pos: [cx + 0.47 + sx, fpMidY + 0.49 - SCREW_M3.h / 2, fpMidZ - 1.88], rides: `drw${i}` });
+          pos: [cx + 0.47 + sx, fpMidY - 1.01 - SCREW_M3.h / 2, fpMidZ + 2.12], rides: `drw${i}` });
     }
     add(face.node(code), face.label(code), 'Faceplate', face.links);
     if (face.hasHandle) {
@@ -1109,7 +1111,11 @@ export function generateManifest(build) {
       // portrait phones, whose horizontal fov is a third of a desktop's)
       const fitR = Math.hypot(plateW, fpH, 30) / 2 * 1.5;
       const camFront = { t: 12, p: 82, fitR, target: pc };
-      const camBack = { t: 168, p: 82, fitR, target: pc };
+      // Behind-the-plate shot for the handle screws + back cover. Was near
+      // straight-on (t 168), which flattened the screws into discs — a 3/4
+      // angle shows the threads and the plate's back detail (Joey 2026-07-24),
+      // and the tighter fitR brings the hardware close enough to read.
+      const camBack = { t: 143, p: 76, fitR: fitR * 0.72, target: pc };
       const unit = [ // the plate + its dressing — everything that slides down as one
         { id: `fp${i}` },
         ...(face.hasHandle ? [{ id: `h${i}` }, ...[0, 1].map(n => ({ id: `hs${i}_${n}` }))] : []),
@@ -1151,7 +1157,9 @@ export function generateManifest(build) {
           // the same [0, HOV, 40] every other dressing piece lands on (the
           // drawer is popped 40 forward while the unit assembles) — miss it and
           // the step's net stops cancelling and prev/jump lands them 40 back.
-          { enter: [0, 1].map(n => ({ id: `hs${i}_${n}`, at: [0, HOV, 40], from: [0, 0, -30] })), sync: true },
+          // `spin` turns each screw about its own shank on the way in, so it
+          // reads as threading rather than sliding into place
+          { enter: [0, 1].map(n => ({ id: `hs${i}_${n}`, at: [0, HOV, 40], from: [0, 0, -30], spin: 3 })), sync: true },
         ] : []),
         ...(bcOn ? [
           // cover arrives behind riding high, forward 20 against the plate back, down 4 onto its hooks
@@ -1337,7 +1345,8 @@ export function generateManifest(build) {
             ? 'press the accent panel into the face and lay the label onto the grip slope'
             : 'press the accent panel into the face and slide the label into its window')
           // the screws are shown going in from behind, so the note says where
-          : `hold the ${handleStyle.label} against the front and drive 2× M3×6 button head screws in from behind the plate`) +
+          // plastic threads strip easily — say so where the screws go in
+          : `hold the ${handleStyle.label} against the front and thread 2× M3×6 button head screws in from behind the plate · go gently and stop as soon as they seat, the screws bite straight into plastic and will strip if you overtighten`) +
         (bcOn ? ', then clip the back cover in from behind' : '') +
         '. Pop a drawer out about 40 mm, slide the assembled faceplate DOWN onto the drawer front until it snaps, then push the drawer home.' +
         ` Repeat for every ${classicCount ? 'Decor drawer' : 'drawer'} · the build is done. Tap any part to see its name and download links.`,

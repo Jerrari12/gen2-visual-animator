@@ -455,7 +455,8 @@ function applyState(i) { // instant snap to "after step i" (i = -1 for nothing)
     inst.group.visible = st.visible.has(inst.cfg.id) && !inst.styleHidden; // styleHidden: bolt-on handles while an EdgeLabel plate is active
     inst.staged = !!inst.cfg.stage && !st.settled.has(inst.cfg.stage);
     inst.group.position.copy(basePos(inst, inst.staged));
-    if (inst.group.children[0]) inst.group.children[0].position.set(0, 0, 0); // clear a stranded label lift (killed mid-tween)
+    // clear a stranded label lift / mid-spin screw (killed mid-tween)
+    if (inst.group.children[0]) { inst.group.children[0].position.set(0, 0, 0); inst.group.children[0].rotation.set(0, 0, 0); }
     // restore shared materials (an interrupted fade leaves per-mesh clones)
     inst.group.traverse(o => { if (o.isMesh) o.material = materialFor(inst, false, o.userData.zone); });
   }
@@ -681,9 +682,31 @@ async function playStep(i) {
       const pts = [fromV, to, ...(e.via || []).map(d => to.clone().add(new THREE.Vector3(...d)))];
       const legs = []; let total = 0;
       for (let s = 1; s < pts.length; s++) { total += pts[s].distanceTo(pts[s - 1]); legs.push(total); }
+      // `spin: <turns>`: rotate the part about its own depth axis as it travels
+      // — a screw visibly THREADS in rather than sliding (Joey 2026-07-24).
+      // Parts are bottom-anchored (base at Y=0) and only X/Z are centred, so
+      // spinning group.rotation.z would swing the screw around its base instead
+      // of its shank; rotate the inner child about the mesh's own centre by
+      // compensating the translation (p → R(p−c)+c). Positive θ reads CLOCKWISE
+      // from behind the plate — where the person holding the driver is.
+      const child = e.spin ? inst.group.children[0] : null;
+      let pivot = null;
+      if (child) {
+        child.rotation.set(0, 0, 0); child.position.set(0, 0, 0);
+        inst.group.updateMatrixWorld(true);
+        pivot = inst.group.worldToLocal(new THREE.Box3().setFromObject(child).getCenter(new THREE.Vector3()));
+      }
       jobs.push(tween({
         duration: (DUR.enter + DUR.via * (e.via?.length || 0)) * pace, delay: ph.sync ? 0 : n * DUR.stagger * pace,
         onUpdate: k => {
+          if (child) {
+            // land on a whole number of turns so the resting pose is identity
+            const th = k >= 1 ? 0 : e.spin * Math.PI * 2 * k;
+            child.rotation.z = th;
+            child.position.set(
+              pivot.x - (pivot.x * Math.cos(th) - pivot.y * Math.sin(th)),
+              pivot.y - (pivot.x * Math.sin(th) + pivot.y * Math.cos(th)), 0);
+          }
           if (!total) { inst.group.position.copy(pts[pts.length - 1]); return; }
           const d = k * total;
           let s = legs.findIndex(L => d <= L); if (s === -1) s = legs.length - 1;
