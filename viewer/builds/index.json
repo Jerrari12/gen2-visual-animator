@@ -3,6 +3,7 @@
     "id": "240-tabletop-kit",
     "title": "GEN2 240 Tabletop Kit",
     "tagline": "Four deep drawers for the desktop — the classic first GEN2 build.",
+    "length": 240,
     "drawers": 4,
     "units": 4,
     "dims": "176 × 112 × 240 mm"

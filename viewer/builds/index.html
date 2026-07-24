@@ -6,76 +6,169 @@
 <title>Official GEN2 Kits — 3D Build Studio</title>
 <meta name="description" content="Preconfigured GEN2 builds with interactive LEGO-style 3D assembly instructions. Pick a kit, follow the steps, make it yours.">
 <style>
-/* Standalone, no three.js — brand palette matches the viewer/planner */
+/* A secondary page of the GEN2 Planner — same dark chrome, brand tokens and
+   footer (mirrors gen2-planner css/style.css :root). */
 :root {
+  --bg: #2c2d31;
+  --panel: #3a3b3f;
+  --line: #4a4b50;
+  --text: #ececee;
+  --muted: #a6a8ad;
   --accent: #ff8a40;
-  --ink: #23262b;
-  --ink-soft: #5b6069;
-  --panel-border: #e3e5e9;
-  --bg: #eef0f3;
+  --radius: 10px;
+  font-size: 16px;
 }
-* { box-sizing: border-box; margin: 0; padding: 0; }
+* { box-sizing: border-box; }
 body {
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  color: var(--ink); background: var(--bg);
-  min-height: 100vh; display: flex; flex-direction: column;
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  line-height: 1.45;
+  min-height: 100vh;
+  display: flex; flex-direction: column;
 }
-header {
-  background: #fff; border-bottom: 1px solid var(--panel-border);
-  padding: 18px 20px; text-align: center;
+a { color: var(--accent); }
+
+/* ---- planner-style top bar ---- */
+.hero-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 18px 28px;
+  border-bottom: 1px solid var(--line);
 }
-header img { height: 44px; }
-header h1 { font-size: 20px; font-weight: 800; margin-top: 8px; }
-header p { font-size: 13.5px; color: var(--ink-soft); margin-top: 4px; max-width: 520px; margin-left: auto; margin-right: auto; line-height: 1.45; }
+.brand { display: flex; align-items: center; gap: 11px; text-decoration: none; }
+.brand-logo { height: 44px; width: auto; flex-shrink: 0; filter: drop-shadow(0 1px 4px rgba(0,0,0,0.55)); }
+.brand-mark { font-weight: 800; font-size: 1.5rem; letter-spacing: 0.05em; color: var(--accent); }
+.brand-sub { margin-left: 8px; font-weight: 300; letter-spacing: 0.35em; color: var(--muted); }
+.hero-bar-actions { display: flex; align-items: center; gap: 16px; }
+.back-planner {
+  font-size: 0.82rem; font-weight: 600; text-decoration: none;
+  color: #d7d8db; background: rgba(0,0,0,0.35);
+  border: 1px solid rgba(255,255,255,0.22); border-radius: 999px;
+  padding: 6px 14px;
+}
+.back-planner:hover { color: var(--accent); border-color: var(--accent); }
+.brand-link { font-size: 0.85rem; text-decoration: none; color: var(--muted); }
+.brand-link:hover { color: var(--accent); }
+
+/* ---- intro ---- */
+.lede { max-width: 1180px; margin: 0 auto; padding: 26px 28px 4px; }
+.lede h1 { margin: 0 0 6px; font-size: 1.5rem; line-height: 1.2; }
+.lede p { margin: 0; max-width: 640px; font-size: 0.92rem; color: var(--muted); }
+
+/* ---- kit cards ---- */
 main {
-  flex: 1; width: 100%; max-width: 980px; margin: 0 auto;
-  padding: 26px 18px 40px;
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 18px;
+  flex: 1; width: 100%; max-width: 1180px; margin: 0 auto;
+  padding: 22px 28px 50px;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(480px, 1fr)); gap: 20px;
   align-content: start;
 }
+/* Card = the planner's mount-card pattern: dark panel, 3/4 render as a
+   right-side background bleeding under a left gradient, length-colored spine. */
 .kit-card {
-  background: #fff; border: 1px solid var(--panel-border); border-radius: 14px;
-  overflow: hidden; display: flex; flex-direction: column;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+  position: relative;
+  display: flex; flex-direction: column; justify-content: flex-end;
+  min-height: 250px;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--len, var(--accent));  /* length color spine */
+  border-radius: 14px;
+  overflow: hidden;
+  background-color: var(--panel);
+  /* the ?shot=1 render (if present) is captured on this exact panel gray, so
+     contain-fit blends seamlessly and the build is never cropped */
+  background-size: contain;
+  background-position: right center;
+  background-repeat: no-repeat;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.35);
+  text-decoration: none; color: inherit;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
 }
-.kit-card img { width: 100%; aspect-ratio: 16/10; object-fit: cover; background: var(--bg); }
-.kit-body { padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 8px; flex: 1; }
-.kit-title { font-size: 16px; font-weight: 800; }
-.kit-tagline { font-size: 13px; color: var(--ink-soft); line-height: 1.4; flex: 1; }
-.kit-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.kit-card:hover { transform: translateY(-2px); box-shadow: 0 8px 22px rgba(0,0,0,0.45); }
+.kit-card::before {                     /* legibility gradient over the render */
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(90deg,
+    rgba(44,45,49,0.94) 0%, rgba(44,45,49,0.82) 42%, rgba(44,45,49,0.25) 75%, rgba(44,45,49,0.05) 100%);
+  pointer-events: none;
+}
+.kit-body { position: relative; padding: 18px 20px; max-width: 78%; }
+.kit-len {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 0.74rem; font-weight: 800; letter-spacing: 0.08em;
+  color: var(--len, var(--accent));
+  margin-bottom: 6px; text-transform: uppercase;
+}
+.kit-len::before {                      /* the planner's length color, as a dot */
+  content: ""; width: 10px; height: 10px; border-radius: 3px;
+  background: var(--len, var(--accent));
+}
+.kit-title { font-size: 1.25rem; font-weight: 800; margin: 0 0 6px; text-shadow: 0 1px 6px rgba(0,0,0,0.6); }
+.kit-tagline { font-size: 0.88rem; color: #d7d8db; margin: 0 0 12px; text-shadow: 0 1px 6px rgba(0,0,0,0.6); }
+.kit-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
 .kit-chips span {
-  font-size: 11.5px; font-weight: 700; color: var(--ink-soft);
-  background: var(--bg); border-radius: 999px; padding: 3px 9px;
+  font-size: 0.72rem; font-weight: 700; color: #d7d8db;
+  background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.14);
+  border-radius: 999px; padding: 3px 10px;
 }
 .kit-open {
-  margin-top: 4px; display: block; text-align: center; text-decoration: none;
-  font-size: 14px; font-weight: 700; color: #fff;
-  background: var(--accent); border-radius: 8px; padding: 10px 14px;
+  display: inline-block; text-align: center;
+  font-size: 0.9rem; font-weight: 700; color: #1d1e20;
+  background: var(--accent); border-radius: 8px; padding: 9px 16px;
 }
-.kit-open:hover { filter: brightness(1.05); }
-#empty { grid-column: 1 / -1; text-align: center; color: var(--ink-soft); font-size: 14px; padding: 40px 0; }
-footer {
-  text-align: center; padding: 20px; font-size: 12.5px; color: var(--ink-soft);
-  border-top: 1px solid var(--panel-border);
+.kit-card:hover .kit-open { filter: brightness(1.06); }
+#empty { grid-column: 1 / -1; text-align: center; color: var(--muted); font-size: 0.9rem; padding: 40px 0; }
+
+/* ---- planner footer ---- */
+.footer {
+  text-align: center; padding: 24px;
+  color: var(--muted); font-size: 0.85rem;
+  border-top: 1px solid var(--line);
 }
-footer a { color: var(--accent); text-decoration: none; font-weight: 700; }
+.footer a { color: var(--accent); }
+
+@media (max-width: 560px) {
+  .hero-bar { padding: 14px 18px; }
+  .brand-logo { height: 34px; }
+  .brand-mark { font-size: 1.2rem; }
+  .lede, main { padding-left: 18px; padding-right: 18px; }
+  main { grid-template-columns: 1fr; }
+  .kit-body { max-width: 100%; }
+}
 </style>
 </head>
 <body>
-  <header>
-    <img src="../img/gen2-logo.png" alt="GEN2 QuickLock Modular System" onerror="this.remove()">
+  <div class="hero-bar">
+    <a class="brand" href="https://gen2planner.jerrari3d.com/">
+      <img class="brand-logo" src="../img/jerrari-logo.svg" alt="Jerrari Design" onerror="this.remove()">
+      <span class="brand-word"><span class="brand-mark">GEN2</span><span class="brand-sub">KITS</span></span>
+    </a>
+    <span class="hero-bar-actions">
+      <a class="back-planner" href="https://gen2planner.jerrari3d.com/">&#8592; Open the GEN2 Planner</a>
+      <a class="brand-link" href="https://www.jerrari3d.com/gen2-modular-system" target="_blank" rel="noopener">JERRARI3D.com &rarr;</a>
+    </span>
+  </div>
+
+  <div class="lede">
     <h1>Official GEN2 Kits</h1>
     <p>Proven builds with interactive, LEGO-style 3D assembly instructions — follow along step by step, try filament colors, then customize the build in the planner when you're ready.</p>
-  </header>
+  </div>
+
   <main id="kits"><div id="empty">Loading kits…</div></main>
-  <footer>
-    Want to design your own from scratch? <a href="https://gen2planner.jerrari3d.com/" rel="noopener">Open the GEN2 Planner</a>
-    · <a href="https://www.jerrari3d.com" rel="noopener">jerrari3d.com</a>
+
+  <footer class="footer">
+    GEN2 QuickLock Modular System by <a href="https://www.jerrari3d.com" target="_blank" rel="noopener">JERRARI3D</a>
+    · Models on <a href="https://www.printables.com/@Jerrari" target="_blank" rel="noopener">Printables</a>
+    and <a href="https://thangs.com/designer/Jerrari" target="_blank" rel="noopener">Thangs</a>
+    · <a href="https://gen2planner.jerrari3d.com/">GEN2 Planner</a>
   </footer>
+
 <script>
 // The kit list is data (builds/index.json, stats precomputed at authoring
-// time) — this page just renders cards. A kit's cover image is optional:
-// builds/img/<id>.jpg, and the card degrades to text-only without it.
+// time) — this page just renders cards. Card background = the kit's ?shot=1
+// render (builds/img/<id>.jpg, captured on the same --panel gray so it blends
+// seamlessly); a card without one stays a plain panel. Length colors mirror
+// the planner's GEN2.lengths palette exactly.
+const LENGTH_COLORS = { 59: '#f2f2f2', 115: '#9ea3a8', 165: '#3aa0e8', 185: '#ff8a40', 240: '#3ecfa0', 270: '#e8453c' };
+
 fetch('index.json').then(r => r.json()).then(kits => {
   const main = document.getElementById('kits');
   main.innerHTML = '';
@@ -84,19 +177,27 @@ fetch('index.json').then(r => r.json()).then(kits => {
     return;
   }
   for (const k of kits) {
-    const card = document.createElement('div');
+    const card = document.createElement('a');
     card.className = 'kit-card';
-    const img = document.createElement('img');
-    img.src = 'img/' + k.id + '.jpg';
-    img.alt = '';
-    img.onerror = () => img.remove();
-    card.appendChild(img);
+    card.href = '../?build=' + encodeURIComponent(k.id);
+    if (LENGTH_COLORS[k.length]) card.style.setProperty('--len', LENGTH_COLORS[k.length]);
+    // probe the render first so a missing image never flashes a broken bg
+    const probe = new Image();
+    probe.onload = () => { card.style.backgroundImage = `url("img/${k.id}.jpg")`; };
+    probe.src = 'img/' + k.id + '.jpg';
+
     const body = document.createElement('div');
     body.className = 'kit-body';
-    const title = document.createElement('div');
+    if (k.length) {
+      const len = document.createElement('div');
+      len.className = 'kit-len';
+      len.textContent = k.length + ' collection';
+      body.appendChild(len);
+    }
+    const title = document.createElement('h2');
     title.className = 'kit-title';
     title.textContent = k.title;
-    const tag = document.createElement('div');
+    const tag = document.createElement('p');
     tag.className = 'kit-tagline';
     tag.textContent = k.tagline || '';
     const chips = document.createElement('div');
@@ -107,9 +208,8 @@ fetch('index.json').then(r => r.json()).then(kits => {
       s.textContent = c;
       chips.appendChild(s);
     }
-    const open = document.createElement('a');
+    const open = document.createElement('span');
     open.className = 'kit-open';
-    open.href = '../?build=' + encodeURIComponent(k.id);
     open.textContent = 'Open the 3D instructions →';
     body.append(title, tag, chips, open);
     card.appendChild(body);

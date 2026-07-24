@@ -3217,6 +3217,37 @@ if (IS_EMBED && build) {
   goTo(0); // open on the cover
 }
 booted = true;
+// ?shot=1 (dev-only, like ?debug): capture the FINISHED build as a 3/4 gallery
+// thumbnail and download it as <id>.jpg for viewer/builds/img/ — planner-card
+// backdrop (--panel #3a3b3f), no table/grid/wall/surface, canvas-only (DOM
+// chrome never reaches toDataURL). Repeatable for every future official kit:
+// open ?build=<id>&shot=1, save the download, commit. The render loop's own
+// resize() restores the canvas on the next frame, so the page stays usable.
+if (new URLSearchParams(location.search).get('shot')) {
+  applyState(manifest.steps.length - 1);          // assembled, deterministic
+  table.visible = grid.visible = false;
+  if (isWallBuild) wall.visible = false;
+  if (isUnderTableBuild) surface.visible = false;
+  scene.background = new THREE.Color(0x3a3b3f);
+  const W = 1200, H = 750;                        // 16:10 — the gallery card's aspect
+  renderer.setSize(W, H, false);
+  camera.aspect = W / H;
+  camera.fov = 40;
+  camera.updateProjectionMatrix();
+  const { pos, target } = camPos({ t: 35, p: 66, fov: 40, fit: 0.95, target: buildCenter.toArray() });
+  // gallery-card composition: slide camera + target along screen-left so the
+  // build sits right-of-center — the card's text column overlays the empty left
+  const right = new THREE.Vector3().subVectors(target, pos).cross(camera.up).normalize();
+  const slide = right.multiplyScalar(-buildRadius * 0.5);
+  pos.add(slide); target.add(slide);
+  camera.position.copy(pos);
+  camera.lookAt(target);
+  renderer.render(scene, camera);
+  const a = document.createElement('a');
+  a.href = renderer.domElement.toDataURL('image/jpeg', 0.92);
+  a.download = (OFFICIAL ? OFFICIAL.id : 'build') + '.jpg';
+  a.click();
+}
 // introduce this tab to the planner (opener tab OR split-view parent) so live
 // layout sync works even after a planner reload (it re-captures our window
 // from any gen2 message) — the planner replies with the current layout,
@@ -3264,5 +3295,6 @@ renderer.setAnimationLoop(now => {
 // dev-only hook (mirrors the planner's guarded test-hook convention): ?debug=1
 if (new URLSearchParams(location.search).get('debug')) {
   window.__GEN2_VIEWER__ = { THREE, scene, camera, controls, goTo, applyState, instances, manifest, cinema, updateCinema, cinemaScene, party, confetti, confettiPop, fpFocus, fpEnv,
+    renderer, table, grid, camPos, get buildCenter() { return buildCenter; },
     get build() { return build; }, regenerate, setSelected, get selectedId() { return selectedId; } };
 }

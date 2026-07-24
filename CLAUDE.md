@@ -640,9 +640,24 @@ quiet pill under the skip link) + `#outro-customize` in the outro card — both
 open `PLANNER_URL#build=` of the CURRENT mutated build (option tweaks ride
 along; raw base64, NEVER percent-encoded — the planner's decode lacks
 decodeURIComponent and silently fails on encoded hashes). **Gallery:**
-`viewer/builds/index.html` (standalone page, no three.js) renders cards from
-`builds/index.json` (stats precomputed at authoring; optional cover art
-`builds/img/<id>.jpg`, degrades to text-only). **Authoring:** the planner's
+`viewer/builds/index.html` (standalone page, no three.js) — styled as a
+SECONDARY PAGE OF THE PLANNER (Joey 2026-07-23): its dark :root tokens,
+hero-bar brand ("GEN2 KITS" wordmark + "← Open the GEN2 Planner" ghost pill),
+and footer mirror gen2-planner css/style.css. Cards render from
+`builds/index.json` (stats + `length` precomputed at authoring): each card is
+the planner mount-card pattern — dark panel, the kit's 3/4 render as a
+right-side background under a left legibility gradient, and the planner's
+LENGTH COLOR (data.js GEN2.lengths, mirrored in the page's LENGTH_COLORS —
+240=#3ecfa0 green etc.) as a left spine + "<L> COLLECTION" chip. Card art =
+**`?shot=1` capture mode** (main.js, dev-only like ?debug): boots the build,
+applyState(final), hides table/grid/wall/surface, sets scene bg to the card's
+EXACT panel gray #3a3b3f, 1200×750 @ t35/p66/fov40 fit 0.95, slides camera+
+target along screen-left by buildRadius·0.5 so the build sits RIGHT-of-center
+(text column overlays the empty left), downloads `<id>.jpg` → commit to
+`builds/img/`. The page contain-fits the render (never crops; the matched bg
+gray blends seamlessly — a missing image degrades to a plain panel). NB the
+capture rides the ACTIVE palette — apply a preset first for themed art.
+Debug hook also exposes renderer/table/grid/camPos/buildCenter now. **Authoring:** the planner's
 "📦 Export official kit" button (Save & share block, `IS_LOCAL_DEV`-gated —
 invisible in prod) prompts title/id(slugified, editable)/tagline, downloads the
 wrapper, and console.logs the ready index.json row. **Golden tests (the
