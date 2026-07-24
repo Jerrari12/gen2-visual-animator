@@ -114,6 +114,9 @@ body {
    (⚙ Build options · 🎨 Filament colors · 🧩 Parts to print) */
 .section-head { font-size: 11.5px; font-weight: 800; color: var(--ink-soft); letter-spacing: .01em; margin-bottom: 7px; }
 #parts-head { margin: 2px 0 8px; }
+/* the shared "needs bought hardware" wrench, inline in text — sized in em so it
+   tracks whatever it sits beside, and currentColor so it never fights the theme */
+.hw-ico { width: 1em; height: 1em; vertical-align: -0.15em; fill: currentColor; }
 #build-options { margin-bottom: 8px; padding-bottom: 10px; border-bottom: 1px solid var(--panel-border); }
 .opt-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
 .opt-label { font-size: 12px; font-weight: 600; }

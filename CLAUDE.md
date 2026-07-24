@@ -970,10 +970,18 @@ Surfacing it costs NO new layout (Joey's constraint):
 - viewer checklist head: `🧩 N to print · 🔩 N to buy` — the buy half renders
   only when required hardware exists, so a print-only build looks CLEANER
   (renderChecklist reads `p.purchased && p.required`).
-- viewer Build options: the Faceplate ◀▶ name suffixes 🔩 on bolt-on families
-  (`hasHandle`), so flipping styles shows which ones you can finish today.
-- planner: a corner `🔩` (`.needs-hw`) on faceplate cards without
-  `integratedHandle` and on the Wall / Under-Table mount cards.
+- viewer Build options: the Faceplate ◀▶ name suffixes the wrench on bolt-on
+  families (`hasHandle`), so flipping styles shows which you can finish today.
+- planner: the same wrench in the top corner of faceplate cards without
+  `integratedHandle` and of the Wall / Under-Table mount cards.
+**One icon, two repos:** a single-colour inline SVG wrench (`HW_ICON` in both
+main.js and the planner's app.js) — two different glyphs for one idea read as
+two ideas (Joey), so keep the path in sync. Drawing note: the head is a C-RING
+(outer arc → step in → inner arc back), NOT a circle with a notch subtracted —
+a notch has to overhang the circle to leave the jaw open, and that overhang is
+a lone counter-clockwise region, still winding −1, so nonzero fill renders it
+as a stray square floating off the head. Ring + shaft wound clockwise union
+seamlessly; only the handle hole (fully inside the shaft) is counter-clockwise.
 
 ## Decor Faceplates — EdgeLabel (thumbnails + GLB DONE — 2026-07-08)
 

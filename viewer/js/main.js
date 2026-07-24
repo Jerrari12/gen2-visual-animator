@@ -912,7 +912,7 @@ function renderOptions() {
     // screws before you can finish. Integrated-grip families print complete, so
     // flipping through the styles shows which ones you can build today.
     const bolts = currentFaceplateStyle().hasHandle;
-    name.textContent = currentFaceplateStyle().label + (bolts ? ' 🔩' : '');
+    name.innerHTML = currentFaceplateStyle().label + (bolts ? ' ' + HW_ICON : '');
     name.title = bolts ? 'Bolt-on handle — needs 2× M3×6 screws per drawer' : 'Handle is printed in — no hardware needed';
     const next = document.createElement('button'); next.textContent = '▶'; next.onclick = () => cycleFaceplateStyle(1);
     grp.append(prev, name, next); row.append(lab, grp); box.appendChild(row);
@@ -943,6 +943,17 @@ function renderOptions() {
   const reset = document.createElement('button'); reset.className = 'opt-reset'; reset.textContent = '↺ Reset to original';
   reset.onclick = resetBuild; box.appendChild(reset);
 }
+
+// "needs bought hardware" wrench — the SAME single-colour glyph the planner
+// puts on its option cards (HW_PATH in its app.js): two icons for one idea read
+// as two different ideas (Joey 2026-07-24), so keep these in sync. Head is a
+// C-ring rather than a circle-minus-notch — see the planner comment for why a
+// notch leaves a stray filled square.
+const HW_ICON =
+  '<svg class="hw-ico" viewBox="0 0 24 24" aria-hidden="true"><g transform="rotate(-45 12 12)"><path d="' +
+  'M14.02 2.87A4.6 4.6 0 1 1 9.98 2.87L10.95 4.84A2.4 2.4 0 1 0 13.05 4.84Z' +
+  'M10.1 9.5L13.9 9.5L13.9 17.1A1.9 1.9 0 0 1 10.1 17.1Z' +
+  'M10.65 17.2a1.35 1.35 0 1 0 2.7 0a1.35 1.35 0 1 0 -2.7 0Z"/></g></svg>';
 
 function renderChecklist() {
   renderOptions();
@@ -997,7 +1008,7 @@ function renderChecklist() {
   // print-only build simply shows nothing extra — the cleaner line IS the
   // reward. Opt-in magnets never trip it.
   const toBuy = manifest.parts.filter(p => p.purchased && p.required).reduce((n, p) => n + p.qty, 0);
-  $('parts-head').textContent = `🧩 ${total} to print` + (toBuy ? ` · 🔩 ${toBuy} to buy` : '');
+  $('parts-head').innerHTML = `🧩 ${total} to print` + (toBuy ? ` · ${HW_ICON} ${toBuy} to buy` : '');
   $('checklist-tab').textContent = `Parts · ${total}`;
 }
 
