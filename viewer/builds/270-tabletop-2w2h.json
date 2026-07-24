@@ -1,12 +1,12 @@
 {
   "gen2OfficialBuild": 1,
-  "id": "185-tabletop-kit",
-  "title": "GEN2 185 Tabletop Kit",
-  "tagline": "Three drawers of everyday storage — the standard GEN2 starter build.",
+  "id": "270-tabletop-2w2h",
+  "title": "GEN2 270 Tabletop Kit 2W-2H",
+  "tagline": "Three large drawers for long tools and big gear — the XL starter build.",
   "buildVersion": 1,
   "build": {
     "mount": "tabletop",
-    "length": 185,
+    "length": 270,
     "printer": "any",
     "customBed": {
       "x": null,

@@ -126,7 +126,7 @@ function resize() {
     // re-fit a whole-build shot to the new aspect (skip during the cinema, which
     // drives the camera itself, and during drawer/faceplate focus, which park
     // the camera on the part)
-    if (curCamPreset?.fit && !cinema.on && !tweens.size && !camOverride && !dFocus.carrier && !fpFocus.id) {
+    if ((curCamPreset?.fit || curCamPreset?.coverBox) && !cinema.on && !tweens.size && !camOverride && !dFocus.carrier && !fpFocus.id) {
       const { pos, target } = camPos(curCamPreset);
       camera.position.copy(pos); controls.target.copy(target); controls.update();
     }
@@ -418,6 +418,17 @@ function fitDistanceFor(R, fovDeg) {
   return Math.max(R / Math.sin(vFov / 2), R / Math.sin(hFov / 2));
 }
 const fitDistance = (margin, fovDeg) => fitDistanceFor(buildRadius * margin, fovDeg);
+// distance that keeps an OFF-CENTRE composition on frame: halfW/halfH are the
+// worst-case extents measured from the camera axis (not the build centre), so
+// the cover can push the model left of the brand overlay without cropping it.
+// halfD (half the depth) matters: the widest thing on screen is the NEAR face,
+// which sits halfD closer than the centre and so subtends more angle — ignoring
+// it ate the whole margin on a deep 240 build and clipped 3 px off the edge.
+function coverDistance({ halfW, halfH, halfD = 0 }, fovDeg, min) {
+  const vT = Math.tan(THREE.MathUtils.degToRad(fovDeg || 40) / 2);
+  const hT = vT * (camera.aspect || 1.6);
+  return Math.max(min || 0, halfW / hT + halfD, halfH / vT + halfD);
+}
 
 // ---------- step state (deterministic jump to any step) ----------
 // After step i: which instances are visible, which stages are settled.
@@ -530,7 +541,15 @@ function applyCover() {
     const R = size.length() / 2;
     return { t: 0, p: 90, r: Math.min(7500, fitDistanceFor(R * 1.15, 12)), target: [c.x, c.y, 0], fov: 12 };
   }
-  return { t: 0, p: 90, r: spread * 7.2, target: [c.x + size.x * 0.33, c.y, 0], fov: 9 };
+  // Box art: straight-on telephoto with the build pushed left of the brand
+  // overlay. `spread * 7.2` is Joey's tuned distance but it's WIDTH-BLIND —
+  // spread saturates on depth/height, so a 3W+ build kept the same pull-back,
+  // sat further left (the offset scales with size.x) and ran off the frame.
+  // coverBox states what must stay on screen and camPos only ever pulls FURTHER
+  // back, so narrow builds keep the tuned composition exactly.
+  const off = size.x * 0.33;
+  return { t: 0, p: 90, r: spread * 7.2, target: [c.x + off, c.y, 0], fov: 9,
+    coverBox: { halfW: (size.x / 2 + off) * 1.04, halfH: size.y / 2 * 1.12, halfD: size.z / 2 } };
 }
 // LEGO-box dressing: a thick corner ribbon (collection number + "COLLECTION")
 // and stat badges bottom-left (big "ONLY N PARTS" block + drawers / steps /
@@ -736,7 +755,11 @@ function camPos(preset) {
   // the current aspect; `fitR` frames a preset-supplied RADIUS in mm the same
   // aspect-aware way (the faceplate cinematic — a fixed r overfilled portrait
   // phones, whose horizontal fov is tiny); others use their tuned r.
-  const r = preset.fitR ? fitDistanceFor(preset.fitR, preset.fov || 40)
+  // `coverBox` frames the cover's OFF-CENTRE composition: a plain `fit` would
+  // re-centre the build and throw the box-art layout away, so fit the stated
+  // half-extents at the live aspect and never come closer than the tuned r.
+  const r = preset.coverBox ? coverDistance(preset.coverBox, preset.fov || 40, preset.r)
+    : preset.fitR ? fitDistanceFor(preset.fitR, preset.fov || 40)
     : preset.fit ? fitDistance(preset.fit, preset.fov || 40) : preset.r;
   const pos = new THREE.Vector3(
     r * Math.sin(p) * Math.sin(t),

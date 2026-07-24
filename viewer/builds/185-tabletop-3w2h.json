@@ -1,12 +1,12 @@
 {
   "gen2OfficialBuild": 1,
-  "id": "115-tabletop-kit",
-  "title": "GEN2 115 Tabletop Kit",
-  "tagline": "Three drawers for pens, cables and small parts — the compact starter build.",
+  "id": "185-tabletop-3w2h",
+  "title": "GEN2 185 Tabletop Kit 3W-2H",
+  "tagline": "Five drawers across a wider frame — the next build, with brick-staggered covers.",
   "buildVersion": 1,
   "build": {
     "mount": "tabletop",
-    "length": 115,
+    "length": 185,
     "printer": "any",
     "customBed": {
       "x": null,
@@ -25,7 +25,7 @@
     "placed": [
       {
         "id": 1,
-        "x": 2,
+        "x": 1,
         "y": 6,
         "w": 1,
         "hh": 2,
@@ -35,7 +35,7 @@
       },
       {
         "id": 2,
-        "x": 3,
+        "x": 2,
         "y": 6,
         "w": 1,
         "hh": 2,
@@ -45,15 +45,35 @@
       },
       {
         "id": 3,
-        "x": 2,
+        "x": 3,
+        "y": 6,
+        "w": 1,
+        "hh": 2,
+        "fill": "decor",
+        "shelves": 0,
+        "closure": "magnet"
+      },
+      {
+        "id": 4,
+        "x": 1,
         "y": 4,
         "w": 2,
         "hh": 2,
         "fill": "decor",
         "shelves": 0,
         "closure": "magnet"
+      },
+      {
+        "id": 5,
+        "x": 3,
+        "y": 4,
+        "w": 1,
+        "hh": 2,
+        "fill": "decor",
+        "shelves": 0,
+        "closure": "magnet"
       }
     ],
-    "nextId": 4
+    "nextId": 6
   }
 }

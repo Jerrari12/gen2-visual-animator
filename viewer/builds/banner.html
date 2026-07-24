@@ -80,7 +80,7 @@ async function drawBanner(kit, logo) {
   c.fillStyle = accent; c.fillRect(0, 0, 16, H);
 
   const L = 84;                       // left text margin
-  let y = 132;
+  let y = 170;                        // starts low enough that the block reads optically centred
 
   if (logo) {                          // JERRARI mark
     const lh = 64, lw = logo.width * (lh / logo.height);
@@ -94,14 +94,16 @@ async function drawBanner(kit, logo) {
   c.letterSpacing = '3px';
   c.fillText('GEN2 ' + kit.length + ' COLLECTION', L, y + 30);
   c.letterSpacing = '0px';
-  y += 96;
+  y += 112;                            // eyebrow → headline (was 96 — crowded the caps)
 
-  // headline
+  // headline. 86px type at 92px leading was ~1.07 — the two lines nearly
+  // touched; 104 (~1.21) lets them breathe without splitting the block.
   c.fillStyle = '#ffffff';
   c.font = '800 86px "Segoe UI", system-ui, sans-serif';
+  const LEAD = 104;
   c.fillText('Interactive 3D', L, y);
-  c.fillText('Build Guide', L, y + 92);
-  y += 168;
+  c.fillText('Build Guide', L, y + LEAD);
+  y += LEAD + 80;
 
   // subhead: which kit
   c.fillStyle = '#d7d8db';
@@ -111,9 +113,10 @@ async function drawBanner(kit, logo) {
 
   // feature bullets
   c.font = '600 27px "Segoe UI", system-ui, sans-serif';
-  for (const line of ['Step-by-step 3D assembly — rotate & zoom',
+  // plain hyphens, not em-dashes (Joey) — they read cleaner at banner scale
+  for (const line of ['Step-by-step 3D assembly - rotate & zoom',
                       'Full parts list with download links',
-                      'Try your own filament colors']) {
+                      'Swap faceplates, handles & colors']) {
     c.fillStyle = accent; c.fillText('✓', L, y);
     c.fillStyle = '#c9cbd0'; c.fillText(line, L + 40, y);
     y += 44;

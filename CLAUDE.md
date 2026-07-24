@@ -554,6 +554,17 @@ sprinkles; bits flutter/tumble, rest on the table, then shrink out. All of it
 mounts in startCinema / unmounts in stopCinema — instruction pages never see
 it. startCinema also claims fov 40 (fixes stuck telephoto when dot-jumping
 cover → outro).
+**Cover framing is width-aware (2026-07-24):** applyCover's box-art shot is a
+straight-on telephoto with the build pushed left of the brand overlay, at a
+tuned `spread * 7.2`. `spread` saturates on depth/height, so it was WIDTH-BLIND
+— a 3W+ build kept the same pull-back AND sat further left (the offset scales
+with size.x) and ran off frame (Joey caught it on the new 3W kit; it hit any
+wide planner build too). The preset now also carries `coverBox {halfW, halfH,
+halfD}` and camPos's `coverDistance()` only ever pulls FURTHER back, so narrow
+builds keep the tuned composition byte-for-byte. halfD is essential: the widest
+thing on screen is the NEAR face, halfD closer than the centre — ignoring it ate
+the entire margin on a deep 240 and still clipped. resize() re-fits `coverBox`
+presets like `fit` ones, so the framing follows a window resize.
 **Camera framing:** whole-build camera presets (generate.js `cam(...,FIT)`, margin
 1.18) carry a `fit` flag; the viewer's `camPos` reframes them to the real
 bounding sphere at the current aspect (`fitDistance` uses both v/h FOV) so 16:9
@@ -620,7 +631,7 @@ Preconfigured builds a beginner can follow like LEGO instructions, with links
 durable enough for Printables descriptions / QR codes. `viewer/builds/<id>.json`
 = `{gen2OfficialBuild:1, id, title, tagline, buildVersion:1, build:<the
 planner's serializeBuild() shape>}` — opened via **`?build=<id>`**
-(gen2build.jerrari3d.com/?build=240-tabletop-kit). The build data lives in the
+(gen2build.jerrari3d.com/?build=240-tabletop-2w2h). The build data lives in the
 COMMITTED file, not the URL: short links, no base64 mangling, and a kit is
 fixable post-print (replace the file; the id stays). Ids are mintable by repo
 commit only — `?build=anything-else` = friendly 404 with a gallery link — so
@@ -666,7 +677,7 @@ runs every builds/*.json through migrate+generateManifest (pure JS, plain node)
 and diffs against `test/golden/<id>.manifest.json` — a generator change that
 alters an official kit fails before it can deploy over a printed link;
 intentional changes refresh via `UPDATE_GOLDEN=1 npm test`.
-**The five starter kits (2026-07-23):** `{115,165,185,240,270}-tabletop-kit` —
+**The five starter kits (2026-07-23):** `{115,165,185,240,270}-tabletop-2w2h` —
 ONE layout for all (2W-1H on top, two 1W-1H below = 3 drawers / 42 prints /
 12 steps) so the collection DEPTH is the only variable across the family. 59
 is excluded (hanging-only). **Magnet closures are ON by default and that's
@@ -677,8 +688,16 @@ viewer so the kits double as a demo of Build options. Essential faceplates +
 Deco handles (nothing club-gated required on day one). Gallery `dims` are the
 TRUE physical envelope read from the viewer's assembledBox (matches the cover
 badge — 240 = 176×140×269), NOT the planner's grid math.
-**Second tier — the 3W "Workbench Kit" (2026-07-24):** `{185,240}-workbench-kit`
+**Second tier — the 3W kit (2026-07-24):** `{185,240}-tabletop-3w2h`
 — top row 2W-1H + 1W-1H over three 1W-1H (5 drawers / 68 prints / 14 steps).
+**Naming: every kit is a "Tabletop Kit", differentiated ONLY by footprint**
+(`GEN2 240 Tabletop Kit 3W-2H`, id `<L>-tabletop-<w>w<h>h`) — Joey rejected a
+separate "Workbench Kit" name because the ASSEMBLY PROCESS is identical, and a
+new name implied a different build type; W-H codes are the system's existing
+vocabulary (cases are already 2W-1H etc.) so users parse them for free. Ids
+were renamed 2026-07-24, which is only safe because nothing was published yet
+— **once a link is printed in a Printables description the id is frozen
+forever** (that's the whole point of the official-build indirection).
 It exists to TEACH THE BRICK STAGGER: at ≤2W both cover/footrail layers are a
 single tile, so the two-layer design reads as pointless doubling-up (Joey's
 most-asked question); at 3W the seams offset (CL 2W+1W over CU 1W+2W) and the
@@ -696,7 +715,10 @@ That fires on every ≤2W build, planner-generated ones included.
 **Printables banners:** `viewer/builds/banner.html` (dev tool, same folder as
 the gallery) composites a 1600×900 banner per kit from its `?shot=1` render —
 length-colored accent spine + eyebrow, "Interactive 3D Build Guide" headline,
-feature bullets, and the permanent short link as a pill. The banner's backdrop
+feature bullets, and the permanent short link as a pill. Copy rules (Joey
+2026-07-24): plain hyphens, never em-dashes, in all kit-facing copy (banner
+bullets, index.json taglines, gallery blurbs); the third bullet sells the
+customizer ("Swap faceplates, handles & colors"), not filament alone. The banner's backdrop
 is the SAME panel gray (#3a3b3f) the renders are captured on, so the model
 blends with no keying; the accent spine must be drawn AFTER the text-side
 shade gradient or it's buried. Output: `builds/img/banner-<id>.jpg` ("Download
