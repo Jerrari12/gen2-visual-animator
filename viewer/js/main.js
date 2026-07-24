@@ -2401,6 +2401,13 @@ $('identify-close-drawer').onclick = () => setSelected(null);
 
 canvas.addEventListener('pointerdown', e => { downXY = [e.clientX, e.clientY]; });
 canvas.addEventListener('pointerup', e => {
+  // The cover and outro are PRESENTATION pages (box art / end-credits cinema) —
+  // taps there must not identify parts: a stray cover click used to raycast the
+  // model and ISOLATE a faceplate underneath the cover chrome (Joey's official-
+  // kit repro, 2026-07-23 — latent on every cover; the telephoto framing makes
+  // a face-on plate the likeliest hit). Orbit/zoom stay free; identify starts
+  // with the instruction pages.
+  if (PAGES[cur]?.cover || PAGES[cur]?.outro) return;
   if (!downXY || Math.hypot(e.clientX - downXY[0], e.clientY - downXY[1]) > 6) return;
   const r = canvas.getBoundingClientRect();
   ray.setFromCamera(new THREE.Vector2(
