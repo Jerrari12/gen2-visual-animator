@@ -738,17 +738,18 @@ mount filter bar appears on the same condition. Mount leads because it's the
 planner's own question 1 and the builder's hard constraint; size is the
 progression inside it. Flat (mount, size) sections beat nesting — they stay
 scannable as the matrix fills. Verified by injecting fake wall/under-table rows.
-**Printables banners:** `viewer/builds/banner.html` (dev tool, same folder as
-the gallery) composites a 1600×900 banner per kit from its `?shot=1` render —
-length-colored accent spine + eyebrow, "Interactive 3D Build Guide" headline,
-feature bullets, and the permanent short link as a pill. Copy rules (Joey
-2026-07-24): plain hyphens, never em-dashes, in all kit-facing copy (banner
-bullets, index.json taglines, gallery blurbs); the third bullet sells the
-customizer ("Swap faceplates, handles & colors"), not filament alone. The banner's backdrop
-is the SAME panel gray (#3a3b3f) the renders are captured on, so the model
-blends with no keying; the accent spine must be drawn AFTER the text-side
-shade gradient or it's buried. Output: `builds/img/banner-<id>.jpg` ("Download
-all" button, or POST the canvases). Rollback tag in both repos:
+**Printables share images:** `viewer/builds/banner.html` (dev tool, same folder
+as the gallery) renders each kit as THE SAME CARD the gallery shows — length
+spine, collection chip, title, tagline, stat chips — at 1600×700, drawn on
+canvas from `builds/index.json` + the `?shot=1` render. Joey picked the card
+over the earlier wide "Interactive 3D Build Guide" banner (2026-07-24): it's
+more polished and carries real detail. Two things a standalone card can't do,
+so they're added: the button can't be clicked, so it states the VALUE
+("Interactive 3D build guide →"), and the address is printed under it. The copy
+block is measured then vertically CENTRED (a fixed start left a dead gap under
+short taglines). Output `builds/img/card-<id>.jpg` ("Download all", or POST the
+canvases). The old `banner-*.jpg` files are gone.
+Rollback tag in both repos:
 `pre-official-kits`.
 
 ## Planner → generated instructions (BUILT)

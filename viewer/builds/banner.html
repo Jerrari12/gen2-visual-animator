@@ -2,37 +2,40 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Kit banner generator (dev)</title>
+<title>Kit share images (dev)</title>
 <style>
   body { margin: 0; background: #2c2d31; color: #ececee;
          font-family: "Segoe UI", system-ui, sans-serif; padding: 24px; }
   h1 { font-size: 1.1rem; margin: 0 0 4px; }
-  p  { font-size: 0.85rem; color: #a6a8ad; margin: 0 0 18px; max-width: 760px; }
+  p  { font-size: 0.85rem; color: #a6a8ad; margin: 0 0 18px; max-width: 780px; }
   .row { display: flex; gap: 10px; align-items: center; margin-bottom: 18px; flex-wrap: wrap; }
   button { font: inherit; font-weight: 700; font-size: 0.85rem; cursor: pointer;
            background: #ff8a40; color: #1d1e20; border: none; border-radius: 8px; padding: 9px 16px; }
   button.ghost { background: transparent; color: #d7d8db; border: 1px solid #4a4b50; }
-  canvas { max-width: 100%; height: auto; border: 1px solid #4a4b50; border-radius: 8px; display: block; margin-bottom: 14px; }
+  canvas { max-width: 100%; height: auto; border-radius: 8px; display: block; margin-bottom: 14px; }
   .cap { font-size: 0.78rem; color: #a6a8ad; margin-bottom: 22px; }
   a { color: #ff8a40; }
 </style>
 </head>
 <body>
-<h1>Printables description banners</h1>
-<p>Dev tool. Composites each kit's 3/4 render (<code>img/&lt;id&gt;.jpg</code>, captured with the viewer's
-<code>?shot=1</code> mode) into a 1600×900 banner tinted with that length's planner color. Right-click →
-Save image, or hit “Download all”. Re-run after re-capturing a render.</p>
+<h1>Printables share images</h1>
+<p>Dev tool. Renders each kit as the SAME card the gallery shows — length spine, collection chip,
+stats — at 1600×820 for a Printables description, with the value line and permanent link added
+(a card on its own has no clickable button and no address). Right-click → Save image, or hit
+“Download all”. Re-run after re-capturing a render with <code>?shot=1</code>.</p>
 <div class="row">
-  <button id="dl">⬇ Download all banners</button>
+  <button id="dl">⬇ Download all</button>
   <a class="ghost" href="./" style="text-decoration:none"><button class="ghost">← Back to the kit gallery</button></a>
 </div>
 <div id="out"></div>
 
 <script>
-// Planner length palette (js/data.js GEN2.lengths) — the banner accent per collection.
+// Planner length palette (js/data.js GEN2.lengths) — the card's spine + chip.
 const LENGTH_COLORS = { 59: '#f2f2f2', 115: '#9ea3a8', 165: '#3aa0e8', 185: '#ff8a40', 240: '#3ecfa0', 270: '#e8453c' };
 const SHORT_LINK = 'gen2build.jerrari3d.com';
-const W = 1600, H = 900;
+const W = 1600, H = 700, PAD = 40;          // canvas, and the card's inset inside it
+const BG = '#2c2d31', PANEL = '#3a3b3f', LINE = '#4a4b50', ACCENT = '#ff8a40';
+const F = w => `${w} "Segoe UI", system-ui, sans-serif`;
 
 const loadImg = src => new Promise(res => {
   const i = new Image();
@@ -48,105 +51,120 @@ function roundRect(c, x, y, w, h, r) {
   c.arcTo(x, y, x + w, y, r); c.closePath();
 }
 
-async function drawBanner(kit, logo) {
+// wrap `text` to `max` px, return the lines (never more than `cap`)
+function wrap(c, text, max, cap) {
+  const words = String(text || '').split(/\s+/).filter(Boolean);
+  const lines = [];
+  let line = '';
+  for (const w of words) {
+    const test = line ? line + ' ' + w : w;
+    if (c.measureText(test).width > max && line) { lines.push(line); line = w; }
+    else line = test;
+    if (lines.length === cap) break;
+  }
+  if (line && lines.length < cap) lines.push(line);
+  return lines;
+}
+
+async function drawCard(kit) {
   const cv = document.createElement('canvas');
   cv.width = W; cv.height = H;
   const c = cv.getContext('2d');
-  const accent = LENGTH_COLORS[kit.length] || '#ff8a40';
+  const accent = LENGTH_COLORS[kit.length] || ACCENT;
+  const x = PAD, y = PAD, w = W - PAD * 2, h = H - PAD * 2, R = 26;
 
-  // Backdrop = the SAME panel gray the renders were captured on (#3a3b3f), so the
-  // model art blends in seamlessly with no keying/compositing tricks — then a
-  // soft accent glow behind the model and a vignette to seat the text side.
-  c.fillStyle = '#3a3b3f'; c.fillRect(0, 0, W, H);
-  const glow = c.createRadialGradient(W * 0.72, H * 0.5, 40, W * 0.72, H * 0.5, W * 0.55);
-  glow.addColorStop(0, accent + '33'); glow.addColorStop(1, '#3a3b3f00');
-  c.fillStyle = glow; c.fillRect(0, 0, W, H);
+  c.fillStyle = BG; c.fillRect(0, 0, W, H);
 
-  // the kit render, right side, contain-fit
+  // ---- the card, clipped to its rounded rect (same as the gallery) ----
+  c.save();
+  roundRect(c, x, y, w, h, R); c.clip();
+  c.fillStyle = PANEL; c.fillRect(x, y, w, h);
+
+  // kit render, contain-fit hard right — captured on this exact panel gray
   const shot = await loadImg('img/' + kit.id + '.jpg');
   if (shot) {
-    const boxW = W * 0.56, boxH = H * 0.9;
-    const s = Math.min(boxW / shot.width, boxH / shot.height);
+    const s = Math.min(w / shot.width, h / shot.height);
     const dw = shot.width * s, dh = shot.height * s;
-    c.drawImage(shot, W - dw + dw * 0.04, (H - dh) / 2, dw, dh);
+    c.drawImage(shot, x + w - dw, y + (h - dh) / 2, dw, dh);
+  }
+  // legibility gradient (the card's ::before)
+  const g = c.createLinearGradient(x, 0, x + w, 0);
+  g.addColorStop(0, 'rgba(44,45,49,0.97)'); g.addColorStop(0.44, 'rgba(44,45,49,0.90)');
+  g.addColorStop(0.74, 'rgba(44,45,49,0.45)'); g.addColorStop(1, 'rgba(44,45,49,0.20)');
+  c.fillStyle = g; c.fillRect(x, y, w, h);
+
+  c.fillStyle = accent; c.fillRect(x, y, 11, h);   // length spine
+  c.restore();
+  c.strokeStyle = LINE; c.lineWidth = 2;
+  roundRect(c, x, y, w, h, R); c.stroke();
+
+  // ---- copy ----
+  const L = x + 62, maxText = w * 0.60;
+  // measure the wrapped tagline first so the whole block can be centred — a
+  // fixed start left a big dead gap under the link on short taglines
+  c.font = F('400 30px');
+  const tagLines = wrap(c, kit.tagline, maxText, 2);
+  const blockH = (kit.length ? 62 : 0) + 54 + tagLines.length * 40 + 54 + 46 + 78 + 62 + 34;
+  let ty = y + Math.max(70, (h - blockH) / 2 + 34);
+
+  if (kit.length) {                                 // collection chip
+    c.fillStyle = accent;
+    roundRect(c, L, ty - 17, 19, 19, 5); c.fill();
+    c.font = F('800 29px'); c.letterSpacing = '2.5px';
+    c.fillText(String(kit.length).toUpperCase() + ' COLLECTION', L + 33, ty);
+    c.letterSpacing = '0px';
+    ty += 62;
   }
 
-  // darken the text side so the copy always reads, whatever the render shows
-  const shade = c.createLinearGradient(0, 0, W * 0.62, 0);
-  shade.addColorStop(0, '#26272b'); shade.addColorStop(0.55, '#26272bee'); shade.addColorStop(1, '#26272b00');
-  c.fillStyle = shade; c.fillRect(0, 0, W * 0.62, H);
+  c.fillStyle = '#ffffff'; c.font = F('800 56px');
+  c.fillText(kit.title, L, ty);
+  ty += 54;
 
-  // left accent spine (matches the gallery card) — AFTER the shade, or it's buried
-  c.fillStyle = accent; c.fillRect(0, 0, 16, H);
+  c.fillStyle = '#d7d8db'; c.font = F('400 30px');
+  for (const line of wrap(c, kit.tagline, maxText, 2)) { ty += 40; c.fillText(line, L, ty); }
+  ty += 54;
 
-  const L = 84;                       // left text margin
-  let y = 170;                        // starts low enough that the block reads optically centred
-
-  if (logo) {                          // JERRARI mark
-    const lh = 64, lw = logo.width * (lh / logo.height);
-    c.drawImage(logo, L, y - lh, lw, lh);
-    y += 22;
+  // stat chips
+  c.font = F('700 25px');
+  let cx = L;
+  for (const label of [kit.drawers ? kit.drawers + ' drawers' : null,
+                       kit.units ? kit.units + ' units' : null, kit.dims || null]) {
+    if (!label) continue;
+    const tw = c.measureText(label).width, pw = tw + 40;
+    c.fillStyle = 'rgba(0,0,0,0.40)';
+    roundRect(c, cx, ty - 30, pw, 46, 23); c.fill();
+    c.strokeStyle = 'rgba(255,255,255,0.14)'; c.lineWidth = 2;
+    roundRect(c, cx, ty - 30, pw, 46, 23); c.stroke();
+    c.fillStyle = '#d7d8db'; c.fillText(label, cx + 20, ty);
+    cx += pw + 12;
   }
+  ty += 78;
 
-  // eyebrow: the collection, in its own color
-  c.fillStyle = accent;
-  c.font = '800 30px "Segoe UI", system-ui, sans-serif';
-  c.letterSpacing = '3px';
-  c.fillText('GEN2 ' + kit.length + ' COLLECTION', L, y + 30);
-  c.letterSpacing = '0px';
-  y += 112;                            // eyebrow → headline (was 96 — crowded the caps)
+  // The card's button can't be clicked in a static image, so it states the
+  // value and the address instead — the two things a description needs.
+  c.font = F('700 31px');
+  const cta = 'Interactive 3D build guide →';
+  const cw = c.measureText(cta).width + 56;
+  c.fillStyle = ACCENT;
+  roundRect(c, L, ty - 34, cw, 62, 12); c.fill();
+  c.fillStyle = '#1d1e20'; c.fillText(cta, L + 28, ty + 6);
+  ty += 74;
 
-  // headline. 86px type at 92px leading was ~1.07 — the two lines nearly
-  // touched; 104 (~1.21) lets them breathe without splitting the block.
-  c.fillStyle = '#ffffff';
-  c.font = '800 86px "Segoe UI", system-ui, sans-serif';
-  const LEAD = 104;
-  c.fillText('Interactive 3D', L, y);
-  c.fillText('Build Guide', L, y + LEAD);
-  y += LEAD + 80;
-
-  // subhead: which kit
-  c.fillStyle = '#d7d8db';
-  c.font = '400 34px "Segoe UI", system-ui, sans-serif';
-  c.fillText(kit.title, L, y);
-  y += 62;
-
-  // feature bullets
-  c.font = '600 27px "Segoe UI", system-ui, sans-serif';
-  // plain hyphens, not em-dashes (Joey) — they read cleaner at banner scale
-  for (const line of ['Step-by-step 3D assembly - rotate & zoom',
-                      'Full parts list with download links',
-                      'Swap faceplates, handles & colors']) {
-    c.fillStyle = accent; c.fillText('✓', L, y);
-    c.fillStyle = '#c9cbd0'; c.fillText(line, L + 40, y);
-    y += 44;
-  }
-
-  // the link, as a pill — the whole point of the banner
-  y += 26;
-  c.font = '700 30px "Segoe UI", system-ui, sans-serif';
-  const label = SHORT_LINK + '/?build=' + kit.id;
-  const tw = c.measureText(label).width;
-  c.fillStyle = accent;
-  roundRect(c, L, y - 34, tw + 52, 60, 30); c.fill();
-  c.fillStyle = '#1d1e20';
-  c.fillText(label, L + 26, y + 6);
+  c.fillStyle = '#a6a8ad'; c.font = F('600 27px');
+  c.fillText(SHORT_LINK + '/?build=' + kit.id, L, ty);
 
   return cv;
 }
 
 (async () => {
-  const [kits, logo] = await Promise.all([
-    fetch('index.json').then(r => r.json()),
-    loadImg('../img/jerrari-logo.svg'),
-  ]);
+  const kits = await fetch('index.json').then(r => r.json());
   const out = document.getElementById('out');
   const made = [];
   for (const kit of kits) {
-    const cv = await drawBanner(kit, logo);
+    const cv = await drawCard(kit);
     const cap = document.createElement('div');
     cap.className = 'cap';
-    cap.textContent = 'banner-' + kit.id + '.jpg — 1600×900';
+    cap.textContent = `card-${kit.id}.jpg — ${W}×${H}`;
     out.append(cv, cap);
     made.push([kit.id, cv]);
   }
@@ -154,11 +172,11 @@ async function drawBanner(kit, logo) {
     for (const [id, cv] of made) {
       const a = document.createElement('a');
       a.href = cv.toDataURL('image/jpeg', 0.92);
-      a.download = 'banner-' + id + '.jpg';
+      a.download = 'card-' + id + '.jpg';
       a.click();
     }
   };
-  window.__BANNERS = made;   // for automated capture
+  window.__CARDS = made;   // for automated capture
 })();
 </script>
 </body>
