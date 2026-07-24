@@ -223,6 +223,23 @@ const COLORS = {
   Rail: '#2f7fd6',        // blue — under-table rail (footrails never coexist with it)
 };
 
+// ---- official-kit build migrations -----------------------------------------
+// Official kits (builds/<id>.json) commit a planner build to the repo forever —
+// their printed links (Printables descriptions, QR codes) must outlive format
+// changes. RULE: changes to the planner build format must be ADDITIVE — new
+// optional fields only. Anything else must bump the exporter's buildVersion
+// and add a case here that upgrades older committed files in place (each case
+// falls through to the next, so v1 → v2 → v3 chains). Returning null = the
+// file is NEWER than this viewer knows, which only happens on a stale cached
+// deploy → the caller tells the user to refresh. Lives here (not main.js) so
+// the golden tests exercise the real migration code.
+export function migrateOfficialBuild(b, v) {
+  switch (v) {
+    case 1: return b;   // current planner serializeBuild() shape
+    default: return null;
+  }
+}
+
 export function generateManifest(build) {
   const errors = [], warnings = [];
   if (!build || !Array.isArray(build.placed) || !build.placed.length)

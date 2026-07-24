@@ -501,6 +501,17 @@ body {
   box-shadow: 0 1px 6px rgba(0,0,0,0.10);
 }
 #btn-skip-end:hover { color: var(--accent); background: rgba(244,246,248,0.94); }
+/* official kits only: the planner on-ramp — same quiet-pill family as the skip
+   link, accent-tinted so "make it yours" reads as the next adventure, not chrome */
+#btn-customize {
+  margin-top: 8px; padding: 6px 14px;
+  font: inherit; font-size: 13px; font-weight: 700;
+  border: none; cursor: pointer; color: var(--accent);
+  background: rgba(255,244,235,0.86);
+  border-radius: 999px;
+  box-shadow: 0 1px 6px rgba(0,0,0,0.10);
+}
+#btn-customize:hover { background: rgba(255,238,224,0.97); }
 /* embed cover: the skip link's job is done better by the preview landing —
    swap it for the way back (same quiet-pill look) */
 #cover-preview {

@@ -1,0 +1,10 @@
+{
+  "name": "gen2-visual-animator",
+  "version": "1.0.0",
+  "private": true,
+  "description": "GEN2 3D Build Studio — interactive assembly instructions (build-free static web tool).",
+  "type": "module",
+  "scripts": {
+    "test": "node --test"
+  }
+}

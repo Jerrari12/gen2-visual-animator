@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
-import { generateManifest } from './generate.js';
+import { generateManifest, migrateOfficialBuild } from './generate.js';
 
 const KIT = new URLSearchParams(location.search).get('kit') || 'tabletop-185';
 const KIT_URL = `kits/${KIT}/`;
@@ -18,6 +18,14 @@ const BUILD_HASH = (location.hash || '').match(/build=([^&]+)/);
 // location.search, so the mount/length-change self-reload keeps it.
 const IS_EMBED = new URLSearchParams(location.search).has('embed') && !!BUILD_HASH;
 document.body.classList.toggle('embed', IS_EMBED);
+// ?build=<id> — a named OFFICIAL kit. The build data lives in a COMMITTED file
+// (builds/<id>.json), not in the URL — that's what makes printed links
+// (Printables descriptions, QR codes) permanent: short, un-manglable, and
+// fixable after the fact (replace the file; the id stays). Only files in the
+// repo resolve, so ids are mintable by commit only — nothing for visitors to
+// name or abuse. A #build= hash (the planner hand-off) always wins.
+const OFFICIAL_ID = !BUILD_HASH ? new URLSearchParams(location.search).get('build') : null;
+let OFFICIAL = null; // {id, title, tagline} once the kit file loads
 
 // ---------- tiny tween runner (no lib) ----------
 const tweens = new Set();
@@ -152,6 +160,14 @@ function updateViewInset() {
 // most manifest-derived state below is (re)built inside mountManifest().
 let manifest, PARTS_BASE, build = null, originalBuild = null;
 const decodeBuild = h => { const raw = JSON.parse(decodeURIComponent(escape(atob(decodeURIComponent(h))))); return raw.data || raw; };
+// boot failure → the loading overlay becomes the message and the module halts
+// (the throw is deliberate: nothing below can run without a manifest)
+function bootFail(html, log) {
+  const box = document.getElementById('loading-overlay');
+  box.querySelector('.spinner')?.remove();
+  document.getElementById('loading-text').innerHTML = html;
+  throw new Error(log);
+}
 if (BUILD_HASH) {
   let gen;
   try {
@@ -161,15 +177,35 @@ if (BUILD_HASH) {
   } catch (e) {
     gen = { errors: ['This build link is damaged or truncated · try copying it again from the planner.'], manifest: null };
   }
-  if (!gen.manifest) {
-    const box = document.getElementById('loading-overlay');
-    box.querySelector('.spinner')?.remove();
-    document.getElementById('loading-text').innerHTML =
-      '<strong>Can’t show this build yet</strong><br><br>' + gen.errors.map(e => '• ' + e).join('<br>');
-    throw new Error('unsupported build: ' + gen.errors.join('; '));
-  }
+  if (!gen.manifest)
+    bootFail('<strong>Can’t show this build yet</strong><br><br>' + gen.errors.map(e => '• ' + e).join('<br>'),
+      'unsupported build: ' + gen.errors.join('; '));
   manifest = gen.manifest;
   PARTS_BASE = 'parts/' + (manifest.collection || '185') + '/';   // one self-contained pool per collection (parts/165, parts/185)
+} else if (OFFICIAL_ID) {
+  const GALLERY = '<br><br><a href="builds/">Browse the official GEN2 kits →</a>';
+  const kitFail = msg => bootFail('<strong>' + msg + '</strong>' + GALLERY, 'official kit "' + OFFICIAL_ID + '": ' + msg);
+  let file = null;
+  if (/^[a-z0-9][a-z0-9-]*$/.test(OFFICIAL_ID)) {
+    try {
+      const res = await fetch(`builds/${OFFICIAL_ID}.json`);
+      if (res.ok) file = await res.json();
+    } catch (e) { /* network / parse — falls through to the friendly 404 */ }
+  }
+  if (!file || !file.build)
+    kitFail('This kit link isn’t available — it may have moved or been renamed.');
+  if (file.gen2OfficialBuild !== 1)
+    kitFail('This kit was made for a newer version of the Build Studio — refresh the page and try again.');
+  build = migrateOfficialBuild(file.build, file.buildVersion ?? 1);
+  if (!build)
+    kitFail('This kit was made for a newer version of the Build Studio — refresh the page and try again.');
+  OFFICIAL = { id: OFFICIAL_ID, title: String(file.title || 'GEN2 Kit'), tagline: typeof file.tagline === 'string' ? file.tagline : '' };
+  originalBuild = structuredClone(build);
+  const gen = generateManifest(build);
+  if (!gen.manifest) // a committed kit failing to generate is OUR bug, not the user's — say so plainly
+    kitFail('This kit can’t be shown right now (' + gen.errors.join(' · ') + ') — please report it.');
+  manifest = gen.manifest;
+  PARTS_BASE = 'parts/' + (manifest.collection || '185') + '/';
 } else {
   manifest = await (await fetch(KIT_URL + 'manifest.json')).json();
   PARTS_BASE = KIT_URL + 'parts/';
@@ -1084,6 +1120,22 @@ $('btn-start').onclick = () => goTo(1); // cover → intro, camera pans + de-zoo
 // customizers' shortcut: straight to the finished build (final assembly step —
 // dims + expanded BOM), skipping the step-by-step. Snap, don't replay the step.
 $('btn-skip-end').onclick = () => goTo(PAGES.length - 2, { animate: false });
+// Official kits only: "Customize this build" (cover + outro) — the on-ramp to
+// the planner. Hands over the CURRENT build (option tweaks ride along) as a
+// #build= hash the planner sanitizes + restores. Raw base64, NOT
+// percent-encoded — the planner's decode has no decodeURIComponent, so an
+// encoded hash would silently fail there.
+const PLANNER_URL = 'https://gen2planner.jerrari3d.com/';
+const plannerHandoffUrl = () => PLANNER_URL + '#build=' + btoa(unescape(encodeURIComponent(JSON.stringify(build))));
+if (OFFICIAL) {
+  const cover = $('btn-customize');
+  cover.classList.remove('hidden');
+  cover.onclick = () => window.open(plannerHandoffUrl(), '_blank', 'noopener');
+  const outro = $('outro-customize');
+  outro.classList.remove('hidden');
+  // anchor: freshen the href as the click starts (build mutates with options)
+  outro.addEventListener('click', () => { outro.href = plannerHandoffUrl(); });
+}
 // embed preview ⇄ the instruction flow: "Begin" enters at the cover;
 // the 🧪 Preview tool (embed-only, controls bar — hidden on the preview
 // itself since the whole bar is) re-runs the boot landing from any step.
@@ -1804,7 +1856,9 @@ const PRESETS = [
   } },
 ];
 
-const COLOR_STORE_KEY = 'gen2-colors:' + (BUILD_HASH ? 'custom-build' : KIT);
+// official kits get their own palette slot (keyed by kit id) so a saved color
+// scheme sticks to THAT kit — planner hand-offs share one 'custom-build' slot
+const COLOR_STORE_KEY = 'gen2-colors:' + (BUILD_HASH ? 'custom-build' : OFFICIAL ? 'official-' + OFFICIAL.id : KIT);
 let customColors = {}, useCustom = false; // customColors: type -> {name, hex, url}
 // userPalette = the last palette the user built BY HAND (individual swatch
 // picks / per-type resets / file upload). Hand edits mirror the whole working
@@ -3084,6 +3138,18 @@ addEventListener('message', async (e) => {
 // live outside this.
 async function mountManifest(m) {
   manifest = m;
+  if (OFFICIAL) {
+    // official kits carry their real name — replace the generator's random fun
+    // name on the header/tab and brand the intro step. Done here (not at boot)
+    // so it survives every regenerate(), which re-runs the generator.
+    m.title = OFFICIAL.title;
+    const intro = m.steps[0];
+    if (intro && intro.checklist) {
+      intro.title = OFFICIAL.title;
+      intro.note = (OFFICIAL.tagline ? OFFICIAL.tagline + ' ' : '') +
+        (intro.note || '').replace('Your custom GEN2 build', 'An official GEN2 kit');
+    }
+  }
   $('kit-title').textContent = m.title;
   document.title = m.title;
   typeByNode = Object.fromEntries(m.parts.map(p => [p.node, p.type]));

@@ -606,7 +606,53 @@ are SHA-stamped so prod never cached wrong. NB the Claude preview server is
 EPHEMERAL — it dies with the session; the planner's local "3D instructions"
 button needs SOMETHING on :8123 (Joey's "viewer won't load but planner does"
 repro = no server). Repo: github.com/Jerrari12/gen2-visual-animator — pushing
-main IS a deploy (Pages action serves viewer/).
+main IS a deploy (Pages action serves viewer/). **Custom domain (2026-07-23):
+gen2build.jerrari3d.com** — `viewer/CNAME` rides the Pages artifact; the old
+github.io URL 301-redirects (hash + query survive). Joey's one-time setup: DNS
+CNAME `gen2build` → `jerrari12.github.io` + repo Settings→Pages→custom domain
++ HTTPS. The planner's prod `INSTRUCTIONS_VIEWER_URL` points here. NB the
+domain change reset viewer localStorage once (origin-scoped saved colors) —
+that's why it shipped BEFORE any official-kit link was printed anywhere.
+
+## Official kits (permanent beginner links — 2026-07-23)
+
+Preconfigured builds a beginner can follow like LEGO instructions, with links
+durable enough for Printables descriptions / QR codes. `viewer/builds/<id>.json`
+= `{gen2OfficialBuild:1, id, title, tagline, buildVersion:1, build:<the
+planner's serializeBuild() shape>}` — opened via **`?build=<id>`**
+(gen2build.jerrari3d.com/?build=240-tabletop-kit). The build data lives in the
+COMMITTED file, not the URL: short links, no base64 mangling, and a kit is
+fixable post-print (replace the file; the id stays). Ids are mintable by repo
+commit only — `?build=anything-else` = friendly 404 with a gallery link — so
+there's nothing for users to name or abuse (user builds keep the anonymous
+`#build=` hash). Precedence in main.js boot: `#build=` hash (planner hand-off,
+wins) → `?build=` official → `?kit=` static. **`migrateOfficialBuild` in
+generate.js** (exported; main.js imports it) is the version gate — THE RULE:
+planner build-format changes must be ADDITIVE, else bump the exporter's
+buildVersion and add a migration case (committed kits must never go stale);
+returning null = file newer than the deployed viewer → "refresh" message.
+Official mode: `OFFICIAL = {id,title,tagline}`; mountManifest overrides
+manifest.title + brands the intro step (tagline + "An official GEN2 kit" text
+swap) on EVERY mount so it survives regenerate(); colors persist per kit
+(`gen2-colors:official-<id>`); IS_EMBED stays false (embed requires the hash).
+**Customize CTA** (official only): `#btn-customize` on the cover (accent-tinted
+quiet pill under the skip link) + `#outro-customize` in the outro card — both
+open `PLANNER_URL#build=` of the CURRENT mutated build (option tweaks ride
+along; raw base64, NEVER percent-encoded — the planner's decode lacks
+decodeURIComponent and silently fails on encoded hashes). **Gallery:**
+`viewer/builds/index.html` (standalone page, no three.js) renders cards from
+`builds/index.json` (stats precomputed at authoring; optional cover art
+`builds/img/<id>.jpg`, degrades to text-only). **Authoring:** the planner's
+"📦 Export official kit" button (Save & share block, `IS_LOCAL_DEV`-gated —
+invisible in prod) prompts title/id(slugified, editable)/tagline, downloads the
+wrapper, and console.logs the ready index.json row. **Golden tests (the
+durability guarantee):** repo-root `npm test` → `test/official-builds.test.mjs`
+runs every builds/*.json through migrate+generateManifest (pure JS, plain node)
+and diffs against `test/golden/<id>.manifest.json` — a generator change that
+alters an official kit fails before it can deploy over a printed link;
+intentional changes refresh via `UPDATE_GOLDEN=1 npm test`. Seed kit:
+`240-tabletop-kit` (2×2 240 tabletop decor). Rollback tag in both repos:
+`pre-official-kits`.
 
 ## Planner → generated instructions (BUILT)
 

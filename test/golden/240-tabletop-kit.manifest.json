@@ -1,0 +1,1373 @@
+{
+ "title": "The Steady Parts Palace · GEN2 Custom · 240",
+ "collection": "240",
+ "generated": true,
+ "mount": "tabletop",
+ "pitch": {
+  "x": 88,
+  "y": 56
+ },
+ "colors": {
+  "Case": "#34373c",
+  "Drawer": "#e8433a",
+  "Faceplate": "#f2911f",
+  "Handle": "#f6cf2b",
+  "CoverL": "#34a85a",
+  "CoverU": "#8bd14e",
+  "FootrailL": "#2f7fd6",
+  "FootrailU": "#45c8e0",
+  "QuickLock": "#12b5a8",
+  "Foot": "#8b5cf0",
+  "Stopper": "#d84fb0",
+  "MagnetClip": "#b06a3c",
+  "Magnet": "#b8bcc4",
+  "BackCover": "#5b6ee1",
+  "Accent": "#25316e",
+  "Label": "#eef0f4",
+  "Bracket": "#8792a2",
+  "Screw": "#d5dae1",
+  "Rail": "#2f7fd6"
+ },
+ "parts": [
+  {
+   "node": "FR-U_240-2W",
+   "label": "Footrail Upper 240-2W",
+   "type": "FootrailU",
+   "qty": 1,
+   "links": {
+    "p": "https://www.printables.com/model/1777826-gen2-240-foot-rails",
+    "t": "https://than.gs/m/1574322"
+   },
+   "img": "img/parts/FR-U_240-2W.png"
+  },
+  {
+   "node": "FR-L_240-2W",
+   "label": "Footrail Lower 240-2W",
+   "type": "FootrailL",
+   "qty": 1,
+   "links": {
+    "p": "https://www.printables.com/model/1777826-gen2-240-foot-rails",
+    "t": "https://than.gs/m/1574322"
+   },
+   "img": "img/parts/FR-L_240-2W.png"
+  },
+  {
+   "node": "Tabletop-Kit-Foot",
+   "label": "Tabletop Kit Foot",
+   "type": "Foot",
+   "qty": 6,
+   "links": {
+    "p": "https://www.printables.com/model/1324501-gen2-table-top-kit-v2-240",
+    "t": "https://thangs.com/designer/Jerrari/3d-model/GEN2%20Table%20Top%20Kit%20V2%20-%20240-1360073"
+   }
+  },
+  {
+   "node": "240-1W-1H_Case",
+   "label": "Case 240-1W-1H",
+   "type": "Case",
+   "qty": 4,
+   "links": {
+    "p": "https://www.printables.com/model/1658608-gen2-240-cases-all",
+    "t": "https://than.gs/m/1535459"
+   },
+   "img": "img/parts/Case 240-1W-1H.png"
+  },
+  {
+   "node": "QuickLock-L",
+   "label": "QuickLock L",
+   "type": "QuickLock",
+   "qty": 4,
+   "links": {
+    "p": "https://www.printables.com/model/1012796-gen2-hardware",
+    "t": "https://thangs.com/designer/Jerrari/3d-model/GEN2%20Hardware-1141439"
+   },
+   "img": "img/parts/QuickLock.png"
+  },
+  {
+   "node": "QuickLock-R",
+   "label": "QuickLock R",
+   "type": "QuickLock",
+   "qty": 4,
+   "links": {
+    "p": "https://www.printables.com/model/1012796-gen2-hardware",
+    "t": "https://thangs.com/designer/Jerrari/3d-model/GEN2%20Hardware-1141439"
+   },
+   "img": "img/parts/QuickLock-R.png"
+  },
+  {
+   "node": "Drawer_Stoppers_L",
+   "label": "Drawer Stopper L",
+   "type": "Stopper",
+   "qty": 4,
+   "links": {
+    "p": "https://www.printables.com/model/1012796-gen2-hardware",
+    "t": "https://thangs.com/designer/Jerrari/3d-model/GEN2%20Hardware-1141439"
+   },
+   "img": "img/parts/Drawer Stopper.png"
+  },
+  {
+   "node": "Drawer_Stoppers_R",
+   "label": "Drawer Stopper R",
+   "type": "Stopper",
+   "qty": 4,
+   "links": {
+    "p": "https://www.printables.com/model/1012796-gen2-hardware",
+    "t": "https://thangs.com/designer/Jerrari/3d-model/GEN2%20Hardware-1141439"
+   },
+   "img": "img/parts/Drawer Stopper.png"
+  },
+  {
+   "node": "CL-240-2W",
+   "label": "Cover Lower 240-2W",
+   "type": "CoverL",
+   "qty": 1,
+   "links": {
+    "p": "https://www.printables.com/model/1777846-gen2-240-cover",
+    "t": "https://than.gs/m/1574326"
+   },
+   "img": "img/parts/CL-240-2W.png"
+  },
+  {
+   "node": "CU-240-2W",
+   "label": "Cover Upper 240-2W",
+   "type": "CoverU",
+   "qty": 1,
+   "links": {
+    "p": "https://www.printables.com/model/1777846-gen2-240-cover",
+    "t": "https://than.gs/m/1574326"
+   },
+   "img": "img/parts/CU-240-2W.png"
+  },
+  {
+   "node": "DecorDrawer_240-1W-1H",
+   "label": "Decor Drawer 240-1W-1H",
+   "type": "Drawer",
+   "qty": 4,
+   "links": {
+    "p": "https://www.printables.com/model/1322479-gen2-240-decor-drawers-all",
+    "t": "https://than.gs/m/1360074"
+   },
+   "img": "img/parts/Decor Drawer 240-1W-1H.png"
+  },
+  {
+   "node": "Faceplate_Essential_1W-1H",
+   "label": "Faceplate Essential 1W-1H",
+   "type": "Faceplate",
+   "qty": 4,
+   "links": {
+    "p": "https://www.printables.com/model/964559-gen2-decor-faceplates-essential-series",
+    "t": "https://thangs.com/designer/Jerrari/3d-model/GEN2%20Decor%20-%20Faceplates%20-%20Essential%20Series-1116946"
+   },
+   "img": "img/parts/Faceplate-Essential.jpg"
+  },
+  {
+   "node": "Handle_Deco",
+   "label": "Deco Handle",
+   "type": "Handle",
+   "qty": 4,
+   "links": {
+    "p": "https://www.printables.com/model/1044972-gen2-decor-handles-deco-series",
+    "t": "https://thangs.com/designer/Jerrari/3d-model/GEN2%20Decor%20Handles%20-%20Deco%20Series-1159960"
+   },
+   "img": "img/parts/Handle_Deco.png"
+  }
+ ],
+ "instances": [
+  {
+   "id": "frl0",
+   "node": "FR-L_240-2W",
+   "pos": [
+    0,
+    7.65,
+    0
+   ],
+   "stage": "base"
+  },
+  {
+   "id": "f1",
+   "node": "Tabletop-Kit-Foot",
+   "pos": [
+    -76.48,
+    0,
+    -100.5
+   ],
+   "yaw": 180,
+   "stage": "base"
+  },
+  {
+   "id": "f2",
+   "node": "Tabletop-Kit-Foot",
+   "pos": [
+    -76.48,
+    0,
+    108.65
+   ],
+   "yaw": 180,
+   "stage": "base"
+  },
+  {
+   "id": "f3",
+   "node": "Tabletop-Kit-Foot",
+   "pos": [
+    -0.18,
+    0,
+    -100.5
+   ],
+   "yaw": 0,
+   "stage": "base"
+  },
+  {
+   "id": "f4",
+   "node": "Tabletop-Kit-Foot",
+   "pos": [
+    -0.18,
+    0,
+    108.65
+   ],
+   "yaw": 0,
+   "stage": "base"
+  },
+  {
+   "id": "f5",
+   "node": "Tabletop-Kit-Foot",
+   "pos": [
+    76.65,
+    0,
+    -100.5
+   ],
+   "yaw": 0,
+   "stage": "base"
+  },
+  {
+   "id": "f6",
+   "node": "Tabletop-Kit-Foot",
+   "pos": [
+    76.65,
+    0,
+    108.65
+   ],
+   "yaw": 0,
+   "stage": "base"
+  },
+  {
+   "id": "case0",
+   "node": "240-1W-1H_Case",
+   "pos": [
+    -44,
+    17.65,
+    0
+   ],
+   "stage": "c0"
+  },
+  {
+   "id": "ql0L",
+   "node": "QuickLock-L",
+   "pos": [
+    -84.12,
+    53.330000000000005,
+    92.52
+   ],
+   "stage": "c0"
+  },
+  {
+   "id": "ql0R",
+   "node": "QuickLock-R",
+   "pos": [
+    -3.45,
+    53.330000000000005,
+    92.52
+   ],
+   "stage": "c0"
+  },
+  {
+   "id": "case1",
+   "node": "240-1W-1H_Case",
+   "pos": [
+    44,
+    17.65,
+    0
+   ],
+   "stage": "c1"
+  },
+  {
+   "id": "ql1L",
+   "node": "QuickLock-L",
+   "pos": [
+    3.88,
+    53.330000000000005,
+    92.52
+   ],
+   "stage": "c1"
+  },
+  {
+   "id": "ql1R",
+   "node": "QuickLock-R",
+   "pos": [
+    84.55,
+    53.330000000000005,
+    92.52
+   ],
+   "stage": "c1"
+  },
+  {
+   "id": "case2",
+   "node": "240-1W-1H_Case",
+   "pos": [
+    -44,
+    73.65,
+    0
+   ],
+   "stage": "c2"
+  },
+  {
+   "id": "ql2L",
+   "node": "QuickLock-L",
+   "pos": [
+    -84.12,
+    109.33000000000001,
+    92.52
+   ],
+   "stage": "c2"
+  },
+  {
+   "id": "ql2R",
+   "node": "QuickLock-R",
+   "pos": [
+    -3.45,
+    109.33000000000001,
+    92.52
+   ],
+   "stage": "c2"
+  },
+  {
+   "id": "case3",
+   "node": "240-1W-1H_Case",
+   "pos": [
+    44,
+    73.65,
+    0
+   ],
+   "stage": "c3"
+  },
+  {
+   "id": "ql3L",
+   "node": "QuickLock-L",
+   "pos": [
+    3.88,
+    109.33000000000001,
+    92.52
+   ],
+   "stage": "c3"
+  },
+  {
+   "id": "ql3R",
+   "node": "QuickLock-R",
+   "pos": [
+    84.55,
+    109.33000000000001,
+    92.52
+   ],
+   "stage": "c3"
+  },
+  {
+   "id": "st0L",
+   "node": "Drawer_Stoppers_L",
+   "pos": [
+    -56.6,
+    71.65,
+    104
+   ],
+   "stopperKey": "1:0"
+  },
+  {
+   "id": "st0R",
+   "node": "Drawer_Stoppers_R",
+   "pos": [
+    -31.6,
+    71.65,
+    104
+   ],
+   "stopperKey": "1:0"
+  },
+  {
+   "id": "st1L",
+   "node": "Drawer_Stoppers_L",
+   "pos": [
+    31.4,
+    71.65,
+    104
+   ],
+   "stopperKey": "2:0"
+  },
+  {
+   "id": "st1R",
+   "node": "Drawer_Stoppers_R",
+   "pos": [
+    56.4,
+    71.65,
+    104
+   ],
+   "stopperKey": "2:0"
+  },
+  {
+   "id": "st2L",
+   "node": "Drawer_Stoppers_L",
+   "pos": [
+    -56.6,
+    127.65,
+    104
+   ],
+   "stopperKey": "3:0"
+  },
+  {
+   "id": "st2R",
+   "node": "Drawer_Stoppers_R",
+   "pos": [
+    -31.6,
+    127.65,
+    104
+   ],
+   "stopperKey": "3:0"
+  },
+  {
+   "id": "st3L",
+   "node": "Drawer_Stoppers_L",
+   "pos": [
+    31.4,
+    127.65,
+    104
+   ],
+   "stopperKey": "4:0"
+  },
+  {
+   "id": "st3R",
+   "node": "Drawer_Stoppers_R",
+   "pos": [
+    56.4,
+    127.65,
+    104
+   ],
+   "stopperKey": "4:0"
+  },
+  {
+   "id": "cl0",
+   "node": "CL-240-2W",
+   "pos": [
+    0,
+    129.65,
+    0
+   ]
+  },
+  {
+   "id": "cu0",
+   "node": "CU-240-2W",
+   "pos": [
+    0,
+    133.95000000000002,
+    0
+   ]
+  },
+  {
+   "id": "drw0",
+   "node": "DecorDrawer_240-1W-1H",
+   "pos": [
+    -43.84,
+    23.369999999999997,
+    5.24
+   ]
+  },
+  {
+   "id": "fp0",
+   "node": "Faceplate_Essential_1W-1H",
+   "pos": [
+    -43.53,
+    21.369999999999997,
+    122.57
+   ],
+   "rides": "drw0"
+  },
+  {
+   "id": "h0",
+   "node": "Handle_Deco",
+   "pos": [
+    -43.54,
+    43.87,
+    137.07
+   ],
+   "rides": "drw0"
+  },
+  {
+   "id": "drw1",
+   "node": "DecorDrawer_240-1W-1H",
+   "pos": [
+    44.16,
+    23.369999999999997,
+    5.24
+   ]
+  },
+  {
+   "id": "fp1",
+   "node": "Faceplate_Essential_1W-1H",
+   "pos": [
+    44.47,
+    21.369999999999997,
+    122.57
+   ],
+   "rides": "drw1"
+  },
+  {
+   "id": "h1",
+   "node": "Handle_Deco",
+   "pos": [
+    44.46,
+    43.87,
+    137.07
+   ],
+   "rides": "drw1"
+  },
+  {
+   "id": "drw2",
+   "node": "DecorDrawer_240-1W-1H",
+   "pos": [
+    -43.84,
+    79.37,
+    5.24
+   ]
+  },
+  {
+   "id": "fp2",
+   "node": "Faceplate_Essential_1W-1H",
+   "pos": [
+    -43.53,
+    77.37,
+    122.57
+   ],
+   "rides": "drw2"
+  },
+  {
+   "id": "h2",
+   "node": "Handle_Deco",
+   "pos": [
+    -43.54,
+    99.87,
+    137.07
+   ],
+   "rides": "drw2"
+  },
+  {
+   "id": "drw3",
+   "node": "DecorDrawer_240-1W-1H",
+   "pos": [
+    44.16,
+    79.37,
+    5.24
+   ]
+  },
+  {
+   "id": "fp3",
+   "node": "Faceplate_Essential_1W-1H",
+   "pos": [
+    44.47,
+    77.37,
+    122.57
+   ],
+   "rides": "drw3"
+  },
+  {
+   "id": "h3",
+   "node": "Handle_Deco",
+   "pos": [
+    44.46,
+    99.87,
+    137.07
+   ],
+   "rides": "drw3"
+  },
+  {
+   "id": "fru0",
+   "node": "FR-U_240-2W",
+   "pos": [
+    0,
+    12.75,
+    0
+   ]
+  }
+ ],
+ "stages": {
+  "base": [
+   0,
+   110,
+   0
+  ],
+  "c0": [
+   0,
+   0,
+   -225
+  ],
+  "c1": [
+   0,
+   0,
+   -225
+  ],
+  "c2": [
+   0,
+   0,
+   -225
+  ],
+  "c3": [
+   0,
+   0,
+   -225
+  ]
+ },
+ "steps": [
+  {
+   "title": "The Steady Parts Palace",
+   "note": "Your custom GEN2 build · 4 units, 4 drawers, 2 columns wide. Drag to orbit, tap any part to identify it. 42 prints · quantities on the right. You'll also need 8× M3 screws for the handles. ⚠ 240 hardware positions are scaled from the 185 calibration · double-check a printed build and report anything that sits off.",
+   "camera": {
+    "t": 30,
+    "p": 58,
+    "r": 1062.99,
+    "target": [
+     0,
+     76.8075,
+     50
+    ]
+   },
+   "checklist": true
+  },
+  {
+   "title": "Bench: lower footrail",
+   "note": "Start at the bench · the rails are shown raised so you can see the foot slots on the undersides.",
+   "camera": {
+    "t": 30,
+    "p": 58,
+    "r": 787.4,
+    "target": [
+     0,
+     115,
+     0
+    ],
+    "fit": 1.18
+   },
+   "phases": [
+    {
+     "enter": [
+      {
+       "id": "frl0",
+       "from": [
+        0,
+        90,
+        0
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "Bench: insert the 6 feet",
+   "note": "Pointy end slides in first · outer feet toward the rail ends, middle feet left to right.",
+   "camera": {
+    "t": 30,
+    "p": 58,
+    "r": 787.4,
+    "target": [
+     0,
+     115,
+     0
+    ],
+    "fit": 1.18
+   },
+   "phases": [
+    {
+     "enter": [
+      {
+       "id": "f1",
+       "from": [
+        30,
+        0,
+        0
+       ]
+      },
+      {
+       "id": "f3",
+       "from": [
+        -30,
+        0,
+        0
+       ]
+      },
+      {
+       "id": "f5",
+       "from": [
+        -30,
+        0,
+        0
+       ]
+      }
+     ]
+    },
+    {
+     "enter": [
+      {
+       "id": "f2",
+       "from": [
+        30,
+        0,
+        0
+       ]
+      },
+      {
+       "id": "f4",
+       "from": [
+        -30,
+        0,
+        0
+       ]
+      },
+      {
+       "id": "f6",
+       "from": [
+        -30,
+        0,
+        0
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "Set the base down",
+   "note": "Flip the base feet-down and set it where the kit will live.",
+   "camera": {
+    "t": 30,
+    "p": 58,
+    "r": 787.4,
+    "target": [
+     0,
+     50,
+     0
+    ],
+    "fit": 1.18
+   },
+   "phases": [
+    {
+     "settle": "base"
+    }
+   ]
+  },
+  {
+   "title": "Upper footrail",
+   "note": "Each upper footrail slides on from the back, all the way forward until it stops.",
+   "camera": {
+    "t": 30,
+    "p": 58,
+    "r": 787.4,
+    "target": [
+     0,
+     30,
+     0
+    ],
+    "fit": 1.18
+   },
+   "phases": [
+    {
+     "enter": [
+      {
+       "id": "fru0",
+       "from": [
+        0,
+        0,
+        -225
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "Case 1 · 1W-1H",
+   "note": "QuickLocks in (L left, R right), then slide the case on from the back until it clicks.",
+   "camera": {
+    "t": 30,
+    "p": 58,
+    "r": 787.4,
+    "target": [
+     -44,
+     47.15,
+     0
+    ]
+   },
+   "phases": [
+    {
+     "enter": [
+      {
+       "id": "case0",
+       "from": [
+        0,
+        60,
+        0
+       ]
+      }
+     ]
+    },
+    {
+     "enter": [
+      {
+       "id": "ql0L",
+       "from": [
+        0,
+        55,
+        0
+       ]
+      },
+      {
+       "id": "ql0R",
+       "from": [
+        0,
+        55,
+        0
+       ]
+      }
+     ]
+    },
+    {
+     "settle": "c0"
+    }
+   ]
+  },
+  {
+   "title": "Case 2 · 1W-1H",
+   "note": "QuickLocks in (L left, R right), then slide the case on from the back until it clicks.",
+   "camera": {
+    "t": 30,
+    "p": 58,
+    "r": 787.4,
+    "target": [
+     44,
+     47.15,
+     0
+    ]
+   },
+   "phases": [
+    {
+     "enter": [
+      {
+       "id": "case1",
+       "from": [
+        0,
+        60,
+        0
+       ]
+      }
+     ]
+    },
+    {
+     "enter": [
+      {
+       "id": "ql1L",
+       "from": [
+        0,
+        55,
+        0
+       ]
+      },
+      {
+       "id": "ql1R",
+       "from": [
+        0,
+        55,
+        0
+       ]
+      }
+     ]
+    },
+    {
+     "settle": "c1"
+    }
+   ]
+  },
+  {
+   "title": "Case 3 · 1W-1H",
+   "note": "QuickLocks in, slide the case on from the back until it clicks. Then drop the drawer stoppers into its floor slots · they stop the drawer BELOW from being pulled all the way out (optional).",
+   "camera": {
+    "t": 30,
+    "p": 58,
+    "r": 787.4,
+    "target": [
+     -44,
+     103.15,
+     0
+    ]
+   },
+   "phases": [
+    {
+     "enter": [
+      {
+       "id": "case2",
+       "from": [
+        0,
+        60,
+        0
+       ]
+      }
+     ]
+    },
+    {
+     "enter": [
+      {
+       "id": "ql2L",
+       "from": [
+        0,
+        55,
+        0
+       ]
+      },
+      {
+       "id": "ql2R",
+       "from": [
+        0,
+        55,
+        0
+       ]
+      }
+     ]
+    },
+    {
+     "settle": "c2"
+    },
+    {
+     "enter": [
+      {
+       "id": "st0L",
+       "from": [
+        0,
+        55,
+        0
+       ]
+      },
+      {
+       "id": "st0R",
+       "from": [
+        0,
+        55,
+        0
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "Case 4 · 1W-1H",
+   "note": "QuickLocks in, slide the case on from the back until it clicks. Then drop the drawer stoppers into its floor slots · they stop the drawer BELOW from being pulled all the way out (optional).",
+   "camera": {
+    "t": 30,
+    "p": 58,
+    "r": 787.4,
+    "target": [
+     44,
+     103.15,
+     0
+    ]
+   },
+   "phases": [
+    {
+     "enter": [
+      {
+       "id": "case3",
+       "from": [
+        0,
+        60,
+        0
+       ]
+      }
+     ]
+    },
+    {
+     "enter": [
+      {
+       "id": "ql3L",
+       "from": [
+        0,
+        55,
+        0
+       ]
+      },
+      {
+       "id": "ql3R",
+       "from": [
+        0,
+        55,
+        0
+       ]
+      }
+     ]
+    },
+    {
+     "settle": "c3"
+    },
+    {
+     "enter": [
+      {
+       "id": "st1L",
+       "from": [
+        0,
+        55,
+        0
+       ]
+      },
+      {
+       "id": "st1R",
+       "from": [
+        0,
+        55,
+        0
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "Lower cover",
+   "note": "The lower covers slide over the top from the back · the top cases’ QuickLocks lock them. Then drop the remaining stoppers into the covers’ slots to protect the top-row drawers.",
+   "camera": {
+    "t": 30,
+    "p": 58,
+    "r": 787.4,
+    "target": [
+     0,
+     139.65,
+     0
+    ],
+    "fit": 1.18
+   },
+   "phases": [
+    {
+     "enter": [
+      {
+       "id": "cl0",
+       "from": [
+        0,
+        0,
+        -225
+       ]
+      }
+     ]
+    },
+    {
+     "enter": [
+      {
+       "id": "st2L",
+       "from": [
+        0,
+        55,
+        0
+       ]
+      },
+      {
+       "id": "st2R",
+       "from": [
+        0,
+        55,
+        0
+       ]
+      },
+      {
+       "id": "st3L",
+       "from": [
+        0,
+        55,
+        0
+       ]
+      },
+      {
+       "id": "st3R",
+       "from": [
+        0,
+        55,
+        0
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "Upper cover",
+   "note": "The upper covers slide in from the back, onto the lower covers’ dovetails.",
+   "camera": {
+    "t": 30,
+    "p": 58,
+    "r": 787.4,
+    "target": [
+     0,
+     139.65,
+     0
+    ],
+    "fit": 1.18
+   },
+   "phases": [
+    {
+     "enter": [
+      {
+       "id": "cu0",
+       "from": [
+        0,
+        0,
+        -225
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "Drawers",
+   "note": "Slide each drawer in from the front.",
+   "camera": {
+    "t": 12,
+    "p": 68,
+    "r": 787.4,
+    "target": [
+     0,
+     62.8425,
+     0
+    ],
+    "fit": 1.18
+   },
+   "phases": [
+    {
+     "enter": [
+      {
+       "id": "drw0",
+       "at": [
+        0,
+        0,
+        190
+       ],
+       "from": [
+        0,
+        0,
+        60
+       ]
+      }
+     ]
+    },
+    {
+     "move": [
+      {
+       "id": "drw0",
+       "by": [
+        0,
+        0,
+        -190
+       ]
+      }
+     ]
+    },
+    {
+     "enter": [
+      {
+       "id": "drw1",
+       "from": [
+        0,
+        0,
+        200
+       ]
+      },
+      {
+       "id": "drw2",
+       "from": [
+        0,
+        0,
+        200
+       ]
+      },
+      {
+       "id": "drw3",
+       "from": [
+        0,
+        0,
+        200
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "Faceplates & handles",
+   "note": "Assemble the faceplate first: screw on the Deco Handle (2× M3). Pop a drawer out about 40 mm, slide the assembled faceplate DOWN onto the drawer front until it snaps, then push the drawer home. Repeat for every drawer · the build is done. Tap any part to see its name and download links.",
+   "camera": {
+    "t": 15,
+    "p": 66,
+    "r": 787.4,
+    "target": [
+     0,
+     69.825,
+     0
+    ],
+    "fit": 1.18
+   },
+   "phases": [
+    {
+     "move": [
+      {
+       "id": "drw0",
+       "by": [
+        0,
+        0,
+        40
+       ]
+      }
+     ]
+    },
+    {
+     "vanish": true,
+     "room": 0,
+     "camera": {
+      "t": 12,
+      "p": 82,
+      "fitR": 80.4075556151286,
+      "target": [
+       -43.53,
+       93.87,
+       162.57
+      ]
+     }
+    },
+    {
+     "enter": [
+      {
+       "id": "fp0",
+       "at": [
+        0,
+        45,
+        40
+       ],
+       "from": [
+        0,
+        30,
+        0
+       ]
+      }
+     ]
+    },
+    {
+     "enter": [
+      {
+       "id": "h0",
+       "at": [
+        0,
+        45,
+        55
+       ],
+       "from": [
+        0,
+        0,
+        30
+       ],
+       "via": [
+        [
+         0,
+         0,
+         -15
+        ]
+       ]
+      }
+     ]
+    },
+    {
+     "appear": true,
+     "room": 1,
+     "camera": {
+      "t": 15,
+      "p": 66,
+      "r": 787.4,
+      "target": [
+       0,
+       69.825,
+       0
+      ],
+      "fit": 1.18
+     }
+    },
+    {
+     "move": [
+      {
+       "id": "fp0",
+       "by": [
+        0,
+        -45,
+        0
+       ]
+      },
+      {
+       "id": "h0",
+       "by": [
+        0,
+        -45,
+        0
+       ]
+      }
+     ],
+     "sync": true
+    },
+    {
+     "move": [
+      {
+       "id": "drw0",
+       "by": [
+        0,
+        0,
+        -40
+       ]
+      },
+      {
+       "id": "fp0",
+       "by": [
+        0,
+        0,
+        -40
+       ]
+      },
+      {
+       "id": "h0",
+       "by": [
+        0,
+        0,
+        -40
+       ]
+      }
+     ]
+    },
+    {
+     "fade": [
+      {
+       "id": "fp1"
+      },
+      {
+       "id": "h1"
+      },
+      {
+       "id": "fp2"
+      },
+      {
+       "id": "h2"
+      },
+      {
+       "id": "fp3"
+      },
+      {
+       "id": "h3"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

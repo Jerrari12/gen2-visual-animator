@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Official GEN2 Kits — 3D Build Studio</title>
+<meta name="description" content="Preconfigured GEN2 builds with interactive LEGO-style 3D assembly instructions. Pick a kit, follow the steps, make it yours.">
+<style>
+/* Standalone, no three.js — brand palette matches the viewer/planner */
+:root {
+  --accent: #ff8a40;
+  --ink: #23262b;
+  --ink-soft: #5b6069;
+  --panel-border: #e3e5e9;
+  --bg: #eef0f3;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color: var(--ink); background: var(--bg);
+  min-height: 100vh; display: flex; flex-direction: column;
+}
+header {
+  background: #fff; border-bottom: 1px solid var(--panel-border);
+  padding: 18px 20px; text-align: center;
+}
+header img { height: 44px; }
+header h1 { font-size: 20px; font-weight: 800; margin-top: 8px; }
+header p { font-size: 13.5px; color: var(--ink-soft); margin-top: 4px; max-width: 520px; margin-left: auto; margin-right: auto; line-height: 1.45; }
+main {
+  flex: 1; width: 100%; max-width: 980px; margin: 0 auto;
+  padding: 26px 18px 40px;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 18px;
+  align-content: start;
+}
+.kit-card {
+  background: #fff; border: 1px solid var(--panel-border); border-radius: 14px;
+  overflow: hidden; display: flex; flex-direction: column;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+}
+.kit-card img { width: 100%; aspect-ratio: 16/10; object-fit: cover; background: var(--bg); }
+.kit-body { padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 8px; flex: 1; }
+.kit-title { font-size: 16px; font-weight: 800; }
+.kit-tagline { font-size: 13px; color: var(--ink-soft); line-height: 1.4; flex: 1; }
+.kit-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.kit-chips span {
+  font-size: 11.5px; font-weight: 700; color: var(--ink-soft);
+  background: var(--bg); border-radius: 999px; padding: 3px 9px;
+}
+.kit-open {
+  margin-top: 4px; display: block; text-align: center; text-decoration: none;
+  font-size: 14px; font-weight: 700; color: #fff;
+  background: var(--accent); border-radius: 8px; padding: 10px 14px;
+}
+.kit-open:hover { filter: brightness(1.05); }
+#empty { grid-column: 1 / -1; text-align: center; color: var(--ink-soft); font-size: 14px; padding: 40px 0; }
+footer {
+  text-align: center; padding: 20px; font-size: 12.5px; color: var(--ink-soft);
+  border-top: 1px solid var(--panel-border);
+}
+footer a { color: var(--accent); text-decoration: none; font-weight: 700; }
+</style>
+</head>
+<body>
+  <header>
+    <img src="../img/gen2-logo.png" alt="GEN2 QuickLock Modular System" onerror="this.remove()">
+    <h1>Official GEN2 Kits</h1>
+    <p>Proven builds with interactive, LEGO-style 3D assembly instructions — follow along step by step, try filament colors, then customize the build in the planner when you're ready.</p>
+  </header>
+  <main id="kits"><div id="empty">Loading kits…</div></main>
+  <footer>
+    Want to design your own from scratch? <a href="https://gen2planner.jerrari3d.com/" rel="noopener">Open the GEN2 Planner</a>
+    · <a href="https://www.jerrari3d.com" rel="noopener">jerrari3d.com</a>
+  </footer>
+<script>
+// The kit list is data (builds/index.json, stats precomputed at authoring
+// time) — this page just renders cards. A kit's cover image is optional:
+// builds/img/<id>.jpg, and the card degrades to text-only without it.
+fetch('index.json').then(r => r.json()).then(kits => {
+  const main = document.getElementById('kits');
+  main.innerHTML = '';
+  if (!Array.isArray(kits) || !kits.length) {
+    main.innerHTML = '<div id="empty">No kits published yet — check back soon!</div>';
+    return;
+  }
+  for (const k of kits) {
+    const card = document.createElement('div');
+    card.className = 'kit-card';
+    const img = document.createElement('img');
+    img.src = 'img/' + k.id + '.jpg';
+    img.alt = '';
+    img.onerror = () => img.remove();
+    card.appendChild(img);
+    const body = document.createElement('div');
+    body.className = 'kit-body';
+    const title = document.createElement('div');
+    title.className = 'kit-title';
+    title.textContent = k.title;
+    const tag = document.createElement('div');
+    tag.className = 'kit-tagline';
+    tag.textContent = k.tagline || '';
+    const chips = document.createElement('div');
+    chips.className = 'kit-chips';
+    for (const c of [k.drawers ? k.drawers + ' drawers' : null, k.units ? k.units + ' units' : null, k.dims || null]) {
+      if (!c) continue;
+      const s = document.createElement('span');
+      s.textContent = c;
+      chips.appendChild(s);
+    }
+    const open = document.createElement('a');
+    open.className = 'kit-open';
+    open.href = '../?build=' + encodeURIComponent(k.id);
+    open.textContent = 'Open the 3D instructions →';
+    body.append(title, tag, chips, open);
+    card.appendChild(body);
+    main.appendChild(card);
+  }
+}).catch(() => {
+  document.getElementById('kits').innerHTML = '<div id="empty">Couldn’t load the kit list — try refreshing.</div>';
+});
+</script>
+</body>
+</html>
