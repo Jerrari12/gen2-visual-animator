@@ -3253,12 +3253,32 @@ booted = true;
 // chrome never reaches toDataURL). Repeatable for every future official kit:
 // open ?build=<id>&shot=1, save the download, commit. The render loop's own
 // resize() restores the canvas on the next frame, so the page stays usable.
-if (new URLSearchParams(location.search).get('shot')) {
+// The planner's per-length lineup colors (data.js GEN2.lengths) — card art is
+// tinted with them so the kits don't all look identical across collections.
+const SHOT_LEN_COLORS = { 59: '#f2f2f2', 115: '#9ea3a8', 165: '#3aa0e8', 185: '#ff8a40', 240: '#3ecfa0', 270: '#e8453c' };
+function captureShot() {
   applyState(manifest.steps.length - 1);          // assembled, deterministic
   table.visible = grid.visible = false;
   if (isWallBuild) wall.visible = false;
   if (isUnderTableBuild) surface.visible = false;
   scene.background = new THREE.Color(0x3a3b3f);
+  // Card palette (Joey 2026-07-24): the instruction rainbow made every kit read
+  // the same at thumbnail size. Faceplates take the COLLECTION color and the
+  // rest of the shell goes graphite, so the length is the thing you see first.
+  // Deterministic — it replaces whatever palette the tab happens to be holding.
+  const shotHex = SHOT_LEN_COLORS[parseInt(manifest.collection, 10)];
+  if (shotHex) {
+    const graphite = { name: 'Graphite', hex: '#2b2d31' }, dark = { name: 'Black', hex: '#17181a' };
+    customColors = {
+      Faceplate: { name: 'Collection', hex: shotHex },
+      Handle: dark, Accent: dark, Label: { name: 'White', hex: '#eef0f4' },
+      CoverL: graphite, CoverU: graphite, FootrailL: graphite, FootrailU: graphite,
+      Foot: dark, QuickLock: graphite, Stopper: graphite, Rail: graphite,
+      Drawer: { name: 'Shell', hex: '#3c3f45' },
+    };
+    useCustom = true;
+    applyPalette();
+  }
   const W = 1200, H = 750;                        // 16:10 — the gallery card's aspect
   renderer.setSize(W, H, false);
   camera.aspect = W / H;
@@ -3273,8 +3293,11 @@ if (new URLSearchParams(location.search).get('shot')) {
   camera.position.copy(pos);
   camera.lookAt(target);
   renderer.render(scene, camera);
+  return renderer.domElement.toDataURL('image/jpeg', 0.92);
+}
+if (new URLSearchParams(location.search).get('shot')) {
   const a = document.createElement('a');
-  a.href = renderer.domElement.toDataURL('image/jpeg', 0.92);
+  a.href = captureShot();
   a.download = (OFFICIAL ? OFFICIAL.id : 'build') + '.jpg';
   a.click();
 }
@@ -3325,6 +3348,6 @@ renderer.setAnimationLoop(now => {
 // dev-only hook (mirrors the planner's guarded test-hook convention): ?debug=1
 if (new URLSearchParams(location.search).get('debug')) {
   window.__GEN2_VIEWER__ = { THREE, scene, camera, controls, goTo, applyState, instances, manifest, cinema, updateCinema, cinemaScene, party, confetti, confettiPop, fpFocus, fpEnv,
-    renderer, table, grid, camPos, get buildCenter() { return buildCenter; },
+    renderer, table, grid, camPos, captureShot, get buildCenter() { return buildCenter; },
     get build() { return build; }, regenerate, setSelected, get selectedId() { return selectedId; } };
 }

@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Official GEN2 Kits — 3D Build Studio</title>
-<meta name="description" content="Preconfigured GEN2 builds with interactive LEGO-style 3D assembly instructions. Pick a kit, follow the steps, make it yours.">
+<title>GEN2 Starter Kits — 3D Build Studio</title>
+<meta name="description" content="Ready-made GEN2 builds with interactive LEGO-style 3D assembly instructions. Print a starter kit, follow the steps, then expand it in the planner.">
 <style>
 /* A secondary page of the GEN2 Planner — the :root tokens, parallax hero,
    brand bar and footer are all mirrored from gen2-planner css/style.css so the
@@ -131,6 +131,15 @@ a { color: var(--accent); }
 }
 .tier-head h2 { font-size: 1.05rem; margin: 0; }
 .tier-head span { font-size: 0.85rem; color: var(--muted); }
+/* mount filter — only rendered once there's more than one mount to pick from */
+.filter-bar { display: flex; gap: 8px; flex-wrap: wrap; margin: 22px 0 2px; }
+.filter-chip {
+  font: inherit; font-size: 0.82rem; font-weight: 600; cursor: pointer;
+  color: var(--muted); background: transparent;
+  border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px;
+}
+.filter-chip:hover { color: var(--text); border-color: var(--muted); }
+.filter-chip.on { color: #1d1e20; background: var(--accent); border-color: var(--accent); }
 .tier-grid {
   display: grid; grid-template-columns: repeat(auto-fill, minmax(480px, 1fr)); gap: 20px;
   align-content: start; margin-top: 14px;
@@ -156,8 +165,10 @@ a { color: var(--accent); }
 .kit-card:hover { transform: translateY(-2px); box-shadow: 0 8px 22px rgba(0,0,0,0.45); }
 .kit-card::before {                     /* legibility gradient over the render */
   content: ""; position: absolute; inset: 0;
+  /* holds all the way to the right edge (…,0.20) so the art sits back a little
+     and the copy always wins — Joey asked for the image to drop in opacity */
   background: linear-gradient(90deg,
-    rgba(44,45,49,0.94) 0%, rgba(44,45,49,0.82) 42%, rgba(44,45,49,0.25) 75%, rgba(44,45,49,0.05) 100%);
+    rgba(44,45,49,0.97) 0%, rgba(44,45,49,0.90) 44%, rgba(44,45,49,0.45) 74%, rgba(44,45,49,0.20) 100%);
   pointer-events: none;
 }
 .kit-body { position: relative; padding: 18px 20px; max-width: 78%; }
@@ -228,9 +239,9 @@ a { color: var(--accent); }
     </span>
   </div>
   <div class="hero-tagline">
-    <h1>Official GEN2 kits &middot; proven builds, ready to print.</h1>
-    <p>Pick a kit and follow the interactive 3D guide step by step - every part, quantity and download link included. Open it in the planner whenever you want to make it your own.</p>
-    <div class="hero-chips"><span>Proven layouts</span><span>Interactive 3D guide</span><span>Full parts list</span></div>
+    <h1>GEN2 starter kits &middot; lay the first brick.</h1>
+    <p>A ready-made build to get you going - follow the interactive 3D guide step by step, with every part, quantity and download link included. Expand it or make it your own in the planner whenever you're ready.</p>
+    <div class="hero-chips"><span>Nothing to design</span><span>Interactive 3D guide</span><span>Full parts list</span></div>
   </div>
 </header>
 
@@ -278,38 +289,80 @@ for (const a of document.querySelectorAll('.planner-link, #brand-home')) a.href 
 // render (builds/img/<id>.jpg). Length colors mirror the planner's
 // GEN2.lengths palette exactly.
 const LENGTH_COLORS = { 59: '#f2f2f2', 115: '#9ea3a8', 165: '#3aa0e8', 185: '#ff8a40', 240: '#3ecfa0', 270: '#e8453c' };
+/* Sections are keyed by MOUNT × SIZE, in that order. Mount is the first thing a
+   builder actually knows ("where will this live?") and it's the planner's own
+   question 1, so it leads; size is the progression inside it. A flat list of
+   (mount, size) sections beats nesting — it stays scannable as under-table and
+   wall kits land, and the mount filter below keeps the page from growing
+   unbounded. Rows missing mount/tier fall into the first of each. */
+const MOUNTS = [
+  { key: 'tabletop',    label: 'Tabletop' },
+  { key: 'under-table', label: 'Under-Table' },
+  { key: 'wall',        label: 'Wall Mount' },
+];
 const TIERS = [
-  { key: 'starter', title: 'Start here', blurb: '2W-2H · your first GEN2 build - 3 drawers, about 42 printed parts.' },
-  { key: 'next',    title: 'Go bigger',  blurb: '3W-2H · the same assembly one column wider - 5 drawers, and the covers stagger brick-style.' },
+  { key: 'starter', label: '2W-2H', blurb: 'Start here - 3 drawers, about 42 printed parts.' },
+  { key: 'next',    label: '3W-2H', blurb: 'One column wider - 5 drawers, and the covers stagger brick-style.' },
 ];
 
+let ALL_KITS = [];
+let mountFilter = 'all';
+
 fetch('index.json').then(r => r.json()).then(kits => {
-  const main = document.getElementById('kits');
-  main.innerHTML = '';
-  if (!Array.isArray(kits) || !kits.length) {
-    main.innerHTML = '<div id="empty">No kits published yet — check back soon!</div>';
-    return;
-  }
-  // group into tiers; anything with an unknown/missing tier lands in the first
-  const groups = TIERS.map(t => ({ ...t, kits: kits.filter(k => (k.tier || TIERS[0].key) === t.key) }))
-    .filter(g => g.kits.length);
-  for (const g of groups) {
-    if (groups.length > 1) {
-      const head = document.createElement('div');
-      head.className = 'tier-head';
-      const h = document.createElement('h2'); h.textContent = g.title;
-      const s = document.createElement('span'); s.textContent = g.blurb;
-      head.append(h, s);
-      main.appendChild(head);
-    }
-    const grid = document.createElement('div');
-    grid.className = 'tier-grid';
-    main.appendChild(grid);
-    renderCards(g.kits, grid);
-  }
+  ALL_KITS = Array.isArray(kits) ? kits : [];
+  render();
 }).catch(() => {
   document.getElementById('kits').innerHTML = '<div id="empty">Couldn’t load the kit list — try refreshing.</div>';
 });
+
+function render() {
+  const main = document.getElementById('kits');
+  main.innerHTML = '';
+  if (!ALL_KITS.length) {
+    main.innerHTML = '<div id="empty">No kits published yet — check back soon!</div>';
+    return;
+  }
+  const mountOf = k => k.mount || MOUNTS[0].key;
+  const present = MOUNTS.filter(m => ALL_KITS.some(k => mountOf(k) === m.key));
+  // the filter only earns its space once there's more than one mount to choose
+  if (present.length > 1) main.appendChild(buildFilter(present));
+
+  const shown = ALL_KITS.filter(k => mountFilter === 'all' || mountOf(k) === mountFilter);
+  for (const m of present) {
+    if (mountFilter !== 'all' && m.key !== mountFilter) continue;
+    for (const t of TIERS) {
+      const group = shown.filter(k => mountOf(k) === m.key && (k.tier || TIERS[0].key) === t.key)
+        .sort((a, b) => (a.length || 0) - (b.length || 0));
+      if (!group.length) continue;
+      const head = document.createElement('div');
+      head.className = 'tier-head';
+      const h = document.createElement('h2');
+      // with a single mount the label would just repeat itself on every heading
+      h.textContent = present.length > 1 ? `${m.label} · ${t.label}` : t.label;
+      const s = document.createElement('span');
+      s.textContent = t.blurb;
+      head.append(h, s);
+      const grid = document.createElement('div');
+      grid.className = 'tier-grid';
+      main.append(head, grid);
+      renderCards(group, grid);
+    }
+  }
+}
+
+function buildFilter(present) {
+  const bar = document.createElement('div');
+  bar.className = 'filter-bar';
+  for (const opt of [{ key: 'all', label: 'All kits' }, ...present]) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'filter-chip' + (mountFilter === opt.key ? ' on' : '');
+    b.textContent = opt.label;
+    b.onclick = () => { mountFilter = opt.key; render(); };
+    bar.appendChild(b);
+  }
+  return bar;
+}
 
 function renderCards(kits, main) {
   for (const k of kits) {

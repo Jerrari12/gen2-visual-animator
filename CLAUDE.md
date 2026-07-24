@@ -679,8 +679,14 @@ EXACT panel gray #3a3b3f, 1200×750 @ t35/p66/fov40 fit 0.95, slides camera+
 target along screen-left by buildRadius·0.5 so the build sits RIGHT-of-center
 (text column overlays the empty left), downloads `<id>.jpg` → commit to
 `builds/img/`. The page contain-fits the render (never crops; the matched bg
-gray blends seamlessly — a missing image degrades to a plain panel). NB the
-capture rides the ACTIVE palette — apply a preset first for themed art.
+gray blends seamlessly — a missing image degrades to a plain panel).
+**Card palette (Joey 2026-07-24):** the instruction rainbow made all five kits
+look identical at thumbnail size, so captureShot() FORCES its own product
+palette — faceplates take the collection color (SHOT_LEN_COLORS, the planner's
+lineup palette), everything else goes graphite/black. Deterministic: it
+replaces whatever palette the tab holds, so re-captures are reproducible.
+`captureShot()` is exported on the debug hook, so an automated capture drives
+the exact same code path as `?shot=1`.
 Debug hook also exposes renderer/table/grid/camPos/buildCenter now. **Authoring:** the planner's
 "📦 Export official kit" button (Save & share block, `IS_LOCAL_DEV`-gated —
 invisible in prod) prompts title/id(slugified, editable)/tagline, downloads the
@@ -725,6 +731,13 @@ appear, grouped "Start here" / "Go bigger" via each index.json row's `tier`
 are two layers** (upper footrail + upper cover steps in generate.js): the
 lower cover carries the stopper slots and dovetails, the upper locks them in.
 That fires on every ≤2W build, planner-generated ones included.
+**Gallery sections are MOUNT × SIZE** (2026-07-24, ahead of under-table/wall
+kits): each index.json row carries `mount` + `tier`, sections render as
+"Tabletop · 2W-2H" (the mount prefix appears only once >1 mount exists), and a
+mount filter bar appears on the same condition. Mount leads because it's the
+planner's own question 1 and the builder's hard constraint; size is the
+progression inside it. Flat (mount, size) sections beat nesting — they stay
+scannable as the matrix fills. Verified by injecting fake wall/under-table rows.
 **Printables banners:** `viewer/builds/banner.html` (dev tool, same folder as
 the gallery) composites a 1600×900 banner per kit from its `?shot=1` render —
 length-colored accent spine + eyebrow, "Interactive 3D Build Guide" headline,
