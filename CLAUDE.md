@@ -1293,6 +1293,45 @@ parts/115..270/, the four 1W/2W × 05H/1H sizes + label in parts/59/, 1W-1H (+
 #build= (accents/labels/covers place correctly, 3-zone identify card, family
 swap round-trips both generated + static); planner partImage per-size renders.
 
+## Label generators (EdgeLabel / Classic Pro) — external tools, 2026-07-24 fix
+
+The two faceplate-label generators the viewer links to (`LABEL_GEN_URLS` in
+main.js: edgelabel.jerrari3d.com / classic.jerrari3d.com — the "🏷 Design your
+labels" pill on a selected label) are SEPARATE projects with their own GitHub
+Pages repos. ⚠ **Their deployed source lives at
+`C:\Users\Joey\Documents\Github\gen2-edgelabel-label-generator\` and
+`…\gen2-classic-label-generator\`** (GitHub Desktop clones, carry the CNAMEs +
+remotes) — NOT under `D:\Code Projects\`. A stale D: copy existed and got
+edited by mistake once; Joey deleted the D: copies 2026-07-24. Each is a single
+`index.html` + a `vendor/` folder + README.
+**Fixes (both generators, from a Printables report — user mbravo):**
+- **Blank page in Firefox, fine in Chrome.** The apps pulled three.js /
+  opentype.js / JSZip / SVGLoader from jsdelivr, and `init()` ran
+  `setupThree()` BEFORE `setupUI()` — so one unreachable script threw on the
+  first line, the label inputs were never built, and the status stuck on
+  "Loading…". The user's Firefox was blocking the CDN (DoH / tracking
+  protection / an extension). Reproduced EXACTLY in Chrome by pointing the CDN
+  at an unroutable host.
+  - Fix 1 — **libraries vendored** in `vendor/` (three 0.146.0, opentype.js
+    1.3.4, JSZip 3.10.1, SVGLoader). Same rationale as the viewer's vendored
+    three.js: no third party in the load path, can't be blocked without
+    blocking the page. `.gitattributes` marks `vendor/**` `-text -diff` so
+    autocrlf doesn't rewrite the minified files.
+  - Fix 2 — **fail-safe init**: `setupUI()` runs FIRST, then each lib is
+    checked and any missing one named, then `setupThree()` is guarded. Worst
+    case is now a usable form + a real error message; Download stays disabled
+    (nothing exports without three.js).
+- **"Plate W × L says mm but shows cm"** — NOT a unit bug. The number inputs
+  were `width:46px`, too narrow for 3 digits + the spinner, so 250 rendered
+  clipped as "25". Widened to 68px (clears the 1000 max). Hit every preset
+  ≥100 mm (Bambu 256, Prusa XL 360, …), not just the default.
+- Verified on the LIVE sites after deploy: zero third-party requests, plate
+  reads 250 × 220, exports a valid 3MF. Both repos pushed 2026-07-24.
+- ⚠ The Classic Pro repo has MIXED line endings (127 CRLF / 2203 LF). Edit it
+  IN PLACE preserving each line's own terminator — a whole-file rewrite shows
+  as thousands of phantom changed lines. The generators are NOT part of this
+  repo's tests; verify them by loading each with the network/vendor blocked.
+
 ## Deferred (designed, not built)
 
 Ghost previews of upcoming parts, fx timelines (quicklock dip-and-pop, disassembly
