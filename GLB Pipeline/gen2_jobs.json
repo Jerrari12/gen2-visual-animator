@@ -245,6 +245,17 @@
       "depth_mode": "center"
     },
     {
+      "name": "ClassicDecor Faceplates (185)",
+      "_note": "18 sizes. The OG Classic Decor faceplate (Fusion doc 'OG Faceplate'). BODY + FACE + GRIP + integral grip-accent rod MERGED into one object per size = 4 material slots -> 4 primitives (BODY/FACE/GRIP/GRIP ACCENT zone tags, law #2 relaxed). NO handle and NO label part -- the grip is integral to the print. Parts arrived as per-size STL from Fusion -> PrusaSlicer split -> Blender loose-part reassembly (2026-07-25); classified by depth signature BODY 4.2 / FACE 2.0 / GRIP 23.0 / GRIP ACCENT 2.83, stacked BODY 0-4.2, FACE 4.2-6.2, GRIP 6.2-29.2 from the back face. NB the four 1H sizes carry the grip BOTTOM-flush, the other fourteen TOP-flush -- that is correct per Fusion, do not 'fix' it. Accent rod inset 19.4645 mm per side, length W-38.929. Object names are already part-code -> name_template {name}. Pre-merge backup: '...- Classic_premerge_backup.blend'.",
+      "blend": "D:\\Code Projects\\GEN2 Visual Animator\\Blender Files\\Decor Faceplates\\GEN2 GLB Exporter - GEN2 Faceplates - Classic.blend",
+      "out": "D:\\Code Projects\\GEN2 Visual Animator\\GLB Library\\Faceplates\\ClassicDecor",
+      "select": "prefix:Faceplate_ClassicDecor",
+      "code_regex": "",
+      "name_template": "{name}",
+      "depth_mode": "center",
+      "export_materials": "EXPORT"
+    },
+    {
       "name": "Classic Drawers (59)",
       "_note": "All-lengths consolidated exporter blend (lives in GLB Library\\, not Blender Files\\). 2026-07-11: all six lengths exported in-session (88 parts, all canonical_ok). The blend must carry the 2026-07-11 fixes (240-4W rotations zeroed, 115-4W-15H/2H restored, 185-4W-05H/1H appended, spec-order 'Classic Drawer <code>' names) \u2014 save it before any headless re-run or the bugs come back.",
       "blend": "D:\\Code Projects\\GEN2 Visual Animator\\GLB Library\\GEN2 GLB Exporter - GEN2 Classic Drawers.blend",
