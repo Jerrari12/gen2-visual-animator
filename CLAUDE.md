@@ -704,7 +704,10 @@ deliberate** (Joey): it adds the clip/magnet install steps and puts the
 hardware-store magnets in the BOM with their affiliate buy chips — a beginner
 sees exactly what to order; stoppers ship too, and both are ✕-removable in the
 viewer so the kits double as a demo of Build options. Essential faceplates +
-Deco handles (nothing club-gated required on day one). Gallery `dims` are the
+Deco handles (nothing club-gated required on day one) — **planned to switch to
+print-in-place Classic faceplates once their GLBs land, dropping the kits'
+required hardware to zero; see the "PLANNED: Classic faceplates" section**.
+Gallery `dims` are the
 TRUE physical envelope read from the viewer's assembledBox (matches the cover
 badge — 240 = 176×140×269), NOT the planner's grid math.
 **Second tier — the 3W kit (2026-07-24):** `{115,165,185,240,270}-tabletop-3w2h`
@@ -982,6 +985,38 @@ a notch has to overhang the circle to leave the jaw open, and that overhang is
 a lone counter-clockwise region, still winding −1, so nonzero fill renders it
 as a stray square floating off the head. Ring + shaft wound clockwise union
 seamlessly; only the handle hole (fully inside the shaft) is counter-clockwise.
+
+## PLANNED: Classic faceplates → make the starter kits print-and-build-today (2026-07-24)
+
+**Not built yet — waiting on Joey's Classic (non-pro) faceplate GLBs.** The
+starter kits currently ship **Essential** faceplates, whose handle BOLTS ON,
+so every kit needs 2× M3×6 per drawer — the ONE required-hardware barrier in an
+otherwise print-only build, and the reason each kit card shows "🔩 6 to buy".
+The **Classic (non-pro)** family (free, popular —
+printables.com/model/1280870-gen2-decor-faceplates-classic-series, which Joey
+is refreshing) prints its grip IN PLACE like the Classic drawers: no bolt-on
+handle, so **zero required hardware**. Switching the kits to Classic makes them
+genuinely print-and-build-today, and the required-hardware wrench marker flips
+every kit from "🔩 6 to buy" to a clean "42 to print" — the value becomes
+self-evident instead of needing explanation.
+**Why this is the right default, not just convenient:** magnets are opt-in
+(a menu with "None" beside them), but a bolt-on handle has no "None" — without
+the screws there's no handle, so an Essential kit CANNOT be finished from the
+printer alone. That's the worst failure point for an onboarding kit.
+**The upsell ladder becomes legible:** Classic (free, no hardware) → Essential
+(free, swap handle styles, costs 2 screws/drawer) → Classic Pro / EdgeLabel
+(club, swappable labels + accent panels). The viewer already lets a tapped
+faceplate cycle all families, so the ladder is visible in-tool.
+**Blocker:** `FACE_FAMILIES` in generate.js has essential/edgelabel/classicpro
+only. Classic needs the same pipeline Classic Pro got — the 18-size GLB set, a
+mounting-plane Z (DERIVE like the others), and a 256² render batch. Scaffolding
+`FACE_FAMILIES.classic` ahead of the GLBs is a standing offer.
+**The M3 screw work is NOT wasted by this:** Essential stays a user-selectable
+family in the planner, so the screws must be modeled + billed regardless — only
+the kit DEFAULT changes. Once Classic lands, flip `faceStyle` "essential" →
+"classic" in all ten `viewer/builds/*.json`, re-capture the `?shot=1` renders +
+share cards, and refresh goldens. Kit ids/structure/links are untouched — safe
+ONLY because nothing is published yet (a printed link freezes the id forever).
 
 ## Decor Faceplates — EdgeLabel (thumbnails + GLB DONE — 2026-07-08)
 
@@ -1263,3 +1298,6 @@ swap round-trips both generated + static); planner partImage per-size renders.
 Ghost previews of upcoming parts, fx timelines (quicklock dip-and-pop, disassembly
 epilogue), classic drawer + case extender GLBs, non-Essential faceplate styles.
 PoC v2 JSX (chat artifact) had the fx design; notes §6 describes it.
+**Classic (non-pro) faceplate family** — see the PLANNED section above; the
+starter kits switch to it once the GLBs land, to drop their required hardware
+to zero.
