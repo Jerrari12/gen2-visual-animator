@@ -5,7 +5,7 @@
 // 2026-07-04 (see CLAUDE.md "Placement math"). Rules generalized from the
 // 1H ground truth are marked DERIVED; positions Joey tuned by eye are
 // marked TUNED. Scope: all six collections (59/115/165/185/240/270) — tabletop
-// and wall everywhere; under-table only where rail GLBs exist (165/185). The 59
+// and wall everywhere; under-table everywhere (all six rail GLB sets landed 2026-07-19). The 59
 // is a mini collection: 1W/2W × 05H/1H only, and NO footrails BY DESIGN (Joey
 // 2026-07-10: too shallow to be stable on rails) — feet go into every bottom
 // case's own underside slots instead.
@@ -28,10 +28,13 @@ let CAM_DEPTH = DEPTH;                        // cam()'s size floor — raised p
 // Assembly Example): QuickLock / stopper / feet / under-table-screw Z. Verify by
 // eye against a printed 165 build, same as the non-1H drawers.
 const COLL = {
+  // railScrewBack = the rail's rear screw-hole row, inset from the rail BACK
+  // face (MEASURED per length 2026-07-19, all widths agree; default 36 = the
+  // 185 calibration, which 270 matches exactly). See utScrewBackZ below.
   185: { depth: 185, railDepth: 201 },
-  165: { depth: 165, railDepth: 179 },
+  165: { depth: 165, railDepth: 179, railScrewBack: 34 },
   // 2026-07-10: the four remaining lengths (cases/drawers/covers landed in the
-  // library). railDepth absent = no under-table rail GLBs yet → UT builds error.
+  // library).
   // ALL hardware Z for these lengths is DERIVED from the 185 calibration via
   // ±dz (same rule that produced the 165) — verify against printed builds.
   // 59: noTabletop mirrors the planner's mountBlocksLength — the mini collection
@@ -41,10 +44,27 @@ const COLL = {
   // lip). It's case depth + 10 everywhere except 59/115, whose exports run
   // 0.11 shy (parts_index.csv ground truth) — generateManifest defaults the
   // rest to depth + 10.
-  59:  { depth: 59, noTabletop: true, maxW: 2, maxHH: 2, classicDepth: 68.89 },
-  115: { depth: 115, classicDepth: 124.89 },
-  240: { depth: 240 },
-  270: { depth: 270 },
+  59:  { depth: 59, noTabletop: true, maxW: 2, maxHH: 2, classicDepth: 68.89, railDepth: 74.89, railScrewBack: 16.89 },
+  // 2026-07-19: 115 + 270 + 240 rail GLBs landed (exported from D:\Render
+  // Projects\GEN2 Under-table Rails.blend — facing verified against the
+  // canonical 185 front-ridge signature). Depths from parts_index.csv:
+  // 115 = 130.9 (115 + 15.9 back overhang), 270 = 286 (270 + 16) — railZ
+  // derives to −7.95 / −8.0, matching the 185 calibration. The 240 Lite rail
+  // is exactly 240 deep (NO back overhang — Joey's fixed models, later same
+  // day) → railZ derives to 0: front-aligned and back-flush. The 59 rails
+  // (gen2-ql-rail-*-small, renamed GEN2 Rail - 59-<w>W) landed last: 74.89
+  // deep (59 + 15.9 back overhang, railZ −7.945) — EVERY collection has rail
+  // GLBs now. ⚠ This block was accidentally REVERTED by fafbad8 (a stale-copy
+  // overwrite during the Crystal-handles work) and shipped broken to prod;
+  // restored 2026-07-25. railDepth absent would make UT builds error.
+  // classicMaxHH: the Classic Drawer catalogs for 115/240/270 stop at 2H (16
+  // GLBs each — no 3H was ever cut; 165/185 have all 18). Without this guard
+  // the generator emits ClassicDrawer_<L>-…-3H unconditionally and the viewer
+  // used to hang forever on the missing GLB (found by the 2026-07-25 sweep;
+  // the planner's sizeExists mirrors this cap via collectionCases.maxClassicH).
+  115: { depth: 115, classicDepth: 124.89, railDepth: 130.9, railScrewBack: 42.4, classicMaxHH: 4 },
+  240: { depth: 240, railDepth: 240, railScrewBack: 20, classicMaxHH: 4 },
+  270: { depth: 270, railDepth: 286, classicMaxHH: 4 },
 };
 
 // Wall mount — CALIBRATED 2026-07-05 from Joey's case-to-bracket reference
@@ -96,13 +116,15 @@ const LINKS = {
   fp:    { p: 'https://www.printables.com/model/964559-gen2-decor-faceplates-essential-series', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20Decor%20-%20Faceplates%20-%20Essential%20Series-1116946' },
   fpe:   { p: 'https://www.printables.com/model/1093933-gen2-decor-faceplates-edgelabel-series', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20Decor%20-%20Faceplate%20-%20EdgeLabel-1215609' },
   fpc:   { p: 'https://www.printables.com/model/1291210-gen2-decor-faceplates-classic-pro-series', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20Decor%20-%20Faceplates%20-%20Classic%20Pro%20Series-1332444' },
+  // the FREE Classic series — not to be confused with `fpc` (Classic Pro, club)
+  fpcl:  { p: 'https://www.printables.com/model/1280870-gen2-decor-faceplates-classic-series', t: 'https://than.gs/m/1334047' },
   h:     { p: 'https://www.printables.com/model/1044972-gen2-decor-handles-deco-series', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20Decor%20Handles%20-%20Deco%20Series-1159960' },
   hb:    { p: 'https://www.printables.com/model/965604-gen2-decor-handles-blockbar-series', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20Decor%20-%20Handles%20-%20BlockBar-1116949' },
   hc:    { p: 'https://www.printables.com/model/1001155-gen2-decor-handles-crystal', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20Decor%20-%20Handles%20-%20Crystal-1134382' },
   // fallbacks when a length has no page of its own yet
   kit:   { p: 'https://www.printables.com/model/1118906-gen2-table-top-kit-v2-185-standard', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20Table%20Top%20Kit%20V2%20-%20185-1231757' },
   wall:  { p: 'https://www.printables.com/model/1777719-gen2-wall-mount-brackets', t: 'https://than.gs/m/1574321' }, // universal brackets page (2026-07-12 — replaced the old -59 placeholder)
-  rail:  { p: 'https://www.printables.com/model/1052357-gen2-rails-185-standard', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20RAILS%20-%20STANDARD-1163830' },
+  rail:  { p: 'https://www.printables.com/model/1052357-gen2-rails-185-standard', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20RAILS%20-%20STANDARD-1163830', m: 'https://makerworld.com/en/models/2199580-gen2-under-table-rails-185' },
 };
 
 // The handle fastener. GLB is canonical like WoodScrew (shank along depth,
@@ -138,42 +160,42 @@ const BUY = {
 // of funneling to the Table Top Kit bundle).
 const LINKS_BY_LEN = {
   cases: {
-    59:  { p: 'https://www.printables.com/model/1658749-gen2-59-cases-all', t: 'https://than.gs/m/1535454' },
-    115: { p: 'https://www.printables.com/model/1658744-gen2-115-cases-all', t: 'https://than.gs/m/1535435' },
-    165: { p: 'https://www.printables.com/model/1658722-gen2-165-cases-all', t: 'https://than.gs/m/1535457' },
-    185: { p: 'https://www.printables.com/model/1658700-gen2-185-cases-all', t: 'https://than.gs/m/1535455' },
-    240: { p: 'https://www.printables.com/model/1658608-gen2-240-cases-all', t: 'https://than.gs/m/1535459' },
-    270: { p: 'https://www.printables.com/model/1658688-gen2-270-cases-all', t: 'https://than.gs/m/1535458' },
+    59:  { p: 'https://www.printables.com/model/1658749-gen2-59-cases-all', t: 'https://than.gs/m/1535454', m: 'https://makerworld.com/en/models/3092550-gen2-59-cases-all' },
+    115: { p: 'https://www.printables.com/model/1658744-gen2-115-cases-all', t: 'https://than.gs/m/1535435', m: 'https://makerworld.com/en/models/3092499-gen2-115-cases-all' },
+    165: { p: 'https://www.printables.com/model/1658722-gen2-165-cases-all', t: 'https://than.gs/m/1535457', m: 'https://makerworld.com/en/models/3092414-gen2-165-cases-all' },
+    185: { p: 'https://www.printables.com/model/1658700-gen2-185-cases-all', t: 'https://than.gs/m/1535455', m: 'https://makerworld.com/en/models/3092219-gen2-185-cases-all' },
+    240: { p: 'https://www.printables.com/model/1658608-gen2-240-cases-all', t: 'https://than.gs/m/1535459', m: 'https://makerworld.com/en/models/3091292-gen2-240-cases-all' },
+    270: { p: 'https://www.printables.com/model/1658688-gen2-270-cases-all', t: 'https://than.gs/m/1535458', m: 'https://makerworld.com/en/models/3092111-gen2-270-cases-all' },
   },
   decor: {
-    59:  { p: 'https://www.printables.com/model/1070454-gen2-59-decor-drawers-all', t: 'https://than.gs/m/1481534' },
-    115: { p: 'https://www.printables.com/model/1307794-gen2-115-decor-drawers-all', t: 'https://than.gs/m/1158598' },
-    165: { p: 'https://www.printables.com/model/1100978-gen2-165-decor-drawers-all', t: 'https://than.gs/m/1493950' },
-    185: { p: 'https://www.printables.com/model/964551-gen2-185-decor-drawers-all', t: 'https://than.gs/m/1116945' },
-    240: { p: 'https://www.printables.com/model/1322479-gen2-240-decor-drawers-all', t: 'https://than.gs/m/1360074' },
-    270: { p: 'https://www.printables.com/model/1062961-gen2-270-decor-drawers-all', t: 'https://than.gs/m/1171387' },
+    59:  { p: 'https://www.printables.com/model/1070454-gen2-59-decor-drawers-all', t: 'https://than.gs/m/1481534', m: 'https://makerworld.com/en/models/2364145-gen2-59-decor-drawers-all' },
+    115: { p: 'https://www.printables.com/model/1307794-gen2-115-decor-drawers-all', t: 'https://than.gs/m/1158598', m: 'https://makerworld.com/en/models/755457-gen2-115-decor-drawers-all' },
+    165: { p: 'https://www.printables.com/model/1100978-gen2-165-decor-drawers-all', t: 'https://than.gs/m/1493950', m: 'https://makerworld.com/en/models/861753-gen2-165-decor-drawers-all' },
+    185: { p: 'https://www.printables.com/model/964551-gen2-185-decor-drawers-all', t: 'https://than.gs/m/1116945', m: 'https://makerworld.com/en/models/1253173-gen2-185-decor-drawers-all' },
+    240: { p: 'https://www.printables.com/model/1322479-gen2-240-decor-drawers-all', t: 'https://than.gs/m/1360074', m: 'https://makerworld.com/en/models/1516607-gen2-240-decor-drawers-all' },
+    270: { p: 'https://www.printables.com/model/1062961-gen2-270-decor-drawers-all', t: 'https://than.gs/m/1171387', m: 'https://makerworld.com/en/models/1938424-gen2-270-decor-drawers-all' },
   },
   classic: { // Thangs pages mirrored from the planner 2026-07-12 (240 new; 59 has none yet)
-    59:  { p: 'https://www.printables.com/model/234780-gen2-59-classic-drawers-all' },
-    115: { p: 'https://www.printables.com/model/1143243-gen2-115-classic-drawers-all', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20115%20Classic%20Drawers-1069181' },
-    165: { p: 'https://www.printables.com/model/625776-gen2-165-classic-drawers-all', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20165%20Classic%20Drawers-1044262' },
-    185: { p: 'https://www.printables.com/model/278293-gen2-185-classic-drawers-all', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20185%20-%20Classic%20Drawers-1042322' },
-    240: { p: 'https://www.printables.com/model/1324538-gen2-240-classic-drawers-all', t: 'https://than.gs/m/1360091' },
-    270: { p: 'https://www.printables.com/model/1164306-gen2-270-classic-drawers-all', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20Drawers%20-%20Large-1093398' },
+    59:  { p: 'https://www.printables.com/model/234780-gen2-59-classic-drawers-all', m: 'https://makerworld.com/en/models/2364890-gen2-59-classic-drawers-all' },
+    115: { p: 'https://www.printables.com/model/1143243-gen2-115-classic-drawers-all', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20115%20Classic%20Drawers-1069181', m: 'https://makerworld.com/en/models/755424-gen2-115-classic-drawers-all' },
+    165: { p: 'https://www.printables.com/model/625776-gen2-165-classic-drawers-all', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20165%20Classic%20Drawers-1044262', m: 'https://makerworld.com/en/models/922620-gen2-165-classic-drawers-all' },
+    185: { p: 'https://www.printables.com/model/278293-gen2-185-classic-drawers-all', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20185%20-%20Classic%20Drawers-1042322', m: 'https://makerworld.com/en/models/513368-gen2-185-classic-drawers-all' },
+    240: { p: 'https://www.printables.com/model/1324538-gen2-240-classic-drawers-all', t: 'https://than.gs/m/1360091', m: 'https://makerworld.com/en/models/1516621-gen2-240-classic-drawers-all' },
+    270: { p: 'https://www.printables.com/model/1164306-gen2-270-classic-drawers-all', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20Drawers%20-%20Large-1093398', m: 'https://makerworld.com/en/models/1938234-gen2-270-classic-drawers-all' },
   },
   covers: { // Thangs pages added 2026-07-12
-    59:  { p: 'https://www.printables.com/model/1777881-gen2-59-cover', t: 'https://than.gs/m/1574324' },
-    115: { p: 'https://www.printables.com/model/1777837-gen2-115-cover', t: 'https://than.gs/m/1574330' },
-    165: { p: 'https://www.printables.com/model/1774498-gen2-165-covers', t: 'https://than.gs/m/1574320' },
-    185: { p: 'https://www.printables.com/model/1777844-gen2-185-cover', t: 'https://than.gs/m/1574319' },
-    240: { p: 'https://www.printables.com/model/1777846-gen2-240-cover', t: 'https://than.gs/m/1574326' },
-    270: { p: 'https://www.printables.com/model/1777849-gen2-270-cover', t: 'https://than.gs/m/1574325' },
+    59:  { p: 'https://www.printables.com/model/1777881-gen2-59-cover', t: 'https://than.gs/m/1574324', m: 'https://makerworld.com/en/models/3094116-gen2-59-covers' },
+    115: { p: 'https://www.printables.com/model/1777837-gen2-115-cover', t: 'https://than.gs/m/1574330', m: 'https://makerworld.com/en/models/3093900-gen2-115-covers' },
+    165: { p: 'https://www.printables.com/model/1774498-gen2-165-covers', t: 'https://than.gs/m/1574320', m: 'https://makerworld.com/en/models/3094016-gen2-165-covers' },
+    185: { p: 'https://www.printables.com/model/1777844-gen2-185-cover', t: 'https://than.gs/m/1574319', m: 'https://makerworld.com/en/models/3093827-gen2-185-covers' },
+    240: { p: 'https://www.printables.com/model/1777846-gen2-240-cover', t: 'https://than.gs/m/1574326', m: 'https://makerworld.com/en/models/3094065-gen2-240-covers' },
+    270: { p: 'https://www.printables.com/model/1777849-gen2-270-cover', t: 'https://than.gs/m/1574325', m: 'https://makerworld.com/en/models/3094095-gen2-270-covers' },
   },
   fr: { // no 59 — that collection has no foot rails. Thangs pages added 2026-07-12
-    115: { p: 'https://www.printables.com/model/1777819-gen2-115-foot-rails', t: 'https://than.gs/m/1574331' },
-    165: { p: 'https://www.printables.com/model/1775386-gen2-165-foot-rails', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20165%20Foot%20Rails-1574329' },
-    185: { p: 'https://www.printables.com/model/1777823-gen2-185-foot-rails', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20185%20Foot%20Rails-1574328' },
-    240: { p: 'https://www.printables.com/model/1777826-gen2-240-foot-rails', t: 'https://than.gs/m/1574322' },
+    115: { p: 'https://www.printables.com/model/1777819-gen2-115-foot-rails', t: 'https://than.gs/m/1574331', m: 'https://makerworld.com/en/models/3093882-gen2-115-foot-rails' },
+    165: { p: 'https://www.printables.com/model/1775386-gen2-165-foot-rails', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20165%20Foot%20Rails-1574329', m: 'https://makerworld.com/en/models/3093999-gen2-165-foot-rails' },
+    185: { p: 'https://www.printables.com/model/1777823-gen2-185-foot-rails', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20185%20Foot%20Rails-1574328', m: 'https://makerworld.com/en/models/3093787-gen2-185-foot-rails' },
+    240: { p: 'https://www.printables.com/model/1777826-gen2-240-foot-rails', t: 'https://than.gs/m/1574322', m: 'https://makerworld.com/en/models/3094051-gen2-240-foot-rails' },
     270: { p: 'https://www.printables.com/model/1777830-gen2-270-foot-rails', t: 'https://than.gs/m/1574327' },
   },
   kit: {
@@ -194,14 +216,14 @@ const LINKS_BY_LEN = {
     240: { p: 'https://www.printables.com/model/1777719-gen2-wall-mount-brackets', t: 'https://than.gs/m/1574321' },
     270: { p: 'https://www.printables.com/model/1777719-gen2-wall-mount-brackets', t: 'https://than.gs/m/1574321' },
   },
-  rail: { // all six lengths have real pages now (2026-07-12) — UT still only
-          // GENERATES for 165/185 (no rail GLBs elsewhere), but the links are ready
-    59:  { p: 'https://www.printables.com/model/1053797-gen2-rails-59-small', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20RAILS%20-%20SMALL-1165763' },
-    115: { p: 'https://www.printables.com/model/1053795-gen2-rails-115-medium', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20RAILS%20-%20MEDIUM-1165720' },
-    165: { p: 'https://www.printables.com/model/1053557-gen2-rails-165-mini', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20RAILS%20-%20165-1165793' },
-    185: { p: 'https://www.printables.com/model/1052357-gen2-rails-185-standard', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20RAILS%20-%20STANDARD-1163830' },
-    240: { p: 'https://www.printables.com/model/1322484-gen2-rails-240', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20RAILS%20-%20240%20Lite-1360077' },
-    270: { p: 'https://www.printables.com/model/1053793-gen2-rails-270-large', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20RAILS%20-%20LARGE-1165816' },
+  rail: { // all six lengths have real pages (2026-07-12) AND real GLBs — UT
+          // GENERATES for every collection (2026-07-19 batches)
+    59:  { p: 'https://www.printables.com/model/1053797-gen2-rails-59-small', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20RAILS%20-%20SMALL-1165763', m: 'https://makerworld.com/en/models/3093597-gen2-under-table-rails-59' },
+    115: { p: 'https://www.printables.com/model/1053795-gen2-rails-115-medium', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20RAILS%20-%20MEDIUM-1165720', m: 'https://makerworld.com/en/models/755511-gen2-under-table-rails-115' },
+    165: { p: 'https://www.printables.com/model/1053557-gen2-rails-165-mini', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20RAILS%20-%20165-1165793', m: 'https://makerworld.com/en/models/939507-gen2-under-table-rails-165' },
+    185: { p: 'https://www.printables.com/model/1052357-gen2-rails-185-standard', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20RAILS%20-%20STANDARD-1163830', m: 'https://makerworld.com/en/models/2199580-gen2-under-table-rails-185' },
+    240: { p: 'https://www.printables.com/model/1322484-gen2-rails-240', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20RAILS%20-%20240%20Lite-1360077', m: 'https://makerworld.com/en/models/1516579-gen2-under-table-rails-240' },
+    270: { p: 'https://www.printables.com/model/1053793-gen2-rails-270-large', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20RAILS%20-%20LARGE-1165816', m: 'https://makerworld.com/en/models/1938132-gen2-under-table-rails-270' },
   },
 };
 
@@ -292,20 +314,25 @@ export function generateManifest(build) {
   // FIT shots that bookend each step still restore full-build context.
   const caseR = (w, h) => Math.max(430, Math.hypot(w * PITCH_X, h, depth) / 2 * 3.0);
   if (isUT && COLL[L] && !coll.railDepth)
-    errors.push(`Under-table rails for the ${L} collection aren't in the 3D part library yet · 165 and 185 under-table builds for now.`);
+    errors.push(`Under-table rails for the ${L} collection aren't in the 3D part library yet.`);
   // planner mountBlocksLength() greys 59 tabletop out, so this only fires on a
   // hand-built link — same physical reason as the planner's tooltip.
   if (!hangs && coll.noTabletop)
     errors.push(`The ${L} collection can't be table-top mounted · it has no foot rails and no feet slots (too shallow to be stable). Wall-mount builds work.`);
   // Under-table rail: front-aligned with the case front (= depth/2). The rail
-  // (railDepth deep) overhangs the case back. Screw rows keep the SAME inset
-  // from each rail face as the 185 calibration (DERIVED for 165). front inset
-  // 15.43, back inset 32.57 (from the 201-deep 185 rail: front 92.5→77.07,
-  // back −108.5→−75.93).
+  // (railDepth deep) overhangs the case back. Screw rows sit on MEASURED hole
+  // rows (2026-07-19, evaluated meshes in the rails render blend — hole-bore
+  // face clustering; Joey caught the 59 back screws floating ~18 mm off):
+  // FRONT row is 12 mm from the rail front on every length (screw pos = axis
+  // − 3.43, the radial offset the pitched WoodScrew GLB carries → 15.43).
+  // BACK row inset from the rail back varies per collection (railScrewBack in
+  // COLL, default 36 = the 185 calibration; 270 measured 36 too, 165 measured
+  // 34 — 2 mm off the old derived value, 115 = 42.4, 240 = 20, 59 = 16.89).
+  // Every measured back row carries holes exactly at the end + seam screw Xs.
   const railFrontZ = depth / 2, railBackZ = depth / 2 - (coll.railDepth || 201); // fallback only pads the error path (UT without rails errors above)
   const railZ = (railFrontZ + railBackZ) / 2;         // −8 (185) / −7 (165)
   const utScrewFrontZ = railFrontZ - 15.43;           // 77.07 (185) / 67.07 (165)
-  const utScrewBackZ = railBackZ + 32.57;             // −75.93 (185) / −63.93 (165)
+  const utScrewBackZ = railBackZ + (coll.railScrewBack || 36) - 3.43; // −75.93 (185) / −65.93 (165)
   // Classic drawer closed Z — DERIVED 2026-07-11 from measured part geometry
   // (no assembled ground truth): the classic's back wall (same 2.6 mm wall +
   // magnet clip slot as the decor) aligns with the calibrated decor back,
@@ -328,7 +355,11 @@ export function generateManifest(build) {
     rail:    LINKS_BY_LEN.rail[L] || LINKS.rail,
   };
   // ---- faceplate family (planner `faceStyle`, carried in share links) -----
-  // essential: flat 5 mm plate + bolt-on handle. edgelabel: 24.1 mm deep 2-zone
+  // essential: flat 5 mm plate + bolt-on handle. classic (2026-07-25): the FREE
+  // Classic series — 29.2 mm deep 4-zone plate (BODY/FACE/GRIP/GRIP ACCENT)
+  // whose grip is printed IN, so no handle AND no dressing: the only family
+  // that needs ZERO bought hardware, which is why the starter kits ship it.
+  // edgelabel: 24.1 mm deep 2-zone
   // plate (grip printed in — NO handle) + accent panel (not on 05H) + the
   // universal label card. classicpro (2026-07-13): 29.5 mm deep 3-zone plate
   // (BODY/GRIP/GRIP ACCENT — grip scoop at the TOP with the label TILTED onto
@@ -346,6 +377,15 @@ export function generateManifest(build) {
   const FACE_FAMILIES = {
     essential: { key: 'essential', node: c => `Faceplate_Essential_${c}`, z: 95.07, hasHandle: true,
                  label: c => `Faceplate Essential ${c}`, extras: false, links: links.fp },
+    // z = mounting plane 92.57 + 29.2/2 (canonical center-mode depth from the
+    // ClassicDecor parts_index). NB the node prefix is ClassicDecor_ (the
+    // exporter's name) while the family/label is "Classic" — and it must never
+    // be prefix-matched loosely, or it swallows Faceplate_ClassicPro_*.
+    // extras:false + hasHandle:false = a bare plate: no accent, no label, no
+    // handle, no screws. It still seats the universal optional back cover
+    // (that placement is family-independent).
+    classic:   { key: 'classic', node: c => `Faceplate_ClassicDecor_${c}`, z: 107.17, hasHandle: false,
+                 label: c => `Classic Faceplate ${c}`, extras: false, links: links.fpcl },
     edgelabel: { key: 'edgelabel', node: c => `Faceplate_EdgeLabel_${c}`, z: 104.62, hasHandle: false,
                  label: c => `EdgeLabel Faceplate ${c}`, extras: true, links: links.fpe, // club family — EdgeLabel Series pages
                  labelNode: 'Label_EdgeLabel', labelName: 'EdgeLabel Label (universal)',
@@ -427,6 +467,8 @@ export function generateManifest(build) {
     if (u.w >= 3 && u.hh === 6) errors.push(`${u.w}W-3H doesn't exist (too large to print) · planner shouldn't allow this.`);
     if (coll.maxW && u.w > coll.maxW) errors.push(`${u.w}W cases don't exist in the ${L} collection (1W and 2W only).`);
     if (coll.maxHH && u.hh > coll.maxHH) errors.push(`${H}H cases don't exist in the ${L} collection (05H and 1H only).`);
+    if (u.fill === 'classic' && coll.classicMaxHH && u.hh > coll.classicMaxHH)
+      errors.push(`Classic Drawers only go up to 2H in the ${L} collection (no ${H}H model) · switch this drawer to Decor, or pick a smaller size.`);
     if (u.fill === 'cabinet') errors.push('Cabinet units need case-extender models that are not in the 3D library yet.');
     if (u.fill === 'shelf' && u.hh !== 2) errors.push('Shelves taller than 1H use case extenders that are not in the 3D library yet.');
   }
@@ -1341,20 +1383,33 @@ export function generateManifest(build) {
     });
   }
   if (firstFpDemo !== null) {
+    // What the user actually assembles before the plate goes on: dressing
+    // (EdgeLabel / Classic Pro), or a bolt-on handle (Essential), or NOTHING —
+    // the free Classic family prints its grip in and takes no dressing, so it
+    // has no assembly step to describe. With nothing to assemble the
+    // "Assemble the faceplate first:" preamble becomes an empty sentence and
+    // there is no "assembled" unit to slide on, so both are replaced rather
+    // than left dangling. The three dressed families stay byte-identical.
+    const dress = face.extras
+      ? (face.key === 'classicpro'
+        ? 'press the accent panel into the face and lay the label onto the grip slope'
+        : 'press the accent panel into the face and slide the label into its window')
+      // the screws are shown going in from behind, so the note says where
+      // plastic threads strip easily — say so where the screws go in
+      : face.hasHandle
+        ? `hold the ${handleStyle.label} against the front and thread 2× M3×6 button head screws in from behind the plate · go gently and stop as soon as they seat, the screws bite straight into plastic and will strip if you overtighten`
+        : '';
+    // on a bare plate the back cover IS the whole sub-assembly, so it leads
+    const bcClause = bcOn ? (dress ? ', then clip the back cover in from behind' : 'clip the back cover in from behind') : '';
+    const prep = dress || bcClause
+      ? `Assemble the faceplate first: ${dress}${bcClause}. `
+      : "The faceplate prints complete — its grip is part of the plate, so there's nothing to bolt on and no hardware to buy. ";
     postSteps.push({
       title: face.hasHandle ? 'Faceplates & handles' : 'Faceplates',
       // assembly-first (Joey): build the plate unit, THEN slide it onto the
       // drawer — the note follows each family's dressing in demo order
-      note: 'Assemble the faceplate first: ' +
-        (face.extras
-          ? (face.key === 'classicpro'
-            ? 'press the accent panel into the face and lay the label onto the grip slope'
-            : 'press the accent panel into the face and slide the label into its window')
-          // the screws are shown going in from behind, so the note says where
-          // plastic threads strip easily — say so where the screws go in
-          : `hold the ${handleStyle.label} against the front and thread 2× M3×6 button head screws in from behind the plate · go gently and stop as soon as they seat, the screws bite straight into plastic and will strip if you overtighten`) +
-        (bcOn ? ', then clip the back cover in from behind' : '') +
-        '. Pop a drawer out about 40 mm, slide the assembled faceplate DOWN onto the drawer front until it snaps, then push the drawer home.' +
+      note: prep +
+        `Pop a drawer out about 40 mm, slide the ${dress || bcClause ? 'assembled ' : ''}faceplate DOWN onto the drawer front until it snaps, then push the drawer home.` +
         ` Repeat for every ${classicCount ? 'Decor drawer' : 'drawer'} · the build is done. Tap any part to see its name and download links.`,
       camera: fpStepCam,
       phases: [
@@ -1402,6 +1457,9 @@ function imgFor(node) {
   if (/^C[LU]-\d+-\dW$/.test(node) || /^FR-[LU]_\d+-\dW$/.test(node)) return `img/parts/${node}.png`;
   // wall brackets: per-width renders (2026-07-11 batch), universal across lengths
   if ((m = node.match(/^WallMount_Lite_(\dW)$/))) return `img/parts/WallMount_Lite_${m[1]}.png`;
+  // under-table rails: per-length + per-width renders (2026-07-19 batch, all six
+  // lengths) — flat "Rails <L>-<w>W.png", same art as the planner's BOM rows
+  if ((m = node.match(/^UnderTableRail_(\d+)-(\d)W$/))) return `img/parts/Rails ${m[1]}-${m[2]}W.png`;
   // decor handles: per-variant renders named by node (2026-07-20 batch —
   // Deco, BlockBar A–F, Crystal A/B) — lights up the handle BOM rows
   if (node.startsWith('Handle_')) return `img/parts/${node}.png`;
@@ -1420,6 +1478,9 @@ function imgFor(node) {
   if ((m = node.match(/^Faceplate_EdgeLabel_(\dW-\d+H)$/))) return `img/parts/EdgeLabel_${m[1]}.png`;
   // Classic Pro plates have per-size renders too (2026-07-13 batch)
   if ((m = node.match(/^Faceplate_ClassicPro_(\dW-\d+H)$/))) return `img/parts/ClassicPro_${m[1]}.png`;
+  // the free Classic series (2026-07-25 batch). ANCHORED on purpose — a loose
+  // startsWith('Faceplate_Classic') would swallow the Classic Pro plates above
+  if ((m = node.match(/^Faceplate_ClassicDecor_(\dW-\d+H)$/))) return `img/parts/ClassicDecor_${m[1]}.png`;
   // universal faceplate back covers: per-size renders (2026-07-13 batch) —
   // the node's family name is historical, the render set serves every family
   if ((m = node.match(/^BackCover_EdgeLabel_(\dW-\d+H)$/))) return `img/parts/BackCover_${m[1]}.png`;

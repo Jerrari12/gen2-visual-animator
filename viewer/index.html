@@ -64,6 +64,7 @@
           <button id="bom-copy" class="bom-btn" title="Copy the parts list to your clipboard">Copy list</button>
           <button id="bom-csv" class="bom-btn" title="Download the parts list as a CSV spreadsheet">Download CSV</button>
         </div>
+        <div id="store-pref"><span>Model links</span><select id="store-select" aria-label="Preferred 3D model site"></select></div>
       </div>
 
       <div id="identify-card" class="hidden">
@@ -90,7 +91,9 @@
       </div>
 
       <div id="filament-menu" class="hidden">
-        <div class="fm-head">Filament colors <span>&#9733; Joey's pick</span></div>
+        <div class="fm-head">Filament colors <span>&#9733; Joey's pick</span>
+          <button id="fm-close" type="button" aria-label="Close filament colors" title="Close">&times;</button>
+        </div>
         <input id="fm-search" type="search" placeholder="Search filaments&hellip;" autocomplete="off">
         <div id="fm-brands"></div>
         <div class="fm-foot">

@@ -182,6 +182,35 @@ body {
   padding: 1px 8px; margin-right: 4px;
 }
 .dl-link:hover { border-color: var(--accent); }
+/* One store button per row + a ▾ for the others, so the row stays the same
+   width however many stores exist. */
+.dl-more { position: relative; display: inline-block; }
+.dl-more-btn {
+  font: inherit; font-size: 11px; line-height: 1; cursor: pointer;
+  padding: 4px 6px; margin-left: -3px;
+  color: var(--ink-soft); background: none;
+  border: 1px solid var(--panel-border); border-radius: 6px;
+}
+.dl-more-btn:hover { color: var(--ink); border-color: var(--accent); }
+.dl-more-menu {
+  position: absolute; z-index: 40; top: calc(100% + 4px); left: 0; min-width: 128px;
+  display: flex; flex-direction: column; gap: 2px; padding: 5px;
+  background: var(--panel); border: 1px solid var(--panel-border);
+  border-radius: 9px; box-shadow: 0 6px 20px rgba(0,0,0,.18);
+}
+/* menu items are .dl-link pills stacked vertically — the ID-qualified variant
+   outranks `#identify-links .dl-link`'s margin, which would otherwise win */
+.dl-more-menu .dl-more-item,
+#identify-links .dl-more-menu .dl-more-item { display: block; margin: 0; white-space: nowrap; text-align: center; }
+#store-pref {
+  display: flex; align-items: center; gap: 7px;
+  margin-top: 7px; font-size: 11.5px; color: var(--ink-soft);
+}
+#store-select {
+  font: inherit; font-size: 11.5px; color: var(--ink);
+  padding: 3px 6px; border: 1px solid var(--panel-border);
+  border-radius: 6px; background: var(--panel); cursor: pointer;
+}
 
 #identify-card {
   position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%);
@@ -222,6 +251,9 @@ body {
 }
 .zone-chip i { width: 18px; height: 18px; border-radius: 50%; border: 1px solid rgba(0,0,0,.15); }
 .zone-chip:hover { border-color: var(--accent); }
+/* the zone the picker is currently editing — without it you can't tell which
+   swatch your next pick lands on */
+.zone-chip.on { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(255,138,64,.28); }
 #identify-links .dl-link { margin: 0 6px 0 0; padding: 3px 12px; font-size: 12px; }
 #identify-remove {
   margin-top: 8px; font: inherit; font-size: 11.5px; font-weight: 700;
@@ -329,8 +361,20 @@ body {
   backdrop-filter: blur(6px);
   box-shadow: 0 6px 24px rgba(0,0,0,.16);
 }
-.fm-head { font-weight: 800; font-size: 13px; margin-bottom: 7px; }
+/* the ✕ sits on the title row so it costs no vertical space; `position:
+   relative` here is what anchors it (the menu itself is the positioned
+   ancestor for the bottom-sheet layout, so don't anchor to that) */
+.fm-head { font-weight: 800; font-size: 13px; margin-bottom: 7px; position: relative; padding-right: 26px; }
 .fm-head span { font-weight: 600; color: var(--ink-soft); font-size: 11.5px; }
+#fm-close {
+  position: absolute; top: -3px; right: -4px;
+  width: 26px; height: 26px; padding: 0; line-height: 1;
+  display: flex; align-items: center; justify-content: center;
+  font: inherit; font-size: 19px; font-weight: 700;
+  color: var(--ink-soft); background: none; border: 0; border-radius: 7px;
+  cursor: pointer;
+}
+#fm-close:hover { color: var(--ink); background: rgba(0,0,0,.06); }
 #fm-search {
   width: 100%; box-sizing: border-box; font: inherit; font-size: 11.5px;
   border: 1px solid var(--panel-border); border-radius: 7px;
@@ -580,6 +624,7 @@ body.embed #cover-preview { display: inline-block; }
    re-renders and regenerates can't undo it. */
 body.embed #topbar { display: none; }
 body.embed #checklist-actions { display: none; }   /* Copy/CSV live in the planner's BOM */
+body.embed #store-pref { display: none; }          /* the docked planner owns the store preference */
 /* the dock is narrower than a desktop but wider than the 560px mobile break:
    cap the note clear of the top-right pills, and give LONG notes the mobile
    treatment — capped height, text scrolls inside (Joey's ask) */
@@ -745,6 +790,9 @@ body.embed-preview.embed-hint-on #embed-hint {
     z-index: 34; box-shadow: 0 -6px 24px rgba(0,0,0,.18);
   }
   .fm-swatches button { width: 30px; height: 30px; }
+  /* bottom sheet: the ✕ is the primary dismiss, so give it a real touch target */
+  #fm-close { width: 34px; height: 34px; font-size: 23px; top: -6px; right: -6px; }
+  .fm-head { padding-right: 34px; }
   #fm-brands { max-height: 42vh; } /* bottom-sheet: keep the list scrollable, footer visible */
 
   /* the "tap any part" hint rides above the bottom pills, not over them */

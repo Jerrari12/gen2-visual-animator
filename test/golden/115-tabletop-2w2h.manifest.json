@@ -36,7 +36,8 @@
    "qty": 1,
    "links": {
     "p": "https://www.printables.com/model/1777819-gen2-115-foot-rails",
-    "t": "https://than.gs/m/1574331"
+    "t": "https://than.gs/m/1574331",
+    "m": "https://makerworld.com/en/models/3093882-gen2-115-foot-rails"
    },
    "img": "img/parts/FR-U_115-2W.png"
   },
@@ -47,7 +48,8 @@
    "qty": 1,
    "links": {
     "p": "https://www.printables.com/model/1777819-gen2-115-foot-rails",
-    "t": "https://than.gs/m/1574331"
+    "t": "https://than.gs/m/1574331",
+    "m": "https://makerworld.com/en/models/3093882-gen2-115-foot-rails"
    },
    "img": "img/parts/FR-L_115-2W.png"
   },
@@ -68,7 +70,8 @@
    "qty": 2,
    "links": {
     "p": "https://www.printables.com/model/1658744-gen2-115-cases-all",
-    "t": "https://than.gs/m/1535435"
+    "t": "https://than.gs/m/1535435",
+    "m": "https://makerworld.com/en/models/3092499-gen2-115-cases-all"
    },
    "img": "img/parts/Case 115-1W-1H.png"
   },
@@ -140,7 +143,8 @@
    "qty": 1,
    "links": {
     "p": "https://www.printables.com/model/1658744-gen2-115-cases-all",
-    "t": "https://than.gs/m/1535435"
+    "t": "https://than.gs/m/1535435",
+    "m": "https://makerworld.com/en/models/3092499-gen2-115-cases-all"
    },
    "img": "img/parts/Case 115-2W-1H.png"
   },
@@ -173,7 +177,8 @@
    "qty": 1,
    "links": {
     "p": "https://www.printables.com/model/1777837-gen2-115-cover",
-    "t": "https://than.gs/m/1574330"
+    "t": "https://than.gs/m/1574330",
+    "m": "https://makerworld.com/en/models/3093900-gen2-115-covers"
    },
    "img": "img/parts/CL-115-2W.png"
   },
@@ -184,7 +189,8 @@
    "qty": 1,
    "links": {
     "p": "https://www.printables.com/model/1777837-gen2-115-cover",
-    "t": "https://than.gs/m/1574330"
+    "t": "https://than.gs/m/1574330",
+    "m": "https://makerworld.com/en/models/3093900-gen2-115-covers"
    },
    "img": "img/parts/CU-115-2W.png"
   },
@@ -195,48 +201,21 @@
    "qty": 2,
    "links": {
     "p": "https://www.printables.com/model/1307794-gen2-115-decor-drawers-all",
-    "t": "https://than.gs/m/1158598"
+    "t": "https://than.gs/m/1158598",
+    "m": "https://makerworld.com/en/models/755457-gen2-115-decor-drawers-all"
    },
    "img": "img/parts/Decor Drawer 115-1W-1H.png"
   },
   {
-   "node": "Faceplate_Essential_1W-1H",
-   "label": "Faceplate Essential 1W-1H",
+   "node": "Faceplate_ClassicDecor_1W-1H",
+   "label": "Classic Faceplate 1W-1H",
    "type": "Faceplate",
    "qty": 2,
    "links": {
-    "p": "https://www.printables.com/model/964559-gen2-decor-faceplates-essential-series",
-    "t": "https://thangs.com/designer/Jerrari/3d-model/GEN2%20Decor%20-%20Faceplates%20-%20Essential%20Series-1116946"
+    "p": "https://www.printables.com/model/1280870-gen2-decor-faceplates-classic-series",
+    "t": "https://than.gs/m/1334047"
    },
-   "img": "img/parts/Faceplate-Essential.jpg"
-  },
-  {
-   "node": "Handle_Deco",
-   "label": "Deco Handle",
-   "type": "Handle",
-   "qty": 3,
-   "links": {
-    "p": "https://www.printables.com/model/1044972-gen2-decor-handles-deco-series",
-    "t": "https://thangs.com/designer/Jerrari/3d-model/GEN2%20Decor%20Handles%20-%20Deco%20Series-1159960"
-   },
-   "img": "img/parts/Handle_Deco.png"
-  },
-  {
-   "node": "ButtonHeadScrew_M3-6",
-   "label": "M3×6mm Button Head Screw",
-   "type": "Screw",
-   "qty": 6,
-   "links": {
-    "buy": [
-     {
-      "label": "Buy M3×6 button head",
-      "url": "https://amzn.to/4x4opHK"
-     }
-    ]
-   },
-   "img": "img/parts/ButtonHeadScrew_M3-6.png",
-   "purchased": true,
-   "required": true
+   "img": "img/parts/ClassicDecor_1W-1H.png"
   },
   {
    "node": "DecorDrawer_115-2W-1H",
@@ -245,20 +224,21 @@
    "qty": 1,
    "links": {
     "p": "https://www.printables.com/model/1307794-gen2-115-decor-drawers-all",
-    "t": "https://than.gs/m/1158598"
+    "t": "https://than.gs/m/1158598",
+    "m": "https://makerworld.com/en/models/755457-gen2-115-decor-drawers-all"
    },
    "img": "img/parts/Decor Drawer 115-2W-1H.png"
   },
   {
-   "node": "Faceplate_Essential_2W-1H",
-   "label": "Faceplate Essential 2W-1H",
+   "node": "Faceplate_ClassicDecor_2W-1H",
+   "label": "Classic Faceplate 2W-1H",
    "type": "Faceplate",
    "qty": 1,
    "links": {
-    "p": "https://www.printables.com/model/964559-gen2-decor-faceplates-essential-series",
-    "t": "https://thangs.com/designer/Jerrari/3d-model/GEN2%20Decor%20-%20Faceplates%20-%20Essential%20Series-1116946"
+    "p": "https://www.printables.com/model/1280870-gen2-decor-faceplates-classic-series",
+    "t": "https://than.gs/m/1334047"
    },
-   "img": "img/parts/Faceplate-Essential.jpg"
+   "img": "img/parts/ClassicDecor_2W-1H.png"
   }
  ],
  "instances": [
@@ -626,41 +606,11 @@
   },
   {
    "id": "fp0",
-   "node": "Faceplate_Essential_1W-1H",
+   "node": "Faceplate_ClassicDecor_1W-1H",
    "pos": [
     -43.53,
     21.369999999999997,
-    60.06999999999999
-   ],
-   "rides": "drw0"
-  },
-  {
-   "id": "h0",
-   "node": "Handle_Deco",
-   "pos": [
-    -43.54,
-    43.87,
-    74.57
-   ],
-   "rides": "drw0"
-  },
-  {
-   "id": "hs0_0",
-   "node": "ButtonHeadScrew_M3-6",
-   "pos": [
-    -65.52,
-    45.32,
-    62.18999999999999
-   ],
-   "rides": "drw0"
-  },
-  {
-   "id": "hs0_1",
-   "node": "ButtonHeadScrew_M3-6",
-   "pos": [
-    -21.51,
-    45.32,
-    62.18999999999999
+    72.17
    ],
    "rides": "drw0"
   },
@@ -698,41 +648,11 @@
   },
   {
    "id": "fp1",
-   "node": "Faceplate_Essential_1W-1H",
+   "node": "Faceplate_ClassicDecor_1W-1H",
    "pos": [
     44.47,
     21.369999999999997,
-    60.06999999999999
-   ],
-   "rides": "drw1"
-  },
-  {
-   "id": "h1",
-   "node": "Handle_Deco",
-   "pos": [
-    44.46,
-    43.87,
-    74.57
-   ],
-   "rides": "drw1"
-  },
-  {
-   "id": "hs1_0",
-   "node": "ButtonHeadScrew_M3-6",
-   "pos": [
-    22.48,
-    45.32,
-    62.18999999999999
-   ],
-   "rides": "drw1"
-  },
-  {
-   "id": "hs1_1",
-   "node": "ButtonHeadScrew_M3-6",
-   "pos": [
-    66.49,
-    45.32,
-    62.18999999999999
+    72.17
    ],
    "rides": "drw1"
   },
@@ -770,41 +690,11 @@
   },
   {
    "id": "fp2",
-   "node": "Faceplate_Essential_2W-1H",
+   "node": "Faceplate_ClassicDecor_2W-1H",
    "pos": [
     0.47,
     77.37,
-    60.06999999999999
-   ],
-   "rides": "drw2"
-  },
-  {
-   "id": "h2",
-   "node": "Handle_Deco",
-   "pos": [
-    0.46,
-    99.87,
-    74.57
-   ],
-   "rides": "drw2"
-  },
-  {
-   "id": "hs2_0",
-   "node": "ButtonHeadScrew_M3-6",
-   "pos": [
-    -21.52,
-    101.32,
-    62.18999999999999
-   ],
-   "rides": "drw2"
-  },
-  {
-   "id": "hs2_1",
-   "node": "ButtonHeadScrew_M3-6",
-   "pos": [
-    22.49,
-    101.32,
-    62.18999999999999
+    72.17
    ],
    "rides": "drw2"
   },
@@ -843,7 +733,7 @@
  "steps": [
   {
    "title": "The Nimble Stack Machine",
-   "note": "Your custom GEN2 build · 3 units, 3 drawers, 2 columns wide. Drag to orbit, tap any part to identify it. 42 prints · quantities on the right. You'll also need 6× M3 screws for the handles and 6× 10×2 mm disc magnets for the optional magnet closures (hardware store items). ⚠ 115 hardware positions are scaled from the 185 calibration · double-check a printed build and report anything that sits off.",
+   "note": "Your custom GEN2 build · 3 units, 3 drawers, 2 columns wide. Drag to orbit, tap any part to identify it. 39 prints · quantities on the right. and 6× 10×2 mm disc magnets for the optional magnet closures (hardware store items). ⚠ 115 hardware positions are scaled from the 185 calibration · double-check a printed build and report anything that sits off.",
    "camera": {
     "t": 30,
     "p": 58,
@@ -1517,8 +1407,8 @@
    ]
   },
   {
-   "title": "Faceplates & handles",
-   "note": "Assemble the faceplate first: hold the Deco Handle against the front and thread 2× M3×6 button head screws in from behind the plate · go gently and stop as soon as they seat, the screws bite straight into plastic and will strip if you overtighten. Pop a drawer out about 40 mm, slide the assembled faceplate DOWN onto the drawer front until it snaps, then push the drawer home. Repeat for every drawer · the build is done. Tap any part to see its name and download links.",
+   "title": "Faceplates",
+   "note": "The faceplate prints complete — its grip is part of the plate, so there's nothing to bolt on and no hardware to buy. Pop a drawer out about 40 mm, slide the faceplate DOWN onto the drawer front until it snaps, then push the drawer home. Repeat for every drawer · the build is done. Tap any part to see its name and download links.",
    "camera": {
     "t": 15,
     "p": 66,
@@ -1569,7 +1459,7 @@
       "target": [
        -43.53,
        93.87,
-       100.07
+       112.17
       ]
      }
     },
@@ -1591,75 +1481,6 @@
      ]
     },
     {
-     "enter": [
-      {
-       "id": "h0",
-       "at": [
-        0,
-        45,
-        55
-       ],
-       "from": [
-        0,
-        0,
-        30
-       ],
-       "via": [
-        [
-         0,
-         0,
-         -15
-        ]
-       ]
-      }
-     ]
-    },
-    {
-     "camera": {
-      "t": 143,
-      "p": 76,
-      "fitR": 57.89344004289259,
-      "target": [
-       -43.53,
-       93.87,
-       100.07
-      ]
-     }
-    },
-    {
-     "enter": [
-      {
-       "id": "hs0_0",
-       "at": [
-        0,
-        45,
-        40
-       ],
-       "from": [
-        0,
-        0,
-        -30
-       ],
-       "spin": 3
-      },
-      {
-       "id": "hs0_1",
-       "at": [
-        0,
-        45,
-        40
-       ],
-       "from": [
-        0,
-        0,
-        -30
-       ],
-       "spin": 3
-      }
-     ],
-     "sync": true
-    },
-    {
      "appear": true,
      "room": 1,
      "camera": {
@@ -1678,30 +1499,6 @@
      "move": [
       {
        "id": "fp0",
-       "by": [
-        0,
-        -45,
-        0
-       ]
-      },
-      {
-       "id": "h0",
-       "by": [
-        0,
-        -45,
-        0
-       ]
-      },
-      {
-       "id": "hs0_0",
-       "by": [
-        0,
-        -45,
-        0
-       ]
-      },
-      {
-       "id": "hs0_1",
        "by": [
         0,
         -45,
@@ -1744,30 +1541,6 @@
         0,
         -40
        ]
-      },
-      {
-       "id": "h0",
-       "by": [
-        0,
-        0,
-        -40
-       ]
-      },
-      {
-       "id": "hs0_0",
-       "by": [
-        0,
-        0,
-        -40
-       ]
-      },
-      {
-       "id": "hs0_1",
-       "by": [
-        0,
-        0,
-        -40
-       ]
       }
      ]
     },
@@ -1777,25 +1550,7 @@
        "id": "fp1"
       },
       {
-       "id": "h1"
-      },
-      {
-       "id": "hs1_0"
-      },
-      {
-       "id": "hs1_1"
-      },
-      {
        "id": "fp2"
-      },
-      {
-       "id": "h2"
-      },
-      {
-       "id": "hs2_0"
-      },
-      {
-       "id": "hs2_1"
       }
      ]
     }

@@ -301,8 +301,11 @@ const MOUNTS = [
   { key: 'wall',        label: 'Wall Mount' },
 ];
 const TIERS = [
-  { key: 'starter', label: '2W-2H', blurb: 'Start here - 3 drawers, about 42 printed parts.' },
-  { key: 'next',    label: '3W-2H', blurb: 'One column wider - 5 drawers, and the covers stagger brick-style.' },
+  // Counts follow the kits' own BOM (2026-07-25: the Classic faceplate prints
+  // its grip in, so the handles and their screws left the list — 42 -> 39 and
+  // 68 -> 63, and there is no longer anything to buy).
+  { key: 'starter', label: '2W-2H', blurb: 'Start here - 3 drawers, 39 printed parts and nothing to buy.' },
+  { key: 'next',    label: '3W-2H', blurb: 'One column wider - 5 drawers, 63 printed parts, and the covers stagger brick-style.' },
 ];
 
 let ALL_KITS = [];

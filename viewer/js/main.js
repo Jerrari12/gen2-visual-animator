@@ -252,6 +252,20 @@ function baseMatFor(type, zone = '') { // shared material per (type, zone) — z
   if (!materials[key]) materials[key] = new THREE.MeshStandardMaterial({ color: new THREE.Color(activeHex(key)), roughness: 0.55, metalness: 0.05 });
   return materials[key];
 }
+// Which single colour REPRESENTS a part where only one swatch fits (BOM chip,
+// identify-card header)? Not the base type when a zone covers the whole visible
+// front: the Classic plate's FACE is the surface you actually look at, while
+// BODY sits behind it and barely shows (Joey 2026-07-25). Data-driven off the
+// GLB's own zone tags, so any future part with a FACE zone inherits this.
+const FRONT_ZONE = 'FACE';
+function primaryKey(node) {
+  const type = typeByNode[node];
+  const t = templates[node];
+  if (!t || !type) return type;
+  let front = false;
+  t.traverse(o => { if (o.isMesh && o.userData.zone === FRONT_ZONE) front = true; });
+  return front ? zoneKey(type, FRONT_ZONE) : type;
+}
 
 // tiled multi-width types: adjacent same-type tiles alternate a slightly lighter
 // shade of the type color, so a 2W landing next to a 1W reads as two parts, not
@@ -283,10 +297,20 @@ let typeByNode = {}, partInfoByNode = {};
 const templates = {};
 async function loadTemplates() {
   const need = [...new Set(manifest.instances.map(i => i.node))].filter(n => !templates[n]);
+  // A missing GLB used to reject the bare Promise.all and HANG the app on the
+  // loading spinner forever (2026-07-25: classic 3H drawers on 115/240/270 —
+  // the generator guards that gap now, but ANY future asset gap must fail as a
+  // readable message, not a hang). Collect every failure and throw ONE error
+  // naming the nodes; boot routes it to bootFail, regenerate to showBlocked.
+  const missing = [];
   await Promise.all(need.map(async node => {
-    const gltf = await loader.loadAsync(`${PARTS_BASE}${node}.lib.glb`);
-    templates[node] = adoptTemplate(gltf.scene, typeByNode[node]);
+    try {
+      const gltf = await loader.loadAsync(`${PARTS_BASE}${node}.lib.glb`);
+      templates[node] = adoptTemplate(gltf.scene, typeByNode[node]);
+    } catch (e) { missing.push(node); }
   }));
+  if (missing.length)
+    throw new Error(`part model${missing.length > 1 ? 's' : ''} missing from the library: ${missing.sort().join(', ')}`);
 }
 // 2-zone parts (EdgeLabel body+grip) arrive as two primitives carrying named
 // material stubs — the NAME is the zone tag, read once here and stamped on the
@@ -865,6 +889,139 @@ function linkEl(text, href) {
   return a;
 }
 
+// ---------- model stores (Printables / Thangs / MakerWorld / Cults) ----------
+// A part's `links` object carries one url per store key. Rows show ONE button —
+// the user's preferred store — plus a ▾ listing the others that actually have
+// this part. That keeps a row the same width no matter how many stores exist:
+// adding one is a row here plus the url key in generate.js LINKS/LINKS_BY_LEN
+// (and the planner's LINK_OVERRIDES — mirror both).
+// `order` is the fallback chain when the preferred store doesn't carry a part:
+// Printables first, it has the most complete catalog.
+const STORES = [
+  { id: 'printables', key: 'p', label: 'Printables', host: 'printables.com' },
+  { id: 'thangs',     key: 't', label: 'Thangs',     host: 'thangs.com' },
+  { id: 'makerworld', key: 'm', label: 'MakerWorld', host: 'makerworld.com' },
+  { id: 'cults',      key: 'c', label: 'Cults 3D',   host: 'cults3d.com' },
+];
+const STORE_BY_ID = Object.fromEntries(STORES.map(s => [s.id, s]));
+const STORE_STORE_KEY = 'gen2-store'; // preference is a VIEWER-wide pref, not per-kit
+// Which store did the visitor come from? `?from=` is authoritative (we control
+// the links printed in each platform's description, and it survives any
+// referrer policy); document.referrer is the fallback for links we didn't
+// author. Either only SEEDS an empty preference — it must never overwrite a
+// deliberate pick.
+function storeFromEntry() {
+  const from = (new URLSearchParams(location.search).get('from') || '').toLowerCase();
+  if (STORE_BY_ID[from]) return from;
+  try {
+    const host = new URL(document.referrer).hostname;
+    const hit = STORES.find(s => host === s.host || host.endsWith('.' + s.host));
+    if (hit) return hit.id;
+  } catch (e) { /* no/opaque referrer — fine */ }
+  return null;
+}
+let storePref = (() => {
+  let saved = null;
+  try { saved = localStorage.getItem(STORE_STORE_KEY); } catch (e) { /* private mode */ }
+  if (saved && STORE_BY_ID[saved]) return saved;
+  return storeFromEntry() || STORES[0].id;
+})();
+let storePrefT = 0; // stamp for the planner relay (newest-wins, like colors)
+try { storePrefT = +(localStorage.getItem(STORE_STORE_KEY + ':t') || 0) || 0; } catch (e) {}
+function persistStorePref() {
+  try {
+    localStorage.setItem(STORE_STORE_KEY, storePref);
+    localStorage.setItem(STORE_STORE_KEY + ':t', String(storePrefT));
+  } catch (e) { /* private mode — the relay still works in-session */ }
+}
+function setStorePref(id, { relay = true } = {}) {
+  if (!STORE_BY_ID[id] || id === storePref) return;
+  storePref = id;
+  if (relay) { storePrefT = Date.now(); postStorePrefToPlanner(); }
+  persistStorePref();
+  renderChecklist();                                  // BOM rows re-label
+  if (selectedId && instances.has(selectedId)) {      // and so does the open card
+    const inst = instances.get(selectedId), t = typeByNode[inst.cfg.node];
+    renderIdentifyLinks(partInfoByNode[inst.cfg.node], !colorLocked(t) && customColors[t] ? customColors[t] : null);
+  }
+  renderStorePicker();
+}
+// every store that actually carries this part, preferred first then fallback order
+function storesFor(links) {
+  if (!links) return [];
+  const have = STORES.filter(s => links[s.key]);
+  const pref = have.filter(s => s.id === storePref);
+  return [...pref, ...have.filter(s => s.id !== storePref)];
+}
+// Renders the model links for one part: primary button NAMES the store it
+// opens (so a Printables-only part under a MakerWorld preference is never a
+// surprise), plus a ▾ for the rest. Stores without this part are omitted, not
+// greyed — a menu of dead entries is noise.
+function appendStoreLinks(box, links) {
+  const have = storesFor(links);
+  if (!have.length) return;
+  const [primary, ...rest] = have;
+  box.appendChild(linkEl(primary.label, links[primary.key]));
+  if (!rest.length) return;
+  const wrap = document.createElement('span');
+  wrap.className = 'dl-more';
+  const btn = document.createElement('button');
+  btn.className = 'dl-more-btn';
+  btn.type = 'button';
+  btn.textContent = '▾';
+  btn.title = 'Other sites for this part';
+  btn.setAttribute('aria-label', 'Other sites for this part');
+  const menu = document.createElement('div');
+  menu.className = 'dl-more-menu hidden';
+  for (const s of rest) {
+    const a = linkEl(s.label, links[s.key]);
+    a.classList.add('dl-more-item'); // ADD to dl-link — replacing it dropped the pill styling (default blue link, Joey's repro)
+    // opening a store from the menu makes it your default — the preference is
+    // set BY USE, so there's nothing to discover in a settings screen
+    a.addEventListener('click', () => setStorePref(s.id));
+    menu.appendChild(a);
+  }
+  btn.onclick = e => { e.stopPropagation(); closeStoreMenus(menu); menu.classList.toggle('hidden'); };
+  wrap.append(btn, menu);
+  box.appendChild(wrap);
+}
+function closeStoreMenus(except) {
+  for (const m of document.querySelectorAll('.dl-more-menu'))
+    if (m !== except) m.classList.add('hidden');
+}
+addEventListener('click', () => closeStoreMenus(null)); // click-away closes
+
+// Explicit picker for people who'd rather set it up front than discover it via
+// the ▾. Lives beside Copy list / Download CSV — where the links already are.
+function renderStorePicker() {
+  const sel = $('store-select');
+  if (!sel) return;
+  if (!sel.options.length)
+    for (const s of STORES) sel.appendChild(Object.assign(document.createElement('option'), { value: s.id, textContent: s.label }));
+  sel.value = storePref;
+}
+$('store-select').onchange = e => setStorePref(e.target.value);
+renderStorePicker();
+
+// The identify card's link row — shared by setSelected and both style-cycle
+// handlers (they rebuild the card in place), so a store-preference change can
+// re-render it from one call.
+function renderIdentifyLinks(info, filament = null) {
+  const linksEl = $('identify-links');
+  linksEl.innerHTML = '';
+  appendStoreLinks(linksEl, info?.links);
+  // purchased hardware: Amazon affiliate buy options (generate.js BUY) + the
+  // required affiliate disclosure right in the card
+  for (const b of info?.links?.buy || []) linksEl.appendChild(linkEl(b.label, b.url));
+  if (info?.links?.buy?.length) {
+    const aff = document.createElement('div');
+    aff.className = 'fm-note';
+    aff.textContent = 'Affiliate links — they support the project at no extra cost.';
+    linksEl.appendChild(aff);
+  }
+  if (filament) linksEl.appendChild(linkEl('Get filament', filament.url));
+}
+
 // ---------- build options (generated builds only; static kits skip it) ----------
 const drawersInBuild = () => build ? build.placed.filter(u => u.fill === 'decor' || u.fill === 'classic') : [];
 const allStopperKeys = () => drawersInBuild().flatMap(u => Array.from({ length: u.w }, (_, k) => `${u.id}:${k}`));
@@ -971,13 +1128,18 @@ function renderChecklist() {
     row.className = 'checklist-row';
     const chip = document.createElement('button');
     chip.className = 'chip';
-    chip.style.background = activeHex(p.type); // reflects custom filament colors
+    // one swatch per row, so show the colour you actually SEE on the part
+    const pk = primaryKey(p.node);
+    chip.style.background = activeHex(pk); // reflects custom filament colors
     if (colorLocked(p.type)) { // purchased hardware: no filament picker
       chip.classList.add('locked');
       chip.title = 'Hardware-store item · shown in its real finish';
     } else {
-      chip.title = (useCustom && customColors[p.type] ? customColors[p.type].name + ' · ' : '') + 'click to pick a filament color';
-      chip.onclick = () => openFilamentMenu(p.type);
+      const zoned = pk !== p.type;
+      chip.title = (useCustom && customColors[pk] ? customColors[pk].name + ' · ' : '') +
+        (zoned ? 'click to pick the face filament · tap the part for its other zones'
+               : 'click to pick a filament color');
+      chip.onclick = () => openFilamentMenu(pk);
     }
     const mid = document.createElement('div');
     mid.className = 'cl-mid';
@@ -986,8 +1148,7 @@ function renderChecklist() {
     mid.appendChild(label);
     if (p.links) {
       const lnks = document.createElement('span');
-      if (p.links.p) lnks.appendChild(linkEl('Printables', p.links.p));
-      if (p.links.t) lnks.appendChild(linkEl('Thangs', p.links.t));
+      appendStoreLinks(lnks, p.links);
       // purchased hardware: Amazon affiliate buy options (generate.js BUY)
       for (const b of p.links.buy || []) lnks.appendChild(linkEl(b.label, b.url));
       mid.appendChild(lnks);
@@ -1082,7 +1243,7 @@ function goTo(i, { animate = true } = {}) {
   setPaused(false);  // paging is an implicit resume — a frozen new step reads as broken
   setMeasure(false); // parts move between steps — a measurement would go stale
   fpEnv.target = 1;  // a step-scripted `room: 0` (faceplate cinematic) must not outlive its page
-  $('filament-menu').classList.add('hidden');
+  closeFilamentMenu(false); // parts move on a page change; selection is handled below
   stopCinema();
   cur = Math.max(0, Math.min(PAGES.length - 1, i));
   const page = PAGES[cur];
@@ -1351,18 +1512,28 @@ function renderZoneChips(inst) {
   const show = zones.size > 0 && !colorLocked(type);
   box.classList.toggle('hidden', !show);
   if (!show) return;
-  const chip = (label, key) => {
+  const menuOpen = !$('filament-menu').classList.contains('hidden');
+  const chip = (label, key, tip) => {
     const b = document.createElement('button');
-    b.className = 'zone-chip';
+    b.className = 'zone-chip' + (menuOpen && fmType === key ? ' on' : '');
     const dot = document.createElement('i');
     dot.style.background = activeHex(key);
     b.appendChild(dot);
     b.appendChild(document.createTextNode(label));
-    b.title = `Pick a filament color for the ${label.toLowerCase()}`;
-    b.onclick = () => { openFilamentMenu(key); };
+    b.title = tip || `Pick a filament color for the ${label.toLowerCase()}`;
+    // clicking the chip you're already editing closes the picker (there was no
+    // reliable way to dismiss it); any other chip RE-TARGETS without closing
+    b.onclick = () => { (menuOpen && fmType === key) ? closeFilamentMenu() : openFilamentMenu(key); };
     box.appendChild(b);
   };
-  chip('Body', type);
+  // Body is the part's BASE colour: every zone the user hasn't picked yet
+  // inherits it (one identification colour per part by default), so changing
+  // Body visibly repaints those zones too. Say so — it reads as a bug
+  // otherwise (Joey 2026-07-25).
+  const inherits = [...zones].filter(z => !(useCustom && customColors[zoneKey(type, z)]) && !manifest.colors[zoneKey(type, z)]);
+  chip('Body', type, inherits.length
+    ? `Base colour — also repaints the zones you haven’t picked yet (${inherits.map(z => z.toLowerCase()).join(', ')})`
+    : 'Pick a filament color for the body');
   for (const z of [...zones].sort()) chip(z.charAt(0) + z.slice(1).toLowerCase(), zoneKey(type, z));
 }
 
@@ -1375,7 +1546,7 @@ function setSelected(id) {
   }
   const prevOpen = openCarrier; openCarrier = null; // may re-pull the SAME drawer further below
   selectedId = id;
-  $('filament-menu').classList.add('hidden');
+  closeFilamentMenu(false); // the new selection's own glow is applied just below
   const card = $('identify-card');
   if (ritualInst && (!id || !instances.has(id) || instances.get(id) !== ritualInst)) {
     slideRitual(ritualInst, false); // label/accent/cover reseats in reverse on deselect/switch
@@ -1390,9 +1561,12 @@ function setSelected(id) {
   const selType = typeByNode[inst.cfg.node];
   const selLocked = colorLocked(selType); // purchased hardware: swatch is a plain color dot, not a picker
   const sw = $('identify-swatch');
-  sw.style.background = activeHex(selType);
+  const selKey = primaryKey(inst.cfg.node); // the visible front, not the hidden base
+  sw.style.background = activeHex(selKey);
   sw.classList.toggle('locked', selLocked);
-  sw.title = selLocked ? 'Hardware-store item · shown in its real finish' : 'Pick a filament color';
+  sw.title = selLocked ? 'Hardware-store item · shown in its real finish'
+    : selKey !== selType ? 'Pick the face filament · the chips below cover every zone'
+    : 'Pick a filament color';
   renderZoneChips(inst); // 2-zone parts get Body + Grip swatches; others hide the row
   // the swappable label's card links to the label generator (pre-filled with
   // the build's typed labels — the same #labels= handoff the planner's button
@@ -1422,20 +1596,7 @@ function setSelected(id) {
   const img = $('identify-img');
   if (info.img) { img.onerror = () => img.classList.add('hidden'); img.src = info.img; img.classList.remove('hidden'); } // hide if the render 404s (e.g. 165 has no renders yet)
   else img.classList.add('hidden');
-  const linksEl = $('identify-links');
-  linksEl.innerHTML = '';
-  if (info.links?.p) linksEl.appendChild(linkEl('Printables', info.links.p));
-  if (info.links?.t) linksEl.appendChild(linkEl('Thangs', info.links.t));
-  // purchased hardware: Amazon affiliate buy options (generate.js BUY) + the
-  // required affiliate disclosure right in the card
-  for (const b of info.links?.buy || []) linksEl.appendChild(linkEl(b.label, b.url));
-  if (info.links?.buy?.length) {
-    const aff = document.createElement('div');
-    aff.className = 'fm-note';
-    aff.textContent = 'Affiliate links — they support the project at no extra cost.';
-    linksEl.appendChild(aff);
-  }
-  if (!selLocked && customColors[selType]) linksEl.appendChild(linkEl('Get filament', customColors[selType].url));
+  renderIdentifyLinks(info, !selLocked && customColors[selType] ? customColors[selType] : null);
   // handles get a style switcher (Deco / BlockBar A–F); faceplates get the
   // family switcher (Essential / EdgeLabel) when this collection has >1 family
   if (typeByNode[inst.cfg.node] === 'Handle') {
@@ -1809,10 +1970,14 @@ function exitFaceplateFocus() {
 // when Joey's Polymaker affiliate links exist. The Elegoo entry is Joey's
 // budget pick (amzn.to IS an affiliate link) — mainly cases & drawer bodies.
 const PM = id => `https://shop.polymaker.com/products/panchroma-pla?variant=${id}`;
+const PM_SILK = 'https://shop.polymaker.com/products/panchroma-silk?variant=43637561458745';
 const POLYMAKER_URL = PM(44863271895097);
 const FILAMENT_DB = [
-  { brand: 'Elegoo', line: 'PETG', url: 'https://amzn.to/3QWCdV6', colors: [
+  { brand: 'Elegoo', line: 'PLA / PETG', url: 'https://amzn.to/3QWCdV6', colors: [
     { name: 'PETG Black', label: 'Elegoo PETG Black', hex: '#232427', url: 'https://amzn.to/3QWCdV6', pick: true },
+    // PLA Black is the Classic faceplate BODY default (Joey 2026-07-25)
+    { name: 'PLA Black', label: 'Elegoo PLA Black', hex: '#1c1d20', url: 'https://amzn.to/4fqvv1O', pick: true,
+      pickNote: ' · Joey’s black for faceplate bodies & shells' },
   ] },
   { brand: 'Polymaker', line: 'Panchroma™ PLA', url: POLYMAKER_URL, colors: [
     { name: 'Black',           hex: '#2b2b2e', id: 44863271731257 },
@@ -1844,6 +2009,13 @@ const FILAMENT_DB = [
     { name: 'Stone Blue',      hex: '#4a6a8a', id: 44863271370809 },
     { name: 'Purple',          hex: '#7a4fb0', id: 44863271600185 },
   ].map(f => ({ ...f, label: `Panchroma ${f.name}`, url: PM(f.id) })) },
+  // Silk is a separate Panchroma product page (panchroma-silk, not -pla), so it
+  // gets its own section rather than a stray url inside the Basic PLA block.
+  // Silver is the Classic faceplate GRIP ACCENT default (Joey 2026-07-25).
+  { brand: 'Polymaker', line: 'Panchroma™ Silk PLA', url: PM_SILK, colors: [
+    { name: 'Silk Silver', label: 'Panchroma Silk Silver', hex: '#cdd2d9', url: PM_SILK, pick: true,
+      pickNote: ' · Joey’s silver for grip-accent rods' },
+  ] },
   // Printed Solid (Jessie) PLA — real solid Basic/Premium colors with printedsolid.com
   // product links (hexes = the flat swatches from 3dfilamentprofiles.com/filaments/printed-solid;
   // Pure Magenta/Natural read pale — kept as-sourced). Mystery Orange is Joey's Handle orange.
@@ -1880,6 +2052,22 @@ const _f = (name, hex, url = '#') => ({ name, hex, url });
 const _blk = _f('Black', '#232427'), _pro = _f('Prusa Orange', '#f5820a'),
       _proP = _f('Prusa Orange PETG', '#f5820a'), _sil = _f('Silver', '#c7ccd2'),
       _wht = _f('White', '#eef0f4'), _navy = _f('Holo Blue', '#25316e');
+// REAL, buyable filaments (name matches its FILAMENT_DB `label`, so the picker
+// shows the swatch ringed as active and "Buy …" resolves) — Joey's 2026-07-25
+// spec for the Classic faceplate. Everything else in PRESETS is still a
+// placeholder hex; swap those for real products the same way.
+const _ELEGOO_BLK = _f('Elegoo PLA Black', '#1c1d20', 'https://amzn.to/4fqvv1O');
+const _PS_ORANGE = _f('Printed Solid Mystery Orange', '#F56233',
+  'https://www.printedsolid.com/products/jessie-pla-1-75mm-x-1kg-mystery-orange');
+const _PM_SILK_SIL = _f('Panchroma Silk Silver', '#cdd2d9', PM_SILK);
+// The Classic faceplate's four zones, as one reusable block: black body,
+// orange face + grip, silk-silver accent rod.
+const CLASSIC_FACE = {
+  Faceplate: _ELEGOO_BLK,
+  'Faceplate:FACE': _PS_ORANGE,
+  'Faceplate:GRIP': _PS_ORANGE,
+  'Faceplate:GRIP ACCENT': _PM_SILK_SIL,
+};
 // Every preset themes the WHOLE build (Joey 2026-07-13): faceplate zones
 // ('Faceplate:GRIP' drives the EdgeLabel/Classic Pro printed-in grip,
 // ':GRIP ACCENT' the Classic Pro rod) + the dressing (Accent/Label/BackCover)
@@ -1890,15 +2078,18 @@ const PRESETS = [
   { name: 'The Jerrari', swatches: ['#232427', '#f5820a', '#c7ccd2'], colors: {
     Case: _blk, Drawer: _blk, CoverL: _blk, CoverU: _blk, Bracket: _blk,
     FootrailL: _blk, FootrailU: _blk, Foot: _blk, Rail: _blk,
-    Faceplate: _blk, 'Faceplate:GRIP': _pro, 'Faceplate:GRIP ACCENT': _sil,
-    Accent: _navy, Label: _wht, BackCover: _blk,
+    ...CLASSIC_FACE, // black body / orange face + grip / silk-silver rod (real filaments)
+    Accent: _navy, Label: _wht, BackCover: _ELEGOO_BLK,
     Handle: _sil,
     QuickLock: _proP, MagnetClip: _proP, Stopper: _proP, Magnet: _sil, Screw: _sil,
   } },
   { name: 'Stealth', swatches: ['#232427', '#4a4c51', '#6e7178'], colors: {
     Case: _blk, Drawer: _f('Dark Grey', '#4a4c51'), CoverL: _blk, CoverU: _blk,
     Bracket: _blk, FootrailL: _blk, FootrailU: _blk, Foot: _blk, Rail: _blk,
-    Faceplate: _f('Steel Grey', '#6e7178'), 'Faceplate:GRIP': _f('Dark Grey', '#4a4c51'), 'Faceplate:GRIP ACCENT': _sil,
+    // FACE is the Classic plate's front layer — every preset defines all four
+    // zones so nothing silently inherits the body (see renderZoneChips)
+    Faceplate: _f('Steel Grey', '#6e7178'), 'Faceplate:FACE': _f('Dark Grey', '#4a4c51'),
+    'Faceplate:GRIP': _f('Dark Grey', '#4a4c51'), 'Faceplate:GRIP ACCENT': _sil,
     Accent: _blk, Label: _wht, BackCover: _blk,
     Handle: _sil,
     QuickLock: _f('Dark Grey', '#4a4c51'), MagnetClip: _f('Dark Grey', '#4a4c51'),
@@ -1909,7 +2100,8 @@ const PRESETS = [
     CoverL: _f('Green', '#3f9b4f'), CoverU: _f('Green', '#3f9b4f'),
     FootrailL: _f('Blue', '#2f6fbe'), FootrailU: _f('Blue', '#2f6fbe'), Foot: _f('Purple', '#7a4fb0'), Rail: _f('Blue', '#2f6fbe'),
     Bracket: _f('Steel Grey', '#6e7178'),
-    Faceplate: _pro, 'Faceplate:GRIP': _f('Yellow', '#f5c542'), 'Faceplate:GRIP ACCENT': _f('Polymaker Teal', '#00a5a5'),
+    Faceplate: _pro, 'Faceplate:FACE': _f('Yellow', '#f5c542'),
+    'Faceplate:GRIP': _f('Yellow', '#f5c542'), 'Faceplate:GRIP ACCENT': _f('Polymaker Teal', '#00a5a5'),
     Accent: _f('Aqua Blue', '#5cc6e0'), Label: _wht, BackCover: _f('Steel Grey', '#6e7178'),
     Handle: _f('Yellow', '#f5c542'),
     QuickLock: _f('Polymaker Teal', '#00a5a5'), MagnetClip: _f('Brown', '#7a5236'),
@@ -1919,7 +2111,8 @@ const PRESETS = [
     Case: _f('Brown', '#7a5236'), Drawer: _f('Tan', '#c8a97e'),
     CoverL: _f('Cream', '#f1e7cf'), CoverU: _f('Cream', '#f1e7cf'),
     Bracket: _f('Brown', '#7a5236'), FootrailL: _f('Brown', '#7a5236'), FootrailU: _f('Brown', '#7a5236'), Foot: _f('Brown', '#7a5236'), Rail: _f('Brown', '#7a5236'),
-    Faceplate: _pro, 'Faceplate:GRIP': _f('Brown', '#7a5236'), 'Faceplate:GRIP ACCENT': _f('Steel Grey', '#6e7178'),
+    Faceplate: _pro, 'Faceplate:FACE': _f('Brown', '#7a5236'),
+    'Faceplate:GRIP': _f('Brown', '#7a5236'), 'Faceplate:GRIP ACCENT': _f('Steel Grey', '#6e7178'),
     Accent: _f('Tan', '#c8a97e'), Label: _f('Cream', '#f1e7cf'), BackCover: _f('Brown', '#7a5236'),
     Handle: _f('Steel Grey', '#6e7178'),
     QuickLock: _f('Tan', '#c8a97e'), MagnetClip: _f('Brown', '#7a5236'),
@@ -1986,7 +2179,7 @@ function applyPalette() {
   renderPresets(); // keep the active preset / My-palette chip highlight in step
   if (selectedId) {
     const inst = instances.get(selectedId);
-    $('identify-swatch').style.background = activeHex(typeByNode[inst.cfg.node]);
+    $('identify-swatch').style.background = activeHex(primaryKey(inst.cfg.node));
     renderZoneChips(inst); // keep the Body/Grip dots tracking the live palette
   }
 }
@@ -2087,11 +2280,14 @@ $('preset-head').onclick = () => setPresetsOpen($('preset-chips').classList.cont
 setPresetsOpen(sessionStorage.getItem('gen2-presets-open') !== '0');
 renderPresets();
 
-let fmType = null;     // the part type the filament menu is editing
+let fmType = null;     // the part type/zone key the filament menu is editing
 let fmQuery = '';      // live search filter (cleared on every open)
-let fmExpanded = null; // Set of expanded brand names (null → first render expands all)
+let fmExpanded = null; // Set of expanded brand+line keys (null → first render expands all)
+const secKey = b => `${b.brand} ${b.line}`;
 function renderFilamentBrands() {
-  if (!fmExpanded) fmExpanded = new Set(FILAMENT_DB.map(b => b.brand)); // session default: everything visible
+  // keyed by brand+LINE: one brand can ship several lines (Polymaker Basic PLA
+  // and Silk PLA are separate product pages), and they must fold independently
+  if (!fmExpanded) fmExpanded = new Set(FILAMENT_DB.map(secKey)); // session default: everything visible
   const box = $('fm-brands');
   box.innerHTML = '';
   const q = fmQuery.trim().toLowerCase();
@@ -2100,13 +2296,14 @@ function renderFilamentBrands() {
       ? brand.colors.filter(f => `${brand.brand} ${brand.line} ${f.label}`.toLowerCase().includes(q))
       : brand.colors;
     if (q && !colors.length) continue;                    // searching: hide brands with no hits
-    const open = q ? true : fmExpanded.has(brand.brand);  // searching force-opens the matches
+    const key = secKey(brand);
+    const open = q ? true : fmExpanded.has(key);          // searching force-opens the matches
     const sec = document.createElement('div');
     sec.className = 'fm-brand';
     const head = document.createElement('button');
     head.className = 'fm-brand-head';
     head.innerHTML = `<span>${brand.brand} <i>${brand.line} · ${colors.length}</i></span><span class="fm-chev">${open ? '▾' : '▸'}</span>`;
-    head.onclick = () => { fmExpanded[fmExpanded.has(brand.brand) ? 'delete' : 'add'](brand.brand); renderFilamentBrands(); };
+    head.onclick = () => { fmExpanded[fmExpanded.has(key) ? 'delete' : 'add'](key); renderFilamentBrands(); };
     sec.appendChild(head);
     if (open) {
       const grid = document.createElement('div');
@@ -2126,7 +2323,7 @@ function renderFilamentBrands() {
           renderFilamentBrands(); // refresh the active ring across sections
           const buy = $('fm-buy');
           buy.href = f.url;
-          buy.textContent = `Buy ${f.name} →`;
+          buy.textContent = `Buy ${f.label} →`; // label, not name — `name` is the bare colour ("Black")
         };
         grid.appendChild(b);
       }
@@ -2141,6 +2338,21 @@ function renderFilamentBrands() {
     box.appendChild(none);
   }
 }
+// Closing must CLEAR fmType. It used to linger, so a swatch clicked after the
+// menu had been dismissed still wrote to the last-edited key — picks landing on
+// a zone the user was no longer editing (Joey 2026-07-25).
+function closeFilamentMenu(refresh = true) {
+  if ($('filament-menu').classList.contains('hidden')) return;
+  $('filament-menu').classList.add('hidden');
+  fmType = null;
+  if (refresh) { refreshSelHighlight(); syncZoneChips(); }
+}
+// the zone chips carry the "which key am I editing" ring, so they must be
+// rebuilt whenever the picker opens, retargets or closes — applyPalette only
+// covers the pick itself
+function syncZoneChips() {
+  if (selectedId && instances.has(selectedId)) renderZoneChips(instances.get(selectedId));
+}
 function openFilamentMenu(type) {
   fmType = type;
   fmQuery = '';
@@ -2152,6 +2364,7 @@ function openFilamentMenu(type) {
   buy.textContent = sel ? `Buy ${sel.name.replace('Panchroma ', '')} →` : 'Shop filament →';
   $('filament-menu').classList.remove('hidden');
   refreshSelHighlight(); // color mode: drop the emissive glow so picks read true
+  syncZoneChips();       // move the active ring to the zone we just targeted
 }
 // The selection highlight is an emissive orange — it SKEWS the very color the
 // user is trying to judge (a blue pick reads pink). While the filament menu is
@@ -2166,19 +2379,25 @@ function refreshSelHighlight() {
 $('fm-search').oninput = e => { fmQuery = e.target.value; renderFilamentBrands(); };
 $('identify-swatch').onclick = () => {
   if (!selectedId) return;
-  const type = typeByNode[instances.get(selectedId).cfg.node];
-  if (colorLocked(type)) return; // purchased hardware: no filament picker
-  if ($('filament-menu').classList.contains('hidden')) openFilamentMenu(type);
-  else { $('filament-menu').classList.add('hidden'); refreshSelHighlight(); }
+  const node = instances.get(selectedId).cfg.node;
+  if (colorLocked(typeByNode[node])) return; // purchased hardware: no filament picker
+  // edits the PRIMARY key (the visible front — FACE on a Classic plate, the
+  // plain type elsewhere). Toggle, but RE-TARGET when the menu is open on a
+  // different key: it used to just close, and the next swatch click then wrote
+  // to the stale zone
+  const key = primaryKey(node);
+  if ($('filament-menu').classList.contains('hidden')) openFilamentMenu(key);
+  else if (fmType !== key) openFilamentMenu(key);
+  else closeFilamentMenu();
 };
+$('fm-close').onclick = () => closeFilamentMenu();
 $('fm-reset').onclick = () => {
   if (fmType) delete customColors[fmType];
   if (!Object.keys(customColors).length) useCustom = false;
   snapshotUserPalette(); // a per-type reset is a hand edit too
   saveColors();
   applyPalette();
-  $('filament-menu').classList.add('hidden');
-  refreshSelHighlight();
+  closeFilamentMenu();
 };
 
 // ---------- handle style swap ----------
@@ -2216,13 +2435,25 @@ function faceplateHeightOf(node) {
 }
 let activeHandleStyle = null; // the specific HANDLE_STYLES entry in use (BlockBar_D etc.), re-applied after a regenerate so a variant survives
 async function applyHandleStyle(style) {
+  const prevActive = activeHandleStyle, prevPlanner = build && build.handleStyle;
   activeHandleStyle = style;
   if (build) build.handleStyle = style.planner; // keep the build in sync (regenerate/BOM/reset read this)
   if (!templates[style.node]) {
-    const gltf = await loader.loadAsync(`${PARTS_BASE}${style.node}.lib.glb`);
-    const mat = materials.Handle || fallbackMat;
-    gltf.scene.traverse(o => { if (o.isMesh) o.material = mat; });
-    templates[style.node] = gltf.scene;
+    try {
+      const gltf = await loader.loadAsync(`${PARTS_BASE}${style.node}.lib.glb`);
+      const mat = materials.Handle || fallbackMat;
+      gltf.scene.traverse(o => { if (o.isMesh) o.material = mat; });
+      templates[style.node] = gltf.scene;
+    } catch (e) {
+      // GLB absent from this kit's folder (static kits carry their own parts/):
+      // roll the state back and report `false` so the ▶ cycle can skip past —
+      // the un-caught await used to kill the click handler mid-function, which
+      // read as a dead button (the 185 kits shipped without Crystal once)
+      activeHandleStyle = prevActive;
+      if (build) build.handleStyle = prevPlanner;
+      console.warn(`Handle style "${style.label}" has no GLB at ${PARTS_BASE}${style.node}.lib.glb — skipped.`);
+      return false;
+    }
   }
   let oldNode = null;
   for (const inst of instances.values()) {
@@ -2258,8 +2489,15 @@ async function applyHandleStyle(style) {
 async function cycleHandleStyle(dir) {
   const idx = currentHandleStyleIndex();
   if (idx < 0) return;
-  const next = HANDLE_STYLES[(idx + dir + HANDLE_STYLES.length) % HANDLE_STYLES.length];
-  await applyHandleStyle(next);
+  // a style whose GLB is missing from this kit's folder applies as `false`
+  // (rolled back) — keep stepping in the same direction so ▶ always lands on
+  // a REAL style instead of silently doing nothing on the gap
+  let next = null;
+  for (let hop = 1; hop <= HANDLE_STYLES.length; hop++) {
+    const cand = HANDLE_STYLES[(idx + dir * hop + HANDLE_STYLES.length * hop) % HANDLE_STYLES.length];
+    if (await applyHandleStyle(cand) !== false) { next = cand; break; }
+  }
+  if (!next) return; // nothing but the current style is available
   $('style-name').textContent = next.label;
   if (!selectedId) return;
   const inst = instances.get(selectedId);
@@ -2268,10 +2506,7 @@ async function cycleHandleStyle(dir) {
   selAnchor = new THREE.Box3().setFromObject(inst.group).getCenter(new THREE.Vector3()).sub(inst.group.position);
   const info = partInfoByNode[inst.cfg.node] || { label: next.label };
   $('identify-name').textContent = info.label;
-  const linksEl = $('identify-links');
-  linksEl.innerHTML = '';
-  if (info.links?.p) linksEl.appendChild(linkEl('Printables', info.links.p));
-  if (info.links?.t) linksEl.appendChild(linkEl('Thangs', info.links.t));
+  renderIdentifyLinks(info);
 }
 // ---------- faceplate style swap ----------
 // Like the handle swap, but faceplates are PER-SIZE (the whole family swaps,
@@ -2292,6 +2527,16 @@ const FACEPLATE_STYLES = [
   { key: 'essential', label: 'Essential', node: c => `Faceplate_Essential_${c}`, hasHandle: true,  collections: ['185', '165', '59', '115', '240', '270'],
     img: c => 'img/parts/Faceplate-Essential.jpg',
     links: { p: 'https://www.printables.com/model/964559-gen2-decor-faceplates-essential-series', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20Decor%20-%20Faceplates%20-%20Essential%20Series-1116946' } },
+  // the FREE Classic series (2026-07-25) — 4-zone plate (BODY/FACE/GRIP/GRIP
+  // ACCENT, a fourth swatch that renderZoneChips discovers for free), grip
+  // printed IN and NO dressing at all: the only family that needs zero bought
+  // hardware, which is why the official starter kits ship it. NB the node
+  // prefix is ClassicDecor_ (the exporter's name) while the family is
+  // "Classic" — distinct from Classic Pro below, and neither prefix is a
+  // prefix of the other, so currentFaceplateStyle()'s startsWith is safe.
+  { key: 'classic', label: 'Classic', node: c => `Faceplate_ClassicDecor_${c}`, hasHandle: false, collections: ['185', '165', '59', '115', '240', '270'],
+    img: c => `img/parts/ClassicDecor_${c}.png`, // per-size renders, 2026-07-25 batch
+    links: { p: 'https://www.printables.com/model/1280870-gen2-decor-faceplates-classic-series', t: 'https://than.gs/m/1334047' } },
   { key: 'edgelabel', label: 'EdgeLabel', node: c => `Faceplate_EdgeLabel_${c}`, hasHandle: false, collections: ['185', '165', '59', '115', '240', '270'],
     img: c => `img/parts/EdgeLabel_${c}.png`, // per-size renders, 2026-07-08 batch
     links: { p: 'https://www.printables.com/model/1093933-gen2-decor-faceplates-edgelabel-series', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20Decor%20-%20Faceplate%20-%20EdgeLabel-1215609' } },
@@ -2336,6 +2581,7 @@ function pageVisibility(inst) {
 }
 let activeFaceplateStyle = null; // kit-swap memory (generated builds carry the family in build.faceStyle instead)
 async function applyFaceplateStyle(style) {
+  const prevActive = activeFaceplateStyle;
   activeFaceplateStyle = style;
   if (build) {
     // generated builds go through the GENERATOR — it emits the full family
@@ -2353,12 +2599,21 @@ async function applyFaceplateStyle(style) {
   if (!fps.length) return;
   // lazy-load every size the scene needs in the new family (zone tags included)
   const codes = [...new Set(fps.map(i => fpSizeCode(i.cfg.node)).filter(Boolean))];
-  await Promise.all(codes.map(async code => {
-    const node = style.node(code);
-    if (templates[node]) return;
-    const gltf = await loader.loadAsync(`${PARTS_BASE}${node}.lib.glb`);
-    templates[node] = adoptTemplate(gltf.scene, 'Faceplate');
-  }));
+  try {
+    await Promise.all(codes.map(async code => {
+      const node = style.node(code);
+      if (templates[node]) return;
+      const gltf = await loader.loadAsync(`${PARTS_BASE}${node}.lib.glb`);
+      templates[node] = adoptTemplate(gltf.scene, 'Faceplate');
+    }));
+  } catch (e) {
+    // a family size missing from this kit's folder: roll back and report
+    // `false` so the ▶ cycle skips past instead of dying silently (same
+    // guard as applyHandleStyle — the un-caught await killed the handler)
+    activeFaceplateStyle = prevActive;
+    console.warn(`Faceplate family "${style.label}" is missing a size GLB in ${PARTS_BASE} — skipped.`);
+    return false;
+  }
   for (const inst of fps) {
     const code = fpSizeCode(inst.cfg.node);
     if (!code) continue;
@@ -2412,8 +2667,17 @@ async function cycleFaceplateStyle(dir) {
   const styles = availableFaceplateStyles();
   const curStyle = currentFaceplateStyle();
   if (styles.length < 2 || !curStyle) return;
-  const next = styles[(Math.max(0, styles.indexOf(curStyle)) + dir + styles.length) % styles.length];
-  await applyFaceplateStyle(next);
+  // hop past any family whose GLBs are missing from this kit's folder
+  // (applyFaceplateStyle rolls back and reports `false`) — mirrors the
+  // handle cycle's skip so ▶ never reads as a dead button
+  let next = null;
+  const from = Math.max(0, styles.indexOf(curStyle));
+  for (let hop = 1; hop <= styles.length; hop++) {
+    const cand = styles[(from + dir * hop + styles.length * hop) % styles.length];
+    if (cand === curStyle) break;
+    if (await applyFaceplateStyle(cand) !== false) { next = cand; break; }
+  }
+  if (!next) return;
   $('style-name').textContent = next.label;
   if (!selectedId) return;
   const inst = instances.get(selectedId);
@@ -2425,10 +2689,7 @@ async function cycleFaceplateStyle(dir) {
   $('identify-name').textContent = info.label;
   $('identify-img').classList.add('hidden');
   if (info.img) { const img = $('identify-img'); img.onerror = () => img.classList.add('hidden'); img.src = info.img; img.classList.remove('hidden'); }
-  const linksEl = $('identify-links');
-  linksEl.innerHTML = '';
-  if (info.links?.p) linksEl.appendChild(linkEl('Printables', info.links.p));
-  if (info.links?.t) linksEl.appendChild(linkEl('Thangs', info.links.t));
+  renderIdentifyLinks(info);
 }
 // the ◀ ▶ row serves whichever swappable part is selected
 const cycleStyle = dir => {
@@ -3136,6 +3397,28 @@ function applyRemoteColors(d) {
     applyPalette();
   } finally { applyingRemoteColors = false; }
 }
+// ---- store-preference relay (2026-07-25) ----
+// Rides the SAME newest-wins-by-stamp pattern as the palette, and for the same
+// reason: the preference lives in viewer localStorage, which is partitioned in
+// the dock iframe. Deliberately NOT on the buildOptions channel — that calls
+// regenerate(), and rebuilding the 3D scene because you changed store would be
+// absurd. `booted` isn't required: this touches no scene state.
+let applyingRemoteStore = false;
+function postStorePrefToPlanner() {
+  const pw = plannerWin();
+  if (applyingRemoteStore || !pw) return;
+  try { pw.postMessage({ gen2: 'store', t: storePrefT, store: storePref }, '*'); } catch (e) { /* planner gone */ }
+}
+function applyRemoteStore(d) {
+  if (typeof d.t !== 'number' || !STORE_BY_ID[d.store]) return;
+  if (d.t <= storePrefT) { if (storePrefT > d.t) postStorePrefToPlanner(); return; } // ours is newer — teach the cache
+  applyingRemoteStore = true;
+  try {
+    storePrefT = d.t;                       // adopt the sender's stamp so the exchange converges
+    setStorePref(d.store, { relay: false }); // no re-stamp, no echo
+    persistStorePref();
+  } finally { applyingRemoteStore = false; }
+}
 let syncBuildToPlanner = () => {
   const pw = plannerWin();
   if (applyingRemote || !build || !pw) return;
@@ -3185,6 +3468,7 @@ addEventListener('message', async (e) => {
   if (d.gen2 === 'layoutBlocked' && typeof d.reason === 'string') { showBlocked(d.reason); return; }
   if (d.gen2 === 'layout' && d.build) { await applyRemoteLayout(d.build); return; }
   if (d.gen2 === 'colors') { applyRemoteColors(d); return; }
+  if (d.gen2 === 'store') { applyRemoteStore(d); return; }
   if (d.gen2 !== 'buildOptions' || !d.opts || regenBusy) return;
   const o = d.opts;
   // ignore a message that matches our current state — this is what breaks the
@@ -3261,7 +3545,16 @@ async function regenerate() {
   // toggle changes the step count (e.g. wallStagger restructures the step list
   // so `keep` no longer lands on the auto-open final step).
   const panelOpen = !$('checklist-panel').classList.contains('hidden');
-  await mountManifest(gen.manifest);
+  try {
+    await mountManifest(gen.manifest);
+  } catch (e) {
+    // missing GLB mid-regenerate (loadTemplates throws with the node names):
+    // veil the stage with the reason instead of hanging — and NEVER leave
+    // regenBusy latched, or applyRemoteLayout's retry loop spins forever
+    regenBusy = false;
+    showBlocked('This layout can’t be shown: ' + ((e && e.message) || e));
+    return;
+  }
   applyPalette(); // re-tint any custom filament colors onto the fresh materials
   // the generator rebuilds handles as the planner-level default (blockbar → A);
   // re-apply the specific variant the user picked so it survives the regenerate
@@ -3282,7 +3575,15 @@ const X_URL = 'https://x.com/jerrari3D';
 if (X_URL) { const a = $('outro-x'); a.href = X_URL; a.classList.remove('hidden'); }
 const YT_URL = 'https://www.youtube.com/@jerrari3D';
 if (YT_URL) { const a = $('outro-yt'); a.href = YT_URL; a.classList.remove('hidden'); }
-await mountManifest(manifest);
+try {
+  await mountManifest(manifest);
+} catch (e) {
+  // a mount failure here is almost always a missing GLB (loadTemplates names
+  // them) — without this catch the spinner spins forever with no message
+  bootFail('<strong>Can’t load this build</strong><br><br>• ' + ((e && e.message) || e) +
+    '<br><br>Please report it — this is a library gap on our side, not your build.',
+    'mount failed: ' + ((e && e.message) || e));
+}
 applyPalette(); // restore any saved filament colors
 $('loading-overlay').remove();
 if (IS_EMBED && build) {
@@ -3358,6 +3659,7 @@ if (build && plannerWin()) {
   // …and teach the planner's palette cache our local colors (it keeps the
   // newest; its viewerReady reply may in turn carry something newer for us)
   if (colorsT) postColorsToPlanner();
+  if (storePrefT) postStorePrefToPlanner(); // same deal for the store preference
 }
 // Potato guard, embed only: if we render badly (software GPU, ancient
 // hardware) tell the planner once — it offers to collapse the dock. Sampled
