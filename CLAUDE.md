@@ -1,5 +1,14 @@
 # GEN2 Visual Animator — project memory
 
+> ⚠ **ACTIVE HANDOFF (2026-07-24) — read `2026-07-24-session-handoff.md` before
+> you `git push`.** A stack of commits is held back on purpose: **viewer (~19)
+> and planner (~9) are committed locally but UNPUSHED**, waiting on Joey's DNS
+> setup for `gen2build.jerrari3d.com`. Pushing either `main` is a live deploy;
+> a premature planner push ships a 3D button that opens a dead URL. Push viewer
+> first, then planner, and only after Joey confirms the domain resolves. The
+> 18 untracked `ClassicDecor_*.png` in `img/parts/` predate the session — leave
+> them alone unless asked. Tests currently green (viewer 12/12, planner 88/88).
+
 Interactive LEGO-style assembly instructions for GEN2 kits (jerrari3d.com).
 Same conventions as the gen2-planner: **build-free static web tool**, vanilla JS,
 no bundler — `viewer/index.html` runs from any static server.
