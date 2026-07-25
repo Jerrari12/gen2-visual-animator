@@ -33,16 +33,12 @@ Rollback tag in both repos: `pre-official-kits`.
 
 ## 2. Uncommitted / untracked in the working tree — LEAVE ALONE unless asked
 
-Both repos have the SAME 18 files untracked, **predating this session** (they
-were in the git status at session start; I did not touch them):
-
-- **`viewer/img/parts/ClassicDecor_*.png`** and planner **`img/parts/ClassicDecor_*.png`**
-  — 18 files, one per faceplate size (`1W-05H … 4W-2H`). These look like the
-  **Classic (non-pro) faceplate render thumbnails** — i.e. art for the exact
-  family the planned next step switches the kits to (§4). **Confirm with Joey
-  what they are before wiring them.** Do not commit them as a side effect.
-- viewer also has a pre-existing modified `GLB Pipeline/gen2_jobs.json` + a
-  `.json.bak` — pipeline scratch, not this session's work, not mine to commit.
+**RESOLVED 2026-07-25** — Joey confirmed the untracked `ClassicDecor_*.png` in
+both repos ARE the Classic (non-pro) faceplate renders, and the matching GLBs
+had landed too. Both are now wired and are part of the Classic work (§4), so
+they SHOULD be committed with it. Still do not commit
+`GLB Pipeline/gen2_jobs.json.bak` (pipeline scratch); the `gen2_jobs.json`
+change itself is the ClassicDecor export job and belongs with the assets.
 
 ---
 
@@ -70,14 +66,49 @@ push anytime — they're not gated on DNS):
 
 ## 4. Open threads / suggested next steps
 
-1. **Classic (non-pro) faceplate switch for the starter kits** — the biggest
-   planned item; see the **"PLANNED: Classic faceplates"** section in `CLAUDE.md`.
-   Goal: switch the 10 kits from Essential (bolt-on handle → needs M3 screws) to
-   print-in-place Classic, dropping required hardware to zero. **Blocker:**
-   `FACE_FAMILIES` in `generate.js` has no `classic` entry; needs the 18-size
-   GLB set + a mounting-plane Z + a render batch (same pipeline as Classic Pro).
-   NB the 18 untracked `ClassicDecor_*.png` (§2) may already be the render half —
-   check with Joey. Standing offer: scaffold `FACE_FAMILIES.classic` ahead of the GLBs.
+1. ~~**Classic (non-pro) faceplate switch for the starter kits**~~ — **DONE
+   2026-07-25.** All four families are wired in both tools and the 10 kits ship
+   Classic with zero required hardware (39/63 prints, no wrench counter). Card
+   + share art re-captured, goldens refreshed, viewer 12/12 + planner 90/90.
+   See the "Decor Faceplates — Classic" section in `CLAUDE.md`. The planner's
+   Classic hero card art (`img/parts/Faceplate-Classic.jpg`) landed the same
+   day and is wired, so all four style cards now carry a background + hover
+   preview.
+1b. ✅ **REGRESSION found AND fixed 2026-07-25.** Commit `fafbad8` ("Crystal
+   handles land + embed polish") accidentally reverted the completed 2026-07-19
+   under-table rails wiring in `generate.js` — a stale-copy overwrite: its
+   diffstat was 24 insertions / 38 deletions, and the deletions were all rails
+   work the commit message never mentions. Lost: `railDepth`/`railScrewBack`
+   for 59/115/240/270, 165's MEASURED `railScrewBack: 34`, the `utScrewBackZ`
+   formula (hardcoded back to `railBackZ + 32.57`, which silently put the 165
+   back screw row 2 mm out), `imgFor`'s `UnderTableRail_` branch, and the
+   header/links scope comments.
+   ⚠ **This was NOT pending — `fafbad8` IS `origin/main`, so it was LIVE.** The
+   deployed planner advertises all six under-table lengths with no badge while
+   the deployed viewer errors on four of them. Restored from `369dcff` and
+   verified: all six generate, rails mount, screw rows land on the measured
+   insets (185 −75.93/77.07, 165 −65.93, 240 railZ 0 flush-back), rail BOM rows
+   show their renders. The Crystal-handle changes in the same commit were
+   legitimate and were deliberately left intact.
+   **Lesson for future sessions: never write a whole file back from a copy read
+   earlier in the session — re-read before writing, and check your own diffstat
+   for deletions you can't explain.**
+1c. ✅ **Two more live bugs found by the 2026-07-25 audit, both fixed:**
+   - **Classic 3H drawers on 115/240/270 hung the viewer forever** — those
+     catalogs stop at 2H (no 3H GLB was ever cut), the generator emitted the
+     node anyway, and loadTemplates' bare Promise.all swallowed the 404 with
+     the spinner still up. Fixed at four layers: generate.js
+     `COLL[L].classicMaxHH` (graceful error), planner
+     `collectionCases[L].maxClassicH` (size not offered, sanitize drops it),
+     main.js loadTemplates now throws a readable "part model missing" error
+     (boot → bootFail, regenerate → showBlocked, regenBusy cleared), and
+     `test/parts-exist.test.mjs` sweeps every legal build against the pools.
+   - **Handle ◀▶ silently died on the static kits** — the Crystal batch never
+     copied into the kit folders (tabletop-165 had ONLY Deco). All nine handle
+     GLBs are in all three handled kit folders now (hash-verified against the
+     pools), and applyHandleStyle/applyFaceplateStyle roll back + return
+     `false` on a missing GLB so the cycle SKIPS the gap instead of dying
+     (verified live by stashing a GLB: ▶ from BlockBar F lands on Crystal B).
 2. **Push the label-generator README updates** (doc-only, not DNS-gated) — 1 commit each.
 3. **Reply to mbravo on Printables** once the label fixes are confirmed working
    in his Firefox (the one env neither Claude nor Joey can test).

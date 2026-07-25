@@ -122,6 +122,15 @@ part with its color chip + download links.
   (88 parts — 59:4 / 115:16 / 165:18 / 185:18 / 240:16 / 270:16, `ClassicDrawer_{code}`,
   all canonical_ok; six `collection:<L>` jobs appended to gen2_jobs.json; run notes:
   `D:\Render Projects\GEN2_Blender_Render_Setup_ClassicDrawers_AllLengths.md`).
+  ⚠ **The 16-part catalogs (115/240/270) have NO 3H** — only 165/185 got the
+  two 3H sizes. That gap silently HUNG the viewer (2026-07-25: the generator
+  emitted `ClassicDrawer_<L>-…-3H` unguarded and loadTemplates never surfaced
+  the 404). Guarded both ends now: generate.js `COLL[L].classicMaxHH: 4` →
+  graceful error, planner `collectionCases[L].maxClassicH: 2` → the size isn't
+  offered (sanitize drops it from restored hashes). If the 3H models ever get
+  cut, delete both caps together. `test/parts-exist.test.mjs` sweeps every
+  legal build against the GLB pools so the next catalog gap fails in CI, not
+  as a production hang.
   Source blend is `GLB Library\GEN2 GLB Exporter - GEN2 Classic Drawers.blend` —
   ⚠ it received in-session fixes (240-4W rotations zeroed, 115-4W-15H/2H restored
   from disk, 185-4W-05H/1H appended from the old 185 thumbnail blend, spec-order
@@ -272,9 +281,44 @@ blue/cyan, QuickLock teal, Foot purple, Stopper magenta, bracket/screw steel.
 L/R mirror pairs are single types so they share a color already. Users can still
 switch to their own filament colors via the identify card. The static demo kits
 keep the planner's GEN2 palette in their manifests. Per-part
-`links` {p, t} = Printables/Thangs URLs **mirrored from the planner's verified
-LINK_OVERRIDES** (`gen2-planner-main/js/data.js` is the source of truth — update
-both together). `purchased: true` marks hardware-store items (magnets, screws
+`links` {p, t, m, c} = Printables/Thangs/MakerWorld/Cults URLs **mirrored from
+the planner's verified LINK_OVERRIDES** (`gen2-planner-main/js/data.js` is the
+source of truth — update both together).
+**Preferred model site (2026-07-25, ahead of Joey's MakerWorld/Cults uploads):**
+each row shows ONE store button + a ▾ of the other stores that actually carry
+the part, so rows never widen as stores are added. `STORES` in main.js (id/
+key/label/host) mirrors the planner's STORES in data.js — keep ids and order in
+step; array order IS the fallback chain (Printables first, most complete
+catalog). Resolution: preferred store if it has the part, else first fallback —
+and the button always NAMES the store it opens (a Printables-only part under a
+MakerWorld preference reads "Printables", never a surprise). Stores without the
+part are OMITTED from the ▾, not greyed. The preference is set BY USE (opening
+a store from the ▾ adopts it), by the explicit picker (`#store-pref` beside
+Copy list/CSV; planner `#link-site` in .bom-actions; the embed hides the
+viewer's — the docked planner owns it), or SEEDED by `?from=<storeid>` /
+referrer — seeding only fills an EMPTY preference, never overwrites a pick.
+Put `?from=makerworld` etc. in the links you print in each platform's
+description (also crude attribution). Cross-context sync rides a `{gen2:
+'store', t, store}` message on the SAME newest-wins-by-stamp pattern as the
+palette relay — deliberately NOT on buildOptions, which regenerates the scene.
+Viewer storage `gen2-store`(+`:t`), planner `gen2-link-store`(+`:t`); NOT a
+BUILD_FIELD (device preference, not build state — never rides share links).
+Adding a store = a STORES row in both tools + `m`/`c` urls on LINK_OVERRIDES
+entries (viewer LINKS/LINKS_BY_LEN inherit via the mirror rule). ⚠ MakerWorld
+403s automated fetchers — those urls can't be link-checked in CI, verify by
+eye. **MakerWorld coverage (2026-07-25 batch, Joey's uploads):** cases /
+classic drawers / decor drawers / under-table rails / covers for ALL SIX
+lengths + foot rails 115/165/185/240 — patched into BOTH tools keyed by each
+entry's unique Printables model id (scratch `add_makerworld.py` pattern; the
+per-SKU "185-2W-1H Decor Drawer" row and the viewer's LINKS.rail 185-fallback
+share their page's id and correctly took the same m url). ⚠ Joey's foot-rails
+list arrived with a row slip (165 duplicated the 115 url; 240/270 rows carried
+165/240 slugs) — wired BY SLUG, and **270 foot rails has NO MakerWorld url
+yet** (falls back to Printables, honestly labelled). Faceplates deliberately
+have none (Joey can't publish EdgeLabel there). Kit + wall-bracket pages also
+still Printables/Thangs-only. Planner-side the ▾ lives in string-rendered BOM HTML → its click handler
+is DELEGATED on #bom (survives re-renders); `sitesFor` keeps the ghost-search
+fallback ONLY for the single primary button when NO store has the part. `purchased: true` marks hardware-store items (magnets, screws
 would-be) — excluded from the print count, shown "×N · buy", and **color-locked**
 (main.js `colorLocked`: a type whose rows are all purchased gets no filament
 picker — BOM chip + identify swatch inert, presets/saved tints ignored by
@@ -487,11 +531,18 @@ drawer) — no manifest data, works for generated builds too.
 **Filament colors:** FILAMENT_DB in main.js = a multi-BRAND database — one
 entry per brand `{brand, line, url, colors[]}`, rendered as collapsible
 sections (session-remembered expansion, count badge) under a live search box
-(filters across brand+line+label; matches force-open; empty state). Adding
+(filters across brand+line+label; matches force-open; empty state). Sections are
+keyed by **brand + LINE**, not brand alone — one brand can ship several lines on
+separate product pages (Polymaker Basic PLA vs Silk PLA) and they must fold
+independently. Adding
 Prusa / Polar later = appending one DB entry. Today: Elegoo
-PETG (★ "Elegoo PETG Black", amzn.to affiliate, Joey's budget pick for
-cases/drawer bodies) + Polymaker Panchroma™ PLA (all 28 real 1kg variants,
-Shopify variant ids scraped 2026-07-05, hexes approximated) + Printed Solid
+PLA/PETG (★ "Elegoo PETG Black", amzn.to affiliate, Joey's budget pick for
+cases/drawer bodies; ★ "Elegoo PLA Black" 2026-07-25 = the Classic faceplate
+BODY) + Polymaker Panchroma™ PLA (all 28 real 1kg variants,
+Shopify variant ids scraped 2026-07-05, hexes approximated) + Polymaker
+Panchroma™ Silk PLA (★ "Panchroma Silk Silver" 2026-07-25 = the Classic
+grip-accent rod; its own section because Silk is the `panchroma-silk` product
+page, not `PM(id)`'s `panchroma-pla`) + Printed Solid
 (Jessie) PLA (2026-07-15: 21 solid Basic/Premium colors, hexes + printedsolid.com
 product links scraped from 3dfilamentprofiles.com/filaments/printed-solid;
 PLA-only, solids-only, links-only per Joey — glitter/marble/silk/multicolor +
@@ -514,13 +565,46 @@ an emissive orange that SKEWS the color being judged (a blue pick read pink),
 so while the filament menu is open the selected part renders in its plain
 material — identify card + pointer line still mark it; the glow returns when
 the menu closes (all 3 close paths + handle swaps route through the helper).
+**Picker open/close/target (rebuilt 2026-07-25, Joey):** every dismissal goes
+through `closeFilamentMenu()`, which also CLEARS `fmType` — it used to linger,
+so a swatch clicked after the menu was dismissed still wrote to the
+last-edited key. There's a **✕** in the menu's title row (`#fm-close`; 34 px on
+the mobile bottom sheet) because there was no reliable way to dismiss it.
+Clicking the chip/swatch you're already editing toggles the menu shut; clicking
+a DIFFERENT one RE-TARGETS without closing (the header swatch used to just
+close, which is how stale-key picks happened). The zone chip being edited wears
+an accent ring (`.zone-chip.on`), rebuilt by `syncZoneChips()` on every
+open/retarget/close — without it you can't tell where your next pick lands.
+**One-swatch surfaces show the FRONT, not the base** (`primaryKey(node)`, Joey
+2026-07-25): where only a single chip fits — the BOM row chip and the identify
+card's header swatch — a part with a `FACE` zone shows and EDITS
+`Faceplate:FACE`, because that layer covers the whole visible front while BODY
+sits behind it and barely shows. Data-driven off the GLB's zone tags (`FRONT_ZONE`),
+so any future part with a FACE inherits it; everything else still keys the plain
+type. The per-zone chips remain the full control.
+⚠ **"Body" is the part's BASE colour, not just the body zone**: per `activeHex`,
+every zone with no explicit pick INHERITS it, so changing Body visibly repaints
+all untouched zones — on the 4-zone Classic plate that reads exactly like a bug
+(Joey reported it as one). It's the documented "one identification colour per
+part by default" rule, so the fix was to make it legible, not to remove it: the
+Body chip's tooltip now names the zones currently inheriting. Every PRESET
+defines all four faceplate zones, so under a preset nothing inherits.
 **Filament presets**
 (main.js PRESETS, shown in the BOM panel): one click sets a filament per type —
 "The Jerrari" (black shell INCLUDING the faceplate body + black back cover,
-prusa-orange GRIP, silver grip-accent rod + handles, holo-blue Accent, white
+orange GRIP, silver grip-accent rod, silver handles, holo-blue Accent, white
 Label, orange-PETG hardware — Joey's 2026-07-13 spec) + Stealth / Signal /
-Sandstone. Every preset themes the FULL build now: faceplate zone keys
-('Faceplate:GRIP', ':GRIP ACCENT'), Accent/Label/BackCover, Rail — and L/U
+Sandstone. **The Jerrari's faceplate is REAL, buyable filament as of
+2026-07-25** — the `CLASSIC_FACE` block (Joey's Classic spec): body = Elegoo
+PLA Black, FACE + GRIP = Printed Solid Mystery Orange, GRIP ACCENT = Panchroma
+Silk Silver. Each `name` matches its FILAMENT_DB `label` exactly, which is what
+makes the picker ring that swatch as active and resolve "Buy … →" to the real
+product page — copy that pattern when swapping the remaining placeholder hexes.
+Joey's call 2026-07-25: this is the ONE-CLICK look, **not** the first-load
+default — a fresh build still opens in the K'nex instruction palette so parts
+stay findable while you follow the steps.
+Every preset themes the FULL build: faceplate zone keys
+('Faceplate:FACE' — Classic only, ':GRIP', ':GRIP ACCENT'), Accent/Label/BackCover, Rail — and L/U
 pairs (covers, footrails) share ONE color per preset (the two-tone pair look
 belongs to the instruction palette; see the alt-shade gate above). The preset
 block is COLLAPSIBLE (`#preset-head` chevron, sessionStorage
@@ -616,6 +700,19 @@ notes) — everything else is ground-truth calibrated.
 
 ## Run / preview
 
+⚠ **Never write a whole source file back from a copy you read earlier in the
+session — re-read first, and check your own diffstat for deletions you can't
+explain.** This is not hypothetical: commit `fafbad8` ("Crystal handles land +
+embed polish", 2026-07-20) did exactly that to `generate.js` and silently
+REVERTED the completed 2026-07-19 under-table rails wiring — 24 insertions / 38
+deletions, where every deletion belonged to a feature the commit never mentions.
+It reached production and broke under-table generation for 4 of the 6
+collections (the planner meanwhile advertised all six, so the 3D button was live
+and led to an error overlay). Found + restored 2026-07-25 from `369dcff`. Two
+cheap habits catch it: prefer targeted edits over whole-file writes, and read
+your own `git show <sha> --stat` before committing — a file shrinking in a
+commit that only adds a feature is the tell.
+
 `.claude/launch.json` → "viewer" (`python serve-viewer.py 8123` — a no-store
 http.server serving `viewer/`). Or double-click `serve-viewer.bat` (repo root).
 **Cache-Control: no-store is deliberate** (2026-07-08): plain `python -m
@@ -705,22 +802,42 @@ runs every builds/*.json through migrate+generateManifest (pure JS, plain node)
 and diffs against `test/golden/<id>.manifest.json` — a generator change that
 alters an official kit fails before it can deploy over a printed link;
 intentional changes refresh via `UPDATE_GOLDEN=1 npm test`.
+⚠ `npm test` is bare `node --test`, which executes **every** `.mjs` inside
+`test/` — not just `*.test.mjs`. Drop a scratch probe in there and it becomes
+part of the suite (one that loads a GLB or waits will hang `npm test`
+outright, which is exactly what happened 2026-07-25). Put throwaway scripts in
+a scratch dir OUTSIDE the repo, and if the suite ever hangs or reports odd
+counts, `ls test/` first. Same rule in the planner repo.
+`test/parts-exist.test.mjs` (2026-07-25) is the second suite: it sweeps every
+legal single-unit build (6 lengths × both drawer fills × all sizes × mounts ×
+faceplate families × handle styles) and asserts a generated manifest never
+references a GLB missing from `viewer/parts/<L>/` — the exact condition that
+used to hang the app (see the Classic Drawer 3H note in the GLB Library
+section). It also enforces each static kit folder backs its manifest, all
+NINE handle styles when the kit has handles, and all four faceplate families
+per plate size (the Crystal batch once skipped the kit folders and ▶ died
+silently on the default page; every kit carries all nine now, and main.js's
+cycle handlers roll back + SKIP a style whose GLB is absent instead of dying —
+applyHandleStyle/applyFaceplateStyle return `false`, loadTemplates collects
+missing nodes and throws a READABLE error that boot routes to bootFail and
+regenerate to showBlocked with regenBusy cleared).
 **The five starter kits (2026-07-23):** `{115,165,185,240,270}-tabletop-2w2h` —
-ONE layout for all (2W-1H on top, two 1W-1H below = 3 drawers / 42 prints /
+ONE layout for all (2W-1H on top, two 1W-1H below = 3 drawers / 39 prints /
 12 steps) so the collection DEPTH is the only variable across the family. 59
 is excluded (hanging-only). **Magnet closures are ON by default and that's
 deliberate** (Joey): it adds the clip/magnet install steps and puts the
 hardware-store magnets in the BOM with their affiliate buy chips — a beginner
 sees exactly what to order; stoppers ship too, and both are ✕-removable in the
-viewer so the kits double as a demo of Build options. Essential faceplates +
-Deco handles (nothing club-gated required on day one) — **planned to switch to
-print-in-place Classic faceplates once their GLBs land, dropping the kits'
-required hardware to zero; see the "PLANNED: Classic faceplates" section**.
+viewer so the kits double as a demo of Build options. **Classic faceplates
+since 2026-07-25** (was Essential + Deco handles): the grip prints in, so the
+kits need **zero** required hardware and the wrench counter is gone — see the
+"Decor Faceplates — Classic" section. Magnets stay opt-in, so they don't
+count against the print-and-build-today promise.
 Gallery `dims` are the
 TRUE physical envelope read from the viewer's assembledBox (matches the cover
 badge — 240 = 176×140×269), NOT the planner's grid math.
 **Second tier — the 3W kit (2026-07-24):** `{115,165,185,240,270}-tabletop-3w2h`
-— top row 2W-1H + 1W-1H over three 1W-1H (5 drawers / 68 prints / 14 steps).
+— top row 2W-1H + 1W-1H over three 1W-1H (5 drawers / 63 prints / 14 steps).
 **Naming: every kit is a "Tabletop Kit", differentiated ONLY by footprint**
 (`GEN2 240 Tabletop Kit 3W-2H`, id `<L>-tabletop-<w>w<h>h`) — Joey rejected a
 separate "Workbench Kit" name because the ASSEMBLY PROCESS is identical, and a
@@ -934,9 +1051,13 @@ don't reload the page — force `location.reload()` when testing.
 ## Handle screws — M3-6 button head (2026-07-24)
 
 `ButtonHeadScrew_M3-6` fastens a BOLT-ON handle to its faceplate — the one
-REQUIRED bought item on an Essential build (EdgeLabel / Classic Pro print their
-grip in and emit none; generate.js gates on `face.hasHandle`, the planner on
+REQUIRED bought item on an Essential build, and **Essential is now the ONLY
+family that emits it** (Classic / EdgeLabel / Classic Pro all print their grip
+in; generate.js gates on `face.hasHandle`, the planner on
 `decorExtras[].boltOnOnly` + `faceDef.integratedHandle`). **2 per handle.**
+Since the starter kits moved to Classic (2026-07-25) this is opt-in art rather
+than something every beginner meets — but Essential stays user-selectable, so
+the screws are still modeled, billed and animated.
 Asset handoff + provenance: `2026-07-24-m3-screw-asset-handoff.md`.
 Placement (faceplate-CENTRE-relative, DERIVED from one posed Essential 1W-1H —
 no printed ground truth): x ±21.99/+22.02 (the handle's mount-hole pitch),
@@ -995,37 +1116,76 @@ a lone counter-clockwise region, still winding −1, so nonzero fill renders it
 as a stray square floating off the head. Ring + shaft wound clockwise union
 seamlessly; only the handle hole (fully inside the shaft) is counter-clockwise.
 
-## PLANNED: Classic faceplates → make the starter kits print-and-build-today (2026-07-24)
+## Decor Faceplates — Classic, the FREE series (DONE — 2026-07-25)
 
-**Not built yet — waiting on Joey's Classic (non-pro) faceplate GLBs.** The
-starter kits currently ship **Essential** faceplates, whose handle BOLTS ON,
-so every kit needs 2× M3×6 per drawer — the ONE required-hardware barrier in an
-otherwise print-only build, and the reason each kit card shows "🔩 6 to buy".
-The **Classic (non-pro)** family (free, popular —
-printables.com/model/1280870-gen2-decor-faceplates-classic-series, which Joey
-is refreshing) prints its grip IN PLACE like the Classic drawers: no bolt-on
-handle, so **zero required hardware**. Switching the kits to Classic makes them
-genuinely print-and-build-today, and the required-hardware wrench marker flips
-every kit from "🔩 6 to buy" to a clean "42 to print" — the value becomes
-self-evident instead of needing explanation.
+**The starter kits are print-and-build-today.** All ten now ship **Classic**
+instead of Essential, so their required hardware is **zero** and the wrench
+counter is simply gone from the checklist head ("🧩 39 to print", was
+"42 to print · 🔩 6 to buy"). Print counts dropped because the Deco handles
+left the list too: **2W-2H 42 → 39, 3W-2H 68 → 63** (the gallery's TIERS
+blurbs in `builds/index.html` carry those numbers — update them together).
 **Why this is the right default, not just convenient:** magnets are opt-in
 (a menu with "None" beside them), but a bolt-on handle has no "None" — without
 the screws there's no handle, so an Essential kit CANNOT be finished from the
-printer alone. That's the worst failure point for an onboarding kit.
-**The upsell ladder becomes legible:** Classic (free, no hardware) → Essential
-(free, swap handle styles, costs 2 screws/drawer) → Classic Pro / EdgeLabel
-(club, swappable labels + accent panels). The viewer already lets a tapped
-faceplate cycle all families, so the ladder is visible in-tool.
-**Blocker:** `FACE_FAMILIES` in generate.js has essential/edgelabel/classicpro
-only. Classic needs the same pipeline Classic Pro got — the 18-size GLB set, a
-mounting-plane Z (DERIVE like the others), and a 256² render batch. Scaffolding
-`FACE_FAMILIES.classic` ahead of the GLBs is a standing offer.
-**The M3 screw work is NOT wasted by this:** Essential stays a user-selectable
-family in the planner, so the screws must be modeled + billed regardless — only
-the kit DEFAULT changes. Once Classic lands, flip `faceStyle` "essential" →
-"classic" in all ten `viewer/builds/*.json`, re-capture the `?shot=1` renders +
-share cards, and refresh goldens. Kit ids/structure/links are untouched — safe
-ONLY because nothing is published yet (a printed link freezes the id forever).
+printer alone. That was the worst failure point for an onboarding kit.
+**The upsell ladder is now legible in-tool:** Classic (free, no hardware) →
+Essential (free, swap handle styles, costs 2 screws/drawer) → Classic Pro /
+EdgeLabel (club, labels + accents). A tapped faceplate cycles all four.
+Essential keeps its M3 screws — only the kit DEFAULT changed.
+
+⚠ **Naming trap, the one thing that will bite you:** the GLB/render prefix is
+**`ClassicDecor_`** (the exporter's name) but the family id is `classic` and the
+label is **"Classic"** — and "Classic Pro" is a DIFFERENT family. Never
+prefix-match loosely: `startsWith('Faceplate_Classic')` swallows Classic Pro.
+generate.js `imgFor` uses an anchored regex; the planner's `partImage`
+alternation lists `Classic Pro` BEFORE `Classic`. The planner's BOM template is
+`GEN2 <label> Decor Faceplate - <size>`, so label "Classic" (not "Classic
+Decor") is what avoids a "Decor Decor" stutter.
+
+- **Geometry:** 18 sizes, depth **29.2**, canonical center-mode ⇒ plate z-center
+  = mounting plane 92.57 + 29.2/2 = **107.17** (same rule as every family).
+  **4 material zones — `BODY | FACE | GRIP | GRIP ACCENT`** (one more than
+  Classic Pro; `FACE` is a 2 mm front layer). The identify card grows a 4th
+  swatch with ZERO code — `renderZoneChips` discovers zones from the GLB
+  material stubs. `Faceplate:FACE` has no PRESETS entry on purpose, so it
+  follows the body colour until someone picks it (the "one identification
+  colour by default" rule).
+- ⚠ **The four 1H sizes carry the grip BOTTOM-flush; the other fourteen carry
+  it TOP-flush.** This looks exactly like the upside-down-export bug that hit
+  the accents and the 240 drawers — it is NOT one. The pipeline job note says
+  *"that is correct per Fusion, do not 'fix' it"*, and the shipped Classic
+  DRAWERS behave the same way (see the GLB Library section's note that lip
+  height is not a valid orientation invariant). Verified in-scene: 1H grip low,
+  2H grip high, both facing forward.
+- **No dressing at all** (`extras: false`, `hasHandle: false`): no accent, no
+  label, no handle, no screws — the only family needing zero bought hardware.
+  It DOES seat the universal optional back cover (that placement is
+  family-independent; the row just picks up `face.links`). The faceplate
+  cinematic degenerates to 7 phases — pop, vanish, plate floats in, appear,
+  slide down, home — with the back-cover swoop added when it's on.
+- **The step note needed a real fix, not just a new entry:** it was a BINARY
+  ternary (`extras ? dressing : M3-handle-text`), so a family with neither
+  would have told users to thread screws into a plate that has no handle, after
+  an empty "Assemble the faceplate first: ." sentence. Now three-way, and it
+  drops the "assembled" wording when nothing was assembled. Essential /
+  EdgeLabel / Classic Pro output is **byte-identical** — proved old-vs-new
+  across 78 build shapes before the kits were flipped.
+- **Wired:** generate.js `LINKS.fpcl` + `FACE_FAMILIES.classic` + `imgFor`;
+  main.js `FACEPLATE_STYLES` (2nd, so the cycle reads Essential → Classic →
+  EdgeLabel → Classic Pro); planner `faceplateStyles` (index 1 — NOT 0, that's
+  the default and a test hard-codes "essential"), `LINK_OVERRIDES["GEN2 Decor -
+  Faceplates - Classic Series"]` (serves the plate rows AND, via `linkAs`, the
+  back-cover rows), `partImage`, and the hero card art
+  `img/parts/Faceplate-Classic.jpg`. No `labelGen` — Classic has no label
+  generator, and the ABSENCE of the key is what hides the pill (don't add one).
+  Links: Printables /model/1280870-gen2-decor-faceplates-classic-series ·
+  than.gs/m/1334047.
+- **Assets** (exported 2026-07-25, 18/18 canonical): `GLB Library/Faceplates/
+  ClassicDecor/`, copied into `viewer/parts/{115,165,185,240,270}/` (18 each)
+  and `parts/59/` (4 — the mini catalog's 1W/2W × 05H/1H, same trim as every
+  family), plus the kit folders. 18 renders `ClassicDecor_<size>.png` flat in
+  BOTH tools' `img/parts/`. Source blend `Blender Files\Decor Faceplates\GEN2
+  GLB Exporter - GEN2 Faceplates - Classic.blend`; job in `gen2_jobs.json`.
 
 ## Decor Faceplates — EdgeLabel (thumbnails + GLB DONE — 2026-07-08)
 
@@ -1344,8 +1504,9 @@ edited by mistake once; Joey deleted the D: copies 2026-07-24. Each is a single
 ## Deferred (designed, not built)
 
 Ghost previews of upcoming parts, fx timelines (quicklock dip-and-pop, disassembly
-epilogue), classic drawer + case extender GLBs, non-Essential faceplate styles.
+epilogue), case extender GLBs.
 PoC v2 JSX (chat artifact) had the fx design; notes §6 describes it.
-**Classic (non-pro) faceplate family** — see the PLANNED section above; the
-starter kits switch to it once the GLBs land, to drop their required hardware
-to zero.
+All four decor faceplate families are BUILT now (Essential / Classic / EdgeLabel
+/ Classic Pro) — the last one landed 2026-07-25, hero card art included. The
+only faceplate art still missing is Accent + Label renders for the two club
+families (their identify cards hide the gap).
