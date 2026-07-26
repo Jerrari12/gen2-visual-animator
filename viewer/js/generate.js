@@ -307,6 +307,14 @@ export function generateManifest(build) {
   // final volume. 165/185 keep their calibrated values exactly.
   const slideBack = -Math.max(170, depth - 15);       // covers/FR-U/settle-from-behind reach
   const wallFwd = Math.max(WALL.lowerFwd, depth + 40);// wall lower-row slide-in reach
+  // How far the Drawers step pops the demo drawer forward. The magnet clip
+  // rides the drawer's BACK (z −83 + dz), so the pop has to clear the CASE
+  // FRONT (depth/2) or you're watching the clip go on inside the case — which
+  // is exactly what happened on 240 (40 mm buried) and 270 (70 mm), Joey
+  // 2026-07-25. depth + 5 puts the clip a constant 14.5 mm proud of the case
+  // face on every collection, and is a straight generalization of the 185
+  // calibration (185 + 5 = the 190 this used to hardcode, unchanged).
+  const drwPop = depth + 5;
   // tight per-case framing for wall work: size the shot by THE CASE and its
   // hardware, never the whole build — on a wide build cam()'s totalW scaling
   // shrank the actual action to a thumbnail (Joey 2026-07-11: don't crop the
@@ -1053,16 +1061,16 @@ export function generateManifest(build) {
     const magIds = hasMag ? [{ id: `dc${i}` }, { id: `dm${i}` }] : []; // clip+magnet riders, or none
     if (firstDrawerDemo === null) {
       firstDrawerDemo = i;
-      drawerPhases.push({ enter: [{ id: `drw${i}`, at: [0, 0, 190], from: [0, 0, 60] }] });
+      drawerPhases.push({ enter: [{ id: `drw${i}`, at: [0, 0, drwPop], from: [0, 0, 60] }] });
       if (hasMag) drawerPhases.push(
-        { enter: [{ id: `dc${i}`, at: [0, 35, 190], from: [0, 30, 0] }] },
-        { enter: [{ id: `dm${i}`, at: [0, 35, 190], from: [0, 0, 30] }] },
+        { enter: [{ id: `dc${i}`, at: [0, 35, drwPop], from: [0, 30, 0] }] },
+        { enter: [{ id: `dm${i}`, at: [0, 35, drwPop], from: [0, 0, 30] }] },
         { move: [{ id: `dc${i}`, by: [0, -35, 0] }, { id: `dm${i}`, by: [0, -35, 0] }] },
       );
-      drawerPhases.push({ move: [{ id: `drw${i}`, by: [0, 0, -190] }, ...magIds.map(m => ({ id: m.id, by: [0, 0, -190] }))] });
+      drawerPhases.push({ move: [{ id: `drw${i}`, by: [0, 0, -drwPop] }, ...magIds.map(m => ({ id: m.id, by: [0, 0, -drwPop] }))] });
     } else {
       if (hasMag) drawerFades.push({ id: `dc${i}` }, { id: `dm${i}` });
-      drawerPhases._laterDrawers = (drawerPhases._laterDrawers || []).concat({ id: `drw${i}`, from: [0, 0, 200] });
+      drawerPhases._laterDrawers = (drawerPhases._laterDrawers || []).concat({ id: `drw${i}`, from: [0, 0, drwPop + 10] });
     }
     if (isClassic) return; // the classic drawer IS its own front — no plate, no dressing
     // faceplate: Essential ground-truth z-center 95.07 (front face 97.57, where

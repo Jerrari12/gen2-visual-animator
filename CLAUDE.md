@@ -920,8 +920,15 @@ and builds over 80 units (a step per case stops being instructions).
 The four new lengths generate with a runtime warning ("scaled from the 185
 calibration") — every hardware Z is DERIVED via ±dz (sign generic: 240/270
 shift outward), ZERO ground-truth assemblies; verify on printed builds like the
-165. Deep collections get depth-scaled staging (`slideBack`/`wallFwd`/
-`CAM_DEPTH` locals in generate.js); 165/185 output stays byte-identical
+165. Deep collections get depth-scaled staging (`slideBack`/`wallFwd`/`drwPop`/
+`CAM_DEPTH` locals in generate.js). ⚠ **`drwPop` (the Drawers-step pop) MUST
+scale with depth**: the magnet clip rides the drawer's BACK (z −83 + dz), so
+the pop has to clear the CASE FRONT (depth/2) or the clip is installed
+*inside* the case — a hardcoded 190 buried it 40 mm on the 240 and 70 mm on
+the 270 (Joey 2026-07-25). `drwPop = depth + 5` puts the clip a constant
+14.5 mm proud on every collection and is a generalization of the 185
+calibration, not a new tuning (185 + 5 = the old 190, so 185 is unchanged).
+165/185 output stays byte-identical
 (regression-tested old-vs-new on 11 build shapes, 2026-07-10). Faceplate family
 swap serves all six (main.js FACEPLATE_STYLES.collections). Every collection's
 case/drawer/cover/footrail BOM rows show real photos (2026-07-10 render
