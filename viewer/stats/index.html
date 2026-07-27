@@ -412,13 +412,16 @@ async function api(site, path, params, tries = 0) {
   try {
     res = await paced(() => fetch(url, { headers: { Authorization: 'Bearer ' + tokens[site.id] } }));
   } catch (e) {
-    // fetch only REJECTS at the network layer — a blocked request never gets a
-    // status. goatcounter.com is on the standard tracker blocklists (Brave
-    // Shields, uBlock, Firefox strict), so this is the likeliest failure by far
-    // and deserves a real instruction rather than "TypeError: Failed to fetch".
-    throw new Error(`${site.label}: the request never left the browser. goatcounter.com is on tracker `
-      + `blocklists — allow it for this site (Brave: click the 🦁 → Shields DOWN; uBlock: click the icon → power button) `
-      + `or open this page in a browser without a blocker.`);
+    // fetch rejects with the SAME TypeError for a blocked request, a DNS/network
+    // failure and a CORS rejection — the browser deliberately tells JS nothing.
+    // A blocker is much the likeliest (goatcounter.com is on the standard
+    // lists), but the message must not assert it as fact.
+    throw new Error(`${site.label}: the request never left the browser (${site.host}). `
+      + `Most often a tracker blocker — goatcounter.com is on the standard lists. `
+      + `Brave: 🦁 → Shields DOWN, then RELOAD the page (toggling shields alone doesn't re-run the request). `
+      + `uBlock/AdGuard: allow the site there too — a browser can have more than one blocker. `
+      + `If shields are already down and it still fails, open DevTools → Network, filter "goatcounter", `
+      + `and check the request: no entry at all means blocked, a red/failed entry means DNS or connectivity.`);
   }
   if (res.status === 401 || res.status === 403)
     throw new Error(`${site.label}: token rejected — check it was pasted whole and has the “Read statistics” permission.`);
