@@ -1,5 +1,10 @@
 # Session handoff — GEN2 viewer + planner (2026-07-24)
 
+> ⚠ **SUPERSEDED by `2026-07-25-session-handoff.md` — read that instead.**
+> Kept for the history. Everything below is RESOLVED: the §1 deploy gate is
+> closed (DNS set 2026-07-25, both repos pushed and live), and the §4 open
+> threads are done. Do not act on this file.
+
 Read this first, then `CLAUDE.md` (auto-loaded). This file is the TRANSIENT
 state — what's in flight right now. `CLAUDE.md` has the durable how/why.
 
