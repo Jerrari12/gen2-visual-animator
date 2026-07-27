@@ -132,6 +132,22 @@ canvas { display: block; width: 100%; }
 .note { font-size: .66rem; color: var(--dim); line-height: 1.7; }
 .hidden { display: none !important; }
 .empty { color: var(--dim); font-size: .74rem; padding: 22px 0; text-align: center; }
+
+/* mount cards */
+.mounts { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.mount {
+  display: flex; align-items: center; gap: 12px; padding: 12px 14px;
+  border: 1px solid var(--line); border-radius: 4px; background: #0a0d14;
+}
+.mount .ic { color: var(--cyan); flex: none; filter: drop-shadow(0 0 6px rgba(34,224,214,.5)); }
+.mount .n { font-size: .62rem; letter-spacing: .16em; color: var(--dim); }
+.mount .c { font-size: 1.35rem; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.mount .p { font-size: .6rem; color: var(--dim); }
+/* group heading inside a scrolling list */
+.gh { font-size: .58rem; letter-spacing: .22em; color: var(--dim); margin: 12px 0 2px; }
+.gh:first-child { margin-top: 0; }
+.row .path { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 760px) { #lists, .panel .grid { grid-template-columns: 1fr !important; } }
 </style>
 
 <div class="wrap">
@@ -199,6 +215,26 @@ canvas { display: block; width: 100%; }
       <div class="panel">
         <p class="h">Top countries</p>
         <div class="rows" id="countries"></div>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-top:14px">
+      <p class="h">What people are building <span style="color:var(--dim);text-transform:none;letter-spacing:.05em">— aggregate across all visitors</span></p>
+      <div id="mix-mount" class="mounts"></div>
+      <div class="grid" style="grid-template-columns:1fr 1fr;margin-top:16px">
+        <div><p class="h" style="margin-bottom:9px">Collection</p><div class="rows" id="mix-length"></div></div>
+        <div><p class="h" style="margin-bottom:9px">Drawer fill</p><div class="rows" id="mix-fill"></div></div>
+      </div>
+    </div>
+
+    <div class="grid" style="grid-template-columns:1fr 1fr;margin-top:14px" id="lists">
+      <div class="panel">
+        <p class="h">Pages <span style="color:var(--dim);text-transform:none;letter-spacing:.05em">— real pageviews only</span></p>
+        <div class="rows" id="pages"></div>
+      </div>
+      <div class="panel">
+        <p class="h">Events <span style="color:var(--dim);text-transform:none;letter-spacing:.05em">— clicks &amp; selections, grouped</span></p>
+        <div class="rows" id="events"></div>
       </div>
     </div>
 
@@ -285,21 +321,35 @@ async function load() {
   if (!sites.length) throw new Error('No token for the selected site — press TOKENS to add one.');
 
   const per = await Promise.all(sites.map(async site => {
-    const [total, loc] = await Promise.all([
+    const [total, loc, hits] = await Promise.all([
       api(site, 'stats/total', w),
       api(site, 'stats/locations', w),
+      api(site, 'stats/hits', { ...w, limit: 200 }),
     ]);
-    return { site, total, loc };
+    return { site, total, loc, hits };
   }));
 
   // merge across sites
   const countries = new Map();   // alpha2 -> {code, name, count}
   let views = 0, events = 0;
   const series = new Map();      // "YYYY-MM-DDTHH" -> count
+  const pages = new Map(), evts = new Map();
 
-  for (const { total, loc } of per) {
-    views += total.total || 0;
+  for (const { total, loc, hits } of per) {
+    // ⚠ the API's `total` is "visitors INCLUDING events" — events are a SUBSET,
+    // not a separate bucket. Reported raw, a headline number counts every button
+    // press as a visit; GoatCounter's own Pages list has the same problem.
+    views += (total.total || 0) - (total.total_events || 0);
     events += total.total_events || 0;
+    // one array, pageviews and events mixed, told apart only by `event`
+    for (const h of hits.hits || []) {
+      const into = h.event ? evts : pages;
+      const key = h.path;
+      const cur = into.get(key) || { path: key, title: h.title || '', count: 0 };
+      cur.count += h.count || 0;
+      if (h.title && !cur.title) cur.title = h.title;
+      into.set(key, cur);
+    }
     for (const s of loc.stats || []) {
       const code = String(s.id || '').slice(0, 2).toUpperCase();
       if (!code) continue;
@@ -321,13 +371,54 @@ async function load() {
   // 23:00 will be (always 0). Cut the series at the current hour.
   const nowKey = new Date().toISOString().slice(0, 13);      // "YYYY-MM-DDTHH", same shape as our keys
   const ordered = [...series.entries()].sort((a, b) => a[0] < b[0] ? -1 : 1).filter(([k]) => k <= nowKey);
+  const desc = m => [...m.values()].sort((a, b) => b.count - a.count);
   return {
     views, events,
     countries: [...countries.values()].sort((a, b) => b.count - a.count),
+    pages: desc(pages), events_: desc(evts), mix: buildMix(evts),
     series: ordered,
     thisHour: series.get(nowKey) || 0,
   };
 }
+
+/* ---- GEN2 event vocabulary ----------------------------------------------
+   Both apps emit "family:value" names, so the flat event list can be read as
+   the product questions it was instrumented to answer. Prefix → group; an
+   unknown prefix falls through to OTHER rather than being dropped, so a new
+   event never silently disappears from the dashboard. */
+const GROUPS = [
+  { id: 'build',  label: 'BUILD CONFIG',  pre: ['mount','length','fill','faceplate','handle','backcover','printer','opt'] },
+  { id: 'funnel', label: 'FUNNEL',        pre: ['open','start','step','complete','outro','skip-to-end','collection','from','3d-instructions','resume-build','example','surprise','customize'] },
+  { id: 'out',    label: 'OUTBOUND',      pre: ['out','linksite','store-pref','hardware','filament','labelgen','club'] },
+  { id: 'tools',  label: 'TOOLS & UI',    pre: ['dock','tool','identify','style','preset','colors','bom','export','video','save-build','load-build','share-link','save-image','start-fresh','bom-track'] },
+  { id: 'error',  label: '⚠ FAILURES',    pre: ['error'] },
+];
+const groupOf = name => {
+  const head = String(name).split(':')[0];
+  return (GROUPS.find(g => g.pre.includes(head)) || { id: 'other', label: 'OTHER' });
+};
+
+/* What are people actually building? The three planner questions, aggregated. */
+function buildMix(evts) {
+  const pick = fam => {
+    const out = [];
+    for (const [k, v] of evts) {
+      const [head, ...rest] = k.split(':');
+      if (head === fam && rest.length) out.push({ key: rest.join(':'), count: v.count });
+    }
+    return out.sort((a, b) => b.count - a.count);
+  };
+  return { mount: pick('mount'), length: pick('length'), fill: pick('fill') };
+}
+
+/* Mount glyphs — a box relative to a surface, which is the whole distinction. */
+const MOUNT_ICON = {
+  'tabletop':     '<path d="M2 17h20M5 17v4M19 17v4"/><rect x="7" y="8" width="10" height="9" rx="1"/>',
+  'under-table':  '<path d="M2 6h20M5 2v4M19 2v4"/><rect x="7" y="6" width="10" height="9" rx="1"/>',
+  'wall':         '<path d="M3 2v20"/><rect x="8" y="7" width="11" height="10" rx="1"/>',
+};
+const mountSvg = id => `<svg viewBox="0 0 24 24" width="26" height="26" fill="none"
+  stroke="currentColor" stroke-width="1.6" stroke-linecap="round">${MOUNT_ICON[id] || MOUNT_ICON.tabletop}</svg>`;
 
 /* ================= world map ================= */
 /* Minimal TopoJSON reader — the format is just delta-encoded shared arcs, so a
@@ -542,8 +633,79 @@ function render() {
   }
   $('legend').style.background = 'linear-gradient(90deg,' + RAMP.map(c => `rgb(${c.join(',')})`).join(',') + ')';
   $('legend-max').textContent = max ? '· peak ' + fmt(max) : '';
+
+  renderMix();
+  simpleList('pages', data.pages.slice(0, 30), p => p.path, p => p.title);
+  renderEvents();
   drawStrip();
   drawMap();
+}
+
+const esc = s => String(s == null ? '' : s).replace(/[<>&"]/g, c => ({ '<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;' }[c]));
+
+/* one bar row per item, scaled to the biggest in its own list */
+function simpleList(elId, items, name, sub) {
+  const box = $(elId);
+  box.innerHTML = '';
+  if (!items.length) { box.innerHTML = '<div class="empty">Nothing in this range yet.</div>'; return; }
+  const max = items[0].count || 1;
+  for (const it of items) box.appendChild(barRow(name(it), it.count, max, sub ? sub(it) : ''));
+}
+function barRow(label, count, max, sub) {
+  const t = max <= 1 ? 1 : Math.log(count + 1) / Math.log(max + 1);
+  const [r, g, b] = ramp(t);
+  const el = document.createElement('div');
+  el.className = 'row';
+  el.innerHTML = `<span></span>
+    <span class="path" title="${esc(label)}${sub ? ' · ' + esc(sub) : ''}">${esc(label)}</span>
+    <span class="ct" style="color:rgb(${r},${g},${b})">${fmt(count)}</span>
+    <span class="track"><span class="fill" style="width:${Math.max(2, count / max * 100)}%;
+      background:rgb(${r},${g},${b});box-shadow:0 0 8px rgba(${r},${g},${b},.7)"></span></span>`;
+  return el;
+}
+
+/* events, grouped by the GEN2 vocabulary instead of one flat alphabetical wall */
+function renderEvents() {
+  const box = $('events');
+  box.innerHTML = '';
+  if (!data.events_.length) { box.innerHTML = '<div class="empty">No events in this range yet.</div>'; return; }
+  const buckets = new Map();
+  for (const e of data.events_) {
+    const g = groupOf(e.path);
+    if (!buckets.has(g.id)) buckets.set(g.id, { label: g.label, items: [] });
+    buckets.get(g.id).items.push(e);
+  }
+  const order = [...GROUPS.map(g => g.id), 'other'];
+  for (const id of order) {
+    const b = buckets.get(id);
+    if (!b) continue;
+    const head = document.createElement('div');
+    head.className = 'gh';
+    const sum = b.items.reduce((n, i) => n + i.count, 0);
+    head.textContent = `${b.label} · ${fmt(sum)}`;
+    box.appendChild(head);
+    const max = b.items[0].count || 1;
+    for (const it of b.items.slice(0, 12)) box.appendChild(barRow(it.path, it.count, max));
+  }
+}
+
+function renderMix() {
+  const m = data.mix;
+  const total = m.mount.reduce((n, x) => n + x.count, 0);
+  const box = $('mix-mount');
+  box.innerHTML = '';
+  if (!m.mount.length) box.innerHTML = '<div class="empty">No mount selections in this range.</div>';
+  for (const x of m.mount) {
+    const el = document.createElement('div');
+    el.className = 'mount';
+    el.innerHTML = `<span class="ic">${mountSvg(x.key)}</span>
+      <span><span class="n">${esc(x.key.toUpperCase())}</span>
+      <div class="c">${fmt(x.count)}</div>
+      <span class="p">${total ? Math.round(x.count / total * 100) : 0}% of picks</span></span>`;
+    box.appendChild(el);
+  }
+  simpleList('mix-length', m.length.map(x => ({ ...x, count: x.count })), x => x.key + ' collection');
+  simpleList('mix-fill', m.fill, x => x.key);
 }
 
 /* ================= chrome ================= */

@@ -828,8 +828,34 @@ straight from the browser — no server, no proxy.
   leaks nothing. `noindex`.
 - ⚠ **The page deliberately carries NO GoatCounter script.** Tracking the
   dashboard would fold Joey's own admin visits into the numbers he's reading.
-- Two calls per site: `stats/total` (totals AND the site-wide hourly series in
-  one response) + `stats/locations`. Scope toggle merges both sites.
+- Three calls per site: `stats/total` (totals AND the site-wide hourly series in
+  one response), `stats/locations`, `stats/hits`. Scope toggle merges both sites.
+
+⚠ **GoatCounter conflates events with pageviews, twice over — the dashboard's
+whole reason for existing.** `stats/hits` returns pageviews AND events in ONE
+array (told apart only by `event: true`), which is why GoatCounter's own Pages
+list shows `dock:reveal` next to `/` as if they were the same kind of thing. And
+`stats/total` is documented as *"Total number of visitors (**including
+events**)"* — events are a SUBSET, not a sibling — so reporting `total` raw
+counts every button press as a visit. On Joey's planner that's 1 667 "visits"
+against ~555 actual pageviews. This page splits both: `views = total −
+total_events`, and separate Pages / Events panels off the `event` flag.
+
+Events are grouped by the GEN2 vocabulary (`GROUPS`: BUILD CONFIG / FUNNEL /
+OUTBOUND / TOOLS & UI / ⚠ FAILURES) rather than listed flat — the names are all
+`family:value`, so the list can be read as the questions it was instrumented to
+answer. An unrecognised prefix falls through to OTHER rather than being dropped,
+so a newly added event can never silently disappear. `buildMix()` pulls
+mount/length/fill into a "what people are building" panel with mount glyphs.
+
+⚠ **Aggregate only — there is no per-visitor join.** A country cannot be linked
+to what that person selected: GoatCounter stores no session dimension in the
+stats API, which is exactly why it needs no cookie banner. Encoding location
+into event names (`mount:wall:US`) would explode cardinality AND start
+profiling individuals — don't. The raw-hit CSV export does carry location and
+path per hit, so a batch "wall mounts by country" is *theoretically* possible,
+but it needs Individual Pageviews enabled (off, and it only collects forward)
+and is an async job — not a live view.
 - **Hourly is the floor.** GoatCounter stores no finer, so GA4-style per-minute
   "active users" is not reproducible; the strip says "hourly buckets" rather
   than implying otherwise. Raw-hit export could give timestamps but Individual
