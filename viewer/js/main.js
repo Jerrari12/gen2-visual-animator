@@ -27,6 +27,67 @@ document.body.classList.toggle('embed', IS_EMBED);
 const OFFICIAL_ID = !BUILD_HASH ? new URLSearchParams(location.search).get('build') : null;
 let OFFICIAL = null; // {id, title, tagline} once the kit file loads
 
+// ---------- analytics (GoatCounter — cookieless; see the tag in index.html) ----------
+// `name` is the event path, in the PLANNER'S vocabulary ("step:4", "out:printables")
+// so both apps read the same way on one account. Fails silent and is a no-op when
+// the beacon is blocked or absent — analytics must NEVER be able to break the viewer.
+// Every name comes from a fixed vocabulary (kit ids, store ids, preset names, brand
+// slugs, step numbers): no user-entered values, no colour hexes, no search terms.
+//
+// Unlike the planner — whose events are all click-driven, long after load — this
+// module fires open:/collection:/error: DURING boot, which can beat count.js's async
+// load. Those are the highest-value events in the set, so anything sent before the
+// beacon exists is queued and flushed once it appears (and dropped, not queued
+// forever, if it never does).
+const trackQ = [];
+let trackSettled = false;           // beacon has either appeared or been given up on
+const trackedOnce = new Set();
+// Every name fired this session, in order, capped. Exposed on the ?debug=1 hook
+// as __GEN2_VIEWER__.trackLog: the ONLY way to check what the viewer reports
+// without sending live traffic (count.js skips localhost by design, and forcing
+// it would write junk into the real dashboard).
+const trackLog = [];
+// Installed EARLY — and replaced by the full hook at the end of this file. A
+// boot failure throws long before that hook exists, and the error events are
+// precisely the ones worth reading back (locally, count.js loads but discards
+// localhost hits, so the beacon itself can never be observed in dev).
+if (new URLSearchParams(location.search).has('debug')) window.__GEN2_VIEWER__ = { trackLog };
+function track(name) {
+  if (trackLog.length < 200) trackLog.push(name);
+  try {
+    const gc = window.goatcounter;
+    if (gc && gc.count) { gc.count({ path: name, title: name, event: true }); return; }
+    if (!trackSettled && trackQ.length < 40) trackQ.push(name);
+  } catch (e) { /* ignore — never let tracking throw */ }
+}
+// fire at most once per page session: replay, Back and regenerate() all re-enter
+// the same code paths, and a step counted twice turns the drop-off curve to noise
+function trackOnce(name) { if (!trackedOnce.has(name)) { trackedOnce.add(name); track(name); } }
+// our own names (presets, brands, styles) → a safe event token
+const slug = s => String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+(function flushTrack(tries) {
+  if (window.goatcounter && window.goatcounter.count) {
+    trackSettled = true;
+    for (const n of trackQ.splice(0)) track(n);
+  } else if (tries < 75) {
+    // 30 s, not 5: count.js is an async third-party script and a cold CDN on a
+    // slow phone easily takes longer than a few seconds. Giving up early drops
+    // exactly the boot events (open/collection/error) that matter most.
+    setTimeout(() => flushTrack(tries + 1), 400);
+  } else {
+    trackSettled = true;                            // blocked (the endpoint is on
+    trackQ.length = 0;                              // EasyPrivacy) — stop queueing
+  }
+})(0);
+// `load` waits on async scripts, so by then count.js has either run or failed —
+// a deterministic flush alongside the poll, for whichever arrives first
+addEventListener('load', () => { if (!trackSettled) flushTrack2(); });
+function flushTrack2() {
+  if (!(window.goatcounter && window.goatcounter.count)) return;
+  trackSettled = true;
+  for (const n of trackQ.splice(0)) track(n);
+}
+
 // ---------- tiny tween runner (no lib) ----------
 const tweens = new Set();
 // slow-motion study mode (🐢 in the controls bar): stretches every step and
@@ -64,7 +125,17 @@ function killTweens() { tweens.clear(); }
 
 // ---------- scene ----------
 const canvas = document.getElementById('stage');
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+// A device with no WebGL used to die here with an uncaught throw, leaving the
+// spinner turning forever. bootFail is a hoisted declaration, so it's callable
+// this early. (These visitors were completely invisible before — they just left.)
+let renderer;
+try {
+  renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+} catch (e) {
+  track('error:webgl');
+  bootFail('<strong>This browser can’t show 3D</strong><br><br>The Build Studio needs WebGL. Try a different browser, or turn on hardware acceleration in your browser’s settings.',
+    'WebGL unavailable: ' + e.message);
+}
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0xeef0f3);
@@ -169,22 +240,43 @@ function bootFail(html, log) {
   throw new Error(log);
 }
 if (BUILD_HASH) {
-  let gen;
+  // The message is the same either way, but the EVENT distinguishes three very
+  // different problems: a mangled/truncated hash (the link), a build the
+  // generator knowingly refuses (a capability gap), and a generator that threw
+  // (our bug). Telling them apart in the dashboard is the whole point.
+  let gen = null, fail = 'build-damaged';
+  const HASH_ERR = { errors: ['This build link is damaged or truncated · try copying it again from the planner.'], manifest: null };
   try {
     build = decodeBuild(BUILD_HASH[1]); // accept raw serializeBuild() or the file export wrapper
     originalBuild = structuredClone(build); // "Reset to original" restores this exact build
-    gen = generateManifest(build);
   } catch (e) {
-    gen = { errors: ['This build link is damaged or truncated · try copying it again from the planner.'], manifest: null };
+    gen = HASH_ERR;
   }
-  if (!gen.manifest)
+  if (!gen) {
+    try {
+      gen = generateManifest(build);
+      if (!gen.manifest) fail = 'build-unsupported';
+    } catch (e) {
+      gen = HASH_ERR;
+      fail = 'build-crash';
+    }
+  }
+  if (!gen.manifest) {
+    track('error:' + fail);
     bootFail('<strong>Can’t show this build yet</strong><br><br>' + gen.errors.map(e => '• ' + e).join('<br>'),
       'unsupported build: ' + gen.errors.join('; '));
+  }
   manifest = gen.manifest;
   PARTS_BASE = 'parts/' + (manifest.collection || '185') + '/';   // one self-contained pool per collection (parts/165, parts/185)
 } else if (OFFICIAL_ID) {
   const GALLERY = '<br><br><a href="builds/">Browse the official GEN2 kits →</a>';
-  const kitFail = msg => bootFail('<strong>' + msg + '</strong>' + GALLERY, 'official kit "' + OFFICIAL_ID + '": ' + msg);
+  // `ev` names the failure for analytics — never the id itself, which at this
+  // point is unvalidated visitor input (and a bad id is the whole story anyway:
+  // it means a link we printed somewhere is wrong)
+  const kitFail = (msg, ev) => {
+    track('error:' + ev);
+    bootFail('<strong>' + msg + '</strong>' + GALLERY, 'official kit "' + OFFICIAL_ID + '": ' + msg);
+  };
   let file = null;
   if (/^[a-z0-9][a-z0-9-]*$/.test(OFFICIAL_ID)) {
     try {
@@ -193,23 +285,35 @@ if (BUILD_HASH) {
     } catch (e) { /* network / parse — falls through to the friendly 404 */ }
   }
   if (!file || !file.build)
-    kitFail('This kit link isn’t available — it may have moved or been renamed.');
+    kitFail('This kit link isn’t available — it may have moved or been renamed.', 'kit-not-found');
   if (file.gen2OfficialBuild !== 1)
-    kitFail('This kit was made for a newer version of the Build Studio — refresh the page and try again.');
+    kitFail('This kit was made for a newer version of the Build Studio — refresh the page and try again.', 'kit-version');
   build = migrateOfficialBuild(file.build, file.buildVersion ?? 1);
   if (!build)
-    kitFail('This kit was made for a newer version of the Build Studio — refresh the page and try again.');
+    kitFail('This kit was made for a newer version of the Build Studio — refresh the page and try again.', 'kit-version');
   OFFICIAL = { id: OFFICIAL_ID, title: String(file.title || 'GEN2 Kit'), tagline: typeof file.tagline === 'string' ? file.tagline : '' };
   originalBuild = structuredClone(build);
   const gen = generateManifest(build);
   if (!gen.manifest) // a committed kit failing to generate is OUR bug, not the user's — say so plainly
-    kitFail('This kit can’t be shown right now (' + gen.errors.join(' · ') + ') — please report it.');
+    kitFail('This kit can’t be shown right now (' + gen.errors.join(' · ') + ') — please report it.', 'kit-generate');
   manifest = gen.manifest;
   PARTS_BASE = 'parts/' + (manifest.collection || '185') + '/';
 } else {
   manifest = await (await fetch(KIT_URL + 'manifest.json')).json();
   PARTS_BASE = KIT_URL + 'parts/';
 }
+
+// Funnel entry — which door they came in by, and what they're building. The
+// official id is safe to name here: an unmatched one threw above, so only
+// committed kit slugs reach this line (~20 values, not a long tail).
+track(OFFICIAL_ID ? 'open:' + OFFICIAL_ID
+  : BUILD_HASH ? (IS_EMBED ? 'open:embed' : 'open:planner-link')
+  : 'open:kit-' + KIT);
+track('collection:' + (manifest.collection || '185'));
+if (build?.mount) track('mount:' + build.mount);
+// NB deliberately NO "returning visitor" event: it would need an
+// analytics-only localStorage key, and storing nothing is exactly what lets
+// this run without a consent banner. The other gen2-* keys are user settings.
 
 // mount type is fixed for the life of the page (toggles never change it), so the
 // backdrop + polar limits are set once here from the first manifest.
@@ -309,8 +413,10 @@ async function loadTemplates() {
       templates[node] = adoptTemplate(gltf.scene, typeByNode[node]);
     } catch (e) { missing.push(node); }
   }));
-  if (missing.length)
+  if (missing.length) {
+    track('error:parts-missing'); // covers a real asset gap AND a failed fetch — both leave a broken studio
     throw new Error(`part model${missing.length > 1 ? 's' : ''} missing from the library: ${missing.sort().join(', ')}`);
+  }
 }
 // 2-zone parts (EdgeLabel body+grip) arrive as two primitives carrying named
 // material stubs — the NAME is the zone tag, read once here and stamped on the
@@ -879,14 +985,40 @@ function buildPages() {
   });
 }
 
-function linkEl(text, href) {
+// Every outbound link in the viewer is built here — store buttons, the ▾ menu,
+// hardware buy chips, "Get filament", the label-generator pill — so this is the
+// one place that needs instrumenting, and any link added later is covered for
+// free. `ev` overrides the derived name where the destination host doesn't tell
+// the whole story (a filament buy and a magnet buy are both amazon.com).
+function linkEl(text, href, ev) {
   const a = document.createElement('a');
   a.className = 'dl-link';
   a.href = href;
   a.target = '_blank';
   a.rel = 'noopener';
   a.textContent = text;
+  a.addEventListener('click', () => track(ev || 'out:' + outTarget(href)));
   return a;
+}
+// hostname → a fixed short id, so `out:` stays a small closed vocabulary and a
+// raw url can never become an event name
+const OUT_HOSTS = [
+  [/(^|\.)printables\.com$/,            'printables'],
+  [/(^|\.)thangs\.com$/,                'thangs'],
+  [/(^|\.)than\.gs$/,                   'thangs'],     // the short domain LINKS actually uses
+  [/(^|\.)makerworld\.com$/,            'makerworld'],
+  [/(^|\.)cults3d\.com$/,               'cults'],
+  [/^(edgelabel|classic)\.jerrari3d\.com$/, 'labelgen'],
+  [/(^|\.)jerrari3d\.com$/,             'jerrari'],
+  [/(^|\.)(amzn\.to|amazon\.[a-z.]+)$/, 'amazon'],
+  [/(^|\.)(x\.com|youtube\.com)$/,      'social'],
+];
+function outTarget(href) {
+  try {
+    const host = new URL(href, location.href).hostname.toLowerCase();
+    for (const [re, id] of OUT_HOSTS) if (re.test(host)) return id;
+  } catch (e) { /* malformed href — fall through */ }
+  return 'other';
 }
 
 // ---------- model stores (Printables / Thangs / MakerWorld / Cults) ----------
@@ -905,6 +1037,14 @@ const STORES = [
 ];
 const STORE_BY_ID = Object.fromEntries(STORES.map(s => [s.id, s]));
 const STORE_STORE_KEY = 'gen2-store'; // preference is a VIEWER-wide pref, not per-kit
+// Which platform's listing did they arrive from? `?from=` is OUR param, so
+// GoatCounter can't read it the way it natively reads `ref`/`utm_source` — and
+// it's the attribution that says which listing is actually doing the work.
+// (Bare referrers need no event: GoatCounter records those itself.)
+{
+  const f = (new URLSearchParams(location.search).get('from') || '').toLowerCase();
+  if (STORE_BY_ID[f]) track('from:' + f);
+}
 // Which store did the visitor come from? `?from=` is authoritative (we control
 // the links printed in each platform's description, and it survives any
 // referrer policy); document.referrer is the fallback for links we didn't
@@ -935,7 +1075,11 @@ function persistStorePref() {
   } catch (e) { /* private mode — the relay still works in-session */ }
 }
 function setStorePref(id, { relay = true } = {}) {
-  if (!STORE_BY_ID[id] || id === storePref) return;
+  if (!STORE_BY_ID[id] || id === storePref) return; // the no-op guard also keeps the event honest
+  // only a LOCAL pick counts — this same function receives the planner's relay,
+  // and the planner already tracks its own linksite: choice (double-counting a
+  // single decision would make the store split look twice as busy as it is)
+  if (relay) track('store-pref:' + id);
   storePref = id;
   if (relay) { storePrefT = Date.now(); postStorePrefToPlanner(); }
   persistStorePref();
@@ -1012,14 +1156,14 @@ function renderIdentifyLinks(info, filament = null) {
   appendStoreLinks(linksEl, info?.links);
   // purchased hardware: Amazon affiliate buy options (generate.js BUY) + the
   // required affiliate disclosure right in the card
-  for (const b of info?.links?.buy || []) linksEl.appendChild(linkEl(b.label, b.url));
+  for (const b of info?.links?.buy || []) linksEl.appendChild(linkEl(b.label, b.url, 'hardware:buy'));
   if (info?.links?.buy?.length) {
     const aff = document.createElement('div');
     aff.className = 'fm-note';
     aff.textContent = 'Affiliate links — they support the project at no extra cost.';
     linksEl.appendChild(aff);
   }
-  if (filament) linksEl.appendChild(linkEl('Get filament', filament.url));
+  if (filament) linksEl.appendChild(linkEl('Get filament', filament.url, 'filament:buy'));
 }
 
 // ---------- build options (generated builds only; static kits skip it) ----------
@@ -1039,9 +1183,11 @@ function optSeg(label, options, activeVal, onPick) {
   row.append(lab, grp);
   return row;
 }
-async function setAllClosure(val) { drawersInBuild().forEach(u => u.closure = val); await regenerate(); }
-async function setAllStoppers(on) { build.removedStoppers = on ? [] : allStopperKeys(); await regenerate(); }
-async function resetBuild() { build = structuredClone(originalBuild); activeHandleStyle = null; activeFaceplateStyle = null; await regenerate(); }
+// These three are wired ONLY to the Build options panel — the planner's remote
+// sync mutates `build` directly — so tracking here counts local decisions only.
+async function setAllClosure(val) { track('opt:closure:' + val); drawersInBuild().forEach(u => u.closure = val); await regenerate(); }
+async function setAllStoppers(on) { track('opt:stoppers:' + (on ? 'all' : 'none')); build.removedStoppers = on ? [] : allStopperKeys(); await regenerate(); }
+async function resetBuild() { track('opt:reset'); build = structuredClone(originalBuild); activeHandleStyle = null; activeFaceplateStyle = null; await regenerate(); }
 function renderOptions() {
   const box = $('build-options');
   if (!box) return;
@@ -1091,11 +1237,11 @@ function renderOptions() {
   // Decor drawer's gap, off = older closed-front drawers
   if (drawersInBuild().length) {
     box.appendChild(optSeg('Faceplate back cover', [{ label: 'Off', val: false }, { label: 'On', val: true }], !!build.backCover,
-      async v => { build.backCover = v; await regenerate(); }));
+      async v => { track('opt:backcover:' + (v ? 'on' : 'off')); build.backCover = v; await regenerate(); }));
   }
   if (isWallBuild) {
     box.appendChild(optSeg('Top cover', [{ label: 'Per-column', val: false }, { label: 'Staggered', val: true }], !!build.wallStagger,
-      async v => { build.wallStagger = v; await regenerate(); }));
+      async v => { track('opt:topcover:' + (v ? 'staggered' : 'per-column')); build.wallStagger = v; await regenerate(); }));
   }
   const reset = document.createElement('button'); reset.className = 'opt-reset'; reset.textContent = '↺ Reset to original';
   reset.onclick = resetBuild; box.appendChild(reset);
@@ -1150,7 +1296,7 @@ function renderChecklist() {
       const lnks = document.createElement('span');
       appendStoreLinks(lnks, p.links);
       // purchased hardware: Amazon affiliate buy options (generate.js BUY)
-      for (const b of p.links.buy || []) lnks.appendChild(linkEl(b.label, b.url));
+      for (const b of p.links.buy || []) lnks.appendChild(linkEl(b.label, b.url, 'hardware:buy'));
       mid.appendChild(lnks);
     }
     const qty = document.createElement('span');
@@ -1218,9 +1364,10 @@ function copyBom() {
     if (r.printables) txt += `    Printables: ${r.printables}\n`;
     if (r.thangs) txt += `    Thangs:     ${r.thangs}\n`;
   }
-  navigator.clipboard.writeText(txt).then(() => flashBtn('bom-copy', '✓ Copied!'));
+  navigator.clipboard.writeText(txt).then(() => { track('bom:copy'); flashBtn('bom-copy', '✓ Copied!'); });
 }
 function downloadCsv() {
+  track('bom:csv');
   const esc = s => `"${String(s).replace(/"/g, '""')}"`;
   let csv = 'Qty,Part,Printables,Thangs\n';
   for (const r of bomRows()) csv += [r.qty, esc(r.name), esc(r.printables), esc(r.thangs)].join(',') + '\n';
@@ -1287,6 +1434,7 @@ function goTo(i, { animate = true } = {}) {
     return;
   }
   if (isOutro) {
+    trackOnce('outro'); // they sat through the whole thing
     $('step-counter').textContent = 'Thanks for building';
     setCamOverride(false); // the cinema owns the camera
     $('btn-pause').disabled = true; // the cinema runs its own clock — not pausable
@@ -1301,6 +1449,11 @@ function goTo(i, { animate = true } = {}) {
   }
   const stepIdx = cur - 1;
   const step = manifest.steps[stepIdx];
+  // The drop-off curve: the step where the count falls off a cliff is a broken
+  // instruction. Once per page session only — Back, replay and regenerate() all
+  // re-enter goTo, and a step counted twice makes the curve meaningless.
+  trackOnce(step.checklist ? 'step:intro' : 'step:' + stepIdx);
+  if (stepIdx === manifest.steps.length - 1) trackOnce('complete');
   $('step-title').textContent = step.title;
   $('step-note').textContent = step.note || '';
   const numbered = !step.checklist; // assembly steps count from 1, intro shows none
@@ -1348,10 +1501,10 @@ $('btn-pause').onclick = () => setPaused(!paused);
 // google-maps-style "re-center": drop the user override and glide back to
 // wherever the guided camera last wanted to be.
 $('btn-cam').onclick = () => { setCamOverride(false); tweenCamera(curCamPreset, 900, true); };
-$('btn-start').onclick = () => goTo(1); // cover → intro, camera pans + de-zooms
+$('btn-start').onclick = () => { track('start'); goTo(1); }; // cover → intro, camera pans + de-zooms
 // customizers' shortcut: straight to the finished build (final assembly step —
 // dims + expanded BOM), skipping the step-by-step. Snap, don't replay the step.
-$('btn-skip-end').onclick = () => goTo(PAGES.length - 2, { animate: false });
+$('btn-skip-end').onclick = () => { track('skip-to-end'); goTo(PAGES.length - 2, { animate: false }); };
 // Official kits only: "Customize this build" (cover + outro) — the on-ramp to
 // the planner. Hands over the CURRENT build (option tweaks ride along) as a
 // #build= hash the planner sanitizes + restores. Raw base64, NOT
@@ -1362,11 +1515,11 @@ const plannerHandoffUrl = () => PLANNER_URL + '#build=' + btoa(unescape(encodeUR
 if (OFFICIAL) {
   const cover = $('btn-customize');
   cover.classList.remove('hidden');
-  cover.onclick = () => window.open(plannerHandoffUrl(), '_blank', 'noopener');
+  cover.onclick = () => { track('customize:cover'); window.open(plannerHandoffUrl(), '_blank', 'noopener'); };
   const outro = $('outro-customize');
   outro.classList.remove('hidden');
   // anchor: freshen the href as the click starts (build mutates with options)
-  outro.addEventListener('click', () => { outro.href = plannerHandoffUrl(); });
+  outro.addEventListener('click', () => { track('customize:outro'); outro.href = plannerHandoffUrl(); });
 }
 // embed preview ⇄ the instruction flow: "Begin" enters at the cover;
 // the 🧪 Preview tool (embed-only, controls bar — hidden on the preview
@@ -1540,6 +1693,9 @@ function renderZoneChips(inst) {
 let selAnchor = new THREE.Vector3(); // selected part's bbox-center offset from its origin
 function setSelected(id) {
   if (selectedId === id) return;
+  // "did they discover tap-to-identify at all" — once per session, because the
+  // answer is a yes/no about the feature, not a per-tap volume metric
+  if (id) trackOnce('identify:open');
   if (selectedId && instances.has(selectedId)) {
     const prev = instances.get(selectedId);
     prev.group.traverse(o => { if (o.isMesh) o.material = materialFor(prev, false, o.userData.zone); });
@@ -2190,12 +2346,13 @@ function updateColorToggle() {
   btn.classList.toggle('hidden', !any || !onContentPage);
   btn.textContent = useCustom ? '🎨 My colors' : '🎨 Instruction colors';
 }
-$('color-toggle').onclick = () => { useCustom = !useCustom; saveColors(); applyPalette(); };
+$('color-toggle').onclick = () => { useCustom = !useCustom; track('colors:' + (useCustom ? 'mine' : 'instruction')); saveColors(); applyPalette(); };
 
 // preset picker: apply a whole per-type filament set at once, and save/load
 // them. Presets only replace the WORKING palette (customColors) — the user's
 // hand-built palette survives in userPalette and comes back via its chip.
 function applyPreset(p) {
+  track('preset:' + slug(p.name)); // preset names are OURS — a fixed, tiny vocabulary
   customColors = {};
   for (const [type, f] of Object.entries(p.colors)) customColors[type] = { ...f };
   useCustom = true;
@@ -2203,6 +2360,7 @@ function applyPreset(p) {
   applyPalette();
 }
 function restoreUserPalette() {
+  track('preset:my-palette');
   customColors = structuredClone(userPalette);
   useCustom = true;
   saveColors();
@@ -2242,6 +2400,7 @@ function renderPresets() {
     : useCustom && Object.keys(customColors).length ? '· custom' : '';
 }
 function savePreset() {
+  track('colors:save');
   const blob = new Blob([JSON.stringify({ gen2Filaments: 1, colors: customColors }, null, 2)], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -2255,6 +2414,7 @@ function loadPresetFile(file) {
     try {
       const d = JSON.parse(r.result);
       if (d && d.colors && typeof d.colors === 'object') {
+        track('colors:load');
         customColors = d.colors; useCustom = true;
         snapshotUserPalette(); // an uploaded file is a hand-authored palette
         saveColors(); applyPalette();
@@ -2315,6 +2475,10 @@ function renderFilamentBrands() {
         if (f.pick) b.classList.add('pick');
         if (customColors[fmType]?.name === f.label) b.classList.add('active');
         b.onclick = () => {
+          // brand only, never the colour label — which brands the audience runs
+          // is the useful signal; a colour name is a user-visible value with a
+          // long tail, and the doc's rule is no user values in event names
+          track('filament:' + slug(brand.brand));
           customColors[fmType] = { name: f.label, hex: f.hex, url: f.url };
           useCustom = true;
           snapshotUserPalette(); // a hand pick — this IS the user's palette now
@@ -2498,6 +2662,11 @@ async function cycleHandleStyle(dir) {
     if (await applyHandleStyle(cand) !== false) { next = cand; break; }
   }
   if (!next) return; // nothing but the current style is available
+  // name the style LANDED ON, not the direction — "which handles do people
+  // actually choose" is the question; ◀ vs ▶ answers nothing (9 fixed values).
+  // Tracked here rather than at the two call sites so the identify card and the
+  // Build options ◀▶ both count through one place.
+  track('style:handle:' + slug(next.label));
   $('style-name').textContent = next.label;
   if (!selectedId) return;
   const inst = instances.get(selectedId);
@@ -2554,6 +2723,11 @@ const availableFaceplateStyles = () => FACEPLATE_STYLES.filter(s => s.collection
 // `#labels=<base64 JSON array>` handoff the planner's own button uses
 // (updateLabelGenLink in planner app.js; URLs from its faceplateStyles data)
 const LABEL_GEN_URLS = { edgelabel: 'https://edgelabel.jerrari3d.com/', classicpro: 'https://classic.jerrari3d.com/' };
+// The label-gen pill and the filament menu's Buy button are STATIC anchors (the
+// markup owns them, only the href is swapped), so they miss linkEl's tracking —
+// one listener each, wired once at module level.
+$('identify-label-gen').addEventListener('click', () => track('labelgen:' + (currentFaceplateStyle()?.key || 'unknown')));
+$('fm-buy').addEventListener('click', () => track('filament:buy'));
 function labelGenInfo() {
   const url = LABEL_GEN_URLS[currentFaceplateStyle()?.key];
   if (!url) return null;
@@ -2678,6 +2852,7 @@ async function cycleFaceplateStyle(dir) {
     if (await applyFaceplateStyle(cand) !== false) { next = cand; break; }
   }
   if (!next) return;
+  track('style:faceplate:' + slug(next.label)); // 4 families — the upsell ladder, measured
   $('style-name').textContent = next.label;
   if (!selectedId) return;
   const inst = instances.get(selectedId);
@@ -2696,7 +2871,7 @@ const cycleStyle = dir => {
   const inst = selectedId && instances.get(selectedId);
   if (!inst) return;
   const t = typeByNode[inst.cfg.node];
-  if (t === 'Handle') cycleHandleStyle(dir);
+  if (t === 'Handle') cycleHandleStyle(dir);          // both cycles track themselves
   else if (t === 'Faceplate') cycleFaceplateStyle(dir);
 };
 $('style-prev').onclick = () => cycleStyle(-1);
@@ -2708,8 +2883,10 @@ $('identify-remove').onclick = async () => {
   if (!inst || !build) return;
   const type = typeByNode[inst.cfg.node];
   if (type === 'Stopper' && inst.cfg.stopperKey) {
+    track('opt:remove-stopper');
     build.removedStoppers = [...new Set([...(build.removedStoppers || []), inst.cfg.stopperKey])];
   } else if ((type === 'MagnetClip' || type === 'Magnet') && inst.cfg.owner != null) {
+    track('opt:remove-magnet');
     const d = build.placed.find(u => u.id === inst.cfg.owner);
     if (d) d.closure = 'none'; else return;
   } else return;
@@ -2783,7 +2960,8 @@ function setMeasure(on) {
   if (on) setSelected(null); // identify and measure are mutually exclusive
   else clearMeasure();
 }
-$('measure-toggle').onclick = () => setMeasure(!measure.on);
+// only the deliberate tap counts — goTo() calls setMeasure(false) on every page
+$('measure-toggle').onclick = () => { if (!measure.on) track('tool:measure'); setMeasure(!measure.on); };
 function addMeasurePoint(p) {
   if (measure.pts.length >= 2) clearMeasure(); // 3rd tap starts a fresh measurement
   measure.pts.push(p.clone());
@@ -3699,5 +3877,6 @@ renderer.setAnimationLoop(now => {
 if (new URLSearchParams(location.search).get('debug')) {
   window.__GEN2_VIEWER__ = { THREE, scene, camera, controls, goTo, applyState, instances, manifest, cinema, updateCinema, cinemaScene, party, confetti, confettiPop, fpFocus, fpEnv,
     renderer, table, grid, camPos, captureShot, get buildCenter() { return buildCenter; },
-    get build() { return build; }, regenerate, setSelected, get selectedId() { return selectedId; } };
+    get build() { return build; }, regenerate, setSelected, get selectedId() { return selectedId; },
+    trackLog, track };
 }

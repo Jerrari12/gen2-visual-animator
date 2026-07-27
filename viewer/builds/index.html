@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>GEN2 Starter Kits — 3D Build Studio</title>
 <meta name="description" content="Ready-made GEN2 builds with interactive LEGO-style 3D assembly instructions. Print a starter kit, follow the steps, then expand it in the planner.">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon.ico" sizes="32x32">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <style>
 /* A secondary page of the GEN2 Planner — the :root tokens, parallax hero,
    brand bar and footer are all mirrored from gen2-planner css/style.css so the
@@ -409,5 +412,11 @@ function renderCards(kits, main) {
   }
 }
 </script>
+<!-- GoatCounter analytics: pageviews only — no custom events here. A card click
+     lands on the viewer, which records open:<id> itself, so a click event would
+     just double-count the same visit. Same site code as the viewer (see the
+     tag in ../index.html for why it's separate from the planner's). -->
+<script data-goatcounter="https://jerrari-build.goatcounter.com/count"
+        async src="https://gc.zgo.at/count.js"></script>
 </body>
 </html>

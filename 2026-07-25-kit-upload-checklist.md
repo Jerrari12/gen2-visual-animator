@@ -92,6 +92,33 @@ Append per platform: Printables `&from=printables` · Thangs `&from=thangs` · M
 
 (Same 10 rows for Thangs and MakerWorld — only the `&from=` changes.)
 
+### Also add `&ref=` — it's what tells you WHICH listing works
+
+`&from=` seeds the visitor's part links onto the store they arrived from. It is
+**not** attribution: every kit page on a platform sends the same `from=printables`,
+so it can't tell the 240 kit's page from the 59's.
+
+`ref` is read natively by GoatCounter (no code, no event), so a second suffix
+turns 75 model pages into 75 measurable sources. Convention: **two letters for
+the platform, then the model.**
+
+```
+https://gen2build.jerrari3d.com/?build=240-tabletop-2w2h&from=printables&ref=pr-240-kit-2w2h
+```
+
+| prefix | platform |
+|---|---|
+| `pr-` | Printables |
+| `mw-` | MakerWorld |
+| `th-` | Thangs |
+| `yt-` | YouTube |
+| `x-`  | X |
+
+Worth tagging beyond the kits: the collection pages (`ref=mw-240-cases`), and
+one-off posts (`ref=x-takedown-post` — that post got 4,328 views and nobody
+knows what it converted to). Do it from the FIRST publish; retrofitting means
+re-editing every description.
+
 ---
 
 ## Reminders

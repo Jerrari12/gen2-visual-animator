@@ -1,6 +1,13 @@
 # GEN2 Visual Animator — project memory
 
-> **ACTIVE HANDOFF (2026-07-25) — read `2026-07-25-session-handoff.md` first.**
+> **ACTIVE HANDOFF (2026-07-27) — read `2026-07-27-session-handoff.md` first.**
+> Site icons now ship on all four GEN2 properties, and the viewer is
+> instrumented with GoatCounter (the planner already was). ⚠ **Joey must create
+> the `jerrari-build.goatcounter.com` site** — until then the viewer's beacon
+> 404s silently. Next up is still the magnet buy-links redesign + the club
+> faceplate link gap. Older context below.
+>
+> **PREVIOUS HANDOFF (2026-07-25) — `2026-07-25-session-handoff.md`.**
 > The 2026-07-24 deploy gate is CLOSED: DNS + Pages custom domain + HTTPS are
 > set, the held stack is pushed, and **both repos are live and clean** —
 > viewer at **gen2build.jerrari3d.com**, planner at gen2planner.jerrari3d.com.
@@ -697,6 +704,107 @@ step replay; BOM panel + dims land expanded). The checklist page is the unnumber
 deterministic fun name (generate.js ADJ/NOUN pools) as intro title + header.
 Magnet clip/magnet positions are ESTIMATED from renders (see orientation
 notes) — everything else is ground-truth calibrated.
+
+## Site icons (all four repos — 2026-07-27)
+
+`favicon.svg` + `favicon.ico` + `apple-touch-icon.png` sit at each repo's SERVED
+ROOT (`viewer/` for the viewer, repo root for the other three), linked
+root-absolute so `/builds/` and local dev both resolve. **The same three files
+in all four repos** — the family should read as one site in a tab strip.
+Generated from `viewer/img/jerrari-logo.svg` (the J teardrop, 798.74×1365.44) by
+the scratch `mkicon.py` pattern: wrap the source `<g>` in a 512² viewBox behind a
+`#2c2d31` rounded rect (rx 112 ≈ 22%), mark fitted to **86% of tile height** —
+Joey picked 86 over 90/94 off a proof sheet; 94 crowded the tile corners at
+128 px. ICO is 16/32/48 multi-res via `magick … -define icon:auto-resize`;
+apple-touch renders from an rx=**0** variant (iOS masks its own corners, and a
+pre-rounded tile fringes).
+⚠ **The tile is not decoration** — the mark's core is a WHITE path, so a
+transparent icon dissolves into a light tab bar and degrades to an outline. Any
+future icon variant must keep an opaque backing.
+⚠ **BOTH label-generator repos have MIXED line endings** (not just Classic Pro,
+as previously noted — EdgeLabel's `</title>` line is CRLF while its neighbours
+are LF). A normal file write normalises them: a 6-line insert produced a
+**260-line diff / 127 phantom deletions**, exactly the `fafbad8` failure mode.
+Edit those two byte-exactly (read bytes → insert reusing the neighbouring line's
+own terminator → write bytes; scratch `insert_icons.py`), and check
+`git diff --stat` before committing. Each repo now also carries `*.ico`/`*.png`
+`binary` in `.gitattributes` (the planner gained its first `.gitattributes` —
+binary rules ONLY, no `text=auto`, so nothing renormalises).
+
+## Analytics — GoatCounter (viewer wired 2026-07-27)
+
+Cookieless, no consent banner, **nothing stored client-side** — that last part is
+load-bearing, which is why there is deliberately no "returning visitor" event
+(it would need an analytics-only localStorage key; the other `gen2-*` keys are
+user settings and legitimately exempt).
+
+**Two SEPARATE GoatCounter sites, one account.** Planner → `jerrari.goatcounter.com`
+(instrumented long before this; `track()` in its `js/app.js` + ~28 call sites).
+Viewer + `/builds/` → **`jerrari-build.goatcounter.com`** — separate so the two
+apps' `/` pageviews don't collapse into one row, and so viewer event names need
+no app prefix. ⚠ **Joey must create that site** (goatcounter.com → Settings →
+Additional sites); until he does, the beacon 404s silently, which is the
+intended failure mode anyway. The endpoint lives in exactly two places:
+the `data-goatcounter` tag in `viewer/index.html` and `viewer/builds/index.html`.
+
+`track(name)` in main.js mirrors the planner's helper and its **colon vocabulary**
+(`step:4`, `out:printables`) — one shape across both apps. Additions over the
+planner's version:
+- **A boot queue.** main.js fires `open:`/`collection:`/`error:` DURING boot,
+  which can beat count.js's async load (the planner's events are all
+  click-driven, so it never hits this). Events sent before the beacon exists are
+  queued and flushed by a 400 ms poll for **30 s** — not 5, a cold CDN on a slow
+  phone takes longer, and giving up early drops precisely the highest-value
+  events — plus a `load` flush, whichever wins.
+- `trackOnce()` for `step:*` / `complete` / `identify:open`: Back, replay and
+  `regenerate()` all re-enter `goTo`, and a step counted twice makes the
+  drop-off curve meaningless.
+- **`linkEl` is the single outbound funnel.** Every store button, ▾ item, buy
+  chip and "Get filament" is built there, so ONE listener covers them all and
+  future links are instrumented for free. Hostname → a fixed id via `OUT_HOSTS`
+  (⚠ include `than.gs`, the short domain `LINKS` actually uses, or Thangs lands
+  in `out:other`). Pass `linkEl`'s 3rd arg where the host doesn't tell the story
+  (`hardware:buy` vs `filament:buy` are both amazon).
+- The label-gen pill and `#fm-buy` are STATIC anchors (markup owns them, only
+  the href is swapped) → they miss `linkEl` and carry their own listeners.
+- `setStorePref` tracks only when `relay` is true — it's also the receiver for
+  the planner's relay, and the planner already counts its own `linksite:` pick.
+
+**Every name comes from a fixed vocabulary** (kit ids, store ids, preset names,
+brand slugs, step numbers). Never a colour label, hex, or `fm-search` term —
+that's the rule that keeps this consent-free. Filament picks report the BRAND
+only.
+
+Events: `open:<kitId|planner-link|embed|kit-<name>>` · `collection:<L>` ·
+`mount:<m>` · `from:<store>` (our own param — GoatCounter reads `ref`/`utm_source`
+natively but not this) · `start` · `skip-to-end` · `step:intro|<n>` · `complete` ·
+`outro` · `out:<store>` · `store-pref:<id>` · `bom:copy|csv` · `hardware:buy` ·
+`filament:buy` · `filament:<brand>` · `preset:<slug>` · `colors:mine|instruction|save|load` ·
+`identify:open` · `style:handle:<slug>` / `style:faceplate:<slug>` (names the style
+LANDED ON — "which do people pick" beats ◀/▶) · `labelgen:<family>` ·
+`customize:cover|outro` · `opt:closure|stoppers|backcover|topcover|reset|remove-*` ·
+`error:kit-not-found|kit-version|kit-generate|build-damaged|build-unsupported|build-crash|parts-missing|webgl`.
+
+⚠ **Verification can't use the beacon.** count.js loads fine on localhost but
+discards localhost hits by design, and forcing them would write junk into the
+real dashboard. So `?debug=1` exposes **`__GEN2_VIEWER__.trackLog`** — every name
+fired this session, in order (capped 200). It's installed EARLY as well as in the
+main hook at the end of main.js, because a boot failure throws long before that
+hook exists and the error events are exactly the ones worth reading back.
+Walk the funnel with `goTo()` and diff the log.
+
+Two things this wiring FIXED along the way, both pre-existing:
+- **No WebGL used to hang the spinner forever** (uncaught constructor throw).
+  Now a readable message via `bootFail` (hoisted, so it's callable that early)
+  plus `error:webgl` — those visitors were previously invisible.
+- **The `#build=` catch conflated three failures** into "this link is damaged,
+  copy it again" — including builds that decoded perfectly and were merely
+  unsupported. Split into `build-damaged` (mangled hash) / `build-unsupported`
+  (generator returned errors) / `build-crash` (generator threw). Messages
+  unchanged; only the events distinguish them.
+
+`&ref=` (per-listing attribution, no code — GoatCounter reads it natively) is
+documented in `2026-07-25-kit-upload-checklist.md`.
 
 ## Run / preview
 

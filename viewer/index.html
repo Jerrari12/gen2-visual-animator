@@ -4,6 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>GEN2 Assembly Instructions</title>
+<!-- Site icon: the Jerrari J on a dark tile. The mark's core is WHITE, so a
+     transparent icon dissolves into a light tab bar — the tile keeps it legible
+     in both themes. Root-absolute paths so /builds/ resolves them too. Same
+     three files in all four GEN2 repos; source SVG is img/jerrari-logo.svg. -->
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon.ico" sizes="32x32">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="stylesheet" href="css/viewer.css">
 <script type="importmap">
 {
@@ -177,5 +184,15 @@
     </footer>
   </div>
   <script type="module" src="js/main.js"></script>
+<!-- GoatCounter analytics: cookieless, no consent banner. Counts a pageview on
+     load; main.js's track() sends custom events (open/step/out/error…).
+     Loads async and fails silent · the viewer never depends on it.
+     This is a SEPARATE GoatCounter site from the planner's (jerrari.*), so the
+     two apps' "/" pageviews don't collapse into one row and event names need
+     no app prefix. Keep the two in sync if either ever moves. -->
+<!-- Absolute https (not protocol-relative): a //-URL opened via file://
+     resolves to a Windows network share and hangs the page for minutes. -->
+<script data-goatcounter="https://jerrari-build.goatcounter.com/count"
+        async src="https://gc.zgo.at/count.js"></script>
 </body>
 </html>
