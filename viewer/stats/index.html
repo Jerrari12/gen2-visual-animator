@@ -151,6 +151,12 @@ canvas { display: block; width: 100%; }
   font-size: .78rem; line-height: 1.65; margin-bottom: 14px;
 }
 .err-banner b { color: var(--magenta); letter-spacing: .12em; }
+/* Nothing loaded at all: hide the empty shells. A stack of headed-but-blank
+   panels reads as "this app is broken" rather than "the data didn't arrive",
+   and it buries the one message that says what to do. */
+body.no-data .tiles,
+body.no-data #dash > .grid,
+body.no-data #dash > .panel:not(.err-banner) { display: none; }
 .note { font-size: .66rem; color: var(--dim); line-height: 1.7; }
 .hidden { display: none !important; }
 .empty { color: var(--dim); font-size: .74rem; padding: 22px 0; text-align: center; }
@@ -286,7 +292,6 @@ canvas { display: block; width: 100%; }
          left out instead of repeated -->
     <div id="event-groups" class="grid" style="grid-template-columns:repeat(auto-fit,minmax(280px,1fr));margin-top:14px"></div>
 
-    <p class="warn" id="err"></p>
     <p class="note" style="margin-top:18px">
       Source: GoatCounter API · read-only · this page is not itself tracked.
     </p>
@@ -960,17 +965,22 @@ function segs() {
   }
 }
 
-async function refresh() {
+function showErr(msg) {
   const top = $('err-top');
-  $('err').textContent = '';
+  top.innerHTML = '<b>⚠ COULDN’T LOAD</b><br>' + esc(msg);
+  top.classList.remove('hidden');
+  // only blank the page when there's nothing to show; a failed REFRESH over
+  // good data should leave that data on screen with the warning above it
+  document.body.classList.toggle('no-data', !data);
+}
+async function refresh() {
   try {
     data = await load();
     render();
-    top.classList.add('hidden');
+    $('err-top').classList.add('hidden');
+    document.body.classList.remove('no-data');
   } catch (e) {
-    top.innerHTML = '<b>⚠ COULDN’T LOAD</b><br>' + esc(e.message);
-    top.classList.remove('hidden');
-    $('err').textContent = '⚠ ' + e.message;
+    showErr(e.message);
   }
 }
 $('reload').onclick = refresh;
@@ -981,7 +991,7 @@ async function boot() {
   if (!world) {
     try {
       world = decodeTopo(await (await fetch('vendor/countries-110m.json')).json());
-    } catch (e) { $('err').textContent = '⚠ world map data failed to load'; }
+    } catch (e) { showErr('world map data failed to load'); }
   }
   segs();
   await refresh();
