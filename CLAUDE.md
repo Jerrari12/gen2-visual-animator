@@ -898,9 +898,14 @@ arcs; not worth a library). Three things that WILL bite a future edit:
   geometries by numeric id while GoatCounter reports alpha-2.
 
 ⚠ **GoatCounter returns FULL 24-slot hourly arrays including hours that haven't
-happened yet.** Untrimmed, the strip shows phantom dead hours and "this hour"
-reads 23:00's zero. The series is cut at the current UTC hour and `thisHour` is
-looked up by key, not taken from the tail. Axis is labelled UTC deliberately.
+happened yet**, so the series is cut at the current hour and `thisHour` is
+looked up by key, never taken from the tail.
+⚠ **And those stats are in the ACCOUNT'S timezone, not UTC** — which is exactly
+why the spec carries a separate `total_utc` beside `total`. Cutting at the UTC
+hour on a US account looked 4 hours into the future: "this hour" was a
+guaranteed 0 and the strip carried a dead tail. The zone is read once per
+session from `/api/v0/me` (`user.settings.timezone`) and the axis is labelled
+with it; a failed lookup or bad zone name falls back to UTC.
 
 **Verifying it without a token or a screenshot:** the Browser pane can't
 screenshot unless it's displayed, and there's no real token to hand. Stub

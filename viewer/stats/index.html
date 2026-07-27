@@ -289,6 +289,23 @@ const A2N = {"AE":784,"AF":4,"AL":8,"AM":51,"AO":24,"AQ":10,"AR":32,"AT":40,"AU"
 
 /* ================= state ================= */
 let tokens = {}, scope = 'all', range = '7d', world = null, data = null, timer = null;
+/* ⚠ GoatCounter reports stats in the ACCOUNT'S timezone, not UTC — that's why
+   the spec carries a separate `total_utc` alongside `total`. Trimming the
+   series at the current *UTC* hour therefore looked hours into the future on a
+   non-UTC account, so "this hour" was a guaranteed 0 and the strip carried a
+   dead tail. Read the real zone from /api/v0/me once per session. */
+let siteTz = null;
+function nowKeyIn(tz) {
+  try {
+    const p = Object.fromEntries(new Intl.DateTimeFormat('en-CA', {
+      timeZone: tz || 'UTC', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', hour12: false,
+    }).formatToParts(new Date()).map(x => [x.type, x.value]));
+    const hh = p.hour === '24' ? '00' : p.hour;         // some ICU builds report midnight as 24
+    return `${p.year}-${p.month}-${p.day}T${hh}`;
+  } catch (e) {
+    return new Date().toISOString().slice(0, 13);       // bad zone name — fall back to UTC
+  }
+}
 const $ = id => document.getElementById(id);
 const fmt = n => n == null ? '—' : n.toLocaleString();
 
@@ -379,6 +396,14 @@ async function load() {
   const sites = activeSites();
   if (!sites.length) throw new Error('No token for the selected site — press TOKENS to add one.');
 
+  // once per session; a failure here must never block the stats themselves
+  if (siteTz === null) {
+    try {
+      const me = await api(sites[0], 'me', {});
+      siteTz = me?.user?.settings?.timezone || 'UTC';
+    } catch (e) { siteTz = 'UTC'; }
+  }
+
   const per = await Promise.all(sites.map(async site => {
     const [total, loc, hits] = await Promise.all([
       api(site, 'stats/total', w),
@@ -428,7 +453,7 @@ async function load() {
   // happened yet — so the raw tail is a run of zeros stretching to midnight.
   // Left in, the strip shows phantom dead hours and "this hour" reads whatever
   // 23:00 will be (always 0). Cut the series at the current hour.
-  const nowKey = new Date().toISOString().slice(0, 13);      // "YYYY-MM-DDTHH", same shape as our keys
+  const nowKey = nowKeyIn(siteTz);                           // "YYYY-MM-DDTHH", same shape as our keys
   const ordered = [...series.entries()].sort((a, b) => a[0] < b[0] ? -1 : 1).filter(([k]) => k <= nowKey);
   const desc = m => [...m.values()].sort((a, b) => b.count - a.count);
   return {
@@ -660,7 +685,7 @@ function drawStrip() {
     return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', timeZone: 'UTC' }) + ' ' + k.slice(11) + ':00';
   };
   $('strip-x').innerHTML = pts.length
-    ? `<span>${label(pts[0][0])}</span><span>${label(pts[Math.floor(pts.length / 2)][0])} UTC</span><span>NOW</span>`
+    ? `<span>${label(pts[0][0])}</span><span>${label(pts[Math.floor(pts.length / 2)][0])} ${esc(siteTz || 'UTC')}</span><span>NOW</span>`
     : '';
 }
 
