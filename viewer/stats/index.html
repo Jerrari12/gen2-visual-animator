@@ -155,6 +155,16 @@ canvas { display: block; width: 100%; }
 .mount .n { font-size: .62rem; letter-spacing: .16em; color: var(--dim); }
 .mount .c { font-size: 1.35rem; line-height: 1.1; font-variant-numeric: tabular-nums; }
 .mount .p { font-size: .6rem; color: var(--dim); }
+/* funnel stages */
+.fstage { display: grid; grid-template-columns: 92px 1fr 54px 46px; gap: 10px; align-items: center; margin-bottom: 5px; font-size: .68rem; }
+.fstage .fl { color: var(--dim); letter-spacing: .12em; overflow: hidden; text-overflow: ellipsis; }
+.fstage .fb { height: 13px; background: #0a0d14; border: 1px solid var(--line); border-radius: 2px; overflow: hidden; }
+.fstage .fb > span { display: block; height: 100%; }
+.fstage .fc { text-align: right; font-variant-numeric: tabular-nums; }
+.fstage .fd { text-align: right; color: var(--dim); font-size: .6rem; }
+.fstage.bad .fl { color: var(--magenta); }
+.fstage.bad .fd { color: var(--magenta); font-weight: 700; }
+
 /* group heading inside a scrolling list */
 .gh { font-size: .58rem; letter-spacing: .22em; color: var(--dim); margin: 12px 0 2px; }
 .gh:first-child { margin-top: 0; }
@@ -242,6 +252,17 @@ canvas { display: block; width: 100%; }
       <div class="grid" style="grid-template-columns:1fr 1fr;margin-top:16px">
         <div><p class="h" style="margin-bottom:9px">Collection</p><div class="rows" id="mix-length"></div></div>
         <div><p class="h" style="margin-bottom:9px">Drawer fill</p><div class="rows" id="mix-fill"></div></div>
+      </div>
+    </div>
+
+    <div class="grid cols" style="margin-top:14px">
+      <div class="panel">
+        <p class="h">Instructions funnel <span id="funnel-note" style="color:var(--dim);text-transform:none;letter-spacing:.05em"></span></p>
+        <div id="funnel"></div>
+      </div>
+      <div class="panel">
+        <p class="h">Kits opened</p>
+        <div class="rows" id="kits"></div>
       </div>
     </div>
 
@@ -459,7 +480,7 @@ async function load() {
   return {
     views, events,
     countries: [...countries.values()].sort((a, b) => b.count - a.count),
-    pages: desc(pages), events_: desc(evts), mix: buildMix(evts),
+    pages: desc(pages), events_: desc(evts), mix: buildMix(evts), funnel: buildFunnel(evts),
     series: ordered,
     thisHour: series.get(nowKey) || 0,
   };
@@ -493,6 +514,43 @@ function buildMix(evts) {
     return out.sort((a, b) => b.count - a.count);
   };
   return { mount: pick('mount'), length: pick('length'), fill: pick('fill') };
+}
+
+/* The instructions funnel — the drop-off curve the step events exist for.
+   ⚠ `step:N` deliberately carries no kit id (that would multiply cardinality by
+   the number of kits), so stages aggregate ACROSS kits. Kits run 12–14 steps,
+   so the tail thins for a reason that isn't drop-off; the panel says so rather
+   than letting a structural artefact read as a broken instruction. */
+function buildFunnel(evts) {
+  const get = k => evts.get(k)?.count || 0;
+  const sum = pre => [...evts].filter(([k]) => k.startsWith(pre)).reduce((n, [, v]) => n + v.count, 0);
+  const steps = [...evts]
+    .map(([k, v]) => [/^step:(\d+)$/.exec(k), v])
+    .filter(([m]) => m)
+    .map(([m, v]) => ({ label: 'STEP ' + m[1], count: v.count, n: +m[1] }))
+    .sort((a, b) => a.n - b.n);
+
+  const stages = [
+    { label: 'OPENED',      count: sum('open:') },
+    { label: 'GET STARTED', count: get('start') },
+    { label: 'INTRO',       count: get('step:intro') },
+    ...steps,
+    { label: 'COMPLETE',    count: get('complete') },
+    { label: 'OUTRO',       count: get('outro') },
+  ];
+  // biggest proportional fall between consecutive stages that both have traffic
+  let worst = -1, worstRatio = 1;
+  for (let i = 1; i < stages.length; i++) {
+    const prev = stages[i - 1].count, cur = stages[i].count;
+    if (prev < 5) continue;                       // ignore noise at tiny volumes
+    const ratio = cur / prev;
+    if (ratio < worstRatio) { worstRatio = ratio; worst = i; }
+  }
+  const kits = [...evts]
+    .filter(([k]) => k.startsWith('open:'))
+    .map(([k, v]) => ({ key: k.slice(5), count: v.count }))
+    .sort((a, b) => b.count - a.count);
+  return { stages, worst, skip: get('skip-to-end'), kits, any: stages.some(s => s.count > 0) };
 }
 
 /* Mount glyphs — a box relative to a surface, which is the whole distinction. */
@@ -720,6 +778,8 @@ function render() {
   $('legend-max').textContent = max ? '· peak ' + fmt(max) : '';
 
   renderMix();
+  renderFunnel();
+  simpleList('kits', data.funnel.kits, k => k.key);
   simpleList('pages', data.pages.slice(0, 30), p => p.path, p => p.title);
   renderEvents();
   drawStrip();
@@ -771,6 +831,42 @@ function renderEvents() {
     box.appendChild(head);
     const max = b.items[0].count || 1;
     for (const it of b.items.slice(0, 12)) box.appendChild(barRow(it.path, it.count, max));
+  }
+}
+
+function renderFunnel() {
+  const f = data.funnel, box = $('funnel'), note = $('funnel-note');
+  box.innerHTML = '';
+  if (!f.any) {
+    note.textContent = '';
+    box.innerHTML = `<div class="empty">No instruction sessions in this range yet.<br><br>
+      This fills once people open the Build Studio — <code>?build=&lt;kit&gt;</code> links from the
+      Printables / Thangs / MakerWorld listings are what feed it.</div>`;
+    return;
+  }
+  note.textContent = '— steps aggregate across kits (12–14 steps each), so the tail thins for structural reasons too';
+  const top = f.stages[0].count || 1;
+  f.stages.forEach((s, i) => {
+    const prev = i ? f.stages[i - 1].count : null;
+    const pct = Math.round(s.count / top * 100);
+    const drop = prev ? Math.round((1 - s.count / prev) * 100) : null;
+    const bad = i === f.worst && drop > 0;
+    const [r, g, b] = bad ? [255, 62, 165] : ramp(top <= 1 ? 1 : Math.log(s.count + 1) / Math.log(top + 1));
+    const el = document.createElement('div');
+    el.className = 'fstage' + (bad ? ' bad' : '');
+    el.innerHTML = `<span class="fl">${esc(s.label)}</span>
+      <span class="fb"><span style="width:${Math.max(0.6, pct)}%;background:rgb(${r},${g},${b});
+        box-shadow:0 0 10px rgba(${r},${g},${b},.6)"></span></span>
+      <span class="fc" style="color:rgb(${r},${g},${b})">${fmt(s.count)}</span>
+      <span class="fd">${drop === null ? '' : (drop > 0 ? '−' + drop + '%' : '')}</span>`;
+    box.appendChild(el);
+  });
+  if (f.skip) {
+    const el = document.createElement('div');
+    el.className = 'gh';
+    el.style.marginTop = '12px';
+    el.textContent = `${fmt(f.skip)} skipped straight to the finished build`;
+    box.appendChild(el);
   }
 }
 

@@ -858,6 +858,17 @@ counts every button press as a visit. On Joey's planner that's 1 667 "visits"
 against ~555 actual pageviews. This page splits both: `views = total −
 total_events`, and separate Pages / Events panels off the `event` flag.
 
+The **instructions funnel** panel turns the step events into the drop-off curve
+they exist for: OPENED → GET STARTED → INTRO → STEP n → COMPLETE → OUTRO, each
+with its fall from the previous stage, and the single worst proportional drop
+flagged in magenta (stages under 5 hits are skipped so noise can't win).
+⚠ **`step:N` carries no kit id on purpose** — scoping it would multiply
+cardinality by the kit count — so stages aggregate ACROSS kits, and kits run
+12–14 steps. The tail therefore thins for structural reasons as well as
+drop-off, and the panel label says so; don't read the last few steps as
+attrition. Empty state names the cause (no `?build=` traffic yet) rather than
+rendering a blank panel.
+
 Events are grouped by the GEN2 vocabulary (`GROUPS`: BUILD CONFIG / FUNNEL /
 OUTBOUND / TOOLS & UI / ⚠ FAILURES) rather than listed flat — the names are all
 `family:value`, so the list can be read as the questions it was instrumented to
