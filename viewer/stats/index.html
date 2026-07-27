@@ -1,0 +1,597 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>GEN2 · TELEMETRY</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon.ico" sizes="32x32">
+<!--
+  GEN2 telemetry — a retro-HUD front end for GoatCounter.
+
+  Reads the API straight from the browser: GoatCounter sends permissive CORS
+  headers, so no server and no proxy. Tokens are READ-ONLY API keys that live in
+  this browser's localStorage and nowhere else — never in the repo, never sent
+  anywhere but goatcounter.com. Without a token this page shows a setup screen
+  and nothing else, so the URL being public leaks nothing.
+
+  ⚠ This page deliberately carries NO GoatCounter script. Tracking the dashboard
+  would put your own admin visits into the numbers you're reading.
+
+  Data notes that shape the UI:
+  - GoatCounter's finest granularity is the HOUR (`stats[].hourly`). GA4-style
+    per-minute "active users" is not reproducible; the live strip is honest
+    about being hourly.
+  - /stats/total returns the site-wide time series AND totals in one call, so a
+    full refresh is two requests per site (total + locations).
+-->
+<style>
+:root {
+  --bg: #07080c;
+  --panel: #0d1017;
+  --line: #1c2230;
+  --text: #dfe6f2;
+  --dim: #6b7689;
+  --accent: #ff8a40;   /* the GEN2 orange — ties this to the other tools */
+  --cyan: #22e0d6;
+  --magenta: #ff3ea5;
+  --lime: #9dff3c;
+  --mono: ui-monospace, "Cascadia Mono", "SF Mono", Consolas, "Liberation Mono", monospace;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--mono); }
+body {
+  min-height: 100vh;
+  /* faint HUD grid + a CRT vignette, both purely decorative */
+  background-image:
+    linear-gradient(rgba(34,224,214,.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(34,224,214,.035) 1px, transparent 1px),
+    radial-gradient(ellipse at 50% 40%, rgba(34,224,214,.05), transparent 70%);
+  background-size: 46px 46px, 46px 46px, 100% 100%;
+}
+/* scanlines — pointer-events none so they never eat a click */
+body::after {
+  content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 99;
+  background: repeating-linear-gradient(180deg, rgba(0,0,0,.16) 0 1px, transparent 1px 3px);
+  mix-blend-mode: multiply;
+}
+a { color: var(--cyan); }
+
+.wrap { max-width: 1440px; margin: 0 auto; padding: 18px 20px 60px; }
+
+/* ---------- top bar ---------- */
+.bar { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 18px; }
+.brand { display: flex; align-items: baseline; gap: 10px; margin-right: auto; }
+.brand b { font-size: 1.05rem; letter-spacing: .22em; color: var(--accent); text-shadow: 0 0 14px rgba(255,138,64,.55); }
+.brand span { font-size: .68rem; letter-spacing: .3em; color: var(--dim); }
+.seg { display: flex; border: 1px solid var(--line); border-radius: 3px; overflow: hidden; }
+.seg button {
+  font: inherit; font-size: .68rem; letter-spacing: .16em; padding: 7px 11px; cursor: pointer;
+  background: transparent; color: var(--dim); border: 0; border-right: 1px solid var(--line);
+}
+.seg button:last-child { border-right: 0; }
+.seg button.on { background: rgba(34,224,214,.13); color: var(--cyan); text-shadow: 0 0 10px rgba(34,224,214,.6); }
+.seg button:hover:not(.on) { color: var(--text); }
+.ghost {
+  font: inherit; font-size: .68rem; letter-spacing: .16em; padding: 7px 11px; cursor: pointer;
+  background: transparent; color: var(--dim); border: 1px solid var(--line); border-radius: 3px;
+}
+.ghost:hover { color: var(--text); border-color: var(--dim); }
+
+/* ---------- panels ---------- */
+.grid { display: grid; gap: 14px; }
+.cols { grid-template-columns: 1fr 320px; }
+@media (max-width: 900px) { .cols { grid-template-columns: 1fr; } }
+.panel { position: relative; background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 14px 16px; }
+/* HUD corner brackets */
+.panel::before, .panel::after {
+  content: ""; position: absolute; width: 12px; height: 12px; border: 1px solid var(--cyan); opacity: .5;
+}
+.panel::before { top: -1px; left: -1px; border-right: 0; border-bottom: 0; }
+.panel::after { bottom: -1px; right: -1px; border-left: 0; border-top: 0; }
+.h { font-size: .64rem; letter-spacing: .26em; color: var(--dim); margin: 0 0 12px; text-transform: uppercase; }
+
+/* ---------- stat tiles ---------- */
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; margin-bottom: 14px; }
+.tile .v { font-size: 2.1rem; line-height: 1; font-variant-numeric: tabular-nums; }
+.tile .s { font-size: .62rem; letter-spacing: .16em; color: var(--dim); margin-top: 7px; }
+.c-accent { color: var(--accent); text-shadow: 0 0 18px rgba(255,138,64,.45); }
+.c-cyan   { color: var(--cyan);   text-shadow: 0 0 18px rgba(34,224,214,.45); }
+.c-mag    { color: var(--magenta);text-shadow: 0 0 18px rgba(255,62,165,.45); }
+.c-lime   { color: var(--lime);   text-shadow: 0 0 18px rgba(157,255,60,.4); }
+
+/* live dot */
+.live { display: inline-flex; align-items: center; gap: 7px; font-size: .62rem; letter-spacing: .2em; color: var(--dim); }
+.live i { width: 7px; height: 7px; border-radius: 50%; background: var(--lime); box-shadow: 0 0 9px var(--lime); animation: pulse 2s infinite; }
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .25; } }
+
+canvas { display: block; width: 100%; }
+
+/* ---------- country list ---------- */
+.rows { display: flex; flex-direction: column; gap: 8px; max-height: 430px; overflow-y: auto; }
+.row { display: grid; grid-template-columns: 26px 1fr auto; gap: 10px; align-items: center; font-size: .76rem; }
+.row .flag { font-size: .95rem; }
+.row .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
+.row .ct { color: var(--cyan); font-variant-numeric: tabular-nums; }
+.row .track { grid-column: 2 / -1; height: 2px; background: var(--line); border-radius: 2px; overflow: hidden; margin-top: -4px; }
+.row .fill { height: 100%; background: linear-gradient(90deg, var(--cyan), var(--accent)); box-shadow: 0 0 8px rgba(34,224,214,.7); }
+
+/* ---------- setup / messages ---------- */
+.setup { max-width: 620px; margin: 8vh auto; }
+.setup p { font-size: .8rem; line-height: 1.65; color: var(--dim); }
+.setup label { display: block; font-size: .64rem; letter-spacing: .2em; color: var(--dim); margin: 16px 0 6px; }
+.setup input {
+  width: 100%; font: inherit; font-size: .82rem; padding: 10px 12px; color: var(--text);
+  background: #05060a; border: 1px solid var(--line); border-radius: 3px;
+}
+.setup input:focus { outline: none; border-color: var(--cyan); box-shadow: 0 0 0 1px rgba(34,224,214,.35); }
+.btn {
+  font: inherit; font-size: .72rem; letter-spacing: .18em; padding: 11px 20px; margin-top: 18px; cursor: pointer;
+  background: var(--accent); color: #12060a; border: 0; border-radius: 3px; font-weight: 700;
+}
+.btn:hover { filter: brightness(1.12); }
+.warn { color: var(--magenta); font-size: .72rem; margin-top: 12px; min-height: 1.2em; }
+.note { font-size: .66rem; color: var(--dim); line-height: 1.7; }
+.hidden { display: none !important; }
+.empty { color: var(--dim); font-size: .74rem; padding: 22px 0; text-align: center; }
+</style>
+
+<div class="wrap">
+
+  <!-- ============ setup ============ -->
+  <div id="setup" class="setup hidden">
+    <div class="panel">
+      <p class="h">GEN2 · Telemetry · Setup</p>
+      <p>
+        Paste a <b>read-only API token</b> for each GoatCounter site. Tokens are
+        stored in <b>this browser only</b> (localStorage) — they are never sent
+        anywhere except goatcounter.com, and never committed to the repo.
+      </p>
+      <p class="note">
+        Make one per site (they're separate accounts): open
+        <b>[site].goatcounter.com → User → API tokens → Add new</b> and tick
+        <b>“Read statistics”</b>. You can fill in just one and add the other later.
+      </p>
+
+      <label>jerrari.goatcounter.com — GEN2 Planner</label>
+      <input id="tok-planner" type="password" autocomplete="off" spellcheck="false" placeholder="token">
+
+      <label>jerrari-build.goatcounter.com — 3D Build Studio</label>
+      <input id="tok-build" type="password" autocomplete="off" spellcheck="false" placeholder="token">
+
+      <button class="btn" id="save">CONNECT</button>
+      <div class="warn" id="setup-warn"></div>
+    </div>
+  </div>
+
+  <!-- ============ dashboard ============ -->
+  <div id="dash" class="hidden">
+    <div class="bar">
+      <div class="brand"><b>GEN2</b><span>TELEMETRY</span></div>
+      <div class="seg" id="scope"></div>
+      <div class="seg" id="range"></div>
+      <button class="ghost" id="reload">↻ REFRESH</button>
+      <button class="ghost" id="settings">TOKENS</button>
+    </div>
+
+    <div class="tiles">
+      <div class="panel tile"><div class="v c-accent" id="s-views">—</div><div class="s" id="s-views-l">PAGEVIEWS</div></div>
+      <div class="panel tile"><div class="v c-cyan"   id="s-events">—</div><div class="s">EVENTS</div></div>
+      <div class="panel tile"><div class="v c-mag"    id="s-countries">—</div><div class="s">COUNTRIES</div></div>
+      <div class="panel tile"><div class="v c-lime"   id="s-hour">—</div><div class="s"><span class="live"><i></i>THIS HOUR</span></div></div>
+    </div>
+
+    <div class="panel" style="margin-bottom:14px">
+      <p class="h">Activity · last 48 hours · <span style="color:var(--dim);text-transform:none;letter-spacing:.05em">hourly buckets — GoatCounter stores no finer</span></p>
+      <canvas id="strip" height="150"></canvas>
+      <div id="strip-x" style="display:flex;justify-content:space-between;font-size:.58rem;color:var(--dim);letter-spacing:.1em;margin-top:6px"></div>
+    </div>
+
+    <div class="grid cols">
+      <div class="panel">
+        <p class="h">Global distribution</p>
+        <canvas id="map" height="620"></canvas>
+        <div style="display:flex;align-items:center;gap:10px;margin-top:10px">
+          <span style="font-size:.58rem;letter-spacing:.16em;color:var(--dim)">LOW</span>
+          <span id="legend" style="flex:1;height:5px;border-radius:3px"></span>
+          <span style="font-size:.58rem;letter-spacing:.16em;color:var(--dim)">HIGH</span>
+          <span id="legend-max" style="font-size:.58rem;letter-spacing:.1em;color:var(--dim)"></span>
+        </div>
+      </div>
+      <div class="panel">
+        <p class="h">Top countries</p>
+        <div class="rows" id="countries"></div>
+      </div>
+    </div>
+
+    <p class="warn" id="err"></p>
+    <p class="note" style="margin-top:18px">
+      Source: GoatCounter API · read-only · this page is not itself tracked.
+    </p>
+  </div>
+</div>
+
+<script>
+/* ================= config ================= */
+const SITES = [
+  { id: 'planner', label: 'PLANNER', host: 'jerrari.goatcounter.com',       color: '#ff8a40' },
+  { id: 'build',   label: 'STUDIO',  host: 'jerrari-build.goatcounter.com', color: '#22e0d6' },
+];
+const RANGES = [
+  { id: '24h', label: '24H', days: 1 },
+  { id: '7d',  label: '7D',  days: 7 },
+  { id: '30d', label: '30D', days: 30 },
+  { id: '90d', label: '90D', days: 90 },
+];
+const TOKEN_KEY = 'gen2-stats-tokens';
+/* alpha-2 → ISO-3166 numeric, restricted to the 174 countries the vendored
+   atlas actually carries (it keys geometries by numeric id, GoatCounter reports
+   alpha-2). Generated from the world-countries dataset; 1.5 kB, so inline. */
+/* Countries the 110m atlas is too coarse to draw at all — city-states, islands,
+   micro-nations. Singapore is the one that matters: it's consistently top-3
+   traffic and would otherwise be invisible on the map while sitting second in
+   the list. These get a glowing centroid marker instead of a filled shape.
+   [lon, lat], from the same world-countries dataset. */
+const PTS = {"AD":[1.5,42.5],"AG":[-61.8,17.05],"AI":[-63.17,18.25],"AS":[-170,-14.33],"AW":[-69.97,12.5],"AX":[19.9,60.12],"BB":[-59.53,13.17],"BH":[50.55,26],"BL":[-63.42,18.5],"BM":[-64.75,32.33],"BQ":[-68.25,12.18],"BV":[3.4,-54.43],"CC":[96.83,-12.5],"CK":[-159.77,-21.23],"CV":[-24,16],"CW":[-68.93,12.12],"CX":[105.67,-10.5],"DM":[-61.33,15.42],"FM":[158.25,6.92],"FO":[-7,62],"GD":[-61.67,12.12],"GF":[-53,4],"GG":[-2.58,49.47],"GI":[-5.35,36.13],"GP":[-61.58,16.25],"GS":[-37,-54.5],"GU":[144.78,13.47],"HK":[114.19,22.27],"HM":[72.52,-53.1],"IM":[-4.5,54.25],"IO":[71.5,-6],"JE":[-2.17,49.25],"KI":[173,1.42],"KM":[44.25,-12.17],"KN":[-62.75,17.33],"KY":[-80.5,19.5],"LC":[-61,13.88],"LI":[9.53,47.27],"MC":[7.4,43.73],"MF":[-63.08,18.08],"MH":[168,9],"MO":[113.55,22.17],"MP":[145.75,15.2],"MQ":[-61,14.67],"MS":[-62.2,16.75],"MT":[14.58,35.83],"MU":[57.55,-20.28],"MV":[73,3.25],"NF":[167.95,-29.03],"NR":[166.92,-0.53],"NU":[-169.87,-19.03],"PF":[-140,-15],"PM":[-56.33,46.83],"PN":[-128.32,-25.07],"PW":[134.5,7.5],"RE":[55.53,-21.15],"SC":[55.67,-4.58],"SG":[103.8,1.37],"SH":[-5.72,-15.95],"SJ":[20,78],"SM":[12.42,43.77],"ST":[7,1],"SX":[-63.05,18.03],"TC":[-71.58,21.75],"TK":[-172,-9],"TO":[-175,-20],"TV":[178,-8],"UM":[-168,19.28],"VA":[12.45,41.9],"VC":[-61.2,13.25],"VG":[-64.5,18.43],"VI":[-64.83,18.35],"WF":[-176.2,-13.3],"WS":[-172.33,-13.58],"YT":[45.17,-12.83]};
+const A2N = {"AE":784,"AF":4,"AL":8,"AM":51,"AO":24,"AQ":10,"AR":32,"AT":40,"AU":36,"AZ":31,"BA":70,"BD":50,"BE":56,"BF":854,"BG":100,"BI":108,"BJ":204,"BN":96,"BO":68,"BR":76,"BS":44,"BT":64,"BW":72,"BY":112,"BZ":84,"CA":124,"CD":180,"CF":140,"CG":178,"CH":756,"CI":384,"CL":152,"CM":120,"CN":156,"CO":170,"CR":188,"CU":192,"CY":196,"CZ":203,"DE":276,"DJ":262,"DK":208,"DO":214,"DZ":12,"EC":218,"EE":233,"EG":818,"EH":732,"ER":232,"ES":724,"ET":231,"FI":246,"FJ":242,"FK":238,"FR":250,"GA":266,"GB":826,"GE":268,"GH":288,"GL":304,"GM":270,"GN":324,"GQ":226,"GR":300,"GT":320,"GW":624,"GY":328,"HN":340,"HR":191,"HT":332,"HU":348,"ID":360,"IE":372,"IL":376,"IN":356,"IQ":368,"IR":364,"IS":352,"IT":380,"JM":388,"JO":400,"JP":392,"KE":404,"KG":417,"KH":116,"KP":408,"KR":410,"KW":414,"KZ":398,"LA":418,"LB":422,"LK":144,"LR":430,"LS":426,"LT":440,"LU":442,"LV":428,"LY":434,"MA":504,"MD":498,"ME":499,"MG":450,"MK":807,"ML":466,"MM":104,"MN":496,"MR":478,"MW":454,"MX":484,"MY":458,"MZ":508,"NA":516,"NC":540,"NE":562,"NG":566,"NI":558,"NL":528,"NO":578,"NP":524,"NZ":554,"OM":512,"PA":591,"PE":604,"PG":598,"PH":608,"PK":586,"PL":616,"PR":630,"PS":275,"PT":620,"PY":600,"QA":634,"RO":642,"RS":688,"RU":643,"RW":646,"SA":682,"SB":90,"SD":729,"SE":752,"SI":705,"SK":703,"SL":694,"SN":686,"SO":706,"SR":740,"SS":728,"SV":222,"SY":760,"SZ":748,"TD":148,"TF":260,"TG":768,"TH":764,"TJ":762,"TL":626,"TM":795,"TN":788,"TR":792,"TT":780,"TW":158,"TZ":834,"UA":804,"UG":800,"US":840,"UY":858,"UZ":860,"VE":862,"VN":704,"VU":548,"YE":887,"ZA":710,"ZM":894,"ZW":716};
+
+/* ================= state ================= */
+let tokens = {}, scope = 'all', range = '7d', world = null, data = null, timer = null;
+const $ = id => document.getElementById(id);
+const fmt = n => n == null ? '—' : n.toLocaleString();
+
+try { tokens = JSON.parse(localStorage.getItem(TOKEN_KEY) || '{}'); } catch (e) { tokens = {}; }
+
+/* ================= setup screen ================= */
+function showSetup() {
+  $('setup').classList.remove('hidden');
+  $('dash').classList.add('hidden');
+  $('tok-planner').value = tokens.planner || '';
+  $('tok-build').value = tokens.build || '';
+}
+$('save').onclick = () => {
+  const t = { planner: $('tok-planner').value.trim(), build: $('tok-build').value.trim() };
+  if (!t.planner && !t.build) { $('setup-warn').textContent = 'Enter at least one token.'; return; }
+  tokens = t;
+  try { localStorage.setItem(TOKEN_KEY, JSON.stringify(tokens)); } catch (e) {}
+  $('setup').classList.add('hidden');
+  boot();
+};
+$('settings').onclick = showSetup;
+
+/* ================= API ================= */
+const activeSites = () => SITES.filter(s => tokens[s.id] && (scope === 'all' || scope === s.id));
+
+async function api(site, path, params) {
+  const url = new URL(`https://${site.host}/api/v0/${path}`);
+  for (const [k, v] of Object.entries(params || {})) url.searchParams.set(k, v);
+  const res = await fetch(url, { headers: { Authorization: 'Bearer ' + tokens[site.id] } });
+  if (res.status === 401 || res.status === 403) throw new Error(`${site.label}: token rejected (needs “Read statistics”)`);
+  if (!res.ok) throw new Error(`${site.label}: HTTP ${res.status}`);
+  return res.json();
+}
+
+function window_() {
+  const days = RANGES.find(r => r.id === range).days;
+  const end = new Date();
+  end.setMinutes(0, 0, 0);
+  const start = new Date(end.getTime() - days * 864e5);
+  // the API wants hour-rounded RFC3339; it treats these as UTC
+  return { start: start.toISOString().slice(0, 13) + ':00:00Z',
+           end:   new Date(end.getTime() + 36e5).toISOString().slice(0, 13) + ':00:00Z' };
+}
+
+async function load() {
+  const w = window_();
+  const sites = activeSites();
+  if (!sites.length) throw new Error('No token for the selected site — press TOKENS to add one.');
+
+  const per = await Promise.all(sites.map(async site => {
+    const [total, loc] = await Promise.all([
+      api(site, 'stats/total', w),
+      api(site, 'stats/locations', w),
+    ]);
+    return { site, total, loc };
+  }));
+
+  // merge across sites
+  const countries = new Map();   // alpha2 -> {code, name, count}
+  let views = 0, events = 0;
+  const series = new Map();      // "YYYY-MM-DDTHH" -> count
+
+  for (const { total, loc } of per) {
+    views += total.total || 0;
+    events += total.total_events || 0;
+    for (const s of loc.stats || []) {
+      const code = String(s.id || '').slice(0, 2).toUpperCase();
+      if (!code) continue;
+      const cur = countries.get(code) || { code, name: s.name || code, count: 0 };
+      cur.count += s.count || 0;
+      if (s.name) cur.name = s.name;
+      countries.set(code, cur);
+    }
+    for (const d of total.stats || []) {
+      (d.hourly || []).forEach((n, h) => {
+        const key = d.day + 'T' + String(h).padStart(2, '0');
+        series.set(key, (series.get(key) || 0) + n);
+      });
+    }
+  }
+  // GoatCounter returns FULL 24-slot hourly arrays, including hours that haven't
+  // happened yet — so the raw tail is a run of zeros stretching to midnight.
+  // Left in, the strip shows phantom dead hours and "this hour" reads whatever
+  // 23:00 will be (always 0). Cut the series at the current hour.
+  const nowKey = new Date().toISOString().slice(0, 13);      // "YYYY-MM-DDTHH", same shape as our keys
+  const ordered = [...series.entries()].sort((a, b) => a[0] < b[0] ? -1 : 1).filter(([k]) => k <= nowKey);
+  return {
+    views, events,
+    countries: [...countries.values()].sort((a, b) => b.count - a.count),
+    series: ordered,
+    thisHour: series.get(nowKey) || 0,
+  };
+}
+
+/* ================= world map ================= */
+/* Minimal TopoJSON reader — the format is just delta-encoded shared arcs, so a
+   decoder is ~20 lines and beats pulling in a library we'd have to vendor. */
+function decodeTopo(topo) {
+  const [sx, sy] = topo.transform.scale, [tx, ty] = topo.transform.translate;
+  const arcs = topo.arcs.map(arc => {
+    let x = 0, y = 0;
+    return arc.map(([dx, dy]) => { x += dx; y += dy; return [x * sx + tx, y * sy + ty]; });
+  });
+  const ring = idxs => {
+    const pts = [];
+    for (const i of idxs) {
+      const rev = i < 0, a = arcs[rev ? ~i : i];      // ~i === -1 - i, the spec's reversal encoding
+      const seq = rev ? a.slice().reverse() : a;
+      for (let k = pts.length ? 1 : 0; k < seq.length; k++) pts.push(seq[k]);
+    }
+    return pts;
+  };
+  const out = new Map();                                // numeric id -> array of rings
+  for (const g of topo.objects.countries.geometries) {
+    if (g.id == null) continue;
+    const polys = g.type === 'Polygon' ? [g.arcs] : g.type === 'MultiPolygon' ? g.arcs : [];
+    out.set(+g.id, polys.flatMap(p => p.map(ring)));
+  }
+  return out;
+}
+
+function drawMap() {
+  const cv = $('map'), ctx = cv.getContext('2d');
+  const dpr = Math.min(devicePixelRatio || 1, 2);
+  const W = cv.clientWidth, H = Math.round(W * 0.52);
+  cv.style.height = H + 'px';
+  cv.width = W * dpr; cv.height = H * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, W, H);
+  if (!world) return;
+
+  // equirectangular, clipped to the latitudes the atlas actually covers
+  const LAT0 = 84, LAT1 = -60;                          // trims empty Antarctic waste
+  const px = lon => (lon + 180) / 360 * W;
+  const py = lat => (LAT0 - lat) / (LAT0 - LAT1) * H;
+
+  // graticule
+  ctx.strokeStyle = 'rgba(34,224,214,.07)'; ctx.lineWidth = 1;
+  for (let lon = -180; lon <= 180; lon += 30) { ctx.beginPath(); ctx.moveTo(px(lon), 0); ctx.lineTo(px(lon), H); ctx.stroke(); }
+  for (let lat = -60; lat <= 84; lat += 30) { ctx.beginPath(); ctx.moveTo(0, py(lat)); ctx.lineTo(W, py(lat)); ctx.stroke(); }
+
+  const byNum = new Map();
+  let max = 0;
+  for (const c of (data?.countries || [])) {
+    const n = A2N[c.code];
+    if (n) { byNum.set(n, c.count); max = Math.max(max, c.count); }
+  }
+
+  /* Rings that cross the antimeridian (Russia, Fiji, NZ's outliers) have a
+     ±360° jump in them. Projected naively, the edge from +180 back to -180 is
+     drawn straight across the map and fills as a band spanning every longitude.
+     Fix: rebase the ring to a continuous 0..360 run, then draw it twice — once
+     as-is and once shifted -360 — and let the canvas clip whichever half falls
+     outside. Cheaper and more accurate than clipping the polygon by hand. */
+  const spans = r => {
+    for (let i = 1; i < r.length; i++) if (Math.abs(r[i][0] - r[i - 1][0]) > 180) {
+      const shifted = r.map(([lon, lat]) => [lon < 0 ? lon + 360 : lon, lat]);
+      return [shifted, shifted.map(([lon, lat]) => [lon - 360, lat])];
+    }
+    return [r];
+  };
+  const path = rings => {
+    ctx.beginPath();
+    for (const ring of rings) {
+      if (ring.length < 2) continue;
+      for (const r of spans(ring)) {
+        ctx.moveTo(px(r[0][0]), py(r[0][1]));
+        for (let i = 1; i < r.length; i++) ctx.lineTo(px(r[i][0]), py(r[i][1]));
+        ctx.closePath();
+      }
+    }
+  };
+
+  // unlit landmass first, so the world is always legible even with no traffic
+  ctx.lineJoin = 'round';
+  for (const [id, rings] of world) {
+    if (byNum.has(id)) continue;
+    path(rings);
+    ctx.fillStyle = '#141a26'; ctx.fill();
+    ctx.strokeStyle = '#1e2636'; ctx.lineWidth = .6; ctx.stroke();
+  }
+
+  // lit countries — log scale, because one big country otherwise flattens the rest
+  const lit = [...byNum.entries()].sort((a, b) => a[1] - b[1]);
+  for (const [id, count] of lit) {
+    const rings = world.get(id);
+    if (!rings) continue;
+    const t = max <= 1 ? 1 : Math.log(count + 1) / Math.log(max + 1);
+    const [r, g, b] = ramp(t);
+    path(rings);
+    ctx.save();
+    ctx.shadowColor = `rgba(${r},${g},${b},${.3 + .5 * t})`;
+    ctx.shadowBlur = 6 + 22 * t;
+    ctx.fillStyle = `rgba(${r},${g},${b},${.55 + .4 * t})`;
+    ctx.fill();
+    ctx.restore();
+    ctx.strokeStyle = `rgba(${r},${g},${b},.9)`; ctx.lineWidth = .8; ctx.stroke();
+  }
+
+  // countries with no drawable shape at this resolution — marker instead, or
+  // they'd rank high in the list and appear nowhere on the map
+  for (const c of (data?.countries || [])) {
+    if (A2N[c.code] && world.has(A2N[c.code])) continue;
+    const p = PTS[c.code];
+    if (!p) continue;
+    const t = max <= 1 ? 1 : Math.log(c.count + 1) / Math.log(max + 1);
+    const [r, g, b] = ramp(t);
+    const x = px(p[0]), y = py(p[1]), rad = 2.5 + 4 * t;
+    ctx.save();
+    ctx.shadowColor = `rgba(${r},${g},${b},.95)`; ctx.shadowBlur = 10 + 16 * t;
+    ctx.fillStyle = `rgba(${r},${g},${b},.95)`;
+    ctx.beginPath(); ctx.arc(x, y, rad, 0, 7); ctx.fill();
+    ctx.restore();
+    // halo ring, so a 1-visitor dot still reads against a dark ocean
+    ctx.strokeStyle = `rgba(${r},${g},${b},.35)`; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(x, y, rad + 3.5, 0, 7); ctx.stroke();
+  }
+}
+
+/* Thermal ramp with SATURATED stops. A straight cyan→orange RGB lerp passes
+   through a desaturated olive, so mid-traffic countries came out muddy grey-
+   green; interpolating between adjacent neon stops keeps every level vivid. */
+const RAMP = [[34,224,214], [64,220,120], [157,255,60], [255,210,60], [255,138,64], [255,70,60]];
+function ramp(t) {
+  const u = Math.max(0, Math.min(1, t)) * (RAMP.length - 1);
+  const i = Math.min(RAMP.length - 2, Math.floor(u)), f = u - i;
+  const a = RAMP[i], b = RAMP[i + 1];
+  return [0, 1, 2].map(k => Math.round(a[k] + (b[k] - a[k]) * f));
+}
+
+/* ================= activity strip ================= */
+function drawStrip() {
+  const cv = $('strip'), ctx = cv.getContext('2d');
+  const dpr = Math.min(devicePixelRatio || 1, 2);
+  const W = cv.clientWidth, H = 150;
+  cv.width = W * dpr; cv.height = H * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, W, H);
+
+  const pts = (data?.series || []).slice(-48);
+  if (!pts.length) return;
+  const max = Math.max(1, ...pts.map(p => p[1]));
+  const bw = W / pts.length;
+
+  pts.forEach(([key, n], i) => {
+    const h = Math.round((n / max) * (H - 26));
+    const x = i * bw, y = H - 18 - h;
+    ctx.fillStyle = 'rgba(34,224,214,.07)';
+    ctx.fillRect(x + 1, 4, bw - 2, H - 22);
+    if (!n) return;
+    const last = i === pts.length - 1;
+    ctx.save();
+    ctx.shadowColor = last ? 'rgba(157,255,60,.9)' : 'rgba(34,224,214,.7)';
+    ctx.shadowBlur = 12;
+    const grad = ctx.createLinearGradient(0, y, 0, H - 18);
+    grad.addColorStop(0, last ? '#9dff3c' : '#ff8a40');
+    grad.addColorStop(1, last ? 'rgba(157,255,60,.35)' : 'rgba(34,224,214,.45)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(x + 1, y, bw - 2, Math.max(2, h));
+    ctx.restore();
+  });
+
+  // baseline
+  ctx.strokeStyle = 'rgba(34,224,214,.25)';
+  ctx.beginPath(); ctx.moveTo(0, H - 18); ctx.lineTo(W, H - 18); ctx.stroke();
+
+  // date + hour: with a 48-slot window the first and middle labels can both land
+  // on midnight, and a bare "00:00" twice tells you nothing
+  const label = k => {
+    if (!k) return '';
+    const d = new Date(k + ':00:00Z');
+    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', timeZone: 'UTC' }) + ' ' + k.slice(11) + ':00';
+  };
+  $('strip-x').innerHTML = pts.length
+    ? `<span>${label(pts[0][0])}</span><span>${label(pts[Math.floor(pts.length / 2)][0])} UTC</span><span>NOW</span>`
+    : '';
+}
+
+/* ================= render ================= */
+const flag = code => /^[A-Z]{2}$/.test(code)
+  ? String.fromCodePoint(...[...code].map(c => 0x1f1e6 + c.charCodeAt(0) - 65)) : '🏳';
+
+function render() {
+  $('s-views').textContent = fmt(data.views);
+  $('s-events').textContent = fmt(data.events);
+  $('s-countries').textContent = fmt(data.countries.length);
+  $('s-hour').textContent = fmt(data.thisHour);
+
+  const box = $('countries');
+  box.innerHTML = '';
+  if (!data.countries.length) { box.innerHTML = '<div class="empty">No location data in this range yet.</div>'; }
+  const max = data.countries[0]?.count || 1;
+  for (const c of data.countries.slice(0, 40)) {
+    // same log scale and ramp as the map, so the list and the map agree
+    const t = max <= 1 ? 1 : Math.log(c.count + 1) / Math.log(max + 1);
+    const [r, g, b] = ramp(t);
+    const el = document.createElement('div');
+    el.className = 'row';
+    el.innerHTML = `<span class="flag">${flag(c.code)}</span>
+      <span class="nm">${c.name.replace(/[<>&]/g, '')}</span>
+      <span class="ct" style="color:rgb(${r},${g},${b})">${fmt(c.count)}</span>
+      <span class="track"><span class="fill" style="width:${Math.max(2, c.count / max * 100)}%;
+        background:rgb(${r},${g},${b});box-shadow:0 0 8px rgba(${r},${g},${b},.8)"></span></span>`;
+    box.appendChild(el);
+  }
+  $('legend').style.background = 'linear-gradient(90deg,' + RAMP.map(c => `rgb(${c.join(',')})`).join(',') + ')';
+  $('legend-max').textContent = max ? '· peak ' + fmt(max) : '';
+  drawStrip();
+  drawMap();
+}
+
+/* ================= chrome ================= */
+function segs() {
+  const sc = $('scope');
+  sc.innerHTML = '';
+  const opts = [{ id: 'all', label: 'ALL' }, ...SITES.filter(s => tokens[s.id]).map(s => ({ id: s.id, label: s.label }))];
+  for (const o of opts) {
+    const b = document.createElement('button');
+    b.textContent = o.label; b.className = scope === o.id ? 'on' : '';
+    b.onclick = () => { scope = o.id; segs(); refresh(); };
+    sc.appendChild(b);
+  }
+  const rg = $('range');
+  rg.innerHTML = '';
+  for (const r of RANGES) {
+    const b = document.createElement('button');
+    b.textContent = r.label; b.className = range === r.id ? 'on' : '';
+    b.onclick = () => { range = r.id; segs(); refresh(); };
+    rg.appendChild(b);
+  }
+}
+
+async function refresh() {
+  $('err').textContent = '';
+  try {
+    data = await load();
+    render();
+  } catch (e) {
+    $('err').textContent = '⚠ ' + e.message;
+  }
+}
+$('reload').onclick = refresh;
+
+async function boot() {
+  if (!tokens.planner && !tokens.build) return showSetup();
+  $('dash').classList.remove('hidden');
+  if (!world) {
+    try {
+      world = decodeTopo(await (await fetch('vendor/countries-110m.json')).json());
+    } catch (e) { $('err').textContent = '⚠ world map data failed to load'; }
+  }
+  segs();
+  await refresh();
+  clearInterval(timer);
+  timer = setInterval(refresh, 60000);   // hourly data — a minute is plenty
+}
+
+addEventListener('resize', () => { if (data) { drawStrip(); drawMap(); } });
+boot();
+</script>

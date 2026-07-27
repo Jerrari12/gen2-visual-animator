@@ -69,7 +69,23 @@ are permanently uncounted. A floor on the numbers; nothing to fix.
   copy it again" — including builds that decoded perfectly and were merely
   unsupported. Now split three ways in the events (messages unchanged).
 
-### d. `&ref=` convention documented
+### d. Telemetry dashboard — `/stats/`
+A retro-HUD GoatCounter front end at **gen2build.jerrari3d.com/stats/**: neon
+thermal world map, 48-hour activity strip, totals, top countries. Reads the API
+straight from the browser (GoatCounter allows CORS); tokens live in
+localStorage only, one per site, pasted by Joey — nothing in the repo. Design
+notes + the three map gotchas are in CLAUDE.md.
+
+**v1 is deliberately just the map + strip** (Joey's pick). The three panels
+left on the table are each roughly one function: the **build funnel**
+(`step:1…11` → `complete` drop-off, the thing nothing else can show),
+**normalised referrers**, and **kit/store demand**. `load()` already merges
+across sites, so a new panel is a fetch + a render call.
+
+⚠ **Hourly is GoatCounter's floor** — GA4-style per-minute "active users" can't
+be reproduced, and the UI says so rather than implying otherwise.
+
+### e. `&ref=` convention documented
 `&from=` seeds the store preference but is NOT attribution — every kit page on a
 platform sends the same value. `ref` is read natively by GoatCounter, so
 `&ref=pr-240-kit-2w2h` turns 75 model pages into 75 measurable sources. Table +

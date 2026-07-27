@@ -815,6 +815,60 @@ Two things this wiring FIXED along the way, both pre-existing:
 `&ref=` (per-listing attribution, no code — GoatCounter reads it natively) is
 documented in `2026-07-25-kit-upload-checklist.md`.
 
+### The telemetry dashboard — `viewer/stats/` (2026-07-27)
+
+A retro-HUD front end for GoatCounter at **gen2build.jerrari3d.com/stats/** —
+one self-contained `index.html`, same build-free convention as everything else.
+**GoatCounter sends permissive CORS headers** (verified: a cross-origin call
+with an `Authorization` header returns a readable 401), so it reads the API
+straight from the browser — no server, no proxy.
+- **Tokens live in localStorage only** (`gen2-stats-tokens`), pasted by Joey,
+  one per site because the two GoatCounter sites are separate accounts. Never
+  in the repo. No token → setup screen and nothing else, so the public URL
+  leaks nothing. `noindex`.
+- ⚠ **The page deliberately carries NO GoatCounter script.** Tracking the
+  dashboard would fold Joey's own admin visits into the numbers he's reading.
+- Two calls per site: `stats/total` (totals AND the site-wide hourly series in
+  one response) + `stats/locations`. Scope toggle merges both sites.
+- **Hourly is the floor.** GoatCounter stores no finer, so GA4-style per-minute
+  "active users" is not reproducible; the strip says "hourly buckets" rather
+  than implying otherwise. Raw-hit export could give timestamps but Individual
+  Pageviews is off AND it's an async CSV job — wrong tool for a live widget.
+
+World map: vendored `world-atlas` 110m TopoJSON (107 kB, Natural Earth, public
+domain) + a ~20-line decoder inline (the format is just delta-encoded shared
+arcs; not worth a library). Three things that WILL bite a future edit:
+- **Antimeridian.** Russia's ring runs +180 → −180; projected naively the
+  closing edge fills a band across every longitude at the top of the map. Rings
+  with a >180° jump are rebased to a continuous 0..360 run and drawn twice
+  (as-is and −360), letting the canvas clip. Fiji and NZ's outliers need it too.
+- **Small countries don't exist at 110m.** Singapore is consistently top-3
+  traffic and has no polygon at all — it would rank second in the list and
+  appear nowhere. `PTS` holds centroids for the 76 such countries; they render
+  as glowing markers. Anything in the data with neither a polygon nor a centroid
+  is invisible, so keep both tables in step.
+- **Colour ramp stops must be saturated.** A straight cyan→orange RGB lerp
+  passes through a desaturated olive and mid-traffic countries came out muddy
+  grey-green. `RAMP` is a 6-stop neon thermal scale interpolated between
+  ADJACENT stops; the country list uses the same scale so map and list agree.
+- The alpha-2 → ISO-numeric table (`A2N`) exists because the atlas keys
+  geometries by numeric id while GoatCounter reports alpha-2.
+
+⚠ **GoatCounter returns FULL 24-slot hourly arrays including hours that haven't
+happened yet.** Untrimmed, the strip shows phantom dead hours and "this hour"
+reads 23:00's zero. The series is cut at the current UTC hour and `thisHour` is
+looked up by key, not taken from the tail. Axis is labelled UTC deliberately.
+
+**Verifying it without a token or a screenshot:** the Browser pane can't
+screenshot unless it's displayed, and there's no real token to hand. Stub
+`window.fetch` for `goatcounter.com` URLs with mock payloads (`tokens` is a
+script-scoped `let`, assignable from the console) — that exercises the real
+render path. To SEE the result, POST a canvas `toDataURL` to a throwaway local
+sink (scratch `shotsink.py`; `mode:'no-cors'` with a text body needs no
+preflight, so the sink needs no CORS headers) and read the PNG off disk.
+Both the antimeridian band and the future-hours bug were caught this way and
+would not have shown up in any assertion.
+
 ## Run / preview
 
 ⚠ **Never write a whole source file back from a copy you read earlier in the
