@@ -831,27 +831,27 @@ whole first version of this page was built on that false positive and failed the
 moment it met the real endpoint. **Verify against the real resource, in its real
 state, or you have verified nothing.**
 
-**So the data arrives as a SNAPSHOT.** `.github/workflows/stats.yml` runs
-hourly, `.github/scripts/fetch-stats.mjs` reads the API server-side with
-`secrets.GOATCOUNTER_TOKEN`, and the result is force-pushed as a single commit
-to the **orphan `stats-data` branch** (NOT main — hourly bot commits would bury
-the real history this repo leans on, and would trigger a Pages deploy every
-hour). The page fetches it from `raw.githubusercontent.com`, which serves
-cross-origin (verified). Three problems die at once: no CORS, the token never
-touches a browser, and tracker blockers stop mattering because a GitHub runner
-makes the request, not a visitor.
-- **Setup is one repo secret**, `GOATCOUNTER_TOKEN` — a GoatCounter API token
-  with **"Read statistics" only**. Tokens are created at User → API and are
-  ACCOUNT-level: the "All sites" grant (default) means ONE token covers both
-  sites. There is no per-device setup and nothing stored in localStorage.
-- The snapshot is **public** at its raw URL — aggregate only (counts by country,
-  path and event), no personal data. Joey's call, taken deliberately.
-- The header shows how old it is; REFRESH drops the cache and re-fetches.
-- `fetch-stats.mjs` trims what it stores: per-hit `stats` arrays are dropped
-  entirely and `total.stats` is cut to the last 3 days (the strip only ever
-  draws 48 h). Without that the file is many times larger for nothing.
-- ⚠ Rate limit is **4 requests/second**; the script issues ~26, so it paces at
-  300 ms and retries on 429. Adding a range or endpoint multiplies that.
+**So the data comes through a LOCAL PROXY.** `serve-stats.py` (repo root, port
+8125, `.claude/launch.json` → `stats`) serves `viewer/stats/` and answers
+`/data.json?range=…` by calling the API itself with the token, then returns the
+shape the page consumes. Same origin, so no CORS; the token never enters a
+browser; and tracker blockers stop mattering because that process makes the
+request, not the page.
+- ⚠ **The stats are DELIBERATELY not published.** Joey chose local-only over a
+  GitHub-Action snapshot (2026-07-27) — the page is served publicly at
+  `/stats/`, but with no data source of its own it shows only an error there,
+  which is the intent. Don't "fix" that by publishing a data file: the numbers
+  are business intelligence (traffic, which collections lead, store
+  click-through, funnel drop-off) and are meant to stay on his machine.
+- **Token**: `GOATCOUNTER_TOKEN` env var, else a `.goatcounter-token` file
+  beside the script (**gitignored — never commit it**). Created at User → API
+  with **"Read statistics" only**; tokens are account-level, so the default
+  "All sites" grant covers both sites with one token.
+- The proxy trims what it returns: per-hit `stats` arrays dropped entirely,
+  `total.stats` cut to the last 3 days (the strip only ever draws 48 h).
+- ⚠ Rate limit is **4 requests/second**; the proxy paces at 300 ms and retries
+  on 429. It builds ONE range per request and caches it for 5 minutes, so the
+  page caches per range too (`snapCache`) — switching range re-fetches.
 - ⚠ This page carries NO GoatCounter script — tracking the dashboard would fold
   admin visits into the numbers being read.
 

@@ -16,11 +16,12 @@
   fell through to a generic handler — a false positive this whole page was
   originally built on.)
 
-  So .github/workflows/stats.yml fetches server-side each hour and publishes
-  data.json to the orphan `stats-data` branch. Three things fall out of that:
-  the token lives in GitHub Secrets and never touches a browser, tracker
-  blockers are irrelevant (a runner makes the request), and there is nothing to
-  paste per device.
+  So serve-stats.py (repo root) runs locally, holds the token, and proxies the
+  API from the same origin as this page. Three things fall out of that: no CORS,
+  the token never touches a browser, and tracker blockers stop mattering — the
+  request is made by that process, not by the page. Nothing is published: the
+  numbers never leave the machine, which is why this page is NOT deployed with
+  usable data on the public site.
 
   ⚠ This page deliberately carries NO GoatCounter script. Tracking the dashboard
   would put your own admin visits into the numbers you're reading.
@@ -30,7 +31,7 @@
     per-minute "active users" is not reproducible; the strip is honest about
     being hourly, and the header states how old the snapshot is.
   - Stats come back in the ACCOUNT'S timezone, region-prefixed
-    ("US.America/New_York"); the workflow resolves that to a real IANA name.
+    ("US.America/New_York"); serve-stats.py resolves it to a real IANA name.
 -->
 <style>
 :root {
@@ -268,11 +269,9 @@ body.no-data #dash > .panel:not(.err-banner) { display: none; }
 
 <script>
 /* ================= config ================= */
-/* Published hourly by .github/workflows/stats.yml onto the orphan `stats-data`
-   branch (kept off main so bot commits don't bury real history, and so Pages
-   isn't redeployed every hour). raw.githubusercontent serves it cross-origin —
-   verified, unlike the assumption this page was originally built on. */
-const DATA_URL = 'https://raw.githubusercontent.com/Jerrari12/gen2-visual-animator/stats-data/data.json';
+/* Served by serve-stats.py on this machine — same origin, so no CORS, and the
+   token never enters the browser. Nothing is published anywhere. */
+const DATA_URL = 'data.json';
 const SITES = [
   { id: 'planner', label: 'PLANNER', color: '#ff8a40' },
   { id: 'build',   label: 'STUDIO',  color: '#22e0d6' },
@@ -320,14 +319,19 @@ const fmt = n => n == null ? '—' : n.toLocaleString();
 /* The snapshot, fetched once per page load. See the header comment: the API
    itself is unreachable from a browser on another origin, so a GitHub Action
    fetches it server-side and publishes this file. */
-let snapshot = null;
+let snapshot = null, snapCache = {};
 async function getSnapshot() {
-  if (snapshot) return snapshot;
-  const res = await fetch(DATA_URL + '?t=' + Date.now(), { cache: 'no-store' });
-  if (!res.ok) throw new Error(`snapshot not available (HTTP ${res.status}). `
-    + `It's published by the "Snapshot GoatCounter stats" workflow — check that it has run at least once, `
-    + `and that the GOATCOUNTER_TOKEN repository secret is set.`);
-  snapshot = await res.json();
+  if (snapCache[range]) { snapshot = snapCache[range]; siteTz = snapshot.tz || 'UTC'; return snapshot; }
+  $('asof').innerHTML = '<i></i>FETCHING…';
+  let res;
+  try {
+    res = await fetch(`${DATA_URL}?range=${encodeURIComponent(range)}&t=${Date.now()}`, { cache: 'no-store' });
+  } catch (e) {
+    throw new Error('Can’t reach the local stats server. Start it with: python serve-stats.py');
+  }
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.error || `stats server returned HTTP ${res.status}`);
+  snapshot = snapCache[range] = body;
   siteTz = snapshot.tz || 'UTC';
   return snapshot;
 }
@@ -847,6 +851,7 @@ function segs() {
 }
 
 function showErr(msg) {
+  $('asof').textContent = '';   // clear FETCHING… — it reads as still-loading otherwise
   const top = $('err-top');
   top.innerHTML = '<b>⚠ COULDN’T LOAD</b><br>' + esc(msg);
   top.classList.remove('hidden');
@@ -865,7 +870,7 @@ async function refresh() {
     showErr(e.message);
   }
 }
-$('reload').onclick = () => { snapshot = null; refresh(); };  // drop the cache, re-fetch
+$('reload').onclick = () => { snapCache = {}; refresh(); };  // drop the cache, re-fetch
 
 async function boot() {
   $('dash').classList.remove('hidden');
@@ -879,7 +884,7 @@ async function boot() {
   clearInterval(timer);
   // the snapshot is republished hourly; re-reading it more often just re-parses
   // the same bytes. REFRESH drops the cache and re-fetches on demand.
-  timer = setInterval(() => { snapshot = null; refresh(); }, 900000);
+  timer = setInterval(() => { snapCache = {}; refresh(); }, 900000);
 }
 
 addEventListener('resize', () => { if (data) { drawStrip(); drawMap(); } });

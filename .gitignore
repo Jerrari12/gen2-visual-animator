@@ -13,3 +13,6 @@ __pycache__/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Local GoatCounter API token for serve-stats.py — NEVER commit this.
+.goatcounter-token
