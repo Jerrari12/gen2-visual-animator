@@ -7,21 +7,30 @@
 <!--
   GEN2 telemetry — a retro-HUD front end for GoatCounter.
 
-  Reads the API straight from the browser: GoatCounter sends permissive CORS
-  headers, so no server and no proxy. Tokens are READ-ONLY API keys that live in
-  this browser's localStorage and nowhere else — never in the repo, never sent
-  anywhere but goatcounter.com. Without a token this page shows a setup screen
-  and nothing else, so the URL being public leaks nothing.
+  Reads a SNAPSHOT, not the API. This page cannot call GoatCounter directly and
+  never will be able to: the token is accepted only in an Authorization header,
+  a non-safelisted header always forces a CORS preflight, and GoatCounter
+  answers no OPTIONS request — so every authenticated cross-origin call is
+  refused. (Its GET responses DO carry CORS headers, which is what made an early
+  check look green. That check ran against a site code that didn't exist yet and
+  fell through to a generic handler — a false positive this whole page was
+  originally built on.)
+
+  So .github/workflows/stats.yml fetches server-side each hour and publishes
+  data.json to the orphan `stats-data` branch. Three things fall out of that:
+  the token lives in GitHub Secrets and never touches a browser, tracker
+  blockers are irrelevant (a runner makes the request), and there is nothing to
+  paste per device.
 
   ⚠ This page deliberately carries NO GoatCounter script. Tracking the dashboard
   would put your own admin visits into the numbers you're reading.
 
   Data notes that shape the UI:
   - GoatCounter's finest granularity is the HOUR (`stats[].hourly`). GA4-style
-    per-minute "active users" is not reproducible; the live strip is honest
-    about being hourly.
-  - /stats/total returns the site-wide time series AND totals in one call, so a
-    full refresh is two requests per site (total + locations).
+    per-minute "active users" is not reproducible; the strip is honest about
+    being hourly, and the header states how old the snapshot is.
+  - Stats come back in the ACCOUNT'S timezone, region-prefixed
+    ("US.America/New_York"); the workflow resolves that to a real IANA name.
 -->
 <style>
 :root {
@@ -131,20 +140,7 @@ canvas { display: block; width: 100%; }
 .row .track { grid-column: 2 / -1; height: 2px; background: var(--line); border-radius: 2px; overflow: hidden; margin-top: -4px; }
 .row .fill { height: 100%; background: linear-gradient(90deg, var(--cyan), var(--accent)); box-shadow: 0 0 8px rgba(34,224,214,.7); }
 
-/* ---------- setup / messages ---------- */
-.setup { max-width: 620px; margin: 8vh auto; }
-.setup p { font-size: .8rem; line-height: 1.65; color: var(--dim); }
-.setup label { display: block; font-size: .64rem; letter-spacing: .2em; color: var(--dim); margin: 16px 0 6px; }
-.setup input {
-  width: 100%; font: inherit; font-size: .82rem; padding: 10px 12px; color: var(--text);
-  background: #05060a; border: 1px solid var(--line); border-radius: 3px;
-}
-.setup input:focus { outline: none; border-color: var(--cyan); box-shadow: 0 0 0 1px rgba(34,224,214,.35); }
-.btn {
-  font: inherit; font-size: .72rem; letter-spacing: .18em; padding: 11px 20px; margin-top: 18px; cursor: pointer;
-  background: var(--accent); color: #12060a; border: 0; border-radius: 3px; font-weight: 700;
-}
-.btn:hover { filter: brightness(1.12); }
+/* ---------- messages ---------- */
 .warn { color: var(--magenta); font-size: .72rem; margin-top: 12px; min-height: 1.2em; }
 .err-banner {
   border-color: var(--magenta); background: rgba(255,62,165,.07); color: #ffc8e4;
@@ -190,42 +186,14 @@ body.no-data #dash > .panel:not(.err-banner) { display: none; }
 
 <div class="wrap">
 
-  <!-- ============ setup ============ -->
-  <div id="setup" class="setup hidden">
-    <div class="panel">
-      <p class="h">GEN2 · Telemetry · Setup</p>
-      <p>
-        Paste a <b>read-only API token</b> for each GoatCounter site. Tokens are
-        stored in <b>this browser only</b> (localStorage) — they are never sent
-        anywhere except goatcounter.com, and never committed to the repo.
-      </p>
-      <p class="note">
-        <b>User → API → Add new API Token.</b> Tick <b>only “Read statistics”</b>
-        — “Record pageviews” is write access and the rest manage sites; this page
-        only reads. Leave <b>“All sites”</b> checked and ONE token covers both,
-        so you can paste the same value in both boxes (leave the second blank and
-        it's copied for you). Separate per-site tokens work too.
-      </p>
-
-      <label>jerrari.goatcounter.com — GEN2 Planner</label>
-      <input id="tok-planner" type="password" autocomplete="off" spellcheck="false" placeholder="token">
-
-      <label>jerrari-build.goatcounter.com — 3D Build Studio</label>
-      <input id="tok-build" type="password" autocomplete="off" spellcheck="false" placeholder="same token, or leave blank">
-
-      <button class="btn" id="save">CONNECT</button>
-      <div class="warn" id="setup-warn"></div>
-    </div>
-  </div>
-
   <!-- ============ dashboard ============ -->
   <div id="dash" class="hidden">
     <div class="bar">
       <div class="brand"><b>GEN2</b><span>TELEMETRY</span></div>
       <div class="seg" id="scope"></div>
       <div class="seg" id="range"></div>
+      <span id="asof" class="live" style="letter-spacing:.14em"></span>
       <button class="ghost" id="reload">↻ REFRESH</button>
-      <button class="ghost" id="settings">TOKENS</button>
     </div>
 
     <!-- errors belong ABOVE the fold: buried under a full-height map they were
@@ -300,9 +268,14 @@ body.no-data #dash > .panel:not(.err-banner) { display: none; }
 
 <script>
 /* ================= config ================= */
+/* Published hourly by .github/workflows/stats.yml onto the orphan `stats-data`
+   branch (kept off main so bot commits don't bury real history, and so Pages
+   isn't redeployed every hour). raw.githubusercontent serves it cross-origin —
+   verified, unlike the assumption this page was originally built on. */
+const DATA_URL = 'https://raw.githubusercontent.com/Jerrari12/gen2-visual-animator/stats-data/data.json';
 const SITES = [
-  { id: 'planner', label: 'PLANNER', host: 'jerrari.goatcounter.com',       color: '#ff8a40' },
-  { id: 'build',   label: 'STUDIO',  host: 'jerrari-build.goatcounter.com', color: '#22e0d6' },
+  { id: 'planner', label: 'PLANNER', color: '#ff8a40' },
+  { id: 'build',   label: 'STUDIO',  color: '#22e0d6' },
 ];
 const RANGES = [
   { id: '24h', label: '24H', days: 1 },
@@ -310,7 +283,6 @@ const RANGES = [
   { id: '30d', label: '30D', days: 30 },
   { id: '90d', label: '90D', days: 90 },
 ];
-const TOKEN_KEY = 'gen2-stats-tokens';
 const FUNNEL_MIN = 10;   // below this the funnel is noise, so it explains itself instead
 /* alpha-2 → ISO-3166 numeric, restricted to the 174 countries the vendored
    atlas actually carries (it keys geometries by numeric id, GoatCounter reports
@@ -324,32 +296,13 @@ const PTS = {"AD":[1.5,42.5],"AG":[-61.8,17.05],"AI":[-63.17,18.25],"AS":[-170,-
 const A2N = {"AE":784,"AF":4,"AL":8,"AM":51,"AO":24,"AQ":10,"AR":32,"AT":40,"AU":36,"AZ":31,"BA":70,"BD":50,"BE":56,"BF":854,"BG":100,"BI":108,"BJ":204,"BN":96,"BO":68,"BR":76,"BS":44,"BT":64,"BW":72,"BY":112,"BZ":84,"CA":124,"CD":180,"CF":140,"CG":178,"CH":756,"CI":384,"CL":152,"CM":120,"CN":156,"CO":170,"CR":188,"CU":192,"CY":196,"CZ":203,"DE":276,"DJ":262,"DK":208,"DO":214,"DZ":12,"EC":218,"EE":233,"EG":818,"EH":732,"ER":232,"ES":724,"ET":231,"FI":246,"FJ":242,"FK":238,"FR":250,"GA":266,"GB":826,"GE":268,"GH":288,"GL":304,"GM":270,"GN":324,"GQ":226,"GR":300,"GT":320,"GW":624,"GY":328,"HN":340,"HR":191,"HT":332,"HU":348,"ID":360,"IE":372,"IL":376,"IN":356,"IQ":368,"IR":364,"IS":352,"IT":380,"JM":388,"JO":400,"JP":392,"KE":404,"KG":417,"KH":116,"KP":408,"KR":410,"KW":414,"KZ":398,"LA":418,"LB":422,"LK":144,"LR":430,"LS":426,"LT":440,"LU":442,"LV":428,"LY":434,"MA":504,"MD":498,"ME":499,"MG":450,"MK":807,"ML":466,"MM":104,"MN":496,"MR":478,"MW":454,"MX":484,"MY":458,"MZ":508,"NA":516,"NC":540,"NE":562,"NG":566,"NI":558,"NL":528,"NO":578,"NP":524,"NZ":554,"OM":512,"PA":591,"PE":604,"PG":598,"PH":608,"PK":586,"PL":616,"PR":630,"PS":275,"PT":620,"PY":600,"QA":634,"RO":642,"RS":688,"RU":643,"RW":646,"SA":682,"SB":90,"SD":729,"SE":752,"SI":705,"SK":703,"SL":694,"SN":686,"SO":706,"SR":740,"SS":728,"SV":222,"SY":760,"SZ":748,"TD":148,"TF":260,"TG":768,"TH":764,"TJ":762,"TL":626,"TM":795,"TN":788,"TR":792,"TT":780,"TW":158,"TZ":834,"UA":804,"UG":800,"US":840,"UY":858,"UZ":860,"VE":862,"VN":704,"VU":548,"YE":887,"ZA":710,"ZM":894,"ZW":716};
 
 /* ================= state ================= */
-let tokens = {}, scope = 'all', range = '7d', world = null, data = null, timer = null;
+let scope = 'all', range = '7d', world = null, data = null, timer = null;
 /* ⚠ GoatCounter reports stats in the ACCOUNT'S timezone, not UTC — that's why
    the spec carries a separate `total_utc` alongside `total`. Trimming the
    series at the current *UTC* hour therefore looked hours into the future on a
    non-UTC account, so "this hour" was a guaranteed 0 and the strip carried a
    dead tail. Read the real zone from /api/v0/me once per session. */
 let siteTz = null;
-/* ⚠ GoatCounter reports the zone REGION-PREFIXED — "US.America/New_York", not
-   "America/New_York". That is not a valid IANA name, so Intl throws on it and
-   the whole timezone fix silently degraded back to UTC (this-hour stuck at 0,
-   dead tail on the strip — the exact bug it was meant to cure, just quieter).
-   Try the raw value, then the part after the first dot, then give up to UTC —
-   validating each against Intl rather than trusting any one format. */
-function resolveTz(raw) {
-  const cands = [];
-  if (raw) {
-    cands.push(raw);
-    const dot = raw.indexOf('.');
-    if (dot > -1) cands.push(raw.slice(dot + 1));
-  }
-  cands.push('UTC');
-  for (const c of cands) {
-    try { new Intl.DateTimeFormat('en-CA', { timeZone: c }); return c; } catch (e) { /* next */ }
-  }
-  return 'UTC';
-}
 function nowKeyIn(tz) {
   try {
     const p = Object.fromEntries(new Intl.DateTimeFormat('en-CA', {
@@ -364,112 +317,26 @@ function nowKeyIn(tz) {
 const $ = id => document.getElementById(id);
 const fmt = n => n == null ? '—' : n.toLocaleString();
 
-try { tokens = JSON.parse(localStorage.getItem(TOKEN_KEY) || '{}'); } catch (e) { tokens = {}; }
-
-/* ================= setup screen ================= */
-function showSetup() {
-  $('setup').classList.remove('hidden');
-  $('dash').classList.add('hidden');
-  $('tok-planner').value = tokens.planner || '';
-  $('tok-build').value = tokens.build || '';
-}
-$('save').onclick = () => {
-  const t = { planner: $('tok-planner').value.trim(), build: $('tok-build').value.trim() };
-  if (!t.planner && !t.build) { $('setup-warn').textContent = 'Enter at least one token.'; return; }
-  // GoatCounter tokens are account-level with an "All sites" grant, so one
-  // token normally authenticates against BOTH hosts — fill the gap rather than
-  // making someone paste the same string twice
-  t.planner = t.planner || t.build;
-  t.build = t.build || t.planner;
-  tokens = t;
-  try { localStorage.setItem(TOKEN_KEY, JSON.stringify(tokens)); } catch (e) {}
-  $('setup').classList.add('hidden');
-  boot();
-};
-$('settings').onclick = showSetup;
-
-/* ================= API ================= */
-const activeSites = () => SITES.filter(s => tokens[s.id] && (scope === 'all' || scope === s.id));
-
-/* ⚠ GoatCounter allows 4 requests/SECOND. We issue 3 endpoints per site, so a
-   plain Promise.all across two sites fires 6 at once and gets a blanket 429 —
-   every single load, which is exactly what happened on first real use. Every
-   call goes through this pacer: one at a time, ~300 ms apart (≈3.3/s, under the
-   limit with margin). Six requests cost under two seconds, which is nothing
-   against a dashboard that refreshes on a timer. */
-const gap = ms => new Promise(r => setTimeout(r, ms));
-let apiChain = Promise.resolve();
-function paced(fn) {
-  const run = apiChain.then(fn, fn);
-  apiChain = run.then(() => gap(300), () => gap(300));
-  return run;
-}
-
-async function api(site, path, params, tries = 0) {
-  const url = new URL(`https://${site.host}/api/v0/${path}`);
-  for (const [k, v] of Object.entries(params || {})) url.searchParams.set(k, v);
-  let res;
-  try {
-    res = await paced(() => fetch(url, { headers: { Authorization: 'Bearer ' + tokens[site.id] } }));
-  } catch (e) {
-    // fetch rejects with the SAME TypeError for a blocked request, a DNS/network
-    // failure and a CORS rejection — the browser deliberately tells JS nothing.
-    // A blocker is much the likeliest (goatcounter.com is on the standard
-    // lists), but the message must not assert it as fact.
-    throw new Error(`${site.label}: the request never left the browser (${site.host}). `
-      + `Most often a tracker blocker — goatcounter.com is on the standard lists. `
-      + `Brave: 🦁 → Shields DOWN, then RELOAD the page (toggling shields alone doesn't re-run the request). `
-      + `uBlock/AdGuard: allow the site there too — a browser can have more than one blocker. `
-      + `If shields are already down and it still fails, open DevTools → Network, filter "goatcounter", `
-      + `and check the request: no entry at all means blocked, a red/failed entry means DNS or connectivity.`);
-  }
-  if (res.status === 401 || res.status === 403)
-    throw new Error(`${site.label}: token rejected — check it was pasted whole and has the “Read statistics” permission.`);
-  if (res.status === 429) {
-    // X-Rate-Limit-Reset is only readable cross-origin if the server exposes
-    // it, so treat it as a hint and fall back to a fixed back-off
-    const reset = parseInt(res.headers.get('X-Rate-Limit-Reset') || '', 10);
-    if (tries < 3) {
-      await gap(Math.min(Number.isFinite(reset) ? reset * 1000 : 1200, 5000) + 250);
-      return api(site, path, params, tries + 1);
-    }
-    throw new Error(`${site.label}: rate-limited by GoatCounter (4 requests/second) and still limited after 3 retries. Wait a minute and hit REFRESH.`);
-  }
-  if (!res.ok) throw new Error(`${site.label}: HTTP ${res.status} from the API.`);
-  return res.json();
-}
-
-function window_() {
-  const days = RANGES.find(r => r.id === range).days;
-  const end = new Date();
-  end.setMinutes(0, 0, 0);
-  const start = new Date(end.getTime() - days * 864e5);
-  // the API wants hour-rounded RFC3339; it treats these as UTC
-  return { start: start.toISOString().slice(0, 13) + ':00:00Z',
-           end:   new Date(end.getTime() + 36e5).toISOString().slice(0, 13) + ':00:00Z' };
+/* The snapshot, fetched once per page load. See the header comment: the API
+   itself is unreachable from a browser on another origin, so a GitHub Action
+   fetches it server-side and publishes this file. */
+let snapshot = null;
+async function getSnapshot() {
+  if (snapshot) return snapshot;
+  const res = await fetch(DATA_URL + '?t=' + Date.now(), { cache: 'no-store' });
+  if (!res.ok) throw new Error(`snapshot not available (HTTP ${res.status}). `
+    + `It's published by the "Snapshot GoatCounter stats" workflow — check that it has run at least once, `
+    + `and that the GOATCOUNTER_TOKEN repository secret is set.`);
+  snapshot = await res.json();
+  siteTz = snapshot.tz || 'UTC';
+  return snapshot;
 }
 
 async function load() {
-  const w = window_();
-  const sites = activeSites();
-  if (!sites.length) throw new Error('No token for the selected site — press TOKENS to add one.');
-
-  // once per session; a failure here must never block the stats themselves
-  if (siteTz === null) {
-    try {
-      const me = await api(sites[0], 'me', {});
-      siteTz = resolveTz(me?.user?.settings?.timezone);
-    } catch (e) { siteTz = 'UTC'; }
-  }
-
-  const per = await Promise.all(sites.map(async site => {
-    const [total, loc, hits] = await Promise.all([
-      api(site, 'stats/total', w),
-      api(site, 'stats/locations', w),
-      api(site, 'stats/hits', { ...w, limit: 200 }),
-    ]);
-    return { site, total, loc, hits };
-  }));
+  const snap = await getSnapshot();
+  const sites = SITES.filter(s => (scope === 'all' || scope === s.id) && snap.sites?.[s.id]?.[range]);
+  if (!sites.length) throw new Error('The snapshot holds no data for that site and range yet.');
+  const per = sites.map(s => snap.sites[s.id][range]);
 
   // merge across sites
   const countries = new Map();   // alpha2 -> {code, name, count}
@@ -477,7 +344,11 @@ async function load() {
   const series = new Map();      // "YYYY-MM-DDTHH" -> count
   const pages = new Map(), evts = new Map();
 
-  for (const { total, loc, hits } of per) {
+  for (const site of per) {
+    // the snapshot keeps the API's own field names for these three
+    const total = { total: site.total, total_events: site.total_events, stats: site.series };
+    const loc = { stats: site.locations };
+    const hits = { hits: site.hits };
     // ⚠ the API's `total` is "visitors INCLUDING events" — events are a SUBSET,
     // not a separate bucket. Reported raw, a headline number counts every button
     // press as a visit; GoatCounter's own Pages list has the same problem.
@@ -792,6 +663,13 @@ const flag = code => /^[A-Z]{2}$/.test(code)
   ? String.fromCodePoint(...[...code].map(c => 0x1f1e6 + c.charCodeAt(0) - 65)) : '🏳';
 
 function render() {
+  // the numbers are a snapshot, so say how old they are rather than implying live
+  const el = $('asof');
+  if (el && snapshot?.generated) {
+    const mins = Math.max(0, Math.round((Date.now() - new Date(snapshot.generated)) / 60000));
+    el.innerHTML = '<i></i>' + (mins < 90 ? `SNAPSHOT ${mins} MIN OLD` : `SNAPSHOT ${Math.round(mins / 60)} H OLD`);
+    el.title = 'Published ' + new Date(snapshot.generated).toLocaleString() + ' · refreshed hourly by GitHub Actions';
+  }
   $('s-views').textContent = fmt(data.views);
   $('s-events').textContent = fmt(data.events);
   $('s-countries').textContent = fmt(data.countries.length);
@@ -951,7 +829,7 @@ function renderMix() {
 function segs() {
   const sc = $('scope');
   sc.innerHTML = '';
-  const opts = [{ id: 'all', label: 'ALL' }, ...SITES.filter(s => tokens[s.id]).map(s => ({ id: s.id, label: s.label }))];
+  const opts = [{ id: 'all', label: 'ALL' }, ...SITES.filter(s => snapshot?.sites?.[s.id]).map(s => ({ id: s.id, label: s.label }))];
   for (const o of opts) {
     const b = document.createElement('button');
     b.textContent = o.label; b.className = scope === o.id ? 'on' : '';
@@ -980,16 +858,16 @@ async function refresh() {
   try {
     data = await load();
     render();
+    segs();   // the scope buttons depend on which sites the snapshot holds, which isn't known until it's loaded
     $('err-top').classList.add('hidden');
     document.body.classList.remove('no-data');
   } catch (e) {
     showErr(e.message);
   }
 }
-$('reload').onclick = refresh;
+$('reload').onclick = () => { snapshot = null; refresh(); };  // drop the cache, re-fetch
 
 async function boot() {
-  if (!tokens.planner && !tokens.build) return showSetup();
   $('dash').classList.remove('hidden');
   if (!world) {
     try {
@@ -999,9 +877,9 @@ async function boot() {
   segs();
   await refresh();
   clearInterval(timer);
-  // the data is hourly, so polling every minute bought nothing and spent six
-  // rate-limited requests each time
-  timer = setInterval(refresh, 300000);
+  // the snapshot is republished hourly; re-reading it more often just re-parses
+  // the same bytes. REFRESH drops the cache and re-fetches on demand.
+  timer = setInterval(() => { snapshot = null; refresh(); }, 900000);
 }
 
 addEventListener('resize', () => { if (data) { drawStrip(); drawMap(); } });

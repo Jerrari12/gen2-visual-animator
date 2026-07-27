@@ -819,84 +819,41 @@ documented in `2026-07-25-kit-upload-checklist.md`.
 
 A retro-HUD front end for GoatCounter at **gen2build.jerrari3d.com/stats/** —
 one self-contained `index.html`, same build-free convention as everything else.
-**GoatCounter sends permissive CORS headers** (verified: a cross-origin call
-with an `Authorization` header returns a readable 401), so it reads the API
-straight from the browser — no server, no proxy.
-- **Tokens live in localStorage only** (`gen2-stats-tokens`), pasted by Joey,
-  never in the repo. No token → setup screen and nothing else, so the public
-  URL leaks nothing. `noindex`.
-  API tokens are created at **User → API** and are ACCOUNT-level, not per-site:
-  the "Access to sites → All sites" grant (checked by default) means ONE token
-  authenticates against both hosts, so the setup screen copies a single entry
-  into both slots. Grant **only "Read statistics"** — "Record pageviews" is
-  WRITE access (it could inject fake hits) and the three site-management scopes
-  can create/modify sites. (Add "Export" only if the raw-hit export is ever
-  built; see the aggregate-only note below.)
-- ⚠ **The page deliberately carries NO GoatCounter script.** Tracking the
-  dashboard would fold Joey's own admin visits into the numbers he's reading.
-- Three calls per site: `stats/total` (totals AND the site-wide hourly series in
-  one response), `stats/locations`, `stats/hits`. Scope toggle merges both sites.
 
-⚠ **The API allows 4 requests per SECOND.** Three endpoints × two sites = 6, so
-the original `Promise.all` tripped a blanket **429 on every single load** — it
-failed the first time it met real data, having never failed against a mock.
-Every call now goes through `paced()`: one at a time, ~300 ms apart (≈3.3/s).
-Six requests take under two seconds, which costs nothing on a timer-refreshed
-dashboard. 429 also retries up to 3× (honouring `X-Rate-Limit-Reset` when the
-header is exposed cross-origin, else a fixed back-off). Auto-refresh is **5
-minutes**, not 60 s — the data is hourly, so a minute bought nothing and spent
-six rate-limited requests. **Any new panel = more requests; keep them inside
-`api()` so they're paced too.**
+⚠⚠ **The page CANNOT read the GoatCounter API, and no amount of fiddling will
+change that.** The token is accepted only in an `Authorization` header; a
+non-safelisted header always forces a CORS preflight; GoatCounter implements no
+`OPTIONS` handler. So every authenticated cross-origin call is refused. Its
+*GET* responses do carry CORS headers, which is the trap: an early check
+returned a readable 401 and looked like a green light — but it ran against a
+site code that **did not exist yet** and fell through to a generic handler. The
+whole first version of this page was built on that false positive and failed the
+moment it met the real endpoint. **Verify against the real resource, in its real
+state, or you have verified nothing.**
 
-⚠ **GoatCounter conflates events with pageviews, twice over — the dashboard's
-whole reason for existing.** `stats/hits` returns pageviews AND events in ONE
-array (told apart only by `event: true`), which is why GoatCounter's own Pages
-list shows `dock:reveal` next to `/` as if they were the same kind of thing. And
-`stats/total` is documented as *"Total number of visitors (**including
-events**)"* — events are a SUBSET, not a sibling — so reporting `total` raw
-counts every button press as a visit. On Joey's planner that's 1 667 "visits"
-against ~555 actual pageviews. This page splits both: `views = total −
-total_events`, and separate Pages / Events panels off the `event` flag.
-
-The **instructions funnel** panel turns the step events into the drop-off curve
-they exist for: OPENED → GET STARTED → INTRO → STEP n → COMPLETE → OUTRO, each
-with its fall from the previous stage, and the single worst proportional drop
-flagged in magenta (stages under 5 hits are skipped so noise can't win).
-⚠ **`step:N` carries no kit id on purpose** — scoping it would multiply
-cardinality by the kit count — so stages aggregate ACROSS kits, and kits run
-12–14 steps. The tail therefore thins for structural reasons as well as
-drop-off, and the panel label says so; don't read the last few steps as
-attrition. Empty state names the cause (no `?build=` traffic yet) rather than
-rendering a blank panel.
-
-**Events render as one panel PER FAMILY, and anything already answered by a
-panel above is left out** (`SHOWN_ABOVE`: mount / length / fill, and the whole
-funnel set). A single flat list re-listed the mount counts directly under the
-mount cards, which read as an undifferentiated mash — if you add a panel that
-visualises a family, add its prefix to `SHOWN_ABOVE` too.
-The funnel refuses to draw below `FUNNEL_MIN` (10) opens and explains itself
-instead: at 3 sessions a "−100%" reads as catastrophic drop-off when it's one
-person who didn't press Get started.
-
-Events are grouped by the GEN2 vocabulary (`GROUPS`: BUILD CONFIG / FUNNEL /
-OUTBOUND / TOOLS & UI / ⚠ FAILURES) rather than listed flat — the names are all
-`family:value`, so the list can be read as the questions it was instrumented to
-answer. An unrecognised prefix falls through to OTHER rather than being dropped,
-so a newly added event can never silently disappear. `buildMix()` pulls
-mount/length/fill into a "what people are building" panel with mount glyphs.
-
-⚠ **Aggregate only — there is no per-visitor join.** A country cannot be linked
-to what that person selected: GoatCounter stores no session dimension in the
-stats API, which is exactly why it needs no cookie banner. Encoding location
-into event names (`mount:wall:US`) would explode cardinality AND start
-profiling individuals — don't. The raw-hit CSV export does carry location and
-path per hit, so a batch "wall mounts by country" is *theoretically* possible,
-but it needs Individual Pageviews enabled (off, and it only collects forward)
-and is an async job — not a live view.
-- **Hourly is the floor.** GoatCounter stores no finer, so GA4-style per-minute
-  "active users" is not reproducible; the strip says "hourly buckets" rather
-  than implying otherwise. Raw-hit export could give timestamps but Individual
-  Pageviews is off AND it's an async CSV job — wrong tool for a live widget.
+**So the data arrives as a SNAPSHOT.** `.github/workflows/stats.yml` runs
+hourly, `.github/scripts/fetch-stats.mjs` reads the API server-side with
+`secrets.GOATCOUNTER_TOKEN`, and the result is force-pushed as a single commit
+to the **orphan `stats-data` branch** (NOT main — hourly bot commits would bury
+the real history this repo leans on, and would trigger a Pages deploy every
+hour). The page fetches it from `raw.githubusercontent.com`, which serves
+cross-origin (verified). Three problems die at once: no CORS, the token never
+touches a browser, and tracker blockers stop mattering because a GitHub runner
+makes the request, not a visitor.
+- **Setup is one repo secret**, `GOATCOUNTER_TOKEN` — a GoatCounter API token
+  with **"Read statistics" only**. Tokens are created at User → API and are
+  ACCOUNT-level: the "All sites" grant (default) means ONE token covers both
+  sites. There is no per-device setup and nothing stored in localStorage.
+- The snapshot is **public** at its raw URL — aggregate only (counts by country,
+  path and event), no personal data. Joey's call, taken deliberately.
+- The header shows how old it is; REFRESH drops the cache and re-fetches.
+- `fetch-stats.mjs` trims what it stores: per-hit `stats` arrays are dropped
+  entirely and `total.stats` is cut to the last 3 days (the strip only ever
+  draws 48 h). Without that the file is many times larger for nothing.
+- ⚠ Rate limit is **4 requests/second**; the script issues ~26, so it paces at
+  300 ms and retries on 429. Adding a range or endpoint multiplies that.
+- ⚠ This page carries NO GoatCounter script — tracking the dashboard would fold
+  admin visits into the numbers being read.
 
 World map: vendored `world-atlas` 110m TopoJSON (107 kB, Natural Earth, public
 domain) + a ~20-line decoder inline (the format is just delta-encoded shared

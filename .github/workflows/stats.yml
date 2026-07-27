@@ -1,0 +1,58 @@
+name: Snapshot GoatCounter stats
+
+# Feeds viewer/stats/. The dashboard can't read the API itself — GoatCounter
+# takes its token only in an Authorization header, that forces a CORS preflight,
+# and it answers no OPTIONS request. Fetching here also keeps the token in
+# Secrets and makes tracker blockers irrelevant (a runner makes the request, not
+# a browser).
+#
+# ⚠ Commits to the orphan `stats-data` branch, NOT to main. Hourly bot commits
+# on main would bury real history — which this repo leans on (see the fafbad8
+# post-mortem in CLAUDE.md) — and would trigger a Pages deploy every hour.
+
+on:
+  schedule:
+    - cron: "7 * * * *"   # hourly, off the hour — the data is hourly anyway
+  workflow_dispatch:
+
+concurrency:
+  group: stats-snapshot
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          sparse-checkout: .github/scripts
+          sparse-checkout-cone-mode: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Fetch stats
+        env:
+          GOATCOUNTER_TOKEN: ${{ secrets.GOATCOUNTER_TOKEN }}
+        run: node .github/scripts/fetch-stats.mjs "$RUNNER_TEMP/data.json"
+
+      - name: Publish to the stats-data branch
+        run: |
+          set -euo pipefail
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # orphan branch holding one file and no project history
+          git checkout --orphan stats-data
+          git rm -rf --cached . >/dev/null 2>&1 || true
+          rm -rf .github
+          cp "$RUNNER_TEMP/data.json" data.json
+          git add data.json
+          git commit -q -m "stats snapshot $(date -u +%Y-%m-%dT%H:%MZ)"
+          # single-commit branch: nothing here is worth a history, and force-push
+          # keeps the repo from growing an entry every hour forever
+          git push -f origin stats-data
