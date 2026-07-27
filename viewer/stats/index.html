@@ -113,7 +113,17 @@ canvas { display: block; width: 100%; }
 #map { height: 300px; }
 
 /* ---------- country list ---------- */
-.rows { display: flex; flex-direction: column; gap: 8px; max-height: 430px; overflow-y: auto; }
+/* scrollbar-gutter reserves the track so a count can never sit under the bar
+   (the OS scrollbar was overlapping the right-aligned numbers) */
+.rows {
+  display: flex; flex-direction: column; gap: 8px; max-height: 430px; overflow-y: auto;
+  scrollbar-gutter: stable; padding-right: 6px;
+  scrollbar-width: thin; scrollbar-color: #2e3648 transparent;
+}
+.rows::-webkit-scrollbar { width: 8px; }
+.rows::-webkit-scrollbar-track { background: transparent; }
+.rows::-webkit-scrollbar-thumb { background: #2e3648; border-radius: 4px; }
+.rows::-webkit-scrollbar-thumb:hover { background: #3d4860; }
 .row { display: grid; grid-template-columns: 26px 1fr auto; gap: 10px; align-items: center; font-size: .76rem; }
 .row .flag { font-size: .95rem; }
 .row .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
@@ -169,7 +179,7 @@ canvas { display: block; width: 100%; }
 .gh { font-size: .58rem; letter-spacing: .22em; color: var(--dim); margin: 12px 0 2px; }
 .gh:first-child { margin-top: 0; }
 .row .path { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-@media (max-width: 760px) { #lists, .panel .grid { grid-template-columns: 1fr !important; } }
+@media (max-width: 760px) { #event-groups, .panel .grid { grid-template-columns: 1fr !important; } }
 </style>
 
 <div class="wrap">
@@ -266,16 +276,15 @@ canvas { display: block; width: 100%; }
       </div>
     </div>
 
-    <div class="grid" style="grid-template-columns:1fr 1fr;margin-top:14px" id="lists">
-      <div class="panel">
-        <p class="h">Pages <span style="color:var(--dim);text-transform:none;letter-spacing:.05em">— real pageviews only</span></p>
-        <div class="rows" id="pages"></div>
-      </div>
-      <div class="panel">
-        <p class="h">Events <span style="color:var(--dim);text-transform:none;letter-spacing:.05em">— clicks &amp; selections, grouped</span></p>
-        <div class="rows" id="events"></div>
-      </div>
+    <div class="panel" style="margin-top:14px">
+      <p class="h">Pages <span style="color:var(--dim);text-transform:none;letter-spacing:.05em">— real pageviews only</span></p>
+      <div class="rows" id="pages"></div>
     </div>
+
+    <!-- one panel per family rather than a single scrolling wall; anything the
+         panels above already answer (mount / collection / fill / the funnel) is
+         left out instead of repeated -->
+    <div id="event-groups" class="grid" style="grid-template-columns:repeat(auto-fit,minmax(280px,1fr));margin-top:14px"></div>
 
     <p class="warn" id="err"></p>
     <p class="note" style="margin-top:18px">
@@ -297,6 +306,7 @@ const RANGES = [
   { id: '90d', label: '90D', days: 90 },
 ];
 const TOKEN_KEY = 'gen2-stats-tokens';
+const FUNNEL_MIN = 10;   // below this the funnel is noise, so it explains itself instead
 /* alpha-2 → ISO-3166 numeric, restricted to the 174 countries the vendored
    atlas actually carries (it keys geometries by numeric id, GoatCounter reports
    alpha-2). Generated from the world-countries dataset; 1.5 kB, so inline. */
@@ -511,12 +521,15 @@ async function load() {
    unknown prefix falls through to OTHER rather than being dropped, so a new
    event never silently disappears from the dashboard. */
 const GROUPS = [
-  { id: 'build',  label: 'BUILD CONFIG',  pre: ['mount','length','fill','faceplate','handle','backcover','printer','opt'] },
-  { id: 'funnel', label: 'FUNNEL',        pre: ['open','start','step','complete','outro','skip-to-end','collection','from','3d-instructions','resume-build','example','surprise','customize'] },
-  { id: 'out',    label: 'OUTBOUND',      pre: ['out','linksite','store-pref','hardware','filament','labelgen','club'] },
-  { id: 'tools',  label: 'TOOLS & UI',    pre: ['dock','tool','identify','style','preset','colors','bom','export','video','save-build','load-build','share-link','save-image','start-fresh','bom-track'] },
-  { id: 'error',  label: '⚠ FAILURES',    pre: ['error'] },
+  { id: 'build',  label: 'HARDWARE & STYLE', pre: ['faceplate','handle','backcover','closure','closure-soon','printer','opt'] },
+  { id: 'funnel', label: 'ENTRY & INTENT',   pre: ['collection','from','3d-instructions','resume-build','example','surprise','customize'] },
+  { id: 'out',    label: 'OUTBOUND',         pre: ['out','linksite','store-pref','hardware','filament','labelgen','club'] },
+  { id: 'tools',  label: 'TOOLS & UI',       pre: ['dock','tool','identify','style','preset','colors','bom','export','video','save-build','load-build','share-link','save-image','start-fresh','bom-track'] },
+  { id: 'error',  label: '⚠ FAILURES',       pre: ['error','instructions-blocked'] },
 ];
+/* Families that already have a panel of their own further up — repeating them
+   in a flat event list is what made it read as an undifferentiated mash. */
+const SHOWN_ABOVE = new Set(['mount', 'length', 'fill', 'open', 'start', 'step', 'complete', 'outro', 'skip-to-end']);
 const groupOf = name => {
   const head = String(name).split(':')[0];
   return (GROUPS.find(g => g.pre.includes(head)) || { id: 'other', label: 'OTHER' });
@@ -830,37 +843,52 @@ function barRow(label, count, max, sub) {
 
 /* events, grouped by the GEN2 vocabulary instead of one flat alphabetical wall */
 function renderEvents() {
-  const box = $('events');
+  const box = $('event-groups');
   box.innerHTML = '';
-  if (!data.events_.length) { box.innerHTML = '<div class="empty">No events in this range yet.</div>'; return; }
   const buckets = new Map();
   for (const e of data.events_) {
+    if (SHOWN_ABOVE.has(String(e.path).split(':')[0])) continue;   // already has its own panel
     const g = groupOf(e.path);
     if (!buckets.has(g.id)) buckets.set(g.id, { label: g.label, items: [] });
     buckets.get(g.id).items.push(e);
   }
-  const order = [...GROUPS.map(g => g.id), 'other'];
-  for (const id of order) {
+  if (!buckets.size) {
+    box.innerHTML = '<div class="panel"><div class="empty">No other events in this range yet.</div></div>';
+    return;
+  }
+  for (const id of [...GROUPS.map(g => g.id), 'other']) {
     const b = buckets.get(id);
     if (!b) continue;
-    const head = document.createElement('div');
-    head.className = 'gh';
     const sum = b.items.reduce((n, i) => n + i.count, 0);
-    head.textContent = `${b.label} · ${fmt(sum)}`;
-    box.appendChild(head);
+    const panel = document.createElement('div');
+    panel.className = 'panel';
+    const head = document.createElement('p');
+    head.className = 'h';
+    head.innerHTML = `${esc(b.label)} <span style="color:var(--dim);letter-spacing:.05em">· ${fmt(sum)}</span>`;
+    panel.appendChild(head);
+    const rows = document.createElement('div');
+    rows.className = 'rows';
     const max = b.items[0].count || 1;
-    for (const it of b.items.slice(0, 12)) box.appendChild(barRow(it.path, it.count, max));
+    for (const it of b.items.slice(0, 14)) rows.appendChild(barRow(it.path, it.count, max));
+    panel.appendChild(rows);
+    box.appendChild(panel);
   }
 }
 
 function renderFunnel() {
   const f = data.funnel, box = $('funnel'), note = $('funnel-note');
   box.innerHTML = '';
-  if (!f.any) {
+  // Below a floor, don't draw a curve at all: at 3 opens a "−100%" reads like a
+  // catastrophic drop-off when it's one person who didn't press Get started.
+  const opened = f.stages[0].count;
+  if (!f.any || opened < FUNNEL_MIN) {
     note.textContent = '';
-    box.innerHTML = `<div class="empty">No instruction sessions in this range yet.<br><br>
-      This fills once people open the Build Studio — <code>?build=&lt;kit&gt;</code> links from the
-      Printables / Thangs / MakerWorld listings are what feed it.</div>`;
+    box.innerHTML = `<div class="empty">${opened
+      ? `Only ${fmt(opened)} instruction session${opened === 1 ? '' : 's'} so far — too few to read as a funnel.`
+      : 'No instruction sessions in this range yet.'}<br><br>
+      The Build Studio fills this once people arrive on <code>?build=&lt;kit&gt;</code> links
+      from the Printables / Thangs / MakerWorld listings. The planner's own traffic
+      never appears here — it has no instruction steps to walk.</div>`;
     return;
   }
   note.textContent = '— steps aggregate across kits (12–14 steps each), so the tail thins for structural reasons too';

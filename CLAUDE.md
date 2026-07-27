@@ -869,6 +869,15 @@ drop-off, and the panel label says so; don't read the last few steps as
 attrition. Empty state names the cause (no `?build=` traffic yet) rather than
 rendering a blank panel.
 
+**Events render as one panel PER FAMILY, and anything already answered by a
+panel above is left out** (`SHOWN_ABOVE`: mount / length / fill, and the whole
+funnel set). A single flat list re-listed the mount counts directly under the
+mount cards, which read as an undifferentiated mash — if you add a panel that
+visualises a family, add its prefix to `SHOWN_ABOVE` too.
+The funnel refuses to draw below `FUNNEL_MIN` (10) opens and explains itself
+instead: at 3 sessions a "−100%" reads as catastrophic drop-off when it's one
+person who didn't press Get started.
+
 Events are grouped by the GEN2 vocabulary (`GROUPS`: BUILD CONFIG / FUNNEL /
 OUTBOUND / TOOLS & UI / ⚠ FAILURES) rather than listed flat — the names are all
 `family:value`, so the list can be read as the questions it was instrumented to
