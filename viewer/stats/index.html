@@ -162,16 +162,18 @@ canvas { display: block; width: 100%; }
         anywhere except goatcounter.com, and never committed to the repo.
       </p>
       <p class="note">
-        Make one per site (they're separate accounts): open
-        <b>[site].goatcounter.com → User → API tokens → Add new</b> and tick
-        <b>“Read statistics”</b>. You can fill in just one and add the other later.
+        <b>User → API → Add new API Token.</b> Tick <b>only “Read statistics”</b>
+        — “Record pageviews” is write access and the rest manage sites; this page
+        only reads. Leave <b>“All sites”</b> checked and ONE token covers both,
+        so you can paste the same value in both boxes (leave the second blank and
+        it's copied for you). Separate per-site tokens work too.
       </p>
 
       <label>jerrari.goatcounter.com — GEN2 Planner</label>
       <input id="tok-planner" type="password" autocomplete="off" spellcheck="false" placeholder="token">
 
       <label>jerrari-build.goatcounter.com — 3D Build Studio</label>
-      <input id="tok-build" type="password" autocomplete="off" spellcheck="false" placeholder="token">
+      <input id="tok-build" type="password" autocomplete="off" spellcheck="false" placeholder="same token, or leave blank">
 
       <button class="btn" id="save">CONNECT</button>
       <div class="warn" id="setup-warn"></div>
@@ -286,6 +288,11 @@ function showSetup() {
 $('save').onclick = () => {
   const t = { planner: $('tok-planner').value.trim(), build: $('tok-build').value.trim() };
   if (!t.planner && !t.build) { $('setup-warn').textContent = 'Enter at least one token.'; return; }
+  // GoatCounter tokens are account-level with an "All sites" grant, so one
+  // token normally authenticates against BOTH hosts — fill the gap rather than
+  // making someone paste the same string twice
+  t.planner = t.planner || t.build;
+  t.build = t.build || t.planner;
   tokens = t;
   try { localStorage.setItem(TOKEN_KEY, JSON.stringify(tokens)); } catch (e) {}
   $('setup').classList.add('hidden');

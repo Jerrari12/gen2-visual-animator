@@ -823,9 +823,15 @@ one self-contained `index.html`, same build-free convention as everything else.
 with an `Authorization` header returns a readable 401), so it reads the API
 straight from the browser — no server, no proxy.
 - **Tokens live in localStorage only** (`gen2-stats-tokens`), pasted by Joey,
-  one per site because the two GoatCounter sites are separate accounts. Never
-  in the repo. No token → setup screen and nothing else, so the public URL
-  leaks nothing. `noindex`.
+  never in the repo. No token → setup screen and nothing else, so the public
+  URL leaks nothing. `noindex`.
+  API tokens are created at **User → API** and are ACCOUNT-level, not per-site:
+  the "Access to sites → All sites" grant (checked by default) means ONE token
+  authenticates against both hosts, so the setup screen copies a single entry
+  into both slots. Grant **only "Read statistics"** — "Record pageviews" is
+  WRITE access (it could inject fake hits) and the three site-management scopes
+  can create/modify sites. (Add "Export" only if the raw-hit export is ever
+  built; see the aggregate-only note below.)
 - ⚠ **The page deliberately carries NO GoatCounter script.** Tracking the
   dashboard would fold Joey's own admin visits into the numbers he's reading.
 - Three calls per site: `stats/total` (totals AND the site-wide hourly series in
