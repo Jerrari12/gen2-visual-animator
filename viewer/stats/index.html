@@ -316,6 +316,25 @@ let tokens = {}, scope = 'all', range = '7d', world = null, data = null, timer =
    non-UTC account, so "this hour" was a guaranteed 0 and the strip carried a
    dead tail. Read the real zone from /api/v0/me once per session. */
 let siteTz = null;
+/* ⚠ GoatCounter reports the zone REGION-PREFIXED — "US.America/New_York", not
+   "America/New_York". That is not a valid IANA name, so Intl throws on it and
+   the whole timezone fix silently degraded back to UTC (this-hour stuck at 0,
+   dead tail on the strip — the exact bug it was meant to cure, just quieter).
+   Try the raw value, then the part after the first dot, then give up to UTC —
+   validating each against Intl rather than trusting any one format. */
+function resolveTz(raw) {
+  const cands = [];
+  if (raw) {
+    cands.push(raw);
+    const dot = raw.indexOf('.');
+    if (dot > -1) cands.push(raw.slice(dot + 1));
+  }
+  cands.push('UTC');
+  for (const c of cands) {
+    try { new Intl.DateTimeFormat('en-CA', { timeZone: c }); return c; } catch (e) { /* next */ }
+  }
+  return 'UTC';
+}
 function nowKeyIn(tz) {
   try {
     const p = Object.fromEntries(new Intl.DateTimeFormat('en-CA', {
@@ -421,7 +440,7 @@ async function load() {
   if (siteTz === null) {
     try {
       const me = await api(sites[0], 'me', {});
-      siteTz = me?.user?.settings?.timezone || 'UTC';
+      siteTz = resolveTz(me?.user?.settings?.timezone);
     } catch (e) { siteTz = 'UTC'; }
   }
 
@@ -851,7 +870,10 @@ function renderFunnel() {
     const pct = Math.round(s.count / top * 100);
     const drop = prev ? Math.round((1 - s.count / prev) * 100) : null;
     const bad = i === f.worst && drop > 0;
-    const [r, g, b] = bad ? [255, 62, 165] : ramp(top <= 1 ? 1 : Math.log(s.count + 1) / Math.log(top + 1));
+    // deliberately NOT the intensity ramp: bar length already carries magnitude,
+    // and ramping made a 3-visit top stage render red-hot and alarming. Colour
+    // here means one thing only — magenta is the stage that loses the most.
+    const [r, g, b] = bad ? [255, 62, 165] : [34, 224, 214];
     const el = document.createElement('div');
     el.className = 'fstage' + (bad ? ' bad' : '');
     el.innerHTML = `<span class="fl">${esc(s.label)}</span>

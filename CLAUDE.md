@@ -917,6 +917,12 @@ hour on a US account looked 4 hours into the future: "this hour" was a
 guaranteed 0 and the strip carried a dead tail. The zone is read once per
 session from `/api/v0/me` (`user.settings.timezone`) and the axis is labelled
 with it; a failed lookup or bad zone name falls back to UTC.
+⚠⚠ **That field is REGION-PREFIXED — `US.America/New_York`, not
+`America/New_York`.** It is not a valid IANA name, so `Intl` throws and the
+whole timezone fix degrades silently back to UTC — the same bug it was written
+to cure, just harder to spot (this-hour back to 0, dead tail on the strip).
+`resolveTz()` tries the raw value, then the part after the first dot, then UTC,
+VALIDATING each against `Intl` rather than trusting the format.
 
 **Verifying it without a token or a screenshot:** the Browser pane can't
 screenshot unless it's displayed, and there's no real token to hand. Stub
