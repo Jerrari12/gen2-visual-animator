@@ -39,6 +39,11 @@ RANGES = {"24h": 1, "7d": 7, "30d": 30, "90d": 90}
 SERIES_DAYS = 3      # the strip only ever draws 48h; keeping 90 days of hourly arrays is waste
 HITS_LIMIT = 100
 CACHE_TTL = 300      # seconds; the underlying data only changes hourly
+# ⚠ A whole snapshot is 7 API calls and each can be rate-limited. Retrying each
+# one generously means the request can block for minutes while the page just
+# says FETCHING - so the BUDGET IS FOR THE WHOLE BUILD, not per call. Past it,
+# fail with something readable instead of hanging.
+BUILD_BUDGET = 45.0
 
 _cache = {}          # range -> (fetched_at, payload)
 _last_call = [0.0]
@@ -55,8 +60,10 @@ def token():
     return ""
 
 
-def api(host, path, params=None, tries=0):
+def api(host, path, params=None, tries=0, deadline=None):
     """One GoatCounter call, paced under the 4 requests/second limit."""
+    if deadline is None:
+        deadline = time.time() + BUILD_BUDGET
     wait = 0.3 - (time.time() - _last_call[0])
     if wait > 0:
         time.sleep(wait)
@@ -64,15 +71,23 @@ def api(host, path, params=None, tries=0):
 
     url = f"https://{host}/api/v0/{path}"
     if params:
-        url += "?" + urllib.parse.urlencode(params)
+        # doseq: include_paths is an ARRAY parameter and must repeat, not stringify
+        url += "?" + urllib.parse.urlencode(params, doseq=True)
     req = urllib.request.Request(url, headers={"Authorization": "Bearer " + token()})
     try:
         with urllib.request.urlopen(req, timeout=30) as res:
             return json.loads(res.read().decode("utf-8"))
     except urllib.error.HTTPError as e:
-        if e.code == 429 and tries < 4:
-            time.sleep(min(float(e.headers.get("X-Rate-Limit-Reset") or 1.5), 8) + 0.25)
-            return api(host, path, params, tries + 1)
+        if e.code == 429:
+            hint = float(e.headers.get("X-Rate-Limit-Reset") or 0)
+            wait = min(max(hint, 1.5 * (tries + 1)), 15) + 0.25
+            if time.time() + wait < deadline:
+                time.sleep(wait)
+                return api(host, path, params, tries + 1, deadline)
+            raise RuntimeError(
+                "GoatCounter is rate-limiting us (4 requests/second, and it stays "
+                "limited for a while after a burst). Wait a minute, then press REFRESH."
+            )
         if e.code in (401, 403):
             raise RuntimeError(
                 'token rejected by %s - check it has the "Read statistics" permission '
@@ -85,12 +100,25 @@ def hour_str(t):
     return time.strftime("%Y-%m-%dT%H:00:00Z", time.gmtime(t))
 
 
-def for_range(host, days):
+def for_range(host, days, deadline):
     end = time.time() // 3600 * 3600
     w = {"start": hour_str(end - days * 86400), "end": hour_str(end + 3600)}
-    total = api(host, "stats/total", w)
-    loc = api(host, "stats/locations", w)
-    hits = api(host, "stats/hits", dict(w, limit=HITS_LIMIT))
+    total = api(host, "stats/total", w, deadline=deadline)
+    hits = api(host, "stats/hits", dict(w, limit=HITS_LIMIT), deadline=deadline)
+
+    # ⚠ /stats/locations counts EVERY hit, events included, so its numbers ran
+    # ~6x the pageview tile (645 for the US against 278 pageviews) and looked
+    # broken. Restrict it to the non-event paths so countries and pageviews
+    # describe the same thing. NB `limit` defaults to 20 on this endpoint —
+    # without it the country list silently truncated at 20 and the COUNTRIES
+    # tile reported that cap as if it were the real number.
+    page_paths = [h["path"] for h in (hits.get("hits") or []) if not h.get("event")]
+    if page_paths:
+        loc = api(host, "stats/locations",
+                  dict(w, limit=100, path_by_name="true", include_paths=page_paths),
+                  deadline=deadline)
+    else:
+        loc = {"stats": []}          # no pageviews in this window: no countries to attribute
     return {
         "total": total.get("total") or 0,
         "total_events": total.get("total_events") or 0,
@@ -105,11 +133,11 @@ def for_range(host, days):
     }
 
 
-def resolve_tz():
+def resolve_tz(deadline):
     """GoatCounter reports stats in the ACCOUNT'S timezone and returns it
     region-prefixed ("US.America/New_York"), which is not a valid IANA name."""
     try:
-        raw = (api(SITES["build"], "me").get("user", {})
+        raw = (api(SITES["build"], "me", deadline=deadline).get("user", {})
                .get("settings", {}).get("timezone") or "")
     except Exception:
         return "UTC"
@@ -130,10 +158,11 @@ def snapshot(rng):
     if hit and time.time() - hit[0] < CACHE_TTL:
         return hit[1]
     days = RANGES[rng]
+    deadline = time.time() + BUILD_BUDGET      # one budget for the whole build
     out = {"generated": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-           "tz": resolve_tz(), "sites": {}}
+           "tz": resolve_tz(deadline), "sites": {}}
     for sid, host in SITES.items():
-        out["sites"][sid] = {rng: for_range(host, days)}
+        out["sites"][sid] = {rng: for_range(host, days, deadline)}
     _cache[rng] = (time.time(), out)
     return out
 

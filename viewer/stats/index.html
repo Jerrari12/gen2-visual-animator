@@ -322,12 +322,26 @@ const fmt = n => n == null ? '—' : n.toLocaleString();
 let snapshot = null, snapCache = {};
 async function getSnapshot() {
   if (snapCache[range]) { snapshot = snapCache[range]; siteTz = snapshot.tz || 'UTC'; return snapshot; }
+  // count up while waiting: a static "FETCHING…" is indistinguishable from a hang
+  const t0 = Date.now();
+  const tick = setInterval(() => {
+    $('asof').innerHTML = `<i></i>FETCHING… ${Math.round((Date.now() - t0) / 1000)}s`;
+  }, 1000);
   $('asof').innerHTML = '<i></i>FETCHING…';
+  // the proxy gives itself 45s to beat the rate limiter; give it 60 and then stop
+  const ctl = new AbortController();
+  const bail = setTimeout(() => ctl.abort(), 60000);
   let res;
   try {
-    res = await fetch(`${DATA_URL}?range=${encodeURIComponent(range)}&t=${Date.now()}`, { cache: 'no-store' });
+    res = await fetch(`${DATA_URL}?range=${encodeURIComponent(range)}&t=${Date.now()}`,
+      { cache: 'no-store', signal: ctl.signal });
   } catch (e) {
-    throw new Error('Can’t reach the local stats server. Start it with: python serve-stats.py');
+    throw new Error(e.name === 'AbortError'
+      ? 'The stats server didn’t answer within 60s — most likely GoatCounter is rate-limiting it. Wait a minute and press REFRESH.'
+      : 'Can’t reach the local stats server. Start it with: python serve-stats.py');
+  } finally {
+    clearInterval(tick);
+    clearTimeout(bail);
   }
   const body = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(body.error || `stats server returned HTTP ${res.status}`);
@@ -404,7 +418,11 @@ async function load() {
    unknown prefix falls through to OTHER rather than being dropped, so a new
    event never silently disappears from the dashboard. */
 const GROUPS = [
-  { id: 'build',  label: 'HARDWARE & STYLE', pre: ['faceplate','handle','backcover','closure','closure-soon','printer','opt'] },
+  // faceplate / handle / back cover are one decision tree — the handle bolts to
+  // the plate and the cover seats behind it — so they read together
+  { id: 'face',   label: 'FACEPLATES',       pre: ['faceplate','handle','backcover'] },
+  { id: 'printer',label: '3D PRINTERS',      pre: ['printer'] },
+  { id: 'build',  label: 'DRAWER HARDWARE',  pre: ['closure','closure-soon','opt'] },
   { id: 'funnel', label: 'ENTRY & INTENT',   pre: ['collection','from','3d-instructions','resume-build','example','surprise','customize'] },
   { id: 'out',    label: 'OUTBOUND',         pre: ['out','linksite','store-pref','hardware','filament','labelgen','club'] },
   { id: 'tools',  label: 'TOOLS & UI',       pre: ['dock','tool','identify','style','preset','colors','bom','export','video','save-build','load-build','share-link','save-image','start-fresh','bom-track'] },
@@ -759,7 +777,9 @@ function renderEvents() {
     const rows = document.createElement('div');
     rows.className = 'rows';
     const max = b.items[0].count || 1;
-    for (const it of b.items.slice(0, 14)) rows.appendChild(barRow(it.path, it.count, max));
+    // the panel scrolls, so this cap only needs to stop a runaway list. At 14 it
+    // was hiding real rows — faceplate:classic sat just under the fold.
+    for (const it of b.items.slice(0, 40)) rows.appendChild(barRow(it.path, it.count, max));
     panel.appendChild(rows);
     box.appendChild(panel);
   }

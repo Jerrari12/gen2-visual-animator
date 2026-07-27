@@ -849,9 +849,22 @@ request, not the page.
   "All sites" grant covers both sites with one token.
 - The proxy trims what it returns: per-hit `stats` arrays dropped entirely,
   `total.stats` cut to the last 3 days (the strip only ever draws 48 h).
-- ⚠ Rate limit is **4 requests/second**; the proxy paces at 300 ms and retries
-  on 429. It builds ONE range per request and caches it for 5 minutes, so the
-  page caches per range too (`snapCache`) — switching range re-fetches.
+- ⚠ Rate limit is **4 requests/second — and once tripped it STAYS tripped for
+  a while**, not for a second. The proxy paces at 300 ms and retries 429s, but
+  the retry budget is **for the whole snapshot build** (`BUILD_BUDGET`, 45 s),
+  not per call: 7 calls each retrying generously blocked for minutes while the
+  page showed only "FETCHING". Past the budget it fails with a readable message;
+  the page also aborts at 60 s and counts the seconds while it waits. Don't run
+  two proxies (or a polling loop) against the same account — that is what
+  exhausted it during development.
+- It builds ONE range per request and caches it for 5 minutes, so the page
+  caches per range too (`snapCache`) — switching range re-fetches.
+- ⚠ `/stats/locations` counts EVERY hit, events included, so its numbers ran ~6×
+  the pageview tile (645 for the US against 278 pageviews). The proxy restricts
+  it with `include_paths` + `path_by_name` to the non-event paths from the same
+  window, so countries and pageviews describe the same thing. Its `limit` also
+  **defaults to 20** — unset, the country list silently truncated at 20 and the
+  COUNTRIES tile reported that cap as the real number.
 - ⚠ This page carries NO GoatCounter script — tracking the dashboard would fold
   admin visits into the numbers being read.
 
