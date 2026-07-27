@@ -857,6 +857,15 @@ request, not the page.
   the page also aborts at 60 s and counts the seconds while it waits. Don't run
   two proxies (or a polling loop) against the same account — that is what
   exhausted it during development.
+- ⚠⚠ **`ThreadingHTTPServer` serves concurrently, and a browser giving up does
+  NOT stop work already running here.** Without locking, every REFRESH started
+  another build, builds interleaved far past 4 req/s, and the limiter never got
+  a quiet moment — a self-sustaining overload indistinguishable from "the API is
+  down". `_api_lock` serialises every call and is held across back-off sleeps
+  (while rate-limited, the correct number of in-flight requests is zero);
+  `_build_lock` single-flights the build so extra callers reuse its result.
+  Verified with a stubbed HTTP layer and 8 concurrent callers: 1 build, 0
+  overlaps, 0.35 s minimum spacing.
 - It builds ONE range per request and caches it for 5 minutes, so the page
   caches per range too (`snapCache`) — switching range re-fetches.
 - ⚠ `/stats/locations` counts EVERY hit, events included, so its numbers ran ~6×

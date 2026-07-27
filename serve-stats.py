@@ -26,6 +26,7 @@ import http.server
 import json
 import os
 import sys
+import threading
 import time
 import urllib.error
 import urllib.parse
@@ -47,6 +48,14 @@ BUILD_BUDGET = 45.0
 
 _cache = {}          # range -> (fetched_at, payload)
 _last_call = [0.0]
+# ⚠ ThreadingHTTPServer serves requests CONCURRENTLY, and a browser giving up
+# does not stop the work already running here. Without these locks every
+# REFRESH started another build, the builds interleaved past 4 req/s, and the
+# rate limiter never got a quiet moment to reset - a self-sustaining overload
+# that looks exactly like "the API is down".
+_api_lock = threading.Lock()     # strictly one in-flight API call, paced
+_build_lock = threading.Lock()   # one snapshot build at a time; the rest reuse its result
+PACE = 0.35                      # ~2.8 req/s, comfortably under the limit
 
 
 def token():
@@ -60,40 +69,49 @@ def token():
     return ""
 
 
-def api(host, path, params=None, tries=0, deadline=None):
-    """One GoatCounter call, paced under the 4 requests/second limit."""
+def api(host, path, params=None, deadline=None):
+    """One GoatCounter call. Serialised and paced under the 4 req/s limit.
+
+    The lock is held for the whole call INCLUDING back-off sleeps: while we are
+    being rate-limited, the right number of concurrent requests is zero.
+    """
     if deadline is None:
         deadline = time.time() + BUILD_BUDGET
-    wait = 0.3 - (time.time() - _last_call[0])
-    if wait > 0:
-        time.sleep(wait)
-    _last_call[0] = time.time()
-
     url = f"https://{host}/api/v0/{path}"
     if params:
         # doseq: include_paths is an ARRAY parameter and must repeat, not stringify
         url += "?" + urllib.parse.urlencode(params, doseq=True)
-    req = urllib.request.Request(url, headers={"Authorization": "Bearer " + token()})
-    try:
-        with urllib.request.urlopen(req, timeout=30) as res:
-            return json.loads(res.read().decode("utf-8"))
-    except urllib.error.HTTPError as e:
-        if e.code == 429:
-            hint = float(e.headers.get("X-Rate-Limit-Reset") or 0)
-            wait = min(max(hint, 1.5 * (tries + 1)), 15) + 0.25
-            if time.time() + wait < deadline:
+
+    with _api_lock:
+        tries = 0
+        while True:
+            wait = PACE - (time.time() - _last_call[0])
+            if wait > 0:
                 time.sleep(wait)
-                return api(host, path, params, tries + 1, deadline)
-            raise RuntimeError(
-                "GoatCounter is rate-limiting us (4 requests/second, and it stays "
-                "limited for a while after a burst). Wait a minute, then press REFRESH."
-            )
-        if e.code in (401, 403):
-            raise RuntimeError(
-                'token rejected by %s - check it has the "Read statistics" permission '
-                "and was copied whole" % host
-            )
-        raise RuntimeError(f"{host}/{path} -> HTTP {e.code}")
+            _last_call[0] = time.time()
+            req = urllib.request.Request(url, headers={"Authorization": "Bearer " + token()})
+            try:
+                with urllib.request.urlopen(req, timeout=30) as res:
+                    return json.loads(res.read().decode("utf-8"))
+            except urllib.error.HTTPError as e:
+                if e.code == 429:
+                    hint = float(e.headers.get("X-Rate-Limit-Reset") or 0)
+                    back = min(max(hint, 1.5 * (tries + 1)), 15) + 0.25
+                    if time.time() + back >= deadline:
+                        raise RuntimeError(
+                            "GoatCounter is rate-limiting us (4 requests/second, and it "
+                            "stays limited for a while after a burst). Wait a minute, "
+                            "then press REFRESH."
+                        )
+                    time.sleep(back)
+                    tries += 1
+                    continue
+                if e.code in (401, 403):
+                    raise RuntimeError(
+                        'token rejected by %s - check it has the "Read statistics" '
+                        "permission and was copied whole" % host
+                    )
+                raise RuntimeError(f"{host}/{path} -> HTTP {e.code}")
 
 
 def hour_str(t):
@@ -154,9 +172,23 @@ def resolve_tz(deadline):
 
 
 def snapshot(rng):
-    hit = _cache.get(rng)
-    if hit and time.time() - hit[0] < CACHE_TTL:
-        return hit[1]
+    def cached():
+        hit = _cache.get(rng)
+        return hit[1] if hit and time.time() - hit[0] < CACHE_TTL else None
+
+    fresh = cached()
+    if fresh:
+        return fresh
+    # single-flight: whoever gets the lock builds, everyone else takes the
+    # result rather than launching a competing build against the same quota
+    with _build_lock:
+        fresh = cached()
+        if fresh:
+            return fresh
+        return _build(rng)
+
+
+def _build(rng):
     days = RANGES[rng]
     deadline = time.time() + BUILD_BUDGET      # one budget for the whole build
     out = {"generated": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
