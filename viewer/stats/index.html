@@ -319,12 +319,26 @@ $('settings').onclick = showSetup;
 /* ================= API ================= */
 const activeSites = () => SITES.filter(s => tokens[s.id] && (scope === 'all' || scope === s.id));
 
-async function api(site, path, params) {
+/* ⚠ GoatCounter allows 4 requests/SECOND. We issue 3 endpoints per site, so a
+   plain Promise.all across two sites fires 6 at once and gets a blanket 429 —
+   every single load, which is exactly what happened on first real use. Every
+   call goes through this pacer: one at a time, ~300 ms apart (≈3.3/s, under the
+   limit with margin). Six requests cost under two seconds, which is nothing
+   against a dashboard that refreshes on a timer. */
+const gap = ms => new Promise(r => setTimeout(r, ms));
+let apiChain = Promise.resolve();
+function paced(fn) {
+  const run = apiChain.then(fn, fn);
+  apiChain = run.then(() => gap(300), () => gap(300));
+  return run;
+}
+
+async function api(site, path, params, tries = 0) {
   const url = new URL(`https://${site.host}/api/v0/${path}`);
   for (const [k, v] of Object.entries(params || {})) url.searchParams.set(k, v);
   let res;
   try {
-    res = await fetch(url, { headers: { Authorization: 'Bearer ' + tokens[site.id] } });
+    res = await paced(() => fetch(url, { headers: { Authorization: 'Bearer ' + tokens[site.id] } }));
   } catch (e) {
     // fetch only REJECTS at the network layer — a blocked request never gets a
     // status. goatcounter.com is on the standard tracker blocklists (Brave
@@ -336,6 +350,16 @@ async function api(site, path, params) {
   }
   if (res.status === 401 || res.status === 403)
     throw new Error(`${site.label}: token rejected — check it was pasted whole and has the “Read statistics” permission.`);
+  if (res.status === 429) {
+    // X-Rate-Limit-Reset is only readable cross-origin if the server exposes
+    // it, so treat it as a hint and fall back to a fixed back-off
+    const reset = parseInt(res.headers.get('X-Rate-Limit-Reset') || '', 10);
+    if (tries < 3) {
+      await gap(Math.min(Number.isFinite(reset) ? reset * 1000 : 1200, 5000) + 250);
+      return api(site, path, params, tries + 1);
+    }
+    throw new Error(`${site.label}: rate-limited by GoatCounter (4 requests/second) and still limited after 3 retries. Wait a minute and hit REFRESH.`);
+  }
   if (!res.ok) throw new Error(`${site.label}: HTTP ${res.status} from the API.`);
   return res.json();
 }
@@ -791,7 +815,9 @@ async function boot() {
   segs();
   await refresh();
   clearInterval(timer);
-  timer = setInterval(refresh, 60000);   // hourly data — a minute is plenty
+  // the data is hourly, so polling every minute bought nothing and spent six
+  // rate-limited requests each time
+  timer = setInterval(refresh, 300000);
 }
 
 addEventListener('resize', () => { if (data) { drawStrip(); drawMap(); } });

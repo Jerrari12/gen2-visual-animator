@@ -837,6 +837,17 @@ straight from the browser — no server, no proxy.
 - Three calls per site: `stats/total` (totals AND the site-wide hourly series in
   one response), `stats/locations`, `stats/hits`. Scope toggle merges both sites.
 
+⚠ **The API allows 4 requests per SECOND.** Three endpoints × two sites = 6, so
+the original `Promise.all` tripped a blanket **429 on every single load** — it
+failed the first time it met real data, having never failed against a mock.
+Every call now goes through `paced()`: one at a time, ~300 ms apart (≈3.3/s).
+Six requests take under two seconds, which costs nothing on a timer-refreshed
+dashboard. 429 also retries up to 3× (honouring `X-Rate-Limit-Reset` when the
+header is exposed cross-origin, else a fixed back-off). Auto-refresh is **5
+minutes**, not 60 s — the data is hourly, so a minute bought nothing and spent
+six rate-limited requests. **Any new panel = more requests; keep them inside
+`api()` so they're paced too.**
+
 ⚠ **GoatCounter conflates events with pageviews, twice over — the dashboard's
 whole reason for existing.** `stats/hits` returns pageviews AND events in ONE
 array (told apart only by `event: true`), which is why GoatCounter's own Pages
