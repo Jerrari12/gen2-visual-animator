@@ -2,9 +2,9 @@
 
 > **ACTIVE HANDOFF (2026-07-27) — read `2026-07-27-session-handoff.md` first.**
 > Site icons now ship on all four GEN2 properties, and the viewer is
-> instrumented with GoatCounter (the planner already was). ⚠ **Joey must create
-> the `jerrari-build.goatcounter.com` site** — until then the viewer's beacon
-> 404s silently. Next up is still the magnet buy-links redesign + the club
+> instrumented with GoatCounter (the planner already was). The
+> `jerrari-build.goatcounter.com` site is created and **verified accepting hits
+> in production**. Next up is still the magnet buy-links redesign + the club
 > faceplate link gap. Older context below.
 >
 > **PREVIOUS HANDOFF (2026-07-25) — `2026-07-25-session-handoff.md`.**
@@ -742,10 +742,19 @@ user settings and legitimately exempt).
 (instrumented long before this; `track()` in its `js/app.js` + ~28 call sites).
 Viewer + `/builds/` → **`jerrari-build.goatcounter.com`** — separate so the two
 apps' `/` pageviews don't collapse into one row, and so viewer event names need
-no app prefix. ⚠ **Joey must create that site** (goatcounter.com → Settings →
-Additional sites); until he does, the beacon 404s silently, which is the
-intended failure mode anyway. The endpoint lives in exactly two places:
-the `data-goatcounter` tag in `viewer/index.html` and `viewer/builds/index.html`.
+no app prefix. Created + production-verified 2026-07-27. The endpoint lives in
+exactly two places: the `data-goatcounter` tag in `viewer/index.html` and
+`viewer/builds/index.html`. (New sites: Settings → **Sites** — GoatCounter
+doesn't use the phrase "additional sites" anywhere in its UI.)
+⚠ **Keep `src` ABSOLUTE (`https://gc.zgo.at/count.js`).** GoatCounter's own
+copy-paste snippet is protocol-relative `//gc.zgo.at/…`, which via `file://`
+resolves to a Windows network share and hangs the page for minutes. Both apps
+are pinned deliberately — don't "correct" them to match the snippet.
+**Testing the endpoint without guessing:** `/count` answers a good request with
+a 1×1 GIF and an unknown site code with a 404, so an `<img>` onload/onerror
+probe is a definitive check — run a made-up site code alongside it as a control.
+The browser tools' network log won't help: it records only fetch/XHR, and the
+beacon (and count.js itself) are image/script loads.
 
 `track(name)` in main.js mirrors the planner's helper and its **colon vocabulary**
 (`step:4`, `out:printables`) — one shape across both apps. Additions over the

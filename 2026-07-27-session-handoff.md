@@ -9,20 +9,28 @@ next work — see §3 below.
 
 ---
 
-## 1. ⚠ ONE THING ONLY JOEY CAN DO — create the GoatCounter site
+## 1. ✅ The GoatCounter site is CREATED and accepting hits
 
-The viewer now reports to **`jerrari-build.goatcounter.com`**, which **does not
-exist yet**. Create it: goatcounter.com → **Settings → Additional sites → Add
-site**, code `jerrari-build`.
+Joey created **`jerrari-build.goatcounter.com`** on 2026-07-27 (its "Your site"
+is set to gen2build.jerrari3d.com; retention 0 = never delete; Sessions +
+Referrer on, which is what makes `&ref=` attribution work). **Verified against
+production the same day** — `/count` returns the 1×1 GIF, while a made-up site
+code 404s, so the test discriminates. Nothing outstanding here.
 
-Until then the beacon 404s silently and the viewer behaves normally — that's the
-designed failure mode, not a bug. If you'd rather use a different code, it lives
-in exactly two places: the `data-goatcounter` tag in `viewer/index.html` and
-`viewer/builds/index.html`.
+The endpoint lives in exactly two places if it ever needs changing: the
+`data-goatcounter` tag in `viewer/index.html` and `viewer/builds/index.html`.
+
+⚠ **Keep `src="https://gc.zgo.at/count.js"` ABSOLUTE.** GoatCounter's own copy-
+paste snippet gives you protocol-relative `//gc.zgo.at/...`; opened via
+`file://` that resolves to a Windows network share and hangs the page for
+minutes. Both apps are deliberately pinned to `https://` — don't "fix" them to
+match the snippet.
 
 **Why separate from the planner's `jerrari.goatcounter.com`:** both apps serve a
 page at `/`, so one shared site would merge their pageviews into a single
 meaningless row. Separate sites also mean viewer events need no app prefix.
+Sites live under Settings → **Sites** (GoatCounter doesn't call it "additional
+sites" anywhere in the UI).
 
 ---
 
