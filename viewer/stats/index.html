@@ -103,7 +103,14 @@ a { color: var(--cyan); }
 .live i { width: 7px; height: 7px; border-radius: 50%; background: var(--lime); box-shadow: 0 0 9px var(--lime); animation: pulse 2s infinite; }
 @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .25; } }
 
+/* ⚠ A canvas is a REPLACED element: with width:100% and no CSS height it keeps
+   its attribute aspect ratio, so the strip rendered ~965px tall on a wide
+   window until JS happened to resize it. Pin both heights in CSS so the empty
+   / failed state can't blow the layout apart. drawStrip/drawMap overwrite
+   style.height with the real value. */
 canvas { display: block; width: 100%; }
+#strip { height: 150px; }
+#map { height: 300px; }
 
 /* ---------- country list ---------- */
 .rows { display: flex; flex-direction: column; gap: 8px; max-height: 430px; overflow-y: auto; }
@@ -129,6 +136,11 @@ canvas { display: block; width: 100%; }
 }
 .btn:hover { filter: brightness(1.12); }
 .warn { color: var(--magenta); font-size: .72rem; margin-top: 12px; min-height: 1.2em; }
+.err-banner {
+  border-color: var(--magenta); background: rgba(255,62,165,.07); color: #ffc8e4;
+  font-size: .78rem; line-height: 1.65; margin-bottom: 14px;
+}
+.err-banner b { color: var(--magenta); letter-spacing: .12em; }
 .note { font-size: .66rem; color: var(--dim); line-height: 1.7; }
 .hidden { display: none !important; }
 .empty { color: var(--dim); font-size: .74rem; padding: 22px 0; text-align: center; }
@@ -189,6 +201,10 @@ canvas { display: block; width: 100%; }
       <button class="ghost" id="reload">↻ REFRESH</button>
       <button class="ghost" id="settings">TOKENS</button>
     </div>
+
+    <!-- errors belong ABOVE the fold: buried under a full-height map they were
+         invisible exactly when something had gone wrong -->
+    <div class="panel err-banner hidden" id="err-top"></div>
 
     <div class="tiles">
       <div class="panel tile"><div class="v c-accent" id="s-views">—</div><div class="s" id="s-views-l">PAGEVIEWS</div></div>
@@ -306,9 +322,21 @@ const activeSites = () => SITES.filter(s => tokens[s.id] && (scope === 'all' || 
 async function api(site, path, params) {
   const url = new URL(`https://${site.host}/api/v0/${path}`);
   for (const [k, v] of Object.entries(params || {})) url.searchParams.set(k, v);
-  const res = await fetch(url, { headers: { Authorization: 'Bearer ' + tokens[site.id] } });
-  if (res.status === 401 || res.status === 403) throw new Error(`${site.label}: token rejected (needs “Read statistics”)`);
-  if (!res.ok) throw new Error(`${site.label}: HTTP ${res.status}`);
+  let res;
+  try {
+    res = await fetch(url, { headers: { Authorization: 'Bearer ' + tokens[site.id] } });
+  } catch (e) {
+    // fetch only REJECTS at the network layer — a blocked request never gets a
+    // status. goatcounter.com is on the standard tracker blocklists (Brave
+    // Shields, uBlock, Firefox strict), so this is the likeliest failure by far
+    // and deserves a real instruction rather than "TypeError: Failed to fetch".
+    throw new Error(`${site.label}: the request never left the browser. goatcounter.com is on tracker `
+      + `blocklists — allow it for this site (Brave: click the 🦁 → Shields DOWN; uBlock: click the icon → power button) `
+      + `or open this page in a browser without a blocker.`);
+  }
+  if (res.status === 401 || res.status === 403)
+    throw new Error(`${site.label}: token rejected — check it was pasted whole and has the “Read statistics” permission.`);
+  if (!res.ok) throw new Error(`${site.label}: HTTP ${res.status} from the API.`);
   return res.json();
 }
 
@@ -568,6 +596,7 @@ function drawStrip() {
   const cv = $('strip'), ctx = cv.getContext('2d');
   const dpr = Math.min(devicePixelRatio || 1, 2);
   const W = cv.clientWidth, H = 150;
+  cv.style.height = H + 'px';   // drawMap already did this; without it the canvas keeps its 2:1 intrinsic ratio
   cv.width = W * dpr; cv.height = H * dpr;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, W, H);
@@ -737,11 +766,15 @@ function segs() {
 }
 
 async function refresh() {
+  const top = $('err-top');
   $('err').textContent = '';
   try {
     data = await load();
     render();
+    top.classList.add('hidden');
   } catch (e) {
+    top.innerHTML = '<b>⚠ COULDN’T LOAD</b><br>' + esc(e.message);
+    top.classList.remove('hidden');
     $('err').textContent = '⚠ ' + e.message;
   }
 }
