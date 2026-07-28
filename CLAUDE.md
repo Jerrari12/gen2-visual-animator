@@ -887,6 +887,17 @@ request, not the page.
   window, so countries and pageviews describe the same thing. Its `limit` also
   **defaults to 20** — unset, the country list silently truncated at 20 and the
   COUNTRIES tile reported that cap as the real number.
+- **Traffic sources** come from `stats/toprefs`, filtered to pageview paths like
+  the country list (a source that "sent" a button click is meaningless).
+  `ref_scheme` matters: **`g`** = generated, and GoatCounter already folds every
+  Google domain into a single "Google" — that grouping is its own, not an error;
+  **`c`** = campaign, which is where `?ref=` / `utm_source` land, so the
+  per-listing `&ref=` tags in the upload checklist surface here as **Tagged
+  links** once the kits publish. `SOURCE_RULES` groups the rest (Model sites /
+  Search / Social / Your sites / Other), and an unmatched host falls to OTHER
+  rather than vanishing. **Direct is DERIVED** — pageviews minus the sum of
+  referrers — because GoatCounter lists only real referrers; clamped at 0 since
+  referrer and pageview counting differ slightly.
 - ⚠ This page carries NO GoatCounter script — tracking the dashboard would fold
   admin visits into the numbers being read.
 

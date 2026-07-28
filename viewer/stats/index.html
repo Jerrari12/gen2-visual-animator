@@ -182,7 +182,7 @@ body.no-data #dash > .panel:not(.err-banner) { display: none; }
 .gh { font-size: .58rem; letter-spacing: .22em; color: var(--dim); margin: 12px 0 2px; }
 .gh:first-child { margin-top: 0; }
 .row .path { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-@media (max-width: 760px) { #event-groups, .panel .grid { grid-template-columns: 1fr !important; } }
+@media (max-width: 760px) { #event-groups, #src-row, .panel .grid { grid-template-columns: 1fr !important; } }
 </style>
 
 <div class="wrap">
@@ -228,6 +228,17 @@ body.no-data #dash > .panel:not(.err-banner) { display: none; }
       <div class="panel">
         <p class="h">Top countries</p>
         <div class="rows" id="countries"></div>
+      </div>
+    </div>
+
+    <div class="grid" style="grid-template-columns:1fr 1fr;margin-top:14px" id="src-row">
+      <div class="panel">
+        <p class="h">Traffic sources <span style="color:var(--dim);text-transform:none;letter-spacing:.05em">— pageviews only, grouped</span></p>
+        <div class="rows" id="sources"></div>
+      </div>
+      <div class="panel">
+        <p class="h">Top referrers <span style="color:var(--dim);text-transform:none;letter-spacing:.05em">— as GoatCounter reports them</span></p>
+        <div class="rows" id="referrers"></div>
       </div>
     </div>
 
@@ -363,12 +374,19 @@ async function load() {
   let views = 0, events = 0;
   const series = new Map();      // "YYYY-MM-DDTHH" -> count
   const pages = new Map(), evts = new Map();
+  const refs = new Map();
 
   for (const site of per) {
     // the snapshot keeps the API's own field names for these three
     const total = { total: site.total, total_events: site.total_events, stats: site.series };
     const loc = { stats: site.locations };
     const hits = { hits: site.hits };
+    for (const r of site.refs || []) {
+      const key = (r.name || '') + ' ' + (r.scheme || '');
+      const cur = refs.get(key) || { name: r.name || '', scheme: r.scheme || '', count: 0 };
+      cur.count += r.count || 0;
+      refs.set(key, cur);
+    }
     // ⚠ the API's `total` is "visitors INCLUDING events" — events are a SUBSET,
     // not a separate bucket. Reported raw, a headline number counts every button
     // press as a visit; GoatCounter's own Pages list has the same problem.
@@ -409,6 +427,8 @@ async function load() {
     views, events,
     countries: [...countries.values()].sort((a, b) => b.count - a.count),
     pages: desc(pages), events_: desc(evts), mix: buildMix(evts), funnel: buildFunnel(evts),
+    refs: [...refs.values()].sort((a, b) => b.count - a.count),
+    sources: buildSources([...refs.values()], views),
     series: ordered,
     thisHour: series.get(nowKey) || 0,
   };
@@ -449,6 +469,39 @@ function buildMix(evts) {
     return out.sort((a, b) => b.count - a.count);
   };
   return { mount: pick('mount'), length: pick('length'), fill: pick('fill') };
+}
+
+/* Where visitors come from. GoatCounter already folds every Google domain into
+   one "Google" (ref_scheme 'g') and reports ?ref= / utm_source as campaigns
+   ('c'); this groups the rest into categories worth acting on. A referrer that
+   matches nothing lands in OTHER rather than being dropped. */
+const SOURCE_RULES = [
+  ['Model sites', /(^|\.)(printables\.com|thangs\.com|than\.gs|makerworld\.com|cults3d\.com|thingiverse\.com|myminifactory\.com)$/i],
+  ['Search',      /(^|\.)(google|bing\.com|duckduckgo\.com|ecosia\.org|yandex|search\.brave\.com|startpage\.com|qwant\.com|search\.marcia|baidu\.com)/i],
+  ['Social',      /(^|\.)(reddit\.com|out\.reddit\.com|x\.com|twitter\.com|t\.co|youtube\.com|youtu\.be|facebook\.com|instagram\.com|pinterest\.|linkedin\.com|discord\.com|mastodon)/i],
+  ['Your sites',  /(^|\.)jerrari3d\.com$/i],
+];
+function sourceGroup(r) {
+  if (r.scheme === 'c') return 'Tagged links';       // our own ?ref= / utm_source
+  const host = String(r.name || '').replace(/^https?:\/\//, '').split('/')[0].toLowerCase();
+  if (!host) return 'Direct';
+  for (const [label, re] of SOURCE_RULES) if (re.test(host)) return label;
+  return 'Other sites';
+}
+function buildSources(refs, pageviews) {
+  const groups = new Map();
+  let counted = 0;
+  for (const r of refs) {
+    const g = sourceGroup(r);
+    groups.set(g, (groups.get(g) || 0) + r.count);
+    counted += r.count;
+  }
+  // GoatCounter lists only real referrers, so anything unaccounted for arrived
+  // with none: typed, bookmarked, QR code, or a client that strips the header.
+  const direct = Math.max(0, pageviews - counted);
+  if (direct) groups.set('Direct / none', (groups.get('Direct / none') || 0) + direct);
+  return [...groups.entries()].map(([name, count]) => ({ name, count }))
+    .sort((a, b) => b.count - a.count);
 }
 
 /* The instructions funnel — the drop-off curve the step events exist for.
@@ -727,6 +780,9 @@ function render() {
   $('legend-max').textContent = max ? '· peak ' + fmt(max) : '';
 
   renderMix();
+  simpleList('sources', data.sources, x => x.name);
+  simpleList('referrers', data.refs.slice(0, 40),
+    x => (x.name || '(no referrer)') + (x.scheme === 'c' ? '  · tagged' : ''));
   renderFunnel();
   simpleList('kits', data.funnel.kits, k => k.key);
   simpleList('pages', data.pages.slice(0, 30), p => p.path, p => p.title);

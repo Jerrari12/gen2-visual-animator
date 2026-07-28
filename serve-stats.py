@@ -157,11 +157,15 @@ def for_range(host, days, deadline):
     # tile reported that cap as if it were the real number.
     page_paths = [h["path"] for h in (hits.get("hits") or []) if not h.get("event")]
     if page_paths:
-        loc = api(host, "stats/locations",
-                  dict(w, limit=100, path_by_name="true", include_paths=page_paths),
-                  deadline=deadline)
+        filt = dict(w, limit=100, path_by_name="true", include_paths=page_paths)
+        loc = api(host, "stats/locations", filt, deadline=deadline)
+        # Referrers, same pageview-only restriction: a source that "sent" a
+        # button click is meaningless, and unfiltered these inherit the same
+        # ~6x event inflation the country list had.
+        refs = api(host, "stats/toprefs", filt, deadline=deadline)
     else:
         loc = {"stats": []}          # no pageviews in this window: no countries to attribute
+        refs = {"stats": []}
     return {
         "total": total.get("total") or 0,
         "total_events": total.get("total_events") or 0,
@@ -169,6 +173,11 @@ def for_range(host, days, deadline):
                    for d in (total.get("stats") or [])[-SERIES_DAYS:]],
         "locations": [{"id": s.get("id"), "name": s.get("name"), "count": s.get("count")}
                       for s in (loc.get("stats") or [])],
+        # ref_scheme: h=HTTP referer, g=generated (GoatCounter groups all Google
+        # domains into one "Google"), c=campaign (our ?ref= / utm_source), o=other
+        "refs": [{"name": s.get("name") or "", "count": s.get("count") or 0,
+                  "scheme": s.get("ref_scheme") or ""}
+                 for s in (refs.get("stats") or [])],
         # each hit carries its own per-day stats array - dropped, unused by the page
         "hits": [{"path": h.get("path"), "count": h.get("count"),
                   "event": bool(h.get("event")), "title": h.get("title") or ""}
