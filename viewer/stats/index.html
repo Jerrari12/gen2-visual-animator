@@ -319,9 +319,9 @@ const fmt = n => n == null ? '—' : n.toLocaleString();
 /* The snapshot, fetched once per page load. See the header comment: the API
    itself is unreachable from a browser on another origin, so a GitHub Action
    fetches it server-side and publishes this file. */
-let snapshot = null, snapCache = {};
+let snapshot = null, snapCache = {}, forceFresh = false;
 async function getSnapshot() {
-  if (snapCache[range]) { snapshot = snapCache[range]; siteTz = snapshot.tz || 'UTC'; return snapshot; }
+  if (!forceFresh && snapCache[range]) { snapshot = snapCache[range]; siteTz = snapshot.tz || 'UTC'; return snapshot; }
   // count up while waiting: a static "FETCHING…" is indistinguishable from a hang
   const t0 = Date.now();
   const tick = setInterval(() => {
@@ -333,7 +333,7 @@ async function getSnapshot() {
   const bail = setTimeout(() => ctl.abort(), 60000);
   let res;
   try {
-    res = await fetch(`${DATA_URL}?range=${encodeURIComponent(range)}&t=${Date.now()}`,
+    res = await fetch(`${DATA_URL}?range=${encodeURIComponent(range)}&fresh=${forceFresh ? 1 : 0}&t=${Date.now()}`,
       { cache: 'no-store', signal: ctl.signal });
   } catch (e) {
     throw new Error(e.name === 'AbortError'
@@ -345,7 +345,9 @@ async function getSnapshot() {
   }
   const body = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(body.error || `stats server returned HTTP ${res.status}`);
-  snapshot = snapCache[range] = body;
+  forceFresh = false;
+  snapshot = body;
+  if (!body.stale) snapCache[range] = body;   // never let a stale answer mask a later real one
   siteTz = snapshot.tz || 'UTC';
   return snapshot;
 }
@@ -693,9 +695,9 @@ function render() {
     // spend by accident, so show what's left rather than only saying so at zero
     const q = snapshot.quota;
     const low = typeof q === 'number' && q < 100;
-    el.innerHTML = '<i></i>' + (mins < 90 ? `${mins} MIN OLD` : `${Math.round(mins / 60)} H OLD`)
+    el.innerHTML = '<i></i>' + (snapshot.stale ? 'CACHED · ' : '') + (mins < 90 ? `${mins} MIN OLD` : `${Math.round(mins / 60)} H OLD`)
       + (typeof q === 'number' ? ` · ${q} REQ LEFT` : '');
-    el.style.color = low ? 'var(--magenta)' : '';
+    el.style.color = (low || snapshot.stale) ? 'var(--magenta)' : '';
     el.title = 'Fetched ' + new Date(snapshot.generated).toLocaleString()
       + (typeof q === 'number' ? ` · ${q} API requests left in this window (a full load costs 7)` : '');
   }
@@ -891,13 +893,22 @@ async function refresh() {
     data = await load();
     render();
     segs();   // the scope buttons depend on which sites the snapshot holds, which isn't known until it's loaded
-    $('err-top').classList.add('hidden');
     document.body.classList.remove('no-data');
+    if (snapshot.stale) {
+      // quota ran out but the server kept its last good numbers — show them
+      // with a notice rather than a wall of nothing
+      const top = $('err-top');
+      top.innerHTML = '<b>SHOWING CACHED NUMBERS</b><br>' + esc(snapshot.stale_error || 'the API is unavailable')
+        + '<br>Data below is from ' + esc(new Date(snapshot.generated).toLocaleString()) + '.';
+      top.classList.remove('hidden');
+    } else {
+      $('err-top').classList.add('hidden');
+    }
   } catch (e) {
     showErr(e.message);
   }
 }
-$('reload').onclick = () => { snapCache = {}; refresh(); };  // drop the cache, re-fetch
+$('reload').onclick = () => { snapCache = {}; forceFresh = true; refresh(); };  // bypass BOTH caches — this is the one deliberate spend
 
 async function boot() {
   $('dash').classList.remove('hidden');
@@ -911,7 +922,7 @@ async function boot() {
   clearInterval(timer);
   // the snapshot is republished hourly; re-reading it more often just re-parses
   // the same bytes. REFRESH drops the cache and re-fetches on demand.
-  timer = setInterval(() => { snapCache = {}; refresh(); }, 900000);
+  timer = setInterval(() => { snapCache = {}; refresh(); }, 3600000);
 }
 
 addEventListener('resize', () => { if (data) { drawStrip(); drawMap(); } });

@@ -866,8 +866,21 @@ request, not the page.
   which looked exactly like a hang. `X-Rate-Limit-Remaining` from the last good
   call rides the snapshot as `quota` and shows in the header (magenta under 100)
   so the budget is visible before it runs out, not only after.
-- It builds ONE range per request and caches it for 5 minutes, so the page
-  caches per range too (`snapCache`) — switching range re-fetches.
+- **Quota economics (learned the hard way):** the data is HOURLY, so the page
+  auto-refreshes hourly and the proxy caches 55 min — an open tab costs ~7
+  calls/hour. REFRESH sends `fresh=1` and is the one deliberate spend. After a
+  burn the budget TRICKLES back and a 15-min auto-refresh was eating the
+  trickle as it returned, which kept the balance pinned at zero for hours.
+- **Stale-serve:** `_cache` is never evicted; when the quota is spent the proxy
+  returns the last good snapshot with `stale: true` + `stale_error`, and the
+  page renders it under a magenta CACHED banner instead of a wall of nothing.
+  The console prints per-call accounting (`[api] path: ok · N calls in last
+  15m · quota left R`), so the next mystery burn names its own culprit.
+- ⚠ **Windows Python has NO timezone database** (`zoneinfo` needs the `tzdata`
+  package) — so validating zone names rejects EVERY name, including real ones,
+  and the tz silently fell to UTC while looking like a quota symptom. The proxy
+  now accepts a plausible IANA name syntactically; the page's Intl fallback is
+  the real guard. tz is cached per process (it cost 1 API call per build).
 - ⚠ `/stats/locations` counts EVERY hit, events included, so its numbers ran ~6×
   the pageview tile (645 for the US against 278 pageviews). The proxy restricts
   it with `include_paths` + `path_by_name` to the non-event paths from the same

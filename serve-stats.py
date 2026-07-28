@@ -39,7 +39,9 @@ SITES = {"planner": "jerrari.goatcounter.com", "build": "jerrari-build.goatcount
 RANGES = {"24h": 1, "7d": 7, "30d": 30, "90d": 90}
 SERIES_DAYS = 3      # the strip only ever draws 48h; keeping 90 days of hourly arrays is waste
 HITS_LIMIT = 100
-CACHE_TTL = 300      # seconds; the underlying data only changes hourly
+# The data is HOURLY - refetching more often spends quota to learn nothing.
+# The page's REFRESH button sends fresh=1 to bypass this deliberately.
+CACHE_TTL = 3300
 # ⚠ THE REAL LIMIT IS NOT THE DOCUMENTED "4 requests/second". Measured from a
 # live 429, GoatCounter enforces a BUDGET: X-Rate-Limit-Limit 500 with
 # X-Rate-Limit-Reset counting down ~765s. So it is ~500 requests per ~13-minute
@@ -51,6 +53,8 @@ BUILD_BUDGET = 45.0
 _cache = {}          # range -> (fetched_at, payload)
 _last_call = [0.0]
 _quota = [None]      # X-Rate-Limit-Remaining from the last successful call
+_tz_cache = [None]   # resolved once per process - it cost 1 API call per build
+_api_log = []        # timestamps of our API calls, for the console accounting
 # ⚠ ThreadingHTTPServer serves requests CONCURRENTLY, and a browser giving up
 # does not stop the work already running here. Without these locks every
 # REFRESH started another build, the builds interleaved past 4 req/s, and the
@@ -92,15 +96,22 @@ def api(host, path, params=None, deadline=None):
             if wait > 0:
                 time.sleep(wait)
             _last_call[0] = time.time()
+            now = time.time()
+            _api_log.append(now)
+            while _api_log and _api_log[0] < now - 900:
+                _api_log.pop(0)
             req = urllib.request.Request(url, headers={"Authorization": "Bearer " + token()})
             try:
                 with urllib.request.urlopen(req, timeout=30) as res:
                     rem = res.headers.get("X-Rate-Limit-Remaining")
                     if rem is not None:
                         _quota[0] = int(rem)
+                    print(f"[api] {path}: ok · {len(_api_log)} calls in last 15m · quota left {rem}")
                     return json.loads(res.read().decode("utf-8"))
             except urllib.error.HTTPError as e:
                 if e.code == 429:
+                    print(f"[api] {path}: 429 · {len(_api_log)} calls in last 15m · "
+                          f"reset {e.headers.get('X-Rate-Limit-Reset')}s")
                     # The server tells us exactly how long the window has left.
                     # Retrying a 12-minute reset in 15-second nibbles just burns
                     # attempts and looks like a hang, so only retry when the wait
@@ -167,39 +178,64 @@ def for_range(host, days, deadline):
 
 def resolve_tz(deadline):
     """GoatCounter reports stats in the ACCOUNT'S timezone and returns it
-    region-prefixed ("US.America/New_York"), which is not a valid IANA name."""
+    region-prefixed ("US.America/New_York"), which is not a valid IANA name.
+    Cached for the life of the process - it doesn't change, and uncached it
+    cost one API call on every single build."""
+    if _tz_cache[0]:
+        return _tz_cache[0]
     try:
         raw = (api(SITES["build"], "me", deadline=deadline).get("user", {})
                .get("settings", {}).get("timezone") or "")
     except Exception:
         return "UTC"
-    for cand in (raw, raw.split(".", 1)[1] if "." in raw else "", "UTC"):
+    stripped = raw.split(".", 1)[1] if "." in raw else raw
+    for cand in (raw, stripped):
         if not cand:
             continue
         try:
             import zoneinfo
             zoneinfo.ZoneInfo(cand)
+            _tz_cache[0] = cand
             return cand
         except Exception:
             continue
+    # ⚠ zoneinfo on Windows often has NO tz database at all (needs the `tzdata`
+    # package), so it rejects EVERY name — including real ones — and this fell
+    # through to UTC while looking like a quota problem. The page's Intl-based
+    # fallback is the real guard, so accept a plausible IANA name syntactically.
+    if stripped and "/" in stripped:
+        _tz_cache[0] = stripped
+        return stripped
+    _tz_cache[0] = "UTC"     # the lookup SUCCEEDED and resolved to nothing — cache that too
     return "UTC"
 
 
-def snapshot(rng):
+def snapshot(rng, force=False):
     def cached():
         hit = _cache.get(rng)
         return hit[1] if hit and time.time() - hit[0] < CACHE_TTL else None
 
-    fresh = cached()
+    fresh = None if force else cached()
     if fresh:
         return fresh
     # single-flight: whoever gets the lock builds, everyone else takes the
     # result rather than launching a competing build against the same quota
     with _build_lock:
-        fresh = cached()
+        fresh = None if force else cached()
         if fresh:
             return fresh
-        return _build(rng)
+        try:
+            return _build(rng)
+        except RuntimeError as e:
+            # quota spent or API down - old numbers beat a wall of nothing.
+            # _cache is never evicted, so whatever loaded last is still here.
+            hit = _cache.get(rng)
+            if hit:
+                stale = dict(hit[1])
+                stale["stale"] = True
+                stale["stale_error"] = str(e)
+                return stale
+            raise
 
 
 def _build(rng):
@@ -227,13 +263,14 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
     def serve_data(self, qs):
         rng = (qs.get("range") or ["7d"])[0]
+        force = (qs.get("fresh") or ["0"])[0] == "1"
         if rng not in RANGES:
             return self.fail(400, f"unknown range {rng!r}")
         if not token():
             return self.fail(500, "No API token. Set GOATCOUNTER_TOKEN, or put the token "
                                   "in a .goatcounter-token file next to serve-stats.py.")
         try:
-            body = json.dumps(snapshot(rng)).encode("utf-8")
+            body = json.dumps(snapshot(rng, force)).encode("utf-8")
         except RuntimeError as e:
             return self.fail(502, str(e))
         except Exception as e:                       # network, JSON, anything else
