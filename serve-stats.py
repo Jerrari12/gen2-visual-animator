@@ -253,12 +253,28 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         self.wfile.write(body)
 
 
+class Server(http.server.ThreadingHTTPServer):
+    # ⚠ http.server defaults allow_reuse_address=True, and on Windows that lets
+    # MULTIPLE processes bind the same port simultaneously. Every "restart" then
+    # ADDS a server instead of replacing one, requests land on whichever process
+    # wins, and stale code keeps answering (three servers were once found
+    # sharing 8125, two of them old builds hammering the API quota). A second
+    # instance must fail loudly instead.
+    allow_reuse_address = False
+
+
 if __name__ == "__main__":
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 8125
     if not token():
         print("!! No token found. Set GOATCOUNTER_TOKEN or create .goatcounter-token")
         print("   ([site].goatcounter.com -> User -> API, tick 'Read statistics' only)")
     handler = functools.partial(Handler, directory=ROOT)
-    print(f"GEN2 telemetry at http://localhost:{port}/   (Ctrl+C to stop)")
+    try:
+        srv = Server(("", port), handler)
+    except OSError:
+        print(f"!! Port {port} is already in use - another serve-stats window is open.")
+        print("   Close the other black console window (or all of them) and run this again.")
+        sys.exit(1)
+    print(f"GEN2 telemetry at http://localhost:{port}/   (Ctrl+C to stop)  [pid {os.getpid()}]")
     print("Stats stay on this machine - nothing is published.")
-    http.server.ThreadingHTTPServer(("", port), handler).serve_forever()
+    srv.serve_forever()
