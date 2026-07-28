@@ -40,14 +40,17 @@ RANGES = {"24h": 1, "7d": 7, "30d": 30, "90d": 90}
 SERIES_DAYS = 3      # the strip only ever draws 48h; keeping 90 days of hourly arrays is waste
 HITS_LIMIT = 100
 CACHE_TTL = 300      # seconds; the underlying data only changes hourly
-# ⚠ A whole snapshot is 7 API calls and each can be rate-limited. Retrying each
-# one generously means the request can block for minutes while the page just
-# says FETCHING - so the BUDGET IS FOR THE WHOLE BUILD, not per call. Past it,
-# fail with something readable instead of hanging.
+# ⚠ THE REAL LIMIT IS NOT THE DOCUMENTED "4 requests/second". Measured from a
+# live 429, GoatCounter enforces a BUDGET: X-Rate-Limit-Limit 500 with
+# X-Rate-Limit-Reset counting down ~765s. So it is ~500 requests per ~13-minute
+# window, and once spent NOTHING gets through until the window rolls over.
+# Pacing cannot save you from that - only making fewer calls can. A build is 7
+# calls, so normal use is nowhere near it; development thrash is what burns it.
 BUILD_BUDGET = 45.0
 
 _cache = {}          # range -> (fetched_at, payload)
 _last_call = [0.0]
+_quota = [None]      # X-Rate-Limit-Remaining from the last successful call
 # ⚠ ThreadingHTTPServer serves requests CONCURRENTLY, and a browser giving up
 # does not stop the work already running here. Without these locks every
 # REFRESH started another build, the builds interleaved past 4 req/s, and the
@@ -92,20 +95,31 @@ def api(host, path, params=None, deadline=None):
             req = urllib.request.Request(url, headers={"Authorization": "Bearer " + token()})
             try:
                 with urllib.request.urlopen(req, timeout=30) as res:
+                    rem = res.headers.get("X-Rate-Limit-Remaining")
+                    if rem is not None:
+                        _quota[0] = int(rem)
                     return json.loads(res.read().decode("utf-8"))
             except urllib.error.HTTPError as e:
                 if e.code == 429:
-                    hint = float(e.headers.get("X-Rate-Limit-Reset") or 0)
-                    back = min(max(hint, 1.5 * (tries + 1)), 15) + 0.25
-                    if time.time() + back >= deadline:
-                        raise RuntimeError(
-                            "GoatCounter is rate-limiting us (4 requests/second, and it "
-                            "stays limited for a while after a burst). Wait a minute, "
-                            "then press REFRESH."
-                        )
-                    time.sleep(back)
-                    tries += 1
-                    continue
+                    # The server tells us exactly how long the window has left.
+                    # Retrying a 12-minute reset in 15-second nibbles just burns
+                    # attempts and looks like a hang, so only retry when the wait
+                    # genuinely fits the budget; otherwise report the real number.
+                    reset = float(e.headers.get("X-Rate-Limit-Reset") or 0)
+                    back = reset if reset > 0 else 1.5 * (tries + 1)
+                    if back + time.time() < deadline and tries < 6:
+                        time.sleep(back + 0.25)
+                        tries += 1
+                        continue
+                    mins = int(reset // 60)
+                    secs = int(reset % 60)
+                    when = f"{mins}m {secs}s" if mins else f"{secs}s"
+                    raise RuntimeError(
+                        f"GoatCounter quota is spent — it allows about "
+                        f"{e.headers.get('X-Rate-Limit-Limit') or '500'} requests per "
+                        f"window and the window resets in {when}. Nothing will load "
+                        f"until then; this isn't a token or network problem."
+                    )
                 if e.code in (401, 403):
                     raise RuntimeError(
                         'token rejected by %s - check it has the "Read statistics" '
@@ -195,6 +209,7 @@ def _build(rng):
            "tz": resolve_tz(deadline), "sites": {}}
     for sid, host in SITES.items():
         out["sites"][sid] = {rng: for_range(host, days, deadline)}
+    out["quota"] = _quota[0]        # requests left in this window, for the header
     _cache[rng] = (time.time(), out)
     return out
 

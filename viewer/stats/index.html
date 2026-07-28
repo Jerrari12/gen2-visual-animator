@@ -689,8 +689,15 @@ function render() {
   const el = $('asof');
   if (el && snapshot?.generated) {
     const mins = Math.max(0, Math.round((Date.now() - new Date(snapshot.generated)) / 60000));
-    el.innerHTML = '<i></i>' + (mins < 90 ? `SNAPSHOT ${mins} MIN OLD` : `SNAPSHOT ${Math.round(mins / 60)} H OLD`);
-    el.title = 'Published ' + new Date(snapshot.generated).toLocaleString() + ' · refreshed hourly by GitHub Actions';
+    // the API quota is a ~500-request budget per ~13 min window and is easy to
+    // spend by accident, so show what's left rather than only saying so at zero
+    const q = snapshot.quota;
+    const low = typeof q === 'number' && q < 100;
+    el.innerHTML = '<i></i>' + (mins < 90 ? `${mins} MIN OLD` : `${Math.round(mins / 60)} H OLD`)
+      + (typeof q === 'number' ? ` · ${q} REQ LEFT` : '');
+    el.style.color = low ? 'var(--magenta)' : '';
+    el.title = 'Fetched ' + new Date(snapshot.generated).toLocaleString()
+      + (typeof q === 'number' ? ` · ${q} API requests left in this window (a full load costs 7)` : '');
   }
   $('s-views').textContent = fmt(data.views);
   $('s-events').textContent = fmt(data.events);

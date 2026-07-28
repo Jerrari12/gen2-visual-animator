@@ -849,23 +849,17 @@ request, not the page.
   "All sites" grant covers both sites with one token.
 - The proxy trims what it returns: per-hit `stats` arrays dropped entirely,
   `total.stats` cut to the last 3 days (the strip only ever draws 48 h).
-- ⚠ Rate limit is **4 requests/second — and once tripped it STAYS tripped for
-  a while**, not for a second. The proxy paces at 300 ms and retries 429s, but
-  the retry budget is **for the whole snapshot build** (`BUILD_BUDGET`, 45 s),
-  not per call: 7 calls each retrying generously blocked for minutes while the
-  page showed only "FETCHING". Past the budget it fails with a readable message;
-  the page also aborts at 60 s and counts the seconds while it waits. Don't run
-  two proxies (or a polling loop) against the same account — that is what
-  exhausted it during development.
-- ⚠⚠ **`ThreadingHTTPServer` serves concurrently, and a browser giving up does
-  NOT stop work already running here.** Without locking, every REFRESH started
-  another build, builds interleaved far past 4 req/s, and the limiter never got
-  a quiet moment — a self-sustaining overload indistinguishable from "the API is
-  down". `_api_lock` serialises every call and is held across back-off sleeps
-  (while rate-limited, the correct number of in-flight requests is zero);
-  `_build_lock` single-flights the build so extra callers reuse its result.
-  Verified with a stubbed HTTP layer and 8 concurrent callers: 1 build, 0
-  overlaps, 0.35 s minimum spacing.
+- ⚠⚠ **The rate limit is NOT the documented "4 requests/second".** Measured off
+  a live 429: `X-Rate-Limit-Limit: 500`, `X-Rate-Limit-Reset: 765` — a **budget
+  of ~500 requests per ~13-minute window**, and once spent NOTHING gets through
+  until it rolls over. Pacing cannot rescue that; only making fewer calls can.
+  One build is 7 calls, so real use is nowhere near it — development thrash
+  (two proxies, a polling loop, repeated REFRESH) is what burns it.
+  On 429 the proxy reads `X-Rate-Limit-Reset` and **fails immediately with the
+  real wait** rather than nibbling at a 12-minute reset in 15-second retries,
+  which looked exactly like a hang. `X-Rate-Limit-Remaining` from the last good
+  call rides the snapshot as `quota` and shows in the header (magenta under 100)
+  so the budget is visible before it runs out, not only after.
 - It builds ONE range per request and caches it for 5 minutes, so the page
   caches per range too (`snapCache`) — switching range re-fetches.
 - ⚠ `/stats/locations` counts EVERY hit, events included, so its numbers ran ~6×
