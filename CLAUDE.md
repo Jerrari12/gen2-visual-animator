@@ -855,6 +855,12 @@ request, not the page.
   until it rolls over. Pacing cannot rescue that; only making fewer calls can.
   One build is 7 calls, so real use is nowhere near it — development thrash
   (two proxies, a polling loop, repeated REFRESH) is what burns it.
+  **The window SLIDES** — measured after a full burn: when `X-Rate-Limit-Reset`
+  hit zero the budget did NOT snap back to 500; a fetch minutes later found only
+  ~9 available (finished with `remaining: 2`). Old requests age out gradually,
+  so after a burn the budget trickles back over ~13 minutes rather than
+  returning all at once. "Wait for the reset" means wait for YOUR requests to
+  age out, not for a counter to refill.
   On 429 the proxy reads `X-Rate-Limit-Reset` and **fails immediately with the
   real wait** rather than nibbling at a 12-minute reset in 15-second retries,
   which looked exactly like a hang. `X-Rate-Limit-Remaining` from the last good
