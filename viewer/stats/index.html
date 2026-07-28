@@ -481,10 +481,11 @@ const SOURCE_RULES = [
   ['Social',      /(^|\.)(reddit\.com|out\.reddit\.com|x\.com|twitter\.com|t\.co|youtube\.com|youtu\.be|facebook\.com|instagram\.com|pinterest\.|linkedin\.com|discord\.com|mastodon)/i],
   ['Your sites',  /(^|\.)jerrari3d\.com$/i],
 ];
+const DIRECT = 'Direct / none';
 function sourceGroup(r) {
   if (r.scheme === 'c') return 'Tagged links';       // our own ?ref= / utm_source
   const host = String(r.name || '').replace(/^https?:\/\//, '').split('/')[0].toLowerCase();
-  if (!host) return 'Direct';
+  if (!host) return DIRECT;
   for (const [label, re] of SOURCE_RULES) if (re.test(host)) return label;
   return 'Other sites';
 }
@@ -499,7 +500,7 @@ function buildSources(refs, pageviews) {
   // GoatCounter lists only real referrers, so anything unaccounted for arrived
   // with none: typed, bookmarked, QR code, or a client that strips the header.
   const direct = Math.max(0, pageviews - counted);
-  if (direct) groups.set('Direct / none', (groups.get('Direct / none') || 0) + direct);
+  if (direct) groups.set(DIRECT, (groups.get(DIRECT) || 0) + direct);
   return [...groups.entries()].map(([name, count]) => ({ name, count }))
     .sort((a, b) => b.count - a.count);
 }
@@ -523,7 +524,7 @@ function buildFunnel(evts) {
     { label: 'GET STARTED', count: get('start') },
     { label: 'INTRO',       count: get('step:intro') },
     ...steps,
-    { label: 'COMPLETE',    count: get('complete') },
+    { label: 'REACHED FINAL', count: get('complete') },
     { label: 'OUTRO',       count: get('outro') },
   ];
   // biggest proportional fall between consecutive stages that both have traffic
@@ -890,7 +891,8 @@ function renderFunnel() {
     const el = document.createElement('div');
     el.className = 'gh';
     el.style.marginTop = '12px';
-    el.textContent = `${fmt(f.skip)} skipped straight to the finished build`;
+    el.textContent = `${fmt(f.skip)} skipped straight to the finished build`
+      + ` — they land on the final step, so they count in REACHED FINAL too`;
     box.appendChild(el);
   }
 }
