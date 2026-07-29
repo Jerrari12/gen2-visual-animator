@@ -27,7 +27,7 @@
     { "node": "FR-U_185-2W",               "label": "Footrail Upper 185-2W", "img": "img/parts/FR-U_185-2W.png",      "type": "FootrailU",  "qty": 1,
       "links": { "p": "https://www.printables.com/model/1777823-gen2-185-foot-rails" } },
     { "node": "Tabletop-Kit-Foot",         "label": "Tabletop Kit Foot",          "type": "Foot",      "qty": 6,
-      "links": { "p": "https://www.printables.com/model/1118906-gen2-table-top-kit-v2-185-standard", "t": "https://thangs.com/designer/Jerrari/3d-model/GEN2%20Table%20Top%20Kit%20V2%20-%20185-1231757" } },
+      "links": { "p": "https://www.printables.com/model/1118906-gen2-185-tabletop-starter-kit", "t": "https://thangs.com/designer/Jerrari/3d-model/GEN2%20185%20Tabletop%20Starter%20Kit-1231757" } },
     { "node": "185-1W-1H_Case",            "label": "Case 185-1W-1H", "img": "img/parts/Case 185-1W-1H.png",             "type": "Case",      "qty": 4,
       "links": { "p": "https://www.printables.com/model/1658700-gen2-185-cases-all", "t": "https://thangs.com/designer/Jerrari/3d-model/GEN2%20185%20Cases%20-%20All-1535455" } },
     { "node": "QuickLock-L",               "label": "QuickLock L", "img": "img/parts/QuickLock.png",                "type": "QuickLock", "qty": 4,

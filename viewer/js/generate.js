@@ -122,9 +122,9 @@ const LINKS = {
   hb:    { p: 'https://www.printables.com/model/965604-gen2-decor-handles-blockbar-series', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20Decor%20-%20Handles%20-%20BlockBar-1116949' },
   hc:    { p: 'https://www.printables.com/model/1001155-gen2-decor-handles-crystal', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20Decor%20-%20Handles%20-%20Crystal-1134382' },
   // fallbacks when a length has no page of its own yet
-  kit:   { p: 'https://www.printables.com/model/1118906-gen2-table-top-kit-v2-185-standard', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20Table%20Top%20Kit%20V2%20-%20185-1231757' },
+  kit:   { p: 'https://www.printables.com/model/1118906-gen2-185-tabletop-starter-kit', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20185%20Tabletop%20Starter%20Kit-1231757' },
   wall:  { p: 'https://www.printables.com/model/1777719-gen2-wall-mount-brackets', t: 'https://than.gs/m/1574321' }, // universal brackets page (2026-07-12 — replaced the old -59 placeholder)
-  rail:  { p: 'https://www.printables.com/model/1052357-gen2-rails-185-standard', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20RAILS%20-%20STANDARD-1163830', m: 'https://makerworld.com/en/models/2199580-gen2-under-table-rails-185' },
+  rail:  { p: 'https://www.printables.com/model/1052357-gen2-rails-185-standard', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20Under%20Table%20Rails%20-%20185-1163830', m: 'https://makerworld.com/en/models/2199580-gen2-under-table-rails-185' },
 };
 
 // The handle fastener. GLB is canonical like WoodScrew (shank along depth,
@@ -201,12 +201,14 @@ const LINKS_BY_LEN = {
     240: { p: 'https://www.printables.com/model/1777826-gen2-240-foot-rails', t: 'https://than.gs/m/1574322', m: 'https://makerworld.com/en/models/3094051-gen2-240-foot-rails' },
     270: { p: 'https://www.printables.com/model/1777830-gen2-270-foot-rails', t: 'https://than.gs/m/1574327' },
   },
+  // Renamed on BOTH platforms 2026-07-29 ("… Tabletop Starter Kit"); the model
+  // ids are unchanged, so the old slugs still 301/resolve — these are canonical.
   kit: {
-    115: { p: 'https://www.printables.com/model/1146353-gen2-table-top-kit-v2-115-medium', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20Table%20Top%20Kit%20V2%20-%20115-1245167' },
-    165: { p: 'https://www.printables.com/model/1124278-gen2-table-top-kit-v2-165-mini', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20Table%20Top%20Kit%20V2%20-%20165-1233752' },
-    185: { p: 'https://www.printables.com/model/1118906-gen2-table-top-kit-v2-185-standard', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20Table%20Top%20Kit%20V2%20-%20185-1231757' },
-    240: { p: 'https://www.printables.com/model/1324501-gen2-table-top-kit-v2-240', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20Table%20Top%20Kit%20V2%20-%20240-1360073' },
-    270: { p: 'https://www.printables.com/model/1163955-gen2-table-top-kit-v2-270-large', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20Table%20Top%20Kit%20V2%20-%20270-1253780' },
+    115: { p: 'https://www.printables.com/model/1146353-gen2-115-tabletop-starter-kit', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20115%20Tabletop%20Starter%20Kit-1245167' },
+    165: { p: 'https://www.printables.com/model/1124278-gen2-165-tabletop-starter-kit', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20165%20Tabletop%20Starter%20Kit-1233752' },
+    185: { p: 'https://www.printables.com/model/1118906-gen2-185-tabletop-starter-kit', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20185%20Tabletop%20Starter%20Kit-1231757' },
+    240: { p: 'https://www.printables.com/model/1324501-gen2-240-tabletop-starter-kit', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20240%20Tabletop%20Starter%20Kit-1360073' },
+    270: { p: 'https://www.printables.com/model/1163955-gen2-270-tabletop-starter-kit', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20270%20Tabletop%20Starter%20Kit-1253780' },
   },
   // Wall mount: ONE universal brackets page serves every length (2026-07-12,
   // Joey — the 1W/2W/3W sections are shared hardware; per-length pages retired).
@@ -220,13 +222,17 @@ const LINKS_BY_LEN = {
     270: { p: 'https://www.printables.com/model/1777719-gen2-wall-mount-brackets', t: 'https://than.gs/m/1574321' },
   },
   rail: { // all six lengths have real pages (2026-07-12) AND real GLBs — UT
-          // GENERATES for every collection (2026-07-19 batches)
-    59:  { p: 'https://www.printables.com/model/1053797-gen2-rails-59-small', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20RAILS%20-%20SMALL-1165763', m: 'https://makerworld.com/en/models/3093597-gen2-under-table-rails-59' },
-    115: { p: 'https://www.printables.com/model/1053795-gen2-rails-115-medium', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20RAILS%20-%20MEDIUM-1165720', m: 'https://makerworld.com/en/models/755511-gen2-under-table-rails-115' },
-    165: { p: 'https://www.printables.com/model/1053557-gen2-rails-165-mini', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20RAILS%20-%20165-1165793', m: 'https://makerworld.com/en/models/939507-gen2-under-table-rails-165' },
-    185: { p: 'https://www.printables.com/model/1052357-gen2-rails-185-standard', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20RAILS%20-%20STANDARD-1163830', m: 'https://makerworld.com/en/models/2199580-gen2-under-table-rails-185' },
-    240: { p: 'https://www.printables.com/model/1322484-gen2-rails-240', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20RAILS%20-%20240%20Lite-1360077', m: 'https://makerworld.com/en/models/1516579-gen2-under-table-rails-240' },
-    270: { p: 'https://www.printables.com/model/1053793-gen2-rails-270-large', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20RAILS%20-%20LARGE-1165816', m: 'https://makerworld.com/en/models/1938132-gen2-under-table-rails-270' },
+          // GENERATES for every collection (2026-07-19 batches).
+          // Thangs renamed all six to "GEN2 Under Table Rails - <L>" 2026-07-29
+          // (old names: SMALL/MEDIUM/165/STANDARD/240 Lite/LARGE). Ids unchanged
+          // — Thangs resolves by the trailing id, so this is canonicalisation.
+          // Printables rails pages were NOT renamed in that cycle.
+    59:  { p: 'https://www.printables.com/model/1053797-gen2-rails-59-small', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20Under%20Table%20Rails%20-%2059-1165763', m: 'https://makerworld.com/en/models/3093597-gen2-under-table-rails-59' },
+    115: { p: 'https://www.printables.com/model/1053795-gen2-rails-115-medium', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20Under%20Table%20Rails%20-%20115-1165720', m: 'https://makerworld.com/en/models/755511-gen2-under-table-rails-115' },
+    165: { p: 'https://www.printables.com/model/1053557-gen2-rails-165-mini', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20Under%20Table%20Rails%20-%20165-1165793', m: 'https://makerworld.com/en/models/939507-gen2-under-table-rails-165' },
+    185: { p: 'https://www.printables.com/model/1052357-gen2-rails-185-standard', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20Under%20Table%20Rails%20-%20185-1163830', m: 'https://makerworld.com/en/models/2199580-gen2-under-table-rails-185' },
+    240: { p: 'https://www.printables.com/model/1322484-gen2-rails-240', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20Under%20Table%20Rails%20-%20240-1360077', m: 'https://makerworld.com/en/models/1516579-gen2-under-table-rails-240' },
+    270: { p: 'https://www.printables.com/model/1053793-gen2-rails-270-large', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20Under%20Table%20Rails%20-%20270-1165816', m: 'https://makerworld.com/en/models/1938132-gen2-under-table-rails-270' },
   },
 };
 
