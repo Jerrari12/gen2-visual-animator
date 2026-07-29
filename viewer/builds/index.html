@@ -149,6 +149,10 @@ a { color: var(--accent); }
 }
 .kit-card {
   position: relative;
+  /* the card is the containing block for the primary CTA's stretched overlay
+     (see .kit-open::after) — isolate so the gradient's z-index:-1 can't escape
+     behind the card's own background in the page stacking context */
+  isolation: isolate;
   display: flex; flex-direction: column; justify-content: flex-end;
   min-height: 250px;
   border: 1px solid var(--line);
@@ -167,14 +171,17 @@ a { color: var(--accent); }
 }
 .kit-card:hover { transform: translateY(-2px); box-shadow: 0 8px 22px rgba(0,0,0,0.45); }
 .kit-card::before {                     /* legibility gradient over the render */
-  content: ""; position: absolute; inset: 0;
+  /* z-index:-1 keeps it above the card's background (colour + render) but below
+     the in-flow copy, so .kit-body no longer needs position:relative — which is
+     what lets .kit-open::after size to the CARD instead of the body */
+  content: ""; position: absolute; inset: 0; z-index: -1;
   /* holds all the way to the right edge (…,0.20) so the art sits back a little
      and the copy always wins — Joey asked for the image to drop in opacity */
   background: linear-gradient(90deg,
     rgba(44,45,49,0.97) 0%, rgba(44,45,49,0.90) 44%, rgba(44,45,49,0.45) 74%, rgba(44,45,49,0.20) 100%);
   pointer-events: none;
 }
-.kit-body { position: relative; padding: 18px 20px; max-width: 78%; }
+.kit-body { padding: 18px 20px; max-width: 78%; }
 .kit-len {
   display: inline-flex; align-items: center; gap: 6px;
   font-size: 0.74rem; font-weight: 800; letter-spacing: 0.08em;
@@ -193,12 +200,58 @@ a { color: var(--accent); }
   background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.14);
   border-radius: 999px; padding: 3px 10px;
 }
+.kit-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 .kit-open {
   display: inline-block; text-align: center;
   font-size: 0.9rem; font-weight: 700; color: #1d1e20;
   background: var(--accent); border-radius: 8px; padding: 9px 16px;
+  text-decoration: none;
 }
+/* the primary CTA stretches over the whole card, so dead space still opens the
+   instructions exactly like the old all-<a> card did. It has to be ONE link for
+   screen readers, hence the overlay rather than a second anchor. */
+.kit-open::after { content: ""; position: absolute; inset: 0; }
 .kit-card:hover .kit-open { filter: brightness(1.06); }
+/* The bundle download: one store button + a ▾ for the others, same split-button
+   as the viewer's BOM rows. The WRAPPER carries the z-index — this whole control
+   must sit ABOVE .kit-open's card-wide overlay to stay clickable. */
+.kit-dl { position: relative; z-index: 1; display: inline-flex; align-items: stretch; gap: 4px; }
+.kit-get {
+  display: inline-block;
+  font-size: 0.82rem; font-weight: 700; color: #d7d8db;
+  background: rgba(0,0,0,0.38); border: 1px solid rgba(255,255,255,0.22);
+  border-radius: 8px; padding: 8px 13px; text-decoration: none;
+  transition: color 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+}
+.kit-get:hover { color: #fff; background: rgba(0,0,0,0.58); border-color: rgba(255,255,255,0.45); }
+.kit-more { position: relative; display: inline-flex; }
+.kit-more-btn {
+  font: inherit; font-size: 0.72rem; line-height: 1; cursor: pointer;
+  padding: 0 10px;
+  color: #d7d8db; background: rgba(0,0,0,0.38);
+  border: 1px solid rgba(255,255,255,0.22); border-radius: 8px;
+  transition: color 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+}
+.kit-more-btn:hover, .kit-more-btn[aria-expanded="true"] {
+  color: #fff; background: rgba(0,0,0,0.58); border-color: rgba(255,255,255,0.45);
+}
+/* ⚠ opens UPWARD. The card is overflow:hidden (it clips the render art to the
+   rounded corners) and this button sits on the card's bottom edge, so a
+   downward menu would be silently clipped in half. There is always room above:
+   the card is min-height 250px and the menu is ~34px per store. */
+.kit-more-menu {
+  position: absolute; z-index: 40; bottom: calc(100% + 6px); left: 0; min-width: 136px;
+  display: flex; flex-direction: column; gap: 2px; padding: 5px;
+  background: #212226; border: 1px solid rgba(255,255,255,0.18);
+  border-radius: 9px; box-shadow: 0 8px 22px rgba(0,0,0,0.55);
+}
+.kit-more-menu.hidden { display: none; }
+.kit-more-item {
+  display: block; white-space: nowrap; text-align: center;
+  font-size: 0.82rem; font-weight: 700; color: #d7d8db;
+  padding: 7px 12px; border-radius: 6px; text-decoration: none;
+}
+.kit-more-item:hover { color: #fff; background: rgba(255,255,255,0.10); }
 #empty { text-align: center; color: var(--muted); font-size: 0.9rem; padding: 40px 0; }
 
 /* ---------- planner footer ---------- */
@@ -292,6 +345,92 @@ for (const a of document.querySelectorAll('.planner-link, #brand-home')) a.href 
 // render (builds/img/<id>.jpg). Length colors mirror the planner's
 // GEN2.lengths palette exactly.
 const LENGTH_COLORS = { 59: '#f2f2f2', 115: '#9ea3a8', 165: '#3aa0e8', 185: '#ff8a40', 240: '#3ecfa0', 270: '#e8453c' };
+
+/* ---------- the bundle download ----------
+   Every kit's parts are ALSO sold as one Tabletop Starter Kit download per
+   length — the whole point being that you grab one file set instead of the ~10
+   individual part pages the viewer's BOM lists. That bundle is only correct
+   HERE, on a pristine committed kit: the moment a build is customised in the
+   viewer or planner (a faceplate family swap, a back cover, a different layout)
+   it can need files the bundle doesn't carry, which is why this link lives on
+   the gallery card and not inside the viewer.
+   ⚠ Confirmed with Joey 2026-07-29: the bundle covers BOTH tiers — the 3W-2H
+   kit needs the 1W cover + foot-rail tiles the 2W-2H one never uses, so if the
+   file set is ever trimmed per length, the 3W cards are what breaks first.
+   MIRROR RULE: these are LINKS_BY_LEN.kit from ../js/generate.js. Kept as a
+   local map rather than an import so this page stays a plain script with no
+   generator dependency — update both together, same as the planner mirror. */
+const KIT_LINKS = {
+  115: { p: 'https://www.printables.com/model/1146353-gen2-115-tabletop-starter-kit', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20115%20Tabletop%20Starter%20Kit-1245167' },
+  165: { p: 'https://www.printables.com/model/1124278-gen2-165-tabletop-starter-kit', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20165%20Tabletop%20Starter%20Kit-1233752' },
+  185: { p: 'https://www.printables.com/model/1118906-gen2-185-tabletop-starter-kit', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20185%20Tabletop%20Starter%20Kit-1231757' },
+  240: { p: 'https://www.printables.com/model/1324501-gen2-240-tabletop-starter-kit', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20240%20Tabletop%20Starter%20Kit-1360073' },
+  270: { p: 'https://www.printables.com/model/1163955-gen2-270-tabletop-starter-kit', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20270%20Tabletop%20Starter%20Kit-1253780' },
+};
+/* Store ids/keys/labels mirror main.js STORES. Only the two the kit pages
+   actually have — a kit has no MakerWorld or Cults listing. */
+const KIT_STORES = [
+  { id: 'printables', key: 'p', label: 'Printables' },
+  { id: 'thangs',     key: 't', label: 'Thangs' },
+];
+/* Same resolution rule as the viewer's BOM: the preferred store leads when it
+   carries the part, the rest sit alongside it, and the primary button always
+   NAMES the store it opens — a Printables link under a Thangs preference is
+   never a surprise. `?from=` seeds an empty preference for someone arriving
+   from a listing (it must never overwrite a deliberate pick).
+   The viewer flattens the alternates into a ▾ so dense BOM rows can't widen;
+   with only ever two kit stores and a whole card to work with, a second chip
+   reads better than a menu and needs no open/close machinery. */
+/* Minimal twin of main.js `track()` — same colon vocabulary, same closed set of
+   names (store ids only, never a url or a title). No boot queue is needed here:
+   unlike the viewer, nothing fires during load, only on a click long after
+   count.js has settled. The link opens in a new tab, so the beacon is never
+   cancelled by navigation — the same reason main.js's linkEl uses _blank. */
+function track(name) {
+  try {
+    const gc = window.goatcounter;
+    if (gc && gc.count) gc.count({ path: name, title: name, event: true });
+  } catch (e) { /* ignore — never let tracking throw */ }
+}
+
+function storedStorePref() {
+  try { return localStorage.getItem('gen2-store') || ''; } catch (e) { return ''; } // private mode
+}
+/* Preferred store first, then the rest that carry it — the primary is [0]. */
+function kitStoresFor(links) {
+  let pref = storedStorePref();
+  if (!pref) pref = (new URLSearchParams(location.search).get('from') || '').toLowerCase();
+  const have = KIT_STORES.filter((s) => links[s.key]);
+  const i = have.findIndex((s) => s.id === pref);
+  return i > 0 ? [have[i], ...have.filter((_, n) => n !== i)] : have;
+}
+/* "The preference is set BY USE" — the same rule as opening a store from the
+   viewer's ▾. Writing it here is safe and wanted: same origin as the viewer, so
+   picking Thangs on a card is remembered when they land in the instructions.
+   The `:t` stamp is what the planner relay's newest-wins compare reads, so it
+   has to be written too. No-op guard mirrors main.js setStorePref, which keeps
+   the store-pref: event honest (a click on the already-preferred store isn't a
+   decision). */
+function adoptStore(id) {
+  if (id === storedStorePref()) return;
+  try {
+    localStorage.setItem('gen2-store', id);
+    localStorage.setItem('gen2-store:t', String(Date.now()));
+  } catch (e) { /* private mode — the click still opens the right page */ }
+  track('store-pref:' + id);
+}
+/* Twin of main.js closeStoreMenus — click-away and Escape, so the ▾ behaves
+   like every other menu on the site. */
+function closeKitMenus(except) {
+  for (const m of document.querySelectorAll('.kit-more-menu')) {
+    if (m === except) continue;
+    m.classList.add('hidden');
+    const b = m.parentElement && m.parentElement.querySelector('.kit-more-btn');
+    if (b) b.setAttribute('aria-expanded', 'false');
+  }
+}
+addEventListener('click', () => closeKitMenus(null));
+addEventListener('keydown', (e) => { if (e.key === 'Escape') closeKitMenus(null); });
 /* Sections are keyed by MOUNT × SIZE, in that order. Mount is the first thing a
    builder actually knows ("where will this live?") and it's the planner's own
    question 1, so it leads; size is the progression inside it. A flat list of
@@ -372,9 +511,11 @@ function buildFilter(present) {
 
 function renderCards(kits, main) {
   for (const k of kits) {
-    const card = document.createElement('a');
+    // a <div>, not an <a>: the card now holds TWO links (instructions + the
+    // bundle download) and nested anchors are invalid — browsers unnest them.
+    // Whole-card clicking survives via .kit-open's stretched ::after overlay.
+    const card = document.createElement('div');
     card.className = 'kit-card';
-    card.href = '../?build=' + encodeURIComponent(k.id);
     if (LENGTH_COLORS[k.length]) card.style.setProperty('--len', LENGTH_COLORS[k.length]);
     // probe the render first so a missing image never flashes a broken bg
     const probe = new Image();
@@ -403,19 +544,93 @@ function renderCards(kits, main) {
       s.textContent = c;
       chips.appendChild(s);
     }
-    const open = document.createElement('span');
+    const actions = document.createElement('div');
+    actions.className = 'kit-actions';
+    const open = document.createElement('a');
     open.className = 'kit-open';
+    open.href = '../?build=' + encodeURIComponent(k.id);
     open.textContent = 'Open the 3D instructions →';
-    body.append(title, tag, chips, open);
+    actions.appendChild(open);
+
+    // The one-download bundle, when this length has a Starter Kit page.
+    // ⚠ Gated on mount: KIT_LINKS is keyed by LENGTH, and the Starter Kit is a
+    // TABLETOP bundle (covers + foot rails, no rails). The gallery already
+    // renders under-table/wall sections in anticipation of those tiers, so
+    // without this an under-table kit would quietly offer a download whose
+    // parts don't build it. A future mount needs its own bundle page here.
+    const links = k.mount === 'tabletop' ? KIT_LINKS[k.length] : null;
+    const stores = links ? kitStoresFor(links) : [];
+    if (stores.length) {
+      const [primary, ...rest] = stores;
+      const dl = document.createElement('span');
+      dl.className = 'kit-dl';
+      const get = document.createElement('a');
+      get.className = 'kit-get';
+      get.href = links[primary.key];
+      get.target = '_blank';
+      get.rel = 'noopener';
+      get.textContent = '⤓ Download the models · ' + primary.label;
+      get.title = 'Every part for this kit in one download, from ' + primary.label;
+      get.addEventListener('click', () => { adoptStore(primary.id); track('kit-dl:' + primary.id); });
+      dl.appendChild(get);
+
+      if (rest.length) {                       // the other stores carrying it
+        const more = document.createElement('span');
+        more.className = 'kit-more';
+        const btn = document.createElement('button');
+        btn.className = 'kit-more-btn';
+        btn.type = 'button';
+        btn.textContent = '▾';
+        btn.title = 'Other sites for this download';
+        btn.setAttribute('aria-label', 'Other sites for this download');
+        btn.setAttribute('aria-expanded', 'false');
+        const menu = document.createElement('div');
+        menu.className = 'kit-more-menu hidden';
+        for (const s of rest) {
+          const a = document.createElement('a');
+          a.className = 'kit-more-item';
+          a.href = links[s.key];
+          a.target = '_blank';
+          a.rel = 'noopener';
+          a.textContent = s.label;
+          a.title = 'The same download, from ' + s.label;
+          a.addEventListener('click', () => {
+            track('kit-dl:' + s.id);
+            adoptStore(s.id);
+            // re-label every card so the new preference is visible, not just
+            // stored. DEFERRED: render() replaces this anchor, and tearing it
+            // out synchronously mid-click can cancel the navigation it just
+            // triggered — the timeout lets the default action run first.
+            setTimeout(render, 0);
+          });
+          menu.appendChild(a);
+        }
+        btn.onclick = (e) => {
+          e.stopPropagation();               // else the click-away handler below closes it instantly
+          closeKitMenus(menu);
+          const open = !menu.classList.toggle('hidden');
+          btn.setAttribute('aria-expanded', String(open));
+        };
+        more.append(btn, menu);
+        dl.appendChild(more);
+      }
+      actions.appendChild(dl);
+    }
+
+    body.append(title, tag, chips, actions);
     card.appendChild(body);
     main.appendChild(card);
   }
 }
 </script>
-<!-- GoatCounter analytics: pageviews only — no custom events here. A card click
-     lands on the viewer, which records open:<id> itself, so a click event would
-     just double-count the same visit. Same site code as the viewer (see the
-     tag in ../index.html for why it's separate from the planner's). -->
+<!-- GoatCounter analytics. A card's "Open the 3D instructions" click needs NO
+     event: it lands on the viewer, which records open:<id> itself, so counting
+     it here would double-count one visit. The bundle download is the opposite
+     case — it leaves for Printables/Thangs and the viewer never sees it, so
+     kit-dl:<store> is the only way to know whether the one-download link is
+     actually used. That's the whole question behind the feature, hence the one
+     event. Same site code as the viewer (see the tag in ../index.html for why
+     it's separate from the planner's). -->
 <script data-goatcounter="https://jerrari-build.goatcounter.com/count"
         async src="https://gc.zgo.at/count.js"></script>
 </body>
