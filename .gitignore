@@ -16,3 +16,11 @@ desktop.ini
 
 # Local GoatCounter API token for serve-stats.py — NEVER commit this.
 .goatcounter-token
+
+# ---- Internal working notes: kept on disk, never published ----
+# Session handoffs, batch run logs, calibration notes and the AI project
+# memory. They stay in the working tree and keep working exactly as before;
+# git simply stops publishing them to a public repo.
+CLAUDE.md
+GEN2-Part-Orientation-Notes.md
+2026-*.md
