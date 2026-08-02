@@ -311,6 +311,38 @@
       "depth_mode": "center"
     },
     {
+      "name": "Classic Drawers 3H additions (115)",
+      "_note": "2026-08-02: the 3H gap flagged by the 2026-07-11 batch is CLOSED. Joey modelled 1W-3H + 2W-3H for 115/240/270 in a SEPARATE blend (the consolidated all-lengths exporter does NOT carry them, so its collection:<L> jobs still emit only 16 each -- these three jobs add the missing 2 apiece). Objects are named 'Classic Drawer <code>' like the originals. Verified against the shipped drawers: back wall full-width/full-height at -Z, pull lip at +Z inset 18mm per side, 1W xfrac 0.52 / 2W 0.779 -- identical signatures. Depths 125/250/280, height 162, widths 75/163.",
+      "blend": "D:\\Render Projects\\GEN2 Thumbnail Renderer - Addition 3H Classic Drawers.blend",
+      "out": "D:\\Code Projects\\GEN2 Visual Animator\\GLB Library\\115",
+      "select": "prefix:Classic Drawer 115",
+      "code_regex": "115-\\d+W-\\d+H",
+      "name_template": "ClassicDrawer_{code}",
+      "depth_mode": "center",
+      "report": "_export_report_3h.json"
+    },
+    {
+      "name": "Classic Drawers 3H additions (240)",
+      "_note": "The two 240 objects carry a 90-degree Z rotation in the blend and that is CORRECT -- the exporter bakes matrix_world into the mesh (gen2_glb_export.py), so they land in the same world orientation as the other lengths. Joey's explicit instruction was to keep it. Do NOT zero it: that is the opposite of the 2026-07-11 240-4W fix and would ship them sideways.",
+      "blend": "D:\\Render Projects\\GEN2 Thumbnail Renderer - Addition 3H Classic Drawers.blend",
+      "out": "D:\\Code Projects\\GEN2 Visual Animator\\GLB Library\\240",
+      "select": "prefix:Classic Drawer 240",
+      "code_regex": "240-\\d+W-\\d+H",
+      "name_template": "ClassicDrawer_{code}",
+      "depth_mode": "center",
+      "report": "_export_report_3h.json"
+    },
+    {
+      "name": "Classic Drawers 3H additions (270)",
+      "blend": "D:\\Render Projects\\GEN2 Thumbnail Renderer - Addition 3H Classic Drawers.blend",
+      "out": "D:\\Code Projects\\GEN2 Visual Animator\\GLB Library\\270",
+      "select": "prefix:Classic Drawer 270",
+      "code_regex": "270-\\d+W-\\d+H",
+      "name_template": "ClassicDrawer_{code}",
+      "depth_mode": "center",
+      "report": "_export_report_3h.json"
+    },
+    {
       "name": "Under-Table Rails (115)",
       "_note": "115 under-table rails, 1W-4W (130.9mm deep), exported 2026-07-19 from the Render Projects blend (collections 115/165/240/270 + 185 at top level). Facing verified via the front-ridge signature vs the canonical 185 GLBs. Report: raw\\_export_report_115.json.",
       "blend": "D:\\Render Projects\\GEN2 Under-table Rails.blend",

@@ -45,6 +45,7 @@
     {
       "node": "Tabletop-Kit-Foot",
       "label": "Tabletop Kit Foot",
+      "img": "img/parts/TPU Foot.png",
       "type": "Foot",
       "qty": 6,
       "links": {

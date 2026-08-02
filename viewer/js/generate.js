@@ -57,14 +57,16 @@ const COLL = {
   // GLBs now. ⚠ This block was accidentally REVERTED by fafbad8 (a stale-copy
   // overwrite during the Crystal-handles work) and shipped broken to prod;
   // restored 2026-07-25. railDepth absent would make UT builds error.
-  // classicMaxHH: the Classic Drawer catalogs for 115/240/270 stop at 2H (16
-  // GLBs each — no 3H was ever cut; 165/185 have all 18). Without this guard
-  // the generator emits ClassicDrawer_<L>-…-3H unconditionally and the viewer
-  // used to hang forever on the missing GLB (found by the 2026-07-25 sweep;
-  // the planner's sizeExists mirrors this cap via collectionCases.maxClassicH).
-  115: { depth: 115, classicDepth: 124.89, railDepth: 130.9, railScrewBack: 42.4, classicMaxHH: 4 },
-  240: { depth: 240, railDepth: 240, railScrewBack: 20, classicMaxHH: 4 },
-  270: { depth: 270, railDepth: 286, classicMaxHH: 4 },
+  // classicMaxHH capped 115/240/270 at 2H while their Classic Drawer catalogs
+  // stopped there (16 GLBs each). CLOSED 2026-08-02 — Joey modelled 1W-3H +
+  // 2W-3H for all three, so every length now ships the full 18 and no entry
+  // sets the cap. The GUARD ITSELF STAYS (see the per-unit validation below):
+  // it costs nothing and is the net that catches the next partial catalog.
+  // Removed here in step with the planner's collectionCases[L].maxClassicH —
+  // lifting only one side offers a size the other end can't build.
+  115: { depth: 115, classicDepth: 124.89, railDepth: 130.9, railScrewBack: 42.4 },
+  240: { depth: 240, railDepth: 240, railScrewBack: 20 },
+  270: { depth: 270, railDepth: 286 },
 };
 
 // Wall mount — CALIBRATED 2026-07-05 from Joey's case-to-bracket reference
@@ -484,8 +486,11 @@ export function generateManifest(build) {
     if (u.w >= 3 && u.hh === 6) errors.push(`${u.w}W-3H doesn't exist (too large to print) · planner shouldn't allow this.`);
     if (coll.maxW && u.w > coll.maxW) errors.push(`${u.w}W cases don't exist in the ${L} collection (1W and 2W only).`);
     if (coll.maxHH && u.hh > coll.maxHH) errors.push(`${H}H cases don't exist in the ${L} collection (05H and 1H only).`);
+    // No length sets classicMaxHH since 2026-08-02 (all six ship 3H classics),
+    // but the guard stays armed for the next partial catalog — so the ceiling
+    // is read from the cap rather than hardcoded, or it would misreport it.
     if (u.fill === 'classic' && coll.classicMaxHH && u.hh > coll.classicMaxHH)
-      errors.push(`Classic Drawers only go up to 2H in the ${L} collection (no ${H}H model) · switch this drawer to Decor, or pick a smaller size.`);
+      errors.push(`Classic Drawers only go up to ${H_LABEL[coll.classicMaxHH]}H in the ${L} collection (no ${H}H model) · switch this drawer to Decor, or pick a smaller size.`);
     if (u.fill === 'cabinet') errors.push('Cabinet units need case-extender models that are not in the 3D library yet.');
     if (u.fill === 'shelf' && u.hh !== 2) errors.push('Shelves taller than 1H use case extenders that are not in the 3D library yet.');
   }
@@ -1486,6 +1491,10 @@ function imgFor(node) {
   if (node.startsWith('Drawer_Stoppers')) return 'img/parts/Drawer Stopper.png';
   if (node === 'MagnetClip_10x2mm') return 'img/parts/Magnet Clip.png';
   if (node === 'Magnet_10x2mm') return 'img/parts/Magnets.png';
+  // TPU foot — ONE universal render: the foot is length-agnostic (it seats in
+  // the foot rail / case underside slots, which are the same on every
+  // collection), so there's no per-length set like the cases or drawers.
+  if (node === 'Tabletop-Kit-Foot') return 'img/parts/TPU Foot.png';
   // handle fastener (2026-07-24) — rendered at full thread detail, unlike the
   // deliberately decimated GLB
   if (node === 'ButtonHeadScrew_M3-6') return 'img/parts/ButtonHeadScrew_M3-6.png';

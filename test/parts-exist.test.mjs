@@ -4,8 +4,9 @@
    missing file used to reject an uncaught Promise.all and hang the app on the
    loading spinner forever. That happened in production (2026-07-25): the
    generator emitted ClassicDrawer_<L>-…-3H for 115/240/270, whose GLBs were
-   never cut. The generator now guards that gap (COLL[L].classicMaxHH) and
-   loadTemplates fails readably, but THIS sweep is the durable net: it walks
+   never cut. Those six were modelled 2026-08-02 so that particular gap is gone,
+   but the generator keeps the guard (COLL[L].classicMaxHH, now unset everywhere)
+   and loadTemplates fails readably. THIS sweep is the durable net: it walks
    every legal single-unit build across all six collections, both drawer
    fills, all three mounts, all four faceplate families and all three handle
    styles, and asserts that whenever a manifest is produced, every GLB it
@@ -65,13 +66,18 @@ test('every legal drawer size resolves to real GLBs (or errors gracefully) in al
           r.errored ? guarded++ : generated++;
         }
   assert.ok(generated > 100, `sweep looks broken — only ${generated} builds generated`);
-  // the known catalog gap must stay GUARDED, not silently generating:
+  // 2026-08-02: the 115/240/270 3H classics were modelled, closing the last
+  // catalog gap. The sweep above already walks them, but name them explicitly —
+  // a re-introduced cap, or a lost GLB, then fails with the specific size.
   for (const L of [115, 240, 270])
     for (const w of [1, 2]) {
+      const node = `ClassicDrawer_${L}-${w}W-3H`;
       const g = generateManifest(mk(L, { placed: [unit(w, 6, 'classic')] }));
-      assert.equal(g.manifest, null, `${L} ${w}W-3H classic must error (no GLB exists) — it generated instead`);
-      assert.match((g.errors || []).join(' '), /Classic Drawers only go up to 2H/,
-        `${L} ${w}W-3H classic should carry the catalog-gap reason`);
+      assert.ok(g.manifest,
+        `${L} ${w}W-3H classic should generate now: ${(g.errors || []).join(' ')}`);
+      assert.ok(g.manifest.instances.some(i => i.node === node),
+        `${L} ${w}W-3H classic must place ${node}`);
+      assert.ok(glbExists(L, node), `${node}.lib.glb is missing from viewer/parts/${L}/`);
     }
 });
 
