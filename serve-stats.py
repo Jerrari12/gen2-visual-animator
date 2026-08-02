@@ -46,11 +46,44 @@ CACHE_TTL = 3300
 # live 429, GoatCounter enforces a BUDGET: X-Rate-Limit-Limit 500 with
 # X-Rate-Limit-Reset counting down ~765s. So it is ~500 requests per ~13-minute
 # window, and once spent NOTHING gets through until the window rolls over.
-# Pacing cannot save you from that - only making fewer calls can. A build is 7
-# calls, so normal use is nowhere near it; development thrash is what burns it.
+# Pacing cannot save you from that - only making fewer calls can. A build is
+# ~10 calls (5 per site, +1 for /me on the first build of the process), so
+# normal use is nowhere near it; development thrash is what burns it.
 BUILD_BUDGET = 45.0
 
 _cache = {}          # range -> (fetched_at, payload)
+# Per-site baseline of today's per-country visitor counts, for the map's
+# "this hour" pulse. ⚠ GoatCounter has NO country×hour data (measured — see
+# for_range), so the hour view is DERIVED: today's counts minus this baseline
+# = who was active since it was taken. The baseline advances ~hourly, so under
+# the page's normal cadence the window is ≈ one hour.
+# PERSISTED to a gitignored file beside this script: without that, every
+# server restart threw the baseline away and the first build reported the hour
+# as unknowable — Joey restarted mid-hour, saw THIS HOUR 13 with a silent map,
+# and reasonably read it as broken. Best-effort: a lost file just means one
+# cold start.
+HOUR_BASE_FILE = os.path.join(HERE, ".stats-hour-base.json")
+HOUR_BASE_ADVANCE = 3000 # rebase after ~50 min — keeps the diff window ≈ 1h
+HOUR_BASE_MAX_AGE = 4500 # a baseline older than 75 min spans multiple hours;
+                         # calling that "this hour" would lie — report unknown
+
+def _load_hour_base():
+    try:
+        with open(HOUR_BASE_FILE, encoding="utf-8") as fh:
+            raw = json.load(fh)
+        return {h: {"t": float(v["t"]), "counts": {str(k): int(n) for k, n in v["counts"].items()}}
+                for h, v in raw.items()}
+    except Exception:
+        return {}                    # missing/corrupt file = plain cold start
+
+def _save_hour_base():
+    try:
+        with open(HOUR_BASE_FILE, "w", encoding="utf-8") as fh:
+            json.dump(_hour_base, fh)
+    except Exception:
+        pass                         # persistence is best-effort by design
+
+_hour_base = _load_hour_base()       # host -> {"t": epoch, "counts": {alpha2: n}}
 _last_call = [0.0]
 _quota = [None]      # X-Rate-Limit-Remaining from the last successful call
 _tz_cache = [None]   # resolved once per process - it cost 1 API call per build
@@ -163,10 +196,51 @@ def for_range(host, days, deadline):
         # button click is meaningless, and unfiltered these inherit the same
         # ~6x event inflation the country list had.
         refs = api(host, "stats/toprefs", filt, deadline=deadline)
+        # Where is TODAY's traffic from? Raw material for the map's THIS HOUR
+        # pulse. ⚠ Asking the API for the hour directly is impossible, and
+        # that was MEASURED, not assumed (2026-07-30): stats/total honours a
+        # 1-hour window (returned 4) but stats/locations rounds the same
+        # window to the ACCOUNT-TZ DAY (returned the whole day) — GoatCounter
+        # keeps no country×hour data. So the narrow window below deliberately
+        # lands anywhere inside today, comes back as today, and the hour view
+        # is DERIVED from it by diffing against _hour_base; don't "fix" the
+        # window to expect hours. Reuses the range's pageview-path filter (a
+        # superset of today's paths bar anything outside the range's top-100 —
+        # acceptable). +1 call per site per build.
+        hw = {"start": hour_str(end), "end": hour_str(end + 3600)}
+        hloc = api(host, "stats/locations",
+                   dict(hw, limit=100, path_by_name="true", include_paths=page_paths),
+                   deadline=deadline)
     else:
         loc = {"stats": []}          # no pageviews in this window: no countries to attribute
         refs = {"stats": []}
-    return {
+        hloc = {"stats": []}
+    # ---- THIS HOUR by country = today's counts diffed against the baseline.
+    # Today-counts only ever RISE within a day, so any drop = the account-tz
+    # day rolled over → everything counted today so far is "new". A missing or
+    # stale baseline (first build after start, or a server that sat idle past
+    # the window) means the delta would span hours — report UNKNOWN (field
+    # omitted) rather than a wrong number; the page then simply doesn't pulse.
+    counts = {}
+    names = {}
+    for s in (hloc.get("stats") or []):
+        cid = s.get("id")
+        if cid and s.get("count"):
+            counts[cid] = s.get("count") or 0
+            names[cid] = s.get("name") or cid
+    now = time.time()
+    base = _hour_base.get(host)
+    hour_rows = None
+    if base and now - base["t"] <= HOUR_BASE_MAX_AGE:
+        rolled = any(counts.get(k, 0) < v for k, v in base["counts"].items())
+        src = counts if rolled else \
+            {k: v - base["counts"].get(k, 0) for k, v in counts.items()}
+        hour_rows = [{"id": k, "name": names.get(k, k), "count": v}
+                     for k, v in sorted(src.items(), key=lambda kv: -kv[1]) if v > 0]
+    if base is None or now - base["t"] >= HOUR_BASE_ADVANCE:
+        _hour_base[host] = {"t": now, "counts": counts}
+        _save_hour_base()            # survive restarts — see the note at HOUR_BASE_FILE
+    out = {
         "total": total.get("total") or 0,
         "total_events": total.get("total_events") or 0,
         "series": [{"day": d["day"], "hourly": d.get("hourly") or []}
@@ -183,6 +257,11 @@ def for_range(host, days, deadline):
                   "event": bool(h.get("event")), "title": h.get("title") or ""}
                  for h in (hits.get("hits") or [])],
     }
+    # present = known (possibly empty: a quiet hour); absent = unknowable right
+    # now (no fresh baseline) — the page pulses nothing in either quiet case
+    if hour_rows is not None:
+        out["hour_locations"] = hour_rows
+    return out
 
 
 def resolve_tz(deadline):

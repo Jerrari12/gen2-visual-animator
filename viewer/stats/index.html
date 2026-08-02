@@ -107,6 +107,14 @@ a { color: var(--cyan); }
 .c-cyan   { color: var(--cyan);   text-shadow: 0 0 18px rgba(34,224,214,.45); }
 .c-mag    { color: var(--magenta);text-shadow: 0 0 18px rgba(255,62,165,.45); }
 .c-lime   { color: var(--lime);   text-shadow: 0 0 18px rgba(157,255,60,.4); }
+.c-text   { color: var(--text);   text-shadow: 0 0 18px rgba(223,230,242,.3); }
+/* stage-conversion chip under each outcome KPI */
+.tile .conv { font-size: .6rem; letter-spacing: .12em; color: var(--dim); margin-top: 6px; min-height: 1em; }
+.tile .conv b { font-weight: 700; }
+/* the demoted operational strip — smaller numbers, tighter panels */
+.tiles.sub { grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); }
+.tiles.sub .panel { padding: 10px 14px; }
+.tiles.sub .v { font-size: 1.3rem; }
 
 /* live dot */
 .live { display: inline-flex; align-items: center; gap: 7px; font-size: .62rem; letter-spacing: .2em; color: var(--dim); }
@@ -183,6 +191,43 @@ body.no-data #dash > .panel:not(.err-banner) { display: none; }
 .gh:first-child { margin-top: 0; }
 .row .path { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 @media (max-width: 760px) { #event-groups, #src-row, .panel .grid { grid-template-columns: 1fr !important; } }
+
+/* ---------- canvas hover tooltips (map + activity strip) ---------- */
+/* absolutely positioned inside the .panel (position:relative), moved by JS;
+   pointer-events none so the tip can never trap the cursor and flicker */
+.tip {
+  position: absolute; z-index: 5; pointer-events: none;
+  background: rgba(7,8,12,.94); border: 1px solid var(--line); border-left: 2px solid var(--cyan);
+  padding: 7px 10px; font-size: .66rem; letter-spacing: .08em; line-height: 1.7;
+  box-shadow: 0 4px 18px rgba(0,0,0,.55); white-space: nowrap;
+}
+.tip .t-name { color: var(--text); letter-spacing: .14em; }
+.tip .t-dim { color: var(--dim); }
+.tip .t-hour { color: var(--lime); text-shadow: 0 0 8px rgba(157,255,60,.5); }
+.tip .t-hour i { display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+  background: var(--lime); box-shadow: 0 0 8px var(--lime); margin-right: 6px;
+  animation: pulse 2s infinite; vertical-align: 1px; }
+
+/* ---------- hero art (the leading faceplate family's product photo) ---------
+   A framed band under the panel head — a ghosted panel background was tried
+   first and was invisible at any opacity that kept the rows legible. The band
+   gets the photo at full presence, a teal-tinted fade so it sits in the HUD
+   palette, and a chip naming the winner. */
+.face-hero {
+  position: relative; height: 96px; margin: 0 0 12px;
+  border: 1px solid var(--line); border-radius: 3px;
+  background-size: cover; background-position: center 30%;
+}
+.face-hero::before {   /* HUD blend: slight dark top, readable chip zone below */
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(180deg, rgba(7,8,12,.22), rgba(7,8,12,.04) 45%, rgba(13,16,23,.82));
+}
+.face-hero .fh-chip {
+  position: absolute; left: 8px; bottom: 7px;
+  font-size: .6rem; letter-spacing: .22em; color: var(--lime);
+  background: rgba(7,8,12,.85); border: 1px solid var(--line);
+  padding: 3px 8px; text-shadow: 0 0 8px rgba(157,255,60,.5);
+}
 </style>
 
 <div class="wrap">
@@ -201,8 +246,30 @@ body.no-data #dash > .panel:not(.err-banner) { display: none; }
          invisible exactly when something had gone wrong -->
     <div class="panel err-banner hidden" id="err-top"></div>
 
+    <!-- The OUTCOME row leads (2026-07-30, from the analytics review): the
+         journey VISITS → BUILDS STARTED → INSTRUCTIONS OPENED → MODEL
+         DOWNLOADS, each with its share of the previous stage. ⚠ These are
+         aggregate event totals, NOT one linked cohort — GoatCounter has no
+         sessions by design — so a stage can legitimately exceed the one
+         before it (a restored planner build can open instructions without
+         placing anything this visit). The % is a ratio of totals, not a
+         measured per-user drop-off; the tile titles say what feeds each. -->
     <div class="tiles">
-      <div class="panel tile"><div class="v c-accent" id="s-views">—</div><div class="s" id="s-views-l">PAGEVIEWS</div></div>
+      <div class="panel tile" title="Pageviews, events excluded — the top of the journey.">
+        <div class="v c-accent" id="k-visits">—</div><div class="s">VISITS</div>
+        <div class="conv" id="kc-visits"></div></div>
+      <div class="panel tile" title="Planner: a visitor placed their first unit this page (build-start — ships 2026-07-30, counts accrue from deploy; restored sessions deliberately don't count). Studio: a kit opened (open:*).">
+        <div class="v c-cyan" id="k-started">—</div><div class="s">BUILDS STARTED</div>
+        <div class="conv" id="kc-started"></div></div>
+      <div class="panel tile" title="Planner: the 3D-guide button (3d-instructions:*). Studio: Get started pressed (start).">
+        <div class="v c-text" id="k-opened">—</div><div class="s">INSTRUCTIONS OPENED</div>
+        <div class="conv" id="kc-opened"></div></div>
+      <div class="panel tile" title="Clicks out to model pages: out:&lt;store&gt; plus the kit gallery's kit-dl:&lt;store&gt;. Hardware/filament buy links are separate events and deliberately excluded.">
+        <div class="v c-lime" id="k-downloads">—</div><div class="s">MODEL DOWNLOADS</div>
+        <div class="conv" id="kc-downloads"></div></div>
+    </div>
+    <!-- operational status, demoted below the outcomes -->
+    <div class="tiles sub">
       <div class="panel tile"><div class="v c-cyan"   id="s-events">—</div><div class="s">EVENTS</div></div>
       <div class="panel tile"><div class="v c-mag"    id="s-countries">—</div><div class="s">COUNTRIES</div></div>
       <div class="panel tile"><div class="v c-lime"   id="s-hour">—</div><div class="s"><span class="live"><i></i>THIS HOUR</span></div></div>
@@ -212,18 +279,23 @@ body.no-data #dash > .panel:not(.err-banner) { display: none; }
       <p class="h">Activity · last 48 hours · <span style="color:var(--dim);text-transform:none;letter-spacing:.05em">hourly buckets — GoatCounter stores no finer</span></p>
       <canvas id="strip" height="150"></canvas>
       <div id="strip-x" style="display:flex;justify-content:space-between;font-size:.58rem;color:var(--dim);letter-spacing:.1em;margin-top:6px"></div>
+      <div class="tip hidden" id="strip-tip"></div>
     </div>
 
     <div class="grid cols">
       <div class="panel">
         <p class="h">Global distribution</p>
         <canvas id="map" height="620"></canvas>
+        <div class="tip hidden" id="map-tip"></div>
         <div style="display:flex;align-items:center;gap:10px;margin-top:10px">
           <span style="font-size:.58rem;letter-spacing:.16em;color:var(--dim)">LOW</span>
           <span id="legend" style="flex:1;height:5px;border-radius:3px"></span>
           <span style="font-size:.58rem;letter-spacing:.16em;color:var(--dim)">HIGH</span>
           <span id="legend-max" style="font-size:.58rem;letter-spacing:.1em;color:var(--dim)"></span>
         </div>
+        <!-- filled only while per-country hour data is warming up — a THIS
+             HOUR tile with a silent map otherwise reads as broken -->
+        <div id="map-note" style="font-size:.6rem;letter-spacing:.1em;color:var(--dim);margin-top:8px"></div>
       </div>
       <div class="panel">
         <p class="h">Top countries</p>
@@ -371,6 +443,12 @@ async function load() {
 
   // merge across sites
   const countries = new Map();   // alpha2 -> {code, name, count}
+  const hourCountries = new Map(); // alpha2 -> visitors in ≈ the last hour
+  // tri-state matters here: hour_locations PRESENT-but-empty is a real answer
+  // (a quiet hour), ABSENT means the proxy had no fresh baseline (first build
+  // after a server start) and the hour is UNKNOWN — the map note says so
+  // instead of leaving a lit THIS HOUR tile next to a silent map
+  let hourKnown = false;
   let views = 0, events = 0;
   const series = new Map();      // "YYYY-MM-DDTHH" -> count
   const pages = new Map(), evts = new Map();
@@ -409,6 +487,17 @@ async function load() {
       if (s.name) cur.name = s.name;
       countries.set(code, cur);
     }
+    // who was active in ≈ THE LAST HOUR. Not an API query — GoatCounter's
+    // locations endpoint rounds any window to the account-tz DAY (measured
+    // 2026-07-30) — the proxy DERIVES it by diffing today's counts against an
+    // hourly baseline (see serve-stats.py _hour_base). Absent when the proxy
+    // has no fresh baseline (first build after a server start) or the
+    // snapshot came from an older proxy: the map simply doesn't pulse.
+    if (Array.isArray(site.hour_locations)) hourKnown = true;
+    for (const s of site.hour_locations || []) {
+      const code = String(s.id || '').slice(0, 2).toUpperCase();
+      if (code) hourCountries.set(code, (hourCountries.get(code) || 0) + (s.count || 0));
+    }
     for (const d of total.stats || []) {
       (d.hourly || []).forEach((n, h) => {
         const key = d.day + 'T' + String(h).padStart(2, '0');
@@ -423,14 +512,26 @@ async function load() {
   const nowKey = nowKeyIn(siteTz);                           // "YYYY-MM-DDTHH", same shape as our keys
   const ordered = [...series.entries()].sort((a, b) => a[0] < b[0] ? -1 : 1).filter(([k]) => k <= nowKey);
   const desc = m => [...m.values()].sort((a, b) => b.count - a.count);
+  // ---- the outcome KPIs (see the tiles' own comment for the cohort caveat).
+  // Prefix sums use "name:" with the colon, so 'out:' can never catch 'outro'.
+  const kget = k => evts.get(k)?.count || 0;
+  const ksum = pre => { let n = 0; for (const [k, v] of evts) if (k.startsWith(pre)) n += v.count; return n; };
+  const kpi = {
+    visits: views,
+    started: kget('build-start') + ksum('open:'),
+    opened: ksum('3d-instructions:') + kget('start'),
+    downloads: ksum('out:') + ksum('kit-dl:'),
+  };
   return {
-    views, events,
+    views, events, kpi,
     countries: [...countries.values()].sort((a, b) => b.count - a.count),
     pages: desc(pages), events_: desc(evts), mix: buildMix(evts), funnel: buildFunnel(evts),
     refs: [...refs.values()].sort((a, b) => b.count - a.count),
     sources: buildSources([...refs.values()], views),
     series: ordered,
     thisHour: series.get(nowKey) || 0,
+    hourCountries,                      // alpha2 -> last-hour count (Map, may be empty)
+    hourKnown,
   };
 }
 
@@ -448,11 +549,22 @@ const GROUPS = [
   { id: 'funnel', label: 'ENTRY & INTENT',   pre: ['collection','from','3d-instructions','resume-build','example','surprise','customize'] },
   { id: 'out',    label: 'OUTBOUND',         pre: ['out','linksite','store-pref','hardware','filament','labelgen','club'] },
   { id: 'tools',  label: 'TOOLS & UI',       pre: ['dock','tool','identify','style','preset','colors','bom','export','video','save-build','load-build','share-link','save-image','start-fresh','bom-track'] },
-  { id: 'error',  label: '⚠ FAILURES',       pre: ['error','instructions-blocked'] },
+  // blocked ≠ broken: these are the planner's own rules stopping an illegal
+  // layout, listed apart from real failures so 14 mid-build `unsupported`s
+  // can't read as 14 crashes. (Since 2026-07-30 the planner also only counts a
+  // block after the layout SITS broken ~3s — transient mid-drag states no
+  // longer fire at all — and `…-click:<code>` rows are people who pressed the
+  // greyed 3D button while blocked: real demand, same idea as closure-soon.)
+  { id: 'blocked',label: 'BLOCKED LAYOUTS',  pre: ['instructions-blocked','instructions-blocked-click'],
+    note: 'The planner refusing an illegal layout — not an error. Counted once per session per reason, only after the layout stays broken a few seconds. "-click" rows pressed the greyed 3D button anyway.' },
+  { id: 'error',  label: '⚠ FAILURES',       pre: ['error'] },
 ];
 /* Families that already have a panel of their own further up — repeating them
    in a flat event list is what made it read as an undifferentiated mash. */
-const SHOWN_ABOVE = new Set(['mount', 'length', 'fill', 'open', 'start', 'step', 'complete', 'outro', 'skip-to-end']);
+/* build-start feeds the BUILDS STARTED tile and carries no detail worth a
+   panel row — unlike 3d-instructions:*, whose per-mount-length values stay in
+   the event wall while the KPI row consumes their sum */
+const SHOWN_ABOVE = new Set(['mount', 'length', 'fill', 'open', 'start', 'step', 'complete', 'outro', 'skip-to-end', 'build-start']);
 const groupOf = name => {
   const head = String(name).split(':')[0];
   return (GROUPS.find(g => g.pre.includes(head)) || { id: 'other', label: 'OTHER' });
@@ -578,15 +690,36 @@ function decodeTopo(topo) {
   return out;
 }
 
+/* The static world renders ONCE into an offscreen base canvas; the visible
+   canvas is then repainted from it (paintMap). Hover highlights and the
+   this-hour pulse need per-frame paints, and re-tracing 174 shadowed country
+   paths 60×/s is exactly what the split avoids. mapView also carries a hit
+   list — a Path2D per LIT country (unlit land isn't hoverable: no data, no
+   tooltip) and a centre+radius per marker — for cursor picking. */
+let mapView = null, mapRaf = 0;
+const REDUCED = matchMedia('(prefers-reduced-motion: reduce)');
+
 function drawMap() {
   const cv = $('map'), ctx = cv.getContext('2d');
   const dpr = Math.min(devicePixelRatio || 1, 2);
   const W = cv.clientWidth, H = Math.round(W * 0.52);
+  cancelAnimationFrame(mapRaf);
+  mapRaf = 0;
+  mapView = null;
+  // a hidden tab (or a pane collapsed to nothing) lays out at 0 width — a
+  // 0×0 offscreen base then makes drawImage THROW in paintMap. Bail; the
+  // resize listener redraws when the canvas has real size again.
+  if (!W) return;
   cv.style.height = H + 'px';
   cv.width = W * dpr; cv.height = H * dpr;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, W, H);
   if (!world) return;
+
+  const base = document.createElement('canvas');
+  base.width = W * dpr; base.height = H * dpr;
+  const b = base.getContext('2d');
+  b.setTransform(dpr, 0, 0, dpr, 0, 0);
 
   // equirectangular, clipped to the latitudes the atlas actually covers
   const LAT0 = 84, LAT1 = -60;                          // trims empty Antarctic waste
@@ -594,15 +727,17 @@ function drawMap() {
   const py = lat => (LAT0 - lat) / (LAT0 - LAT1) * H;
 
   // graticule
-  ctx.strokeStyle = 'rgba(34,224,214,.07)'; ctx.lineWidth = 1;
-  for (let lon = -180; lon <= 180; lon += 30) { ctx.beginPath(); ctx.moveTo(px(lon), 0); ctx.lineTo(px(lon), H); ctx.stroke(); }
-  for (let lat = -60; lat <= 84; lat += 30) { ctx.beginPath(); ctx.moveTo(0, py(lat)); ctx.lineTo(W, py(lat)); ctx.stroke(); }
+  b.strokeStyle = 'rgba(34,224,214,.07)'; b.lineWidth = 1;
+  for (let lon = -180; lon <= 180; lon += 30) { b.beginPath(); b.moveTo(px(lon), 0); b.lineTo(px(lon), H); b.stroke(); }
+  for (let lat = -60; lat <= 84; lat += 30) { b.beginPath(); b.moveTo(0, py(lat)); b.lineTo(W, py(lat)); b.stroke(); }
 
-  const byNum = new Map();
+  const hourBy = data?.hourCountries || new Map();
+  const byNum = new Map();                              // numeric id -> country row
   let max = 0;
   for (const c of (data?.countries || [])) {
     const n = A2N[c.code];
-    if (n) { byNum.set(n, c.count); max = Math.max(max, c.count); }
+    if (n && world.has(n)) byNum.set(n, c);
+    max = Math.max(max, c.count);
   }
 
   /* Rings that cross the antimeridian (Russia, Fiji, NZ's outliers) have a
@@ -610,7 +745,9 @@ function drawMap() {
      drawn straight across the map and fills as a band spanning every longitude.
      Fix: rebase the ring to a continuous 0..360 run, then draw it twice — once
      as-is and once shifted -360 — and let the canvas clip whichever half falls
-     outside. Cheaper and more accurate than clipping the polygon by hand. */
+     outside. Cheaper and more accurate than clipping the polygon by hand.
+     Built as a Path2D so the SAME object serves the base fill, the pulse
+     overlay and isPointInPath picking. */
   const spans = r => {
     for (let i = 1; i < r.length; i++) if (Math.abs(r[i][0] - r[i - 1][0]) > 180) {
       const shifted = r.map(([lon, lat]) => [lon < 0 ? lon + 360 : lon, lat]);
@@ -618,42 +755,43 @@ function drawMap() {
     }
     return [r];
   };
-  const path = rings => {
-    ctx.beginPath();
+  const trace = rings => {
+    const p = new Path2D();
     for (const ring of rings) {
       if (ring.length < 2) continue;
       for (const r of spans(ring)) {
-        ctx.moveTo(px(r[0][0]), py(r[0][1]));
-        for (let i = 1; i < r.length; i++) ctx.lineTo(px(r[i][0]), py(r[i][1]));
-        ctx.closePath();
+        p.moveTo(px(r[0][0]), py(r[0][1]));
+        for (let i = 1; i < r.length; i++) p.lineTo(px(r[i][0]), py(r[i][1]));
+        p.closePath();
       }
     }
+    return p;
   };
 
   // unlit landmass first, so the world is always legible even with no traffic
-  ctx.lineJoin = 'round';
+  b.lineJoin = 'round';
   for (const [id, rings] of world) {
     if (byNum.has(id)) continue;
-    path(rings);
-    ctx.fillStyle = '#141a26'; ctx.fill();
-    ctx.strokeStyle = '#1e2636'; ctx.lineWidth = .6; ctx.stroke();
+    const p = trace(rings);
+    b.fillStyle = '#141a26'; b.fill(p);
+    b.strokeStyle = '#1e2636'; b.lineWidth = .6; b.stroke(p);
   }
 
+  const hit = [];                                       // picking + pulse list
   // lit countries — log scale, because one big country otherwise flattens the rest
-  const lit = [...byNum.entries()].sort((a, b) => a[1] - b[1]);
-  for (const [id, count] of lit) {
-    const rings = world.get(id);
-    if (!rings) continue;
-    const t = max <= 1 ? 1 : Math.log(count + 1) / Math.log(max + 1);
-    const [r, g, b] = ramp(t);
-    path(rings);
-    ctx.save();
-    ctx.shadowColor = `rgba(${r},${g},${b},${.3 + .5 * t})`;
-    ctx.shadowBlur = 6 + 22 * t;
-    ctx.fillStyle = `rgba(${r},${g},${b},${.55 + .4 * t})`;
-    ctx.fill();
-    ctx.restore();
-    ctx.strokeStyle = `rgba(${r},${g},${b},.9)`; ctx.lineWidth = .8; ctx.stroke();
+  const lit = [...byNum.entries()].sort((a, c) => a[1].count - c[1].count);
+  for (const [id, row] of lit) {
+    const t = max <= 1 ? 1 : Math.log(row.count + 1) / Math.log(max + 1);
+    const [r, g, bl] = ramp(t);
+    const p = trace(world.get(id));
+    b.save();
+    b.shadowColor = `rgba(${r},${g},${bl},${.3 + .5 * t})`;
+    b.shadowBlur = 6 + 22 * t;
+    b.fillStyle = `rgba(${r},${g},${bl},${.55 + .4 * t})`;
+    b.fill(p);
+    b.restore();
+    b.strokeStyle = `rgba(${r},${g},${bl},.9)`; b.lineWidth = .8; b.stroke(p);
+    hit.push({ code: row.code, name: row.name, count: row.count, hour: hourBy.get(row.code) || 0, path: p, rgb: [r, g, bl] });
   }
 
   // countries with no drawable shape at this resolution — marker instead, or
@@ -663,18 +801,122 @@ function drawMap() {
     const p = PTS[c.code];
     if (!p) continue;
     const t = max <= 1 ? 1 : Math.log(c.count + 1) / Math.log(max + 1);
-    const [r, g, b] = ramp(t);
+    const [r, g, bl] = ramp(t);
     const x = px(p[0]), y = py(p[1]), rad = 2.5 + 4 * t;
-    ctx.save();
-    ctx.shadowColor = `rgba(${r},${g},${b},.95)`; ctx.shadowBlur = 10 + 16 * t;
-    ctx.fillStyle = `rgba(${r},${g},${b},.95)`;
-    ctx.beginPath(); ctx.arc(x, y, rad, 0, 7); ctx.fill();
-    ctx.restore();
+    b.save();
+    b.shadowColor = `rgba(${r},${g},${bl},.95)`; b.shadowBlur = 10 + 16 * t;
+    b.fillStyle = `rgba(${r},${g},${bl},.95)`;
+    b.beginPath(); b.arc(x, y, rad, 0, 7); b.fill();
+    b.restore();
     // halo ring, so a 1-visitor dot still reads against a dark ocean
-    ctx.strokeStyle = `rgba(${r},${g},${b},.35)`; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.arc(x, y, rad + 3.5, 0, 7); ctx.stroke();
+    b.strokeStyle = `rgba(${r},${g},${bl},.35)`; b.lineWidth = 1;
+    b.beginPath(); b.arc(x, y, rad + 3.5, 0, 7); b.stroke();
+    hit.push({ code: c.code, name: c.name, count: c.count, hour: hourBy.get(c.code) || 0, x, y, rad, rgb: [r, g, bl] });
+  }
+
+  mapView = { base, W, H, dpr, hit, hover: null };
+  paintMap(performance.now());
+  // animate only when something is actually live — an idle rAF loop on a page
+  // that sits open for hours is battery spent on nothing
+  if (hit.some(h => h.hour) && !REDUCED.matches) {
+    const loop = ts => { paintMap(ts); mapRaf = requestAnimationFrame(loop); };
+    mapRaf = requestAnimationFrame(loop);
   }
 }
+
+/* Composite: base world + this-hour pulse + hover highlight. The pulse wave
+   matches the THIS HOUR dot's CSS (2s period) so the two read as one family
+   of "live" signals. The per-country hour comes from the proxy's baseline
+   diff (see the note in load()) — nothing new since the baseline means
+   nothing flashes, which is the whole point. */
+function paintMap(ts) {
+  if (!mapView || !mapView.base.width) return;
+  const cv = $('map'), ctx = cv.getContext('2d');
+  const { base, dpr } = mapView;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  ctx.drawImage(base, 0, 0);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const wave = REDUCED.matches ? .6 : .5 + .5 * Math.sin(ts * Math.PI / 1000);   // 2s period
+  for (const h of mapView.hit) {
+    if (h.hour) {
+      // WHITE, not lime: the countries are already coloured by the ramp, and a
+      // lime wash over green land barely moved between frames (Joey caught it
+      // with two captures). What animates now is a white rim + wash appearing
+      // and vanishing — visible against every ramp stop from teal to red.
+      ctx.save();
+      ctx.shadowColor = `rgba(255,255,255,${.3 + .6 * wave})`;
+      ctx.shadowBlur = 8 + 14 * wave;
+      if (h.path) {
+        ctx.fillStyle = `rgba(255,255,255,${.18 * wave})`;
+        ctx.fill(h.path);
+        ctx.strokeStyle = `rgba(255,255,255,${.2 + .75 * wave})`;
+        ctx.lineWidth = 1 + .9 * wave;
+        ctx.stroke(h.path);
+      } else {
+        ctx.strokeStyle = `rgba(255,255,255,${.2 + .75 * wave})`;
+        ctx.lineWidth = 1 + .9 * wave;
+        ctx.beginPath(); ctx.arc(h.x, h.y, h.rad + 4 + 3 * wave, 0, 7); ctx.stroke();
+      }
+      ctx.restore();
+    }
+    if (h === mapView.hover) {                          // steady cyan under the cursor
+      // cyan, not white — the pulse owns white now, and a STEADY selection
+      // ring must read differently from a breathing live one
+      ctx.save();
+      ctx.shadowColor = 'rgba(34,224,214,.9)'; ctx.shadowBlur = 9;
+      ctx.strokeStyle = 'rgba(34,224,214,.95)'; ctx.lineWidth = 1.6;
+      if (h.path) ctx.stroke(h.path);
+      else { ctx.beginPath(); ctx.arc(h.x, h.y, h.rad + 2.5, 0, 7); ctx.stroke(); }
+      ctx.restore();
+    }
+  }
+}
+
+/* Cursor picking. isPointInPath tests the Path2D as transformed by the current
+   CTM against an UNtransformed point, so with the dpr scale still set the
+   mouse position must be multiplied up to device pixels. Topmost = smallest
+   drawn last, so scan the hit list in reverse. */
+function mapHitAt(mx, my) {
+  if (!mapView) return null;
+  const ctx = $('map').getContext('2d');
+  ctx.setTransform(mapView.dpr, 0, 0, mapView.dpr, 0, 0);
+  for (let i = mapView.hit.length - 1; i >= 0; i--) {
+    const h = mapView.hit[i];
+    if (h.path) { if (ctx.isPointInPath(h.path, mx * mapView.dpr, my * mapView.dpr)) return h; }
+    else if ((mx - h.x) ** 2 + (my - h.y) ** 2 <= (h.rad + 5) ** 2) return h;
+  }
+  return null;
+}
+
+/* shared tip placement: beside the cursor, clamped inside the panel */
+function moveTip(tip, cv, mx, my) {
+  const panel = tip.parentElement;
+  tip.classList.remove('hidden');
+  const x = Math.min(cv.offsetLeft + mx + 16, panel.clientWidth - tip.offsetWidth - 8);
+  const y = Math.min(cv.offsetTop + my + 18, panel.clientHeight - tip.offsetHeight - 6);
+  tip.style.left = Math.max(8, x) + 'px';
+  tip.style.top = Math.max(8, y) + 'px';
+}
+
+$('map').addEventListener('mousemove', e => {
+  const h = mapHitAt(e.offsetX, e.offsetY);
+  $('map').style.cursor = h ? 'crosshair' : 'default';
+  if (mapView && mapView.hover !== h) { mapView.hover = h; if (!mapRaf) paintMap(performance.now()); }
+  const tip = $('map-tip');
+  if (!h) { tip.classList.add('hidden'); return; }
+  const rangeLabel = (RANGES.find(r => r.id === range) || {}).label || range.toUpperCase();
+  tip.innerHTML = `<span class="t-name">${flag(h.code)} ${esc(h.name).toUpperCase()}</span><br>`
+    + `<span class="t-dim">LAST ${rangeLabel} ·</span> ${fmt(h.count)}`
+    + (h.hour ? `<br><span class="t-hour"><i></i>THIS HOUR · ${fmt(h.hour)}</span>` : '');
+  moveTip(tip, $('map'), e.offsetX, e.offsetY);
+});
+$('map').addEventListener('mouseleave', () => {
+  $('map-tip').classList.add('hidden');
+  if (mapView && mapView.hover) { mapView.hover = null; if (!mapRaf) paintMap(performance.now()); }
+});
+// if the OS motion preference flips while the page is open, re-arm or stop
+REDUCED.addEventListener?.('change', () => { if (data) drawMap(); });
 
 /* Thermal ramp with SATURATED stops. A straight cyan→orange RGB lerp passes
    through a desaturated olive, so mid-traffic countries came out muddy grey-
@@ -688,10 +930,33 @@ function ramp(t) {
 }
 
 /* ================= activity strip ================= */
+/* Bars used to carry no numbers at all — the shape was readable but nothing
+   was quantified. Now: a Y scale with faint gridlines at "nice" values, hour
+   ticks along the X baseline, and a hover tooltip with each bar's exact
+   count. stripView keeps the geometry so the mousemove handler and drawStrip
+   agree about where the bars are. */
+let stripView = null, stripHover = -1;
+
+/* label for one series key: "Jul 29 17:00". Keys are already in the account's
+   timezone, so they're FORMATTED as if UTC — no second conversion. */
+function stripLabel(k) {
+  if (!k) return '';
+  const d = new Date(k + ':00:00Z');
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', timeZone: 'UTC' }) + ' ' + k.slice(11) + ':00';
+}
+/* largest 1/2/5×10ⁿ that fits at least twice under max → 2-4 gridlines */
+function niceStep(max) {
+  for (let p = 1; p < 1e6; p *= 10)
+    for (const m of [1, 2, 5]) if (max / (m * p) <= 4) return m * p;
+  return Math.ceil(max / 4);
+}
+
 function drawStrip() {
   const cv = $('strip'), ctx = cv.getContext('2d');
   const dpr = Math.min(devicePixelRatio || 1, 2);
   const W = cv.clientWidth, H = 150;
+  stripView = null;
+  if (!W) return;               // hidden tab lays out at 0 — same guard as drawMap
   cv.style.height = H + 'px';   // drawMap already did this; without it the canvas keeps its 2:1 intrinsic ratio
   cv.width = W * dpr; cv.height = H * dpr;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -701,11 +966,12 @@ function drawStrip() {
   if (!pts.length) return;
   const max = Math.max(1, ...pts.map(p => p[1]));
   const bw = W / pts.length;
+  stripView = { pts, bw, H, max };
 
   pts.forEach(([key, n], i) => {
     const h = Math.round((n / max) * (H - 26));
     const x = i * bw, y = H - 18 - h;
-    ctx.fillStyle = 'rgba(34,224,214,.07)';
+    ctx.fillStyle = i === stripHover ? 'rgba(157,255,60,.10)' : 'rgba(34,224,214,.07)';
     ctx.fillRect(x + 1, 4, bw - 2, H - 22);
     if (!n) return;
     const last = i === pts.length - 1;
@@ -718,23 +984,69 @@ function drawStrip() {
     ctx.fillStyle = grad;
     ctx.fillRect(x + 1, y, bw - 2, Math.max(2, h));
     ctx.restore();
+    if (i === stripHover) {                       // crisp cap on the inspected bar
+      ctx.strokeStyle = 'rgba(223,230,242,.9)';
+      ctx.strokeRect(x + 1.5, y - .5, bw - 3, Math.max(2, h) + 1);
+    }
   });
 
-  // baseline
+  // Y scale — gridlines at nice values, labelled at the left edge. Drawn over
+  // the bars deliberately: a HUD overlay reads as measurement, and gutters
+  // would shrink every bar for the sake of three small numbers.
+  ctx.font = '10px ui-monospace, Consolas, monospace';
+  const step = niceStep(max);
+  for (let v = step; v <= max; v += step) {
+    const y = H - 18 - (v / max) * (H - 26);
+    ctx.strokeStyle = 'rgba(34,224,214,.13)';
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+    // the top gridline can land in the VIEWS/HR tag's corner — keep the line,
+    // skip the number rather than print "60" through the unit label (Joey's
+    // 24H capture)
+    if (y >= 26) {
+      ctx.fillStyle = 'rgba(107,118,137,.95)';
+      ctx.fillText(String(v), 4, y - 3);
+    }
+  }
+  ctx.fillStyle = 'rgba(107,118,137,.7)';
+  ctx.fillText('VIEWS / HR', 4, 12);
+
+  // baseline + hour ticks (every 6h; midnight gets the accent so days separate)
   ctx.strokeStyle = 'rgba(34,224,214,.25)';
   ctx.beginPath(); ctx.moveTo(0, H - 18); ctx.lineTo(W, H - 18); ctx.stroke();
+  pts.forEach(([key], i) => {
+    const hr = +key.slice(11);
+    if (hr % 6) return;
+    const x = i * bw + bw / 2, mid = hr === 0;
+    ctx.strokeStyle = mid ? 'rgba(255,138,64,.6)' : 'rgba(34,224,214,.3)';
+    ctx.beginPath(); ctx.moveTo(x, H - 18); ctx.lineTo(x, H - (mid ? 11 : 14)); ctx.stroke();
+    ctx.fillStyle = mid ? 'rgba(255,138,64,.75)' : 'rgba(107,118,137,.85)';
+    const t = key.slice(11);
+    ctx.fillText(t, x - ctx.measureText(t).width / 2, H - 2);
+  });
 
   // date + hour: with a 48-slot window the first and middle labels can both land
   // on midnight, and a bare "00:00" twice tells you nothing
-  const label = k => {
-    if (!k) return '';
-    const d = new Date(k + ':00:00Z');
-    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', timeZone: 'UTC' }) + ' ' + k.slice(11) + ':00';
-  };
   $('strip-x').innerHTML = pts.length
-    ? `<span>${label(pts[0][0])}</span><span>${label(pts[Math.floor(pts.length / 2)][0])} ${esc(siteTz || 'UTC')}</span><span>NOW</span>`
+    ? `<span>${stripLabel(pts[0][0])}</span><span>${stripLabel(pts[Math.floor(pts.length / 2)][0])} ${esc(siteTz || 'UTC')}</span><span>NOW</span>`
     : '';
 }
+
+$('strip').addEventListener('mousemove', e => {
+  if (!stripView) return;
+  const i = Math.max(0, Math.min(stripView.pts.length - 1, Math.floor(e.offsetX / stripView.bw)));
+  if (i !== stripHover) { stripHover = i; drawStrip(); }
+  const [key, n] = stripView.pts[i];
+  const last = i === stripView.pts.length - 1;
+  const tip = $('strip-tip');
+  tip.innerHTML = `<span class="t-name">${esc(stripLabel(key))}</span>`
+    + (last ? ` <span class="t-hour"><i></i>THIS HOUR</span>` : '')
+    + `<br><span class="t-dim">PAGEVIEWS ·</span> ${fmt(n)}`;
+  moveTip(tip, $('strip'), e.offsetX, e.offsetY);
+});
+$('strip').addEventListener('mouseleave', () => {
+  $('strip-tip').classList.add('hidden');
+  if (stripHover !== -1) { stripHover = -1; drawStrip(); }
+});
 
 /* ================= render ================= */
 const flag = code => /^[A-Z]{2}$/.test(code)
@@ -753,9 +1065,26 @@ function render() {
       + (typeof q === 'number' ? ` · ${q} REQ LEFT` : '');
     el.style.color = (low || snapshot.stale) ? 'var(--magenta)' : '';
     el.title = 'Fetched ' + new Date(snapshot.generated).toLocaleString()
-      + (typeof q === 'number' ? ` · ${q} API requests left in this window (a full load costs 7)` : '');
+      + (typeof q === 'number' ? ` · ${q} API requests left in this window (a full load costs ~10)` : '');
   }
-  $('s-views').textContent = fmt(data.views);
+  // outcome row: numbers + each stage's share of the one before it. A share
+  // can top 100% (aggregate totals, not a cohort — see the markup comment);
+  // shown as-is, the tile title explains.
+  const k = data.kpi;
+  const rangeLabel = (RANGES.find(r => r.id === range) || {}).label || range.toUpperCase();
+  $('k-visits').textContent = fmt(k.visits);
+  $('k-started').textContent = fmt(k.started);
+  $('k-opened').textContent = fmt(k.opened);
+  $('k-downloads').textContent = fmt(k.downloads);
+  $('kc-visits').textContent = 'LAST ' + rangeLabel;
+  const conv = (id, cur, prev, prevLabel, rgb) => {
+    $(id).innerHTML = prev > 0
+      ? `↳ <b style="color:${rgb}">${Math.round(cur / prev * 100)}%</b> OF ${prevLabel}`
+      : '';
+  };
+  conv('kc-started', k.started, k.visits, 'VISITS', 'var(--cyan)');
+  conv('kc-opened', k.opened, k.started, 'STARTED', 'var(--text)');
+  conv('kc-downloads', k.downloads, k.opened, 'OPENED', 'var(--lime)');
   $('s-events').textContent = fmt(data.events);
   $('s-countries').textContent = fmt(data.countries.length);
   $('s-hour').textContent = fmt(data.thisHour);
@@ -779,6 +1108,13 @@ function render() {
   }
   $('legend').style.background = 'linear-gradient(90deg,' + RAMP.map(c => `rgb(${c.join(',')})`).join(',') + ')';
   $('legend-max').textContent = max ? '· peak ' + fmt(max) : '';
+  // a lit THIS HOUR tile beside a silent map reads as broken — say why. Shown
+  // only in the warm-up gap: the proxy's first build after a server start has
+  // no baseline to diff against (the baseline persists across restarts now,
+  // so this needs a genuinely cold start AND traffic in the current hour).
+  $('map-note').textContent = (!data.hourKnown && data.thisHour > 0)
+    ? '◌ THIS HOUR pulse is warming up — per-country hour data needs one more snapshot (the stats server just started)'
+    : '';
 
   renderMix();
   simpleList('sources', data.sources, x => x.name);
@@ -840,6 +1176,25 @@ function renderEvents() {
     head.className = 'h';
     head.innerHTML = `${esc(b.label)} <span style="color:var(--dim);letter-spacing:.05em">· ${fmt(sum)}</span>`;
     panel.appendChild(head);
+    // the leading faceplate family gets its product photo in a framed band
+    // under the head — the one panel where "which one is winning" is the whole
+    // question, so the winner shows itself (Joey 2026-07-30, echoing the
+    // planner's photo-backed style cards). A ghosted background was tried
+    // first and rejected as too subtle at any opacity that kept rows legible:
+    // the fix was to give the photo its own band instead of fighting the text
+    // for the same pixels — it reads as a camera feed in the HUD.
+    if (id === 'face') {
+      const top = b.items.find(i => String(i.path).startsWith('faceplate:'));
+      const slug = top && String(top.path).split(':')[1];
+      const art = slug && FACE_ART[slug];
+      if (art) {
+        const hero = document.createElement('div');
+        hero.className = 'face-hero';
+        hero.style.backgroundImage = `url("img/${art}")`;
+        hero.innerHTML = `<span class="fh-chip">TOP PICK · ${esc(slug).toUpperCase()}</span>`;
+        panel.appendChild(hero);
+      }
+    }
     const rows = document.createElement('div');
     rows.className = 'rows';
     const max = b.items[0].count || 1;
@@ -847,9 +1202,26 @@ function renderEvents() {
     // was hiding real rows — faceplate:classic sat just under the fold.
     for (const it of b.items.slice(0, 40)) rows.appendChild(barRow(it.path, it.count, max));
     panel.appendChild(rows);
+    const g = GROUPS.find(x => x.id === id);
+    if (g?.note) {
+      const n = document.createElement('p');
+      n.className = 'note';
+      n.style.marginTop = '10px';
+      n.textContent = g.note;
+      panel.appendChild(n);
+    }
     box.appendChild(panel);
   }
 }
+
+/* the planner's faceplate style-card photos, copied into stats/img/ — keyed by
+   the `faceplate:<slug>` event value */
+const FACE_ART = {
+  essential: 'Faceplate-Essential.jpg',
+  classic: 'Faceplate-Classic.jpg',
+  edgelabel: 'Faceplate-EdgeLabel.jpg',
+  classicpro: 'Faceplate-ClassicPro.jpg',
+};
 
 function renderFunnel() {
   const f = data.funnel, box = $('funnel'), note = $('funnel-note');

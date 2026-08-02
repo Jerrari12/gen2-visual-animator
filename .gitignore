@@ -16,6 +16,9 @@ desktop.ini
 
 # Local GoatCounter API token for serve-stats.py — NEVER commit this.
 .goatcounter-token
+# serve-stats.py's hour baseline (survives restarts so the map pulse doesn't
+# cold-start blind) — local business data, stays on this machine
+.stats-hour-base.json
 
 # ---- Internal working notes: kept on disk, never published ----
 # Session handoffs, batch run logs, calibration notes and the AI project
