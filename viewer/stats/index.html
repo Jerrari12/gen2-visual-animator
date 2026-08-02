@@ -382,7 +382,7 @@ async function load() {
     const loc = { stats: site.locations };
     const hits = { hits: site.hits };
     for (const r of site.refs || []) {
-      const key = (r.name || '') + ' ' + (r.scheme || '');
+      const key = (r.name || '') + ' ' + (r.scheme || '');
       const cur = refs.get(key) || { name: r.name || '', scheme: r.scheme || '', count: 0 };
       cur.count += r.count || 0;
       refs.set(key, cur);
