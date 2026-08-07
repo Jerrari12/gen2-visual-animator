@@ -546,7 +546,11 @@ const GROUPS = [
   { id: 'face',   label: 'FACEPLATES',       pre: ['faceplate','handle','backcover'] },
   { id: 'printer',label: '3D PRINTERS',      pre: ['printer'] },
   { id: 'build',  label: 'DRAWER HARDWARE',  pre: ['closure','closure-soon','opt'] },
-  { id: 'funnel', label: 'ENTRY & INTENT',   pre: ['collection','from','3d-instructions','resume-build','example','surprise','customize'] },
+  // kits:hero|footer are the planner's two links INTO the kits gallery — a
+  // cross-tool jump like 3d-instructions (planner→studio) and customize
+  // (studio→planner), so they belong with the other intent signals. Split by
+  // placement on purpose: it answers whether the hero pill earns its space.
+  { id: 'funnel', label: 'ENTRY & INTENT',   pre: ['collection','from','3d-instructions','resume-build','example','surprise','customize','kits'] },
   // The conversion links, split OUT of OUTBOUND on purpose: a handful of Club
   // joins listed under dozens of model-download clicks is unreadable, and these
   // are the rows worth acting on. `club:*` fires from BOTH apps (planner
@@ -558,7 +562,8 @@ const GROUPS = [
   // kit-dl:* (the gallery's "download the models" split-button) is a model
   // download like any out:* — it was falling through to OTHER on its own.
   { id: 'out',    label: 'OUTBOUND',         pre: ['out','kit-dl','linksite','store-pref','hardware','filament','labelgen'] },
-  { id: 'tools',  label: 'TOOLS & UI',       pre: ['dock','tool','identify','style','preset','colors','bom','export','video','save-build','load-build','share-link','save-image','start-fresh','bom-track'] },
+  // help:* sits with video:* — both are "someone went looking for guidance"
+  { id: 'tools',  label: 'TOOLS & UI',       pre: ['dock','tool','identify','style','preset','colors','bom','export','video','help','save-build','load-build','share-link','save-image','start-fresh','bom-track'] },
   // blocked ≠ broken: these are the planner's own rules stopping an illegal
   // layout, listed apart from real failures so 14 mid-build `unsupported`s
   // can't read as 14 crashes. (Since 2026-07-30 the planner also only counts a
