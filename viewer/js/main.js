@@ -1016,13 +1016,29 @@ function buyFilamentEvent(pick) {
   return 'buy:filament:' + (src ? slug(src.brand + '-' + src.line) : 'unknown');
 }
 
+/* Which hosts pay a commission. HOST-driven so the "· paid link" marking and
+   the disclosures can never drift from the truth of an individual URL — the
+   filament menu mixes Amazon (paid) with Polymaker/Printed Solid (plain), so a
+   blanket label would misstate the relationship in one direction or the other.
+   When a store becomes a paid program (e.g. Polymaker tracked links), its host
+   joins this list and every surface updates at once. FTC guidance: "paid link"
+   next to the link is adequate where "affiliate link" alone may not be. */
+const PAID_HOSTS = [/(^|\.)amzn\.to$/, /(^|\.)amazon\.[a-z.]+$/];
+function isPaidLink(href) {
+  try { return PAID_HOSTS.some(re => re.test(new URL(href).hostname.toLowerCase())); }
+  catch (e) { return false; }
+}
+
 function linkEl(text, href, ev) {
   const a = document.createElement('a');
   a.className = 'dl-link';
   a.href = href;
   a.target = '_blank';
-  a.rel = 'noopener';
-  a.textContent = text;
+  // every paid link is marked AT the link (FTC proximity) and carries
+  // rel=sponsored (the planner's buy buttons already do)
+  const paid = isPaidLink(href);
+  a.rel = paid ? 'noopener sponsored' : 'noopener';
+  a.textContent = paid ? text + ' · paid link' : text;
   a.addEventListener('click', () => track(ev || 'out:' + outTarget(href)));
   return a;
 }
@@ -1180,16 +1196,22 @@ function renderIdentifyLinks(info, filament = null) {
   const linksEl = $('identify-links');
   linksEl.innerHTML = '';
   appendStoreLinks(linksEl, info?.links);
-  // purchased hardware: Amazon affiliate buy options (generate.js BUY) + the
-  // required affiliate disclosure right in the card
+  // purchased hardware: Amazon affiliate buy options (generate.js BUY)
   for (const b of info?.links?.buy || []) linksEl.appendChild(linkEl(b.label, b.url, buyEvent(b)));
-  if (info?.links?.buy?.length) {
+  if (filament) linksEl.appendChild(linkEl('Get filament', filament.url, buyFilamentEvent(filament)));
+  // The paid-link disclosure covers EVERYTHING this card rendered, so it is
+  // decided after all of it. ⚠ It used to key on links.buy alone, which left
+  // the "Get filament" link (Elegoo = Amazon) undisclosed on parts with a
+  // filament pick but no hardware rows. The filament link is judged by its
+  // HOST because Polymaker/Printed Solid picks are plain links — a disclosure
+  // under those would claim a relationship that doesn't exist.
+  if (info?.links?.buy?.length || (filament && isPaidLink(filament.url))) {
     const aff = document.createElement('div');
     aff.className = 'fm-note';
-    aff.textContent = 'Affiliate links — they support the project at no extra cost.';
+    aff.textContent = 'Paid links — I earn a commission if you buy through them, at no extra cost to you. '
+      + 'As an Amazon Associate I earn from qualifying purchases.';
     linksEl.appendChild(aff);
   }
-  if (filament) linksEl.appendChild(linkEl('Get filament', filament.url, buyFilamentEvent(filament)));
 }
 
 // ---------- build options (generated builds only; static kits skip it) ----------
@@ -1331,12 +1353,14 @@ function renderChecklist() {
     row.append(chip, mid, qty);
     rows.appendChild(row);
   }
-  // Amazon buy chips are affiliate links → the panel carries the disclosure
-  // (same wording as the filament menu's)
+  // Amazon buy chips are paid links → the panel carries the disclosure right
+  // under the rows that show them (FTC: disclosure and links seen together),
+  // including Amazon's own required Associate statement
   if (manifest.parts.some(p => !p.styleHidden && p.links?.buy)) {
     const aff = document.createElement('div');
     aff.className = 'fm-note';
-    aff.textContent = 'Amazon links are affiliate links — buying through them supports the project at no extra cost.';
+    aff.textContent = 'Paid links — I earn a commission if you buy through the Amazon links here, at no extra cost to you. '
+      + 'As an Amazon Associate I earn from qualifying purchases. Any equivalent hardware from any store works.';
     rows.appendChild(aff);
   }
   $('checklist-title').textContent = build ? 'Your build' : 'Parts list';
@@ -2526,6 +2550,7 @@ function renderFilamentBrands() {
           const buy = $('fm-buy');
           buy.href = f.url;
           buy.textContent = `Buy ${f.label} →`; // label, not name — `name` is the bare colour ("Black")
+          markFmBuy();
         };
         grid.appendChild(b);
       }
@@ -2555,6 +2580,15 @@ function closeFilamentMenu(refresh = true) {
 function syncZoneChips() {
   if (selectedId && instances.has(selectedId)) renderZoneChips(instances.get(selectedId));
 }
+// #fm-buy is a STATIC anchor (markup owns it, href/label swapped in TWO places:
+// menu open + colour pick) → linkEl never sees it, so it marks itself. One
+// helper for both sites, judged by the CURRENT href like everything else —
+// Elegoo lands on Amazon (paid), Polymaker / Printed Solid are plain.
+function markFmBuy() {
+  const buy = $('fm-buy');
+  if (isPaidLink(buy.href)) { buy.rel = 'noopener sponsored'; buy.textContent += ' · paid link'; }
+  else buy.rel = 'noopener';
+}
 function openFilamentMenu(type) {
   fmType = type;
   fmQuery = '';
@@ -2564,6 +2598,7 @@ function openFilamentMenu(type) {
   const sel = customColors[type];
   buy.href = sel ? sel.url : FILAMENT_DB[0].url;
   buy.textContent = sel ? `Buy ${sel.name.replace('Panchroma ', '')} →` : 'Shop filament →';
+  markFmBuy();
   $('filament-menu').classList.remove('hidden');
   refreshSelHighlight(); // color mode: drop the emissive glow so picks read true
   syncZoneChips();       // move the active ring to the zone we just targeted
