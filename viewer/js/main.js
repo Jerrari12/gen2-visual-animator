@@ -1477,17 +1477,23 @@ function goTo(i, { animate = true } = {}) {
 
 $('btn-prev').onclick = () => goTo(cur - 1, { animate: false });
 $('btn-next').onclick = () => goTo(cur + 1);
-$('btn-replay').onclick = () => goTo(cur);
+// The study tools all report as `tool:<name>`, and — like tool:measure — only
+// when TURNED ON. These are "is this feature worth its maintenance and its
+// space in the controls row" questions, so a session that used slow-motion
+// once counts the same as one that toggled it five times.
+$('btn-replay').onclick = () => { track('tool:replay'); goTo(cur); };
 // collapse the step text to its number badge (session-sticky across steps) —
 // reclaims the canvas while recoloring/inspecting on small screens
 $('note-collapse').onclick = () => {
   const collapsed = $('note-panel').classList.toggle('collapsed');
+  if (collapsed) track('tool:note-collapse'); // only the "put it away" direction
   // expanded shows ✕ ("put this text away"), collapsed shows ▸ ("bring it back")
   $('note-collapse').innerHTML = collapsed ? '&#9656;' : '&#10005;';
   $('note-collapse').title = collapsed ? 'Show the step text' : 'Collapse the step text';
 };
 $('btn-slow').onclick = () => {
   slowmo = !slowmo;
+  if (slowmo) track('tool:slow');
   $('btn-slow').classList.toggle('on', slowmo);
 };
 function setPaused(on) {
@@ -1497,7 +1503,7 @@ function setPaused(on) {
   b.querySelector('i').textContent = on ? '▶' : '⏸';
   b.querySelector('span').textContent = on ? 'Play' : 'Pause';
 }
-$('btn-pause').onclick = () => setPaused(!paused);
+$('btn-pause').onclick = () => { if (!paused) track('tool:pause'); setPaused(!paused); };
 // google-maps-style "re-center": drop the user override and glide back to
 // wherever the guided camera last wanted to be.
 $('btn-cam').onclick = () => { setCamOverride(false); tweenCamera(curCamPreset, 900, true); };
@@ -1715,6 +1721,12 @@ function setSelected(id) {
   selAnchor = new THREE.Box3().setFromObject(inst.group).getCenter(new THREE.Vector3()).sub(inst.group.position);
   const info = partInfoByNode[inst.cfg.node] || { label: inst.cfg.node, qty: '?' };
   const selType = typeByNode[inst.cfg.node];
+  // WHICH parts people inspect — "are faceplates even being looked at" is the
+  // question the Club upsell rests on. Once per type per session, like
+  // identify:open above: that reads as "what share of sessions examined a
+  // faceplate", where a raw tap count would just surface whoever clicked most.
+  // selType is a fixed vocabulary (the manifest's part types), never user text.
+  if (selType) trackOnce('identify:' + String(selType).toLowerCase());
   const selLocked = colorLocked(selType); // purchased hardware: swatch is a plain color dot, not a picker
   const sw = $('identify-swatch');
   const selKey = primaryKey(inst.cfg.node); // the visible front, not the hidden base
