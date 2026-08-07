@@ -1257,7 +1257,7 @@ export function generateManifest(build) {
     }
   });
 
-  if (classicCount) warnings.push('Classic drawers are placed from measured part geometry (back-aligned with the calibrated Decor drawer) — no assembled ground truth yet · verify the fit on a printed build.');
+  if (classicCount) warnings.push('Classic drawers are placed from measured part geometry (back-aligned with the calibrated Decor drawer) - no assembled ground truth yet · verify the fit on a printed build.');
   if (units.some(u => u.fill === 'decor' && u.hh !== 2)) warnings.push('Non-1H drawers use some derived (not-yet-calibrated) sizing · double-check the tall drawers and report anything that looks off.');
 
   // ---- assemble the step list ----------------------------------------------
@@ -1355,7 +1355,7 @@ export function generateManifest(build) {
         // narrow builds tile ONE piece per layer, so the two-layer design reads as
         // pointless doubling-up ("why not one thick rail?" — Joey's most-asked
         // question). Name the real reason instead of leaving it unexplained.
-          : ' The two layers are one system: the lower rail holds the feet, the upper caps them and carries the case dovetails — and on wider builds their seams offset brick-style to tie sections together.'),
+          : ' The two layers are one system: the lower rail holds the feet, the upper caps them and carries the case dovetails - and on wider builds their seams offset brick-style to tie sections together.'),
       camera: cam(0, 30, totalW, gridBottom, FIT),
       phases: [{ enter: uppers.map((r, i) => {
         inst.push({ id: `fru${i}`, node: `FR-U_${L}-${r.w}W`, pos: [railX(r), FRU_Y, 0] });
@@ -1385,7 +1385,7 @@ export function generateManifest(build) {
         (cuIds.length > 1 ? ' Their seams are staggered brick-style over the lower covers’ seams, locking the sections together.'
         // same rule as the upper footrail note above — at ≤2W both layers are a
         // single tile, so spell out why the cover is two parts
-          : ' They’re not a doubling-up: the lower cover carries the stopper slots and dovetails, and this one locks them in — on wider builds the two layers’ seams also offset to tie sections together.'),
+          : ' They’re not a doubling-up: the lower cover carries the stopper slots and dovetails, and this one locks them in - on wider builds the two layers’ seams also offset to tie sections together.'),
       camera: cam(0, H_MM, totalW, gridBottom, FIT),
       phases: [{ enter: cuIds.map(id => ({ id, from: [0, 0, slideBack] })) }],
     });
@@ -1431,7 +1431,7 @@ export function generateManifest(build) {
     const bcClause = bcOn ? (dress ? ', then clip the back cover in from behind' : 'clip the back cover in from behind') : '';
     const prep = dress || bcClause
       ? `Assemble the faceplate first: ${dress}${bcClause}. `
-      : "The faceplate prints complete — its grip is part of the plate, so there's nothing to bolt on and no hardware to buy. ";
+      : "The faceplate prints complete - its grip is part of the plate, so there's nothing to bolt on and no hardware to buy. ";
     postSteps.push({
       title: face.hasHandle ? 'Faceplates & handles' : 'Faceplates',
       // assembly-first (Joey): build the plate unit, THEN slide it onto the

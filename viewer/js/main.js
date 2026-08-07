@@ -354,17 +354,17 @@ if (BUILD_HASH) {
     } catch (e) { /* network / parse — falls through to the friendly 404 */ }
   }
   if (!file || !file.build)
-    kitFail('This kit link isn’t available — it may have moved or been renamed.', 'kit-not-found');
+    kitFail('This kit link isn’t available - it may have moved or been renamed.', 'kit-not-found');
   if (file.gen2OfficialBuild !== 1)
-    kitFail('This kit was made for a newer version of the Build Studio — refresh the page and try again.', 'kit-version');
+    kitFail('This kit was made for a newer version of the Build Studio - refresh the page and try again.', 'kit-version');
   build = migrateOfficialBuild(file.build, file.buildVersion ?? 1);
   if (!build)
-    kitFail('This kit was made for a newer version of the Build Studio — refresh the page and try again.', 'kit-version');
+    kitFail('This kit was made for a newer version of the Build Studio - refresh the page and try again.', 'kit-version');
   OFFICIAL = { id: OFFICIAL_ID, title: String(file.title || 'GEN2 Kit'), tagline: typeof file.tagline === 'string' ? file.tagline : '' };
   originalBuild = structuredClone(build);
   const gen = generateManifest(build);
   if (!gen.manifest) // a committed kit failing to generate is OUR bug, not the user's — say so plainly
-    kitFail('This kit can’t be shown right now (' + gen.errors.join(' · ') + ') — please report it.', 'kit-generate');
+    kitFail('This kit can’t be shown right now (' + gen.errors.join(' · ') + ') - please report it.', 'kit-generate');
   manifest = gen.manifest;
   PARTS_BASE = 'parts/' + (manifest.collection || '185') + '/';
 } else {
@@ -1282,7 +1282,7 @@ function renderIdentifyLinks(info, filament = null) {
     aff.className = 'fm-note';
     // covers BOTH programs — this card can show Amazon hardware chips OR a
     // Polymaker "Get filament" link, and the note must be true for either
-    aff.textContent = 'Paid links — I earn a commission if you buy through them, at no extra cost to you. '
+    aff.textContent = 'Paid links - I earn a commission if you buy through them, at no extra cost to you. '
       + 'As an Amazon Associate I earn from qualifying purchases; I’m also a Polymaker Ambassador.';
     linksEl.appendChild(aff);
   }
@@ -1338,7 +1338,7 @@ function renderOptions() {
     // flipping through the styles shows which ones you can build today.
     const bolts = currentFaceplateStyle().hasHandle;
     name.innerHTML = currentFaceplateStyle().label + (bolts ? ' ' + HW_ICON : '');
-    name.title = bolts ? 'Bolt-on handle — needs 2× M3×6 screws per drawer' : 'Handle is printed in — no hardware needed';
+    name.title = bolts ? 'Bolt-on handle - needs 2× M3×6 screws per drawer' : 'Handle is printed in - no hardware needed';
     const next = document.createElement('button'); next.textContent = '▶'; next.onclick = () => cycleFaceplateStyle(1);
     grp.append(prev, name, next); row.append(lab, grp); box.appendChild(row);
   }
@@ -1433,7 +1433,7 @@ function renderChecklist() {
   if (manifest.parts.some(p => !p.styleHidden && p.links?.buy)) {
     const aff = document.createElement('div');
     aff.className = 'fm-note';
-    aff.textContent = 'Paid links — I earn a commission if you buy through the Amazon links here, at no extra cost to you. '
+    aff.textContent = 'Paid links - I earn a commission if you buy through the Amazon links here, at no extra cost to you. '
       + 'As an Amazon Associate I earn from qualifying purchases. Any equivalent hardware from any store works.';
     rows.appendChild(aff);
   }
@@ -1819,7 +1819,7 @@ function renderZoneChips(inst) {
   const inherits = [...zones].filter(z => !(useCustom && customColors[zoneKey(type, z)]) && !manifest.colors[zoneKey(type, z)]);
   const bodyName = wornName(type);
   chip('Body', type, [
-    bodyName ? `Body — ${bodyName}` : 'Body — instruction colour',
+    bodyName ? `Body - ${bodyName}` : 'Body - instruction colour',
     inherits.length
       ? `also repaints the zones you haven’t picked yet (${inherits.map(z => z.toLowerCase()).join(', ')})`
       : 'click to change',
@@ -1828,10 +1828,10 @@ function renderZoneChips(inst) {
     const key = zoneKey(type, z);
     const label = z.charAt(0) + z.slice(1).toLowerCase();
     const own = wornName(key);
-    const tip = own ? `${label} — ${own} · click to change`
-      : manifest.colors[key] ? `${label} — this kit’s colour · click to pick a filament`
-      : bodyName ? `${label} — follows Body (${bodyName}) · click to change`
-      : `${label} — instruction colour · click to pick a filament`;
+    const tip = own ? `${label} - ${own} · click to change`
+      : manifest.colors[key] ? `${label} - this kit’s colour · click to pick a filament`
+      : bodyName ? `${label} - follows Body (${bodyName}) · click to change`
+      : `${label} - instruction colour · click to pick a filament`;
     chip(label, key, tip);
   }
 }
@@ -2954,7 +2954,7 @@ async function applyHandleStyle(style) {
       // read as a dead button (the 185 kits shipped without Crystal once)
       activeHandleStyle = prevActive;
       if (build) build.handleStyle = prevPlanner;
-      console.warn(`Handle style "${style.label}" has no GLB at ${PARTS_BASE}${style.node}.lib.glb — skipped.`);
+      console.warn(`Handle style "${style.label}" has no GLB at ${PARTS_BASE}${style.node}.lib.glb - skipped.`);
       return false;
     }
   }
@@ -3124,7 +3124,7 @@ async function applyFaceplateStyle(style) {
     // `false` so the ▶ cycle skips past instead of dying silently (same
     // guard as applyHandleStyle — the un-caught await killed the handler)
     activeFaceplateStyle = prevActive;
-    console.warn(`Faceplate family "${style.label}" is missing a size GLB in ${PARTS_BASE} — skipped.`);
+    console.warn(`Faceplate family "${style.label}" is missing a size GLB in ${PARTS_BASE} - skipped.`);
     return false;
   }
   for (const inst of fps) {
@@ -4115,7 +4115,7 @@ try {
   // a mount failure here is almost always a missing GLB (loadTemplates names
   // them) — without this catch the spinner spins forever with no message
   bootFail('<strong>Can’t load this build</strong><br><br>• ' + ((e && e.message) || e) +
-    '<br><br>Please report it — this is a library gap on our side, not your build.',
+    '<br><br>Please report it - this is a library gap on our side, not your build.',
     'mount failed: ' + ((e && e.message) || e));
 }
 applyPalette(); // restore any saved filament colors
