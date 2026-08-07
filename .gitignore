@@ -33,6 +33,9 @@ GEN2-Part-Orientation-Notes.md
 # Joey's link/catalogue specs. These were sitting UNTRACKED but un-ignored,
 # which is a different thing: one `git add -A` would have published them.
 GEN2_LINKS_UPDATE_*.md
+# AGENTS.md is a COPY of CLAUDE.md for tools that read that filename — same
+# private project memory, same rule: on disk, never published.
+AGENTS.md
 # Archived handoffs and run logs. The patterns above are all basename-only, so
 # they keep matching after a move into notes/ — this covers anything else.
 notes/
