@@ -2245,13 +2245,44 @@ const FILAMENT_DB = [
     { name: 'Stone Blue',      hex: '#4a6a8a', id: 44863271370809 },
     { name: 'Purple',          hex: '#7a4fb0', id: 44863271600185 },
   ].map(f => ({ ...f, label: `Panchroma ${f.name}`, url: PM(f.id) })) },
-  // Silk is a separate Panchroma product page (panchroma-silk, not -pla), so it
+  // Silk is a separate Panchroma product page (shop handle silk-pla), so it
   // gets its own section rather than a stray url inside the Basic PLA block.
-  // Silver is the Classic faceplate GRIP ACCENT default (Joey 2026-07-25).
+  // All 24 new-formula 1.75mm/1kg colours (variant ids scraped from the shop's
+  // product JSON 2026-08-07, shop's own order; ids KEPT like the PLA section's
+  // — unused until Superfiliate supports variant deep links; hexes are
+  // approximated silk sheens, refine against spool renders anytime).
+  // Availability is deliberately NOT tracked — spool stock shifts weekly
+  // (Silver ships as a refill right now) and the product page is the truth.
+  // Silver is the Classic faceplate GRIP ACCENT default (Joey 2026-07-25) —
+  // its label 'Panchroma Silk Silver' is load-bearing: PRESETS' CLASSIC_FACE
+  // block and saved user palettes match on it exactly.
   { brand: 'Polymaker', line: 'Panchroma™ Silk PLA', url: PM_SILK, colors: [
-    { name: 'Silk Silver', label: 'Panchroma Silk Silver', hex: '#cdd2d9', url: PM_SILK, pick: true,
+    { name: 'Silk Black',         hex: '#3a3b40', id: 43637560868921 },
+    { name: 'Silk Purple',        hex: '#8655c8', id: 43637560901689 },
+    { name: 'Silk Magenta',       hex: '#d63d9a', id: 43637560934457 },
+    { name: 'Silk Rose',          hex: '#e87c9c', id: 43637560967225 },
+    { name: 'Silk Red',           hex: '#d43a3a', id: 43637560999993 },
+    { name: 'Silk Rose Gold',     hex: '#e0a48c', id: 43637561032761 },
+    { name: 'Silk Quartz Pink',   hex: '#f2c4cf', id: 43637561065529 },
+    { name: 'Silk Bronze',        hex: '#b0703a', id: 43637561098297 },
+    { name: 'Silk Orange',        hex: '#f28034', id: 43637561131065 },
+    { name: 'Silk White',         hex: '#f4f3ee', id: 43637561163833 },
+    { name: 'Silk Gold',          hex: '#d9b13b', id: 43637561196601 },
+    { name: 'Silk Yellow',        hex: '#f2d03c', id: 43637561229369 },
+    { name: 'Silk Lime',          hex: '#aad438', id: 43637561262137 },
+    { name: 'Silk Green',         hex: '#3da954', id: 43637561294905 },
+    { name: 'Silk Teal',          hex: '#2aa8a0', id: 43637561327673 },
+    { name: 'Silk Light Blue',    hex: '#7ec3ea', id: 43637561360441 },
+    { name: 'Silk Blue',          hex: '#3672c8', id: 43637561393209 },
+    { name: 'Silk Chrome',        hex: '#c8ccd2', id: 43637561425977 },
+    { name: 'Silk Silver',        hex: '#cdd2d9', id: 43637561458745, pick: true,
       pickNote: ' · Joey’s silver for grip-accent rods' },
-  ] },
+    { name: 'Silk Brass',         hex: '#c9a545', id: 43637561491513 },
+    { name: 'Silk Peridot Green', hex: '#9fb43a', id: 43637561524281 },
+    { name: 'Silk Periwinkle',    hex: '#8a96dc', id: 43637561557049 },
+    { name: 'Silk Dark Blue',     hex: '#2b4a8c', id: 43637561589817 },
+    { name: 'Silk Gunmetal Grey', hex: '#6a6f78', id: 43637561622585 },
+  ].map(f => ({ ...f, label: `Panchroma ${f.name}`, url: PM_SILK })) },
   // Printed Solid (Jessie) PLA — real solid Basic/Premium colors with printedsolid.com
   // product links (hexes = the flat swatches from 3dfilamentprofiles.com/filaments/printed-solid;
   // Pure Magenta/Natural read pale — kept as-sourced). Mystery Orange is Joey's Handle orange.
