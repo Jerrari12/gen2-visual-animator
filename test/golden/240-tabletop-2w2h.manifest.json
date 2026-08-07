@@ -117,18 +117,22 @@
    "links": {
     "buy": [
      {
+      "id": "magnet-10x2",
       "label": "10×2 mm",
       "url": "https://amzn.to/4sesPKm"
      },
      {
+      "id": "magnet-6x2",
       "label": "6×2 mm",
       "url": "https://amzn.to/4aH1ASw"
      },
      {
+      "id": "magnet-n52-10x2",
       "label": "N52 10×2 strong",
       "url": "https://amzn.to/4q4JX3Z"
      },
      {
+      "id": "magnet-n52-6x2",
       "label": "N52 6×2 strong",
       "url": "https://amzn.to/49BZyC0"
      }

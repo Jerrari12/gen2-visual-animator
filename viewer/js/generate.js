@@ -139,21 +139,27 @@ const SCREW_M3 = { node: 'ButtonHeadScrew_M3-6', label: 'M3×6mm Button Head Scr
 // identify card (links.buy, main.js). Standard magnets suit most builds; the
 // N52s hold noticeably harder (people found the standard ones weak) but can
 // be too strong for small drawers. Mirrors the planner's HARDWARE_BUY.
+// `id` is the ANALYTICS identity of a listing — it rides the buy:hardware:<id>
+// event so the dashboard can say WHICH affiliate link converted, not just that
+// one did. Keep it stable when a label is reworded (the label is display text,
+// the id is data), and keep it in step with the planner's HARDWARE_BUY ids:
+// both apps point at the same amzn.to listings, so matching ids let the two
+// GoatCounter sites sum into one row.
 const BUY = {
   magnets: [
-    { label: '10×2 mm', url: 'https://amzn.to/4sesPKm' },
-    { label: '6×2 mm', url: 'https://amzn.to/4aH1ASw' },
-    { label: 'N52 10×2 strong', url: 'https://amzn.to/4q4JX3Z' },
-    { label: 'N52 6×2 strong', url: 'https://amzn.to/49BZyC0' },
+    { id: 'magnet-10x2', label: '10×2 mm', url: 'https://amzn.to/4sesPKm' },
+    { id: 'magnet-6x2', label: '6×2 mm', url: 'https://amzn.to/4aH1ASw' },
+    { id: 'magnet-n52-10x2', label: 'N52 10×2 strong', url: 'https://amzn.to/4q4JX3Z' },
+    { id: 'magnet-n52-6x2', label: 'N52 6×2 strong', url: 'https://amzn.to/49BZyC0' },
   ],
   woodScrews: [
-    { label: 'Buy #6', url: 'https://amzn.to/4s487gc' },
-    { label: 'Buy #8', url: 'https://amzn.to/4pTWDuq' },
+    { id: 'woodscrew-6', label: 'Buy #6', url: 'https://amzn.to/4s487gc' },
+    { id: 'woodscrew-8', label: 'Buy #8', url: 'https://amzn.to/4pTWDuq' },
   ],
   // fastens a bolt-on handle to its faceplate — the one REQUIRED buy on an
   // Essential-faceplate build (integrated-grip families need none)
   handleScrews: [
-    { label: 'Buy M3×6 button head', url: 'https://amzn.to/4x4opHK' },
+    { id: 'm3-button-head', label: 'Buy M3×6 button head', url: 'https://amzn.to/4x4opHK' },
   ],
 };
 

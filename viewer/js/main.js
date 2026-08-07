@@ -990,6 +990,32 @@ function buildPages() {
 // one place that needs instrumenting, and any link added later is covered for
 // free. `ev` overrides the derived name where the destination host doesn't tell
 // the whole story (a filament buy and a magnet buy are both amazon.com).
+/* Affiliate clicks all report as `buy:<kind>:<what>` — ONE prefix, so the
+   dashboard can group every monetisable click without also sweeping in
+   `filament:<brand>`, which is a colour PICK in the designer and means the
+   opposite thing (a design choice, not a purchase intent).
+
+   Hardware resolves to the LISTING id from generate.js BUY, so a row reads
+   `buy:hardware:magnet-n52-10x2` — which affiliate link converted, not merely
+   that one did. Falls back to `unknown` rather than dropping the click, so a
+   BUY entry added without an id still counts and shows up as something to fix. */
+const buyEvent = b => 'buy:hardware:' + (b.id || 'unknown');
+
+/* Filament reports BRAND + PRODUCT LINE, resolved from FILAMENT_DB by the
+   colour the user actually picked. Deliberately NOT the colour label: that is
+   a ~70-value long tail that would leave every dashboard row sitting at 1, and
+   it's the rule that keeps event names free of user-visible values (same
+   reason the pick handler sends brand only). Line is included because it maps
+   to a distinct product page — Panchroma PLA and Panchroma Silk are separate
+   listings, so "which line sells" is answerable while the tail stays short. */
+function buyFilamentEvent(pick) {
+  // No pick means the generic "Shop filament →", whose href is FILAMENT_DB[0] —
+  // mirror that here so the event names the page the click actually opens.
+  const src = pick ? FILAMENT_DB.find(f => f.colors.some(c => c.label === pick.name))
+                   : FILAMENT_DB[0];
+  return 'buy:filament:' + (src ? slug(src.brand + '-' + src.line) : 'unknown');
+}
+
 function linkEl(text, href, ev) {
   const a = document.createElement('a');
   a.className = 'dl-link';
@@ -1156,14 +1182,14 @@ function renderIdentifyLinks(info, filament = null) {
   appendStoreLinks(linksEl, info?.links);
   // purchased hardware: Amazon affiliate buy options (generate.js BUY) + the
   // required affiliate disclosure right in the card
-  for (const b of info?.links?.buy || []) linksEl.appendChild(linkEl(b.label, b.url, 'hardware:buy'));
+  for (const b of info?.links?.buy || []) linksEl.appendChild(linkEl(b.label, b.url, buyEvent(b)));
   if (info?.links?.buy?.length) {
     const aff = document.createElement('div');
     aff.className = 'fm-note';
     aff.textContent = 'Affiliate links — they support the project at no extra cost.';
     linksEl.appendChild(aff);
   }
-  if (filament) linksEl.appendChild(linkEl('Get filament', filament.url, 'filament:buy'));
+  if (filament) linksEl.appendChild(linkEl('Get filament', filament.url, buyFilamentEvent(filament)));
 }
 
 // ---------- build options (generated builds only; static kits skip it) ----------
@@ -1296,7 +1322,7 @@ function renderChecklist() {
       const lnks = document.createElement('span');
       appendStoreLinks(lnks, p.links);
       // purchased hardware: Amazon affiliate buy options (generate.js BUY)
-      for (const b of p.links.buy || []) lnks.appendChild(linkEl(b.label, b.url, 'hardware:buy'));
+      for (const b of p.links.buy || []) lnks.appendChild(linkEl(b.label, b.url, buyEvent(b)));
       mid.appendChild(lnks);
     }
     const qty = document.createElement('span');
@@ -2739,7 +2765,7 @@ const LABEL_GEN_URLS = { edgelabel: 'https://edgelabel.jerrari3d.com/', classicp
 // markup owns them, only the href is swapped), so they miss linkEl's tracking —
 // one listener each, wired once at module level.
 $('identify-label-gen').addEventListener('click', () => track('labelgen:' + (currentFaceplateStyle()?.key || 'unknown')));
-$('fm-buy').addEventListener('click', () => track('filament:buy'));
+$('fm-buy').addEventListener('click', () => track(buyFilamentEvent(customColors[fmType])));
 function labelGenInfo() {
   const url = LABEL_GEN_URLS[currentFaceplateStyle()?.key];
   if (!url) return null;
