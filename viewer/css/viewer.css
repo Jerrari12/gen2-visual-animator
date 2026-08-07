@@ -410,6 +410,12 @@ body {
   margin-top: 9px; font-size: 10.5px; line-height: 1.4;
   color: var(--ink-soft);
 }
+/* the Polymaker first-purchase deal — user benefit, so it reads a step above
+   the fine print (same slot, accent ink, slightly larger) */
+.fm-deal {
+  margin-top: 10px; font-size: 11.5px; line-height: 1.4;
+  color: var(--accent); font-weight: 600;
+}
 .fm-foot {
   display: flex; align-items: center; justify-content: space-between; gap: 8px;
   margin-top: 11px; font-size: 12px;

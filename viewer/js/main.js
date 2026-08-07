@@ -1023,7 +1023,10 @@ function buyFilamentEvent(pick) {
    When a store becomes a paid program (e.g. Polymaker tracked links), its host
    joins this list and every surface updates at once. FTC guidance: "paid link"
    next to the link is adequate where "affiliate link" alone may not be. */
-const PAID_HOSTS = [/(^|\.)amzn\.to$/, /(^|\.)amazon\.[a-z.]+$/];
+const PAID_HOSTS = [/(^|\.)amzn\.to$/, /(^|\.)amazon\.[a-z.]+$/,
+  // Polymaker Ambassador tracked links (2026-08-07) — every FILAMENT_DB
+  // Polymaker url routes through /JERRARI, so the whole host is paid now
+  /(^|\.)shop\.polymaker\.com$/];
 function isPaidLink(href) {
   try { return PAID_HOSTS.some(re => re.test(new URL(href).hostname.toLowerCase())); }
   catch (e) { return false; }
@@ -1208,8 +1211,10 @@ function renderIdentifyLinks(info, filament = null) {
   if (info?.links?.buy?.length || (filament && isPaidLink(filament.url))) {
     const aff = document.createElement('div');
     aff.className = 'fm-note';
+    // covers BOTH programs — this card can show Amazon hardware chips OR a
+    // Polymaker "Get filament" link, and the note must be true for either
     aff.textContent = 'Paid links — I earn a commission if you buy through them, at no extra cost to you. '
-      + 'As an Amazon Associate I earn from qualifying purchases.';
+      + 'As an Amazon Associate I earn from qualifying purchases; I’m also a Polymaker Ambassador.';
     linksEl.appendChild(aff);
   }
 }
@@ -2184,11 +2189,24 @@ function exitFaceplateFocus() {
 // here; the menu renders it as its own collapsible section automatically.
 // Polymaker: real Panchroma™ Basic PLA 1.75mm/1kg variants (names + Shopify
 // variant ids pulled from shop.polymaker.com 2026-07-05; hexes approximated —
-// refine against the spool renders anytime). Swap urls for affiliate versions
-// when Joey's Polymaker affiliate links exist. The Elegoo entry is Joey's
+// refine against the spool renders anytime). The Elegoo entry is Joey's
 // budget pick (amzn.to IS an affiliate link) — mainly cases & drawer bodies.
-const PM = id => `https://shop.polymaker.com/products/panchroma-pla?variant=${id}`;
-const PM_SILK = 'https://shop.polymaker.com/products/panchroma-silk?variant=43637561458745';
+//
+// Polymaker links are Joey's AMBASSADOR tracked links (Superfiliate, 2026-08-07).
+// The `q` value is Superfiliate's OWN feed handle — `pla` / `silk-pla`, NOT the
+// shop's `panchroma-pla` / `panchroma-silk` — and only PORTAL-MINTED values are
+// valid: an unknown q fails SOFT (attribution + the 15% first-purchase code
+// still attach; the shopper just lands on the store root instead of the
+// product). Chain: /JERRARI?q=… → superfiliate session → /discount/JERRARI
+// ?redirect=/products/… — so the code arrives pre-applied at checkout.
+// Colour/variant preselect is NOT supported by these links (verified: the
+// variant syntax gets stripped), which is why the buy button names the exact
+// colour to pick on the page. The per-colour variant ids are KEPT in the data
+// below so plain deep links can be restored the day Superfiliate supports
+// them: `https://shop.polymaker.com/products/panchroma-pla?variant=${id}`.
+const POLY_LINK = q => `https://shop.polymaker.com/JERRARI?q=${q}`;
+const PM = id => POLY_LINK('pla');           // id retained in the colour rows, unused for now
+const PM_SILK = POLY_LINK('silk-pla');
 const POLYMAKER_URL = PM(44863271895097);
 const FILAMENT_DB = [
   { brand: 'Elegoo', line: 'PLA / PETG', url: 'https://amzn.to/3QWCdV6', colors: [
