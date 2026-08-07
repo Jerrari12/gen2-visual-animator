@@ -193,7 +193,7 @@ function resize() {
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
-    viewInsetPx = NaN; // canvas size changed — force a view-inset re-apply (NaN, not -1: the offset is SIGNED now and -1 is a real value)
+    viewInset.x = viewInset.y = NaN; // canvas size changed — force a re-apply with fresh dims (the lerp treats NaN as "adopt the target instantly")
     // re-fit a whole-build shot to the new aspect (skip during the cinema, which
     // drives the camera itself, and during drawer/faceplate focus, which park
     // the camera on the part)
@@ -209,33 +209,76 @@ function resize() {
 // framing (fit presets, the faceplate cinematic, isolation) centers itself in
 // the visible band below the note. Projected labels (dims/pointer/measure) go
 // through camera.project(), so they track the shift for free.
-let viewInsetPx = 0;
+const viewInset = { x: 0, y: 0 }; // APPLIED projection pan in px (lerped toward target each frame)
+const _viCorner = new THREE.Vector3(); // scratch — updateViewInset runs every frame
 function updateViewInset() {
-  // Pan the camera PROJECTION so the model centers in the VISIBLE band of the
-  // canvas: below the note panel (top overlap) and — 2026-08-07, Joey — above
-  // the filament bottom sheet (bottom overlap; picking a colour used to leave
-  // a sliver of model peeking between the two). Signed offset, mobile-only:
-  // the desktop menu is a small floating panel and panning the whole scene
-  // for it reads as a glitch. Rects are re-measured every frame, so the sheet
-  // growing/shrinking with the search filter tracks for free.
-  let top = 0, bottom = 0;
-  if (isMobile() && !cinema.on) {
+  // Pan the camera PROJECTION so the model sits in the VISIBLE region of the
+  // canvas. A pure presentation pan (setViewOffset): camera pose, orbit target
+  // and zoom are never touched, and clearing the offset restores the exact
+  // prior framing. Two independent axes:
+  // - MOBILE (vertical): center in the band below the note panel and above the
+  //   filament bottom sheet (2026-08-07 — the two used to leave a sliver).
+  // - DESKTOP (horizontal, 2026-08-07 second UX pass): occlusion-aware only.
+  //   While the right-docked picker is up, if the PROJECTED build extends
+  //   under the panel, shift the composition left just enough to clear it
+  //   (+32px) — and NOT AT ALL when nothing meaningful is covered. The model
+  //   is the picker's live feedback, so an unobstructed build is task support,
+  //   not aesthetics; the conditionality is what keeps it from reading as a
+  //   camera glitch. Sign convention (probed): positive offsetX shifts content
+  //   LEFT, 1px = 1px, so base (unshifted) x = measured x + applied offset.
+  // Rects and projections re-measure every frame; the applied offset LERPS
+  // toward its target (~150-200ms), so panel-open, orbiting and drawer glides
+  // all track smoothly instead of snapping.
+  let tx = 0, ty = 0;
+  if (!cinema.on) {
     const cb = canvas.getBoundingClientRect();
-    const note = $('note-panel');
-    if (note && !note.classList.contains('hidden') && !note.classList.contains('collapsed')) {
-      const nb = note.getBoundingClientRect();
-      top = Math.max(0, Math.min(nb.bottom - cb.top, cb.height * 0.5));
-    }
-    const fm = $('filament-menu');
-    if (fm && !fm.classList.contains('hidden')) {
-      const mb = fm.getBoundingClientRect();
-      bottom = Math.max(0, Math.min(cb.bottom - mb.top, cb.height * 0.5));
+    if (isMobile()) {
+      let top = 0, bottom = 0;
+      const note = $('note-panel');
+      if (note && !note.classList.contains('hidden') && !note.classList.contains('collapsed')) {
+        const nb = note.getBoundingClientRect();
+        top = Math.max(0, Math.min(nb.bottom - cb.top, cb.height * 0.5));
+      }
+      const fm = $('filament-menu');
+      if (fm && !fm.classList.contains('hidden')) {
+        const mb = fm.getBoundingClientRect();
+        bottom = Math.max(0, Math.min(cb.bottom - mb.top, cb.height * 0.5));
+      }
+      ty = (bottom - top) / 2;
+    } else if (document.body.classList.contains('fm-open') && !assembledBox.isEmpty()) {
+      const fm = $('filament-menu');
+      if (fm && !fm.classList.contains('hidden')) {
+        const mb = fm.getBoundingClientRect();
+        const panelLeft = mb.left - cb.left;
+        if (panelLeft > 120) { // sanity: the panel is genuinely right-docked with room to spare
+          let minX = Infinity, maxX = -Infinity, ok = true;
+          const b = assembledBox;
+          for (let i = 0; i < 8; i++) {
+            _viCorner.set(i & 1 ? b.max.x : b.min.x, i & 2 ? b.max.y : b.min.y, i & 4 ? b.max.z : b.min.z).project(camera);
+            if (_viCorner.z > 1) { ok = false; break; } // a corner behind the camera mirrors — bail rather than shift on garbage
+            const sx = (_viCorner.x * 0.5 + 0.5) * cb.width;
+            if (sx < minX) minX = sx;
+            if (sx > maxX) maxX = sx;
+          }
+          if (ok) {
+            const applied = isFinite(viewInset.x) ? viewInset.x : 0;
+            const need = (maxX + applied) - (panelLeft - 32);   // clear the panel by 32px
+            if (need > 12) // deadband: ignore trivial underlap
+              tx = Math.min(need, Math.max(0, (minX + applied) - 16), cb.width * 0.35);
+          }
+        }
+      }
     }
   }
-  const off = (bottom - top) / 2; // top-only reproduces the old -inset/2 exactly
-  if (Math.abs(off - viewInsetPx) < 1) return;
-  viewInsetPx = off;
-  if (off) camera.setViewOffset(canvas.clientWidth, canvas.clientHeight, 0, off, canvas.clientWidth, canvas.clientHeight);
+  // lerp the applied offset toward its target; snap the last half-pixel so a
+  // zero target genuinely reaches clearViewOffset
+  let nx = isFinite(viewInset.x) ? viewInset.x + (tx - viewInset.x) * 0.25 : tx;
+  let ny = isFinite(viewInset.y) ? viewInset.y + (ty - viewInset.y) * 0.25 : ty;
+  if (Math.abs(nx - tx) < 0.5) nx = tx;
+  if (Math.abs(ny - ty) < 0.5) ny = ty;
+  if (nx === viewInset.x && ny === viewInset.y) return;
+  viewInset.x = nx; viewInset.y = ny;
+  if (nx || ny) camera.setViewOffset(canvas.clientWidth, canvas.clientHeight, nx, ny, canvas.clientWidth, canvas.clientHeight);
   else camera.clearViewOffset();
 }
 
