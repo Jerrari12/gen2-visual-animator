@@ -3753,6 +3753,23 @@ const X_URL = 'https://x.com/jerrari3D';
 if (X_URL) { const a = $('outro-x'); a.href = X_URL; a.classList.remove('hidden'); }
 const YT_URL = 'https://www.youtube.com/@jerrari3D';
 if (YT_URL) { const a = $('outro-yt'); a.href = YT_URL; a.classList.remove('hidden'); }
+// Club joins — the conversion event. These are STATIC anchors in index.html
+// (markup owns the href), so they never pass through linkEl and would
+// otherwise be invisible: the outro is the moment someone has just finished a
+// build, which is exactly when a join is most likely. Same names the planner
+// fires, and the two apps report to separate GoatCounter sites, so the
+// dashboard's PLANNER/STUDIO filter already tells you which one converted.
+// NOT trackOnce: a second click is a real second attempt worth seeing.
+$('outro-club-printables').addEventListener('click', () => track('club:printables'));
+$('outro-club-thangs').addEventListener('click', () => track('club:thangs'));
+// The "where else to find us" row under the buttons. Same static-anchor story,
+// and the question they answer is "is this row earning its space?" — so they
+// share ONE `follow:` prefix and read as a block on the dashboard. jerrari3d.com
+// rides it too: it isn't a social follow, but it sits in that row and is judged
+// by the same measure. Destination names only, never a URL.
+$('outro-site').addEventListener('click', () => track('follow:jerrari3d'));
+$('outro-yt').addEventListener('click', () => track('follow:youtube'));
+$('outro-x').addEventListener('click', () => track('follow:x'));
 try {
   await mountManifest(manifest);
 } catch (e) {
