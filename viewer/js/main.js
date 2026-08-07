@@ -1809,15 +1809,31 @@ function renderZoneChips(inst) {
     b.onclick = () => { (menuOpen && fmType === key) ? closeFilamentMenu() : openFilamentMenu(key); };
     box.appendChild(b);
   };
-  // Body is the part's BASE colour: every zone the user hasn't picked yet
-  // inherits it (one identification colour per part by default), so changing
-  // Body visibly repaints those zones too. Say so — it reads as a bug
-  // otherwise (Joey 2026-07-25).
+  // Tooltips are STATE-first (Joey 2026-08-07): the chip visibly IS a colour
+  // picker, so the hover's job is the one thing you can't see — WHICH filament
+  // the zone is wearing. An explicit pick shows its name; an untouched zone
+  // says "follows Body" (the one-identification-colour-per-part rule, which
+  // read as a bug until it was named — Joey 2026-07-25); static kits' own
+  // zone colours and the instruction palette say so honestly.
+  const wornName = key => (useCustom && customColors[key]) ? customColors[key].name : null;
   const inherits = [...zones].filter(z => !(useCustom && customColors[zoneKey(type, z)]) && !manifest.colors[zoneKey(type, z)]);
-  chip('Body', type, inherits.length
-    ? `Base colour — also repaints the zones you haven’t picked yet (${inherits.map(z => z.toLowerCase()).join(', ')})`
-    : 'Pick a filament color for the body');
-  for (const z of [...zones].sort()) chip(z.charAt(0) + z.slice(1).toLowerCase(), zoneKey(type, z));
+  const bodyName = wornName(type);
+  chip('Body', type, [
+    bodyName ? `Body — ${bodyName}` : 'Body — instruction colour',
+    inherits.length
+      ? `also repaints the zones you haven’t picked yet (${inherits.map(z => z.toLowerCase()).join(', ')})`
+      : 'click to change',
+  ].join(' · '));
+  for (const z of [...zones].sort()) {
+    const key = zoneKey(type, z);
+    const label = z.charAt(0) + z.slice(1).toLowerCase();
+    const own = wornName(key);
+    const tip = own ? `${label} — ${own} · click to change`
+      : manifest.colors[key] ? `${label} — this kit’s colour · click to pick a filament`
+      : bodyName ? `${label} — follows Body (${bodyName}) · click to change`
+      : `${label} — instruction colour · click to pick a filament`;
+    chip(label, key, tip);
+  }
 }
 
 let selAnchor = new THREE.Vector3(); // selected part's bbox-center offset from its origin
