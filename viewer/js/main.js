@@ -261,7 +261,14 @@ function updateViewInset() {
             if (sx > maxX) maxX = sx;
           }
           if (ok) {
-            const applied = isFinite(viewInset.x) ? viewInset.x : 0;
+            // ⚠ the base-correction MUST read the CAMERA, not viewInset:
+            // resize() NaNs the bookkeeping while the projection matrix still
+            // carries the offset, and reading the mirror here desynced the
+            // two — need flapped across the deadband and the whole scene
+            // oscillated 0↔target at full amplitude, once per frame (the
+            // "violent vibration": the shifted dim labels changed layout,
+            // layout fired resize(), resize() re-armed the desync).
+            const applied = camera.view && camera.view.enabled ? camera.view.offsetX : 0;
             const need = (maxX + applied) - (panelLeft - 32);   // clear the panel by 32px
             if (need > 12) // deadband: ignore trivial underlap
               tx = Math.min(need, Math.max(0, (minX + applied) - 16), cb.width * 0.35);
@@ -271,9 +278,14 @@ function updateViewInset() {
     }
   }
   // lerp the applied offset toward its target; snap the last half-pixel so a
-  // zero target genuinely reaches clearViewOffset
-  let nx = isFinite(viewInset.x) ? viewInset.x + (tx - viewInset.x) * 0.25 : tx;
-  let ny = isFinite(viewInset.y) ? viewInset.y + (ty - viewInset.y) * 0.25 : ty;
+  // zero target genuinely reaches clearViewOffset. After an invalidation the
+  // lerp reseeds from the CAMERA's actual offset (same truth-source rule as
+  // the base-correction above) — seeding from the target instead turned every
+  // resize() into a full-amplitude jump.
+  const curX = isFinite(viewInset.x) ? viewInset.x : (camera.view && camera.view.enabled ? camera.view.offsetX : 0);
+  const curY = isFinite(viewInset.y) ? viewInset.y : (camera.view && camera.view.enabled ? camera.view.offsetY : 0);
+  let nx = curX + (tx - curX) * 0.25;
+  let ny = curY + (ty - curY) * 0.25;
   if (Math.abs(nx - tx) < 0.5) nx = tx;
   if (Math.abs(ny - ty) < 0.5) ny = ty;
   if (nx === viewInset.x && ny === viewInset.y) return;
