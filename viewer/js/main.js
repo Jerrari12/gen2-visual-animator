@@ -2266,12 +2266,6 @@ const PM = id => POLY_LINK('pla');           // id retained in the colour rows, 
 const PM_SILK = POLY_LINK('silk-pla');
 const POLYMAKER_URL = PM(44863271895097);
 const FILAMENT_DB = [
-  { brand: 'Elegoo', line: 'PLA / PETG', url: 'https://amzn.to/3QWCdV6', colors: [
-    { name: 'PETG Black', label: 'Elegoo PETG Black', hex: '#232427', url: 'https://amzn.to/3QWCdV6', pick: true },
-    // PLA Black is the Classic faceplate BODY default (Joey 2026-07-25)
-    { name: 'PLA Black', label: 'Elegoo PLA Black', hex: '#1c1d20', url: 'https://amzn.to/4fqvv1O', pick: true,
-      pickNote: ' · Joey’s black for faceplate bodies & shells' },
-  ] },
   { brand: 'Polymaker', line: 'Panchroma™ PLA', url: POLYMAKER_URL, colors: [
     { name: 'Black',           hex: '#2b2b2e', id: 44863271731257 },
     { name: 'Dark Grey',       hex: '#4a4c51', id: 44863271010361 },
@@ -2340,6 +2334,45 @@ const FILAMENT_DB = [
     { name: 'Silk Dark Blue',     hex: '#2b4a8c', id: 43637561589817 },
     { name: 'Silk Gunmetal Grey', hex: '#6a6f78', id: 43637561622585 },
   ].map(f => ({ ...f, label: `Panchroma ${f.name}`, url: PM_SILK })) },
+  // Polymaker PETG — feed handle petg, all 25 real 1.75mm/1kg variants
+  // (variant ids scraped from the shop's product JSON 2026-08-07, shop order,
+  // Galaxy/Clear/Army Brown included; hexes approximated like every section).
+  // ★ PETG Black is Joey's recommended PETG — the premium lane beside the
+  // Elegoo budget pick below; both stars are honest, different budgets.
+  { brand: 'Polymaker', line: 'PETG', url: POLY_LINK('petg'), colors: [
+    { name: 'PETG Black',            hex: '#26272b', id: 45079221108793, pick: true,
+      pickNote: ' · Joey’s recommended PETG for cases & drawer bodies' },
+    { name: 'PETG White',            hex: '#f2f2ee', id: 45079221141561 },
+    { name: 'PETG Grey',             hex: '#9a9da3', id: 45079221174329 },
+    { name: 'PETG Red',              hex: '#cf3430', id: 45079221207097 },
+    { name: 'PETG Orange',           hex: '#f07a26', id: 45079221239865 },
+    { name: 'PETG Blue',             hex: '#2f66b8', id: 45079221272633 },
+    { name: 'PETG Yellow',           hex: '#f2c73b', id: 45079221305401 },
+    { name: 'PETG Dark Grey',        hex: '#4d4f54', id: 45079221338169 },
+    { name: 'PETG Teal',             hex: '#159a9c', id: 45079221370937 },
+    { name: 'PETG Silver',           hex: '#b9bec6', id: 45079221403705 },
+    { name: 'PETG Green',            hex: '#2f9e53', id: 45079221436473 },
+    { name: 'PETG Electric Blue',    hex: '#1d7fe0', id: 45079221469241 },
+    { name: 'PETG Purple',           hex: '#7b4fb5', id: 45079221502009 },
+    { name: 'PETG Dark Blue',        hex: '#23407f', id: 45079221534777 },
+    { name: 'PETG Lime',             hex: '#a6cf3a', id: 45079221567545 },
+    { name: 'PETG Dark Green',       hex: '#1e6b46', id: 45079221600313 },
+    { name: 'PETG Magenta',          hex: '#d23590', id: 45079221633081 },
+    { name: 'PETG Pink',             hex: '#ef9cc0', id: 45079221665849 },
+    { name: 'PETG Dark Purple',      hex: '#462a6b', id: 45079221698617 },
+    { name: 'PETG Army Brown',       hex: '#6f5b3e', id: 45588258095161 },
+    { name: 'PETG Clear',            hex: '#e8ecef', id: 46279866023993 },
+    { name: 'PETG Galaxy Black',     hex: '#23252e', id: 45588258553913 },
+    { name: 'PETG Galaxy Dark Grey', hex: '#4a4e59', id: 45588259078201 },
+    { name: 'PETG Galaxy Blue',      hex: '#2b4a8c', id: 45588259176505 },
+    { name: 'PETG Galaxy Red',       hex: '#8c2430', id: 45588259504185 },
+  ].map(f => ({ ...f, label: `Polymaker ${f.name}`, url: POLY_LINK('petg') })) },
+  { brand: 'Elegoo', line: 'PLA / PETG', url: 'https://amzn.to/3QWCdV6', colors: [
+    { name: 'PETG Black', label: 'Elegoo PETG Black', hex: '#232427', url: 'https://amzn.to/3QWCdV6', pick: true },
+    // PLA Black is the Classic faceplate BODY default (Joey 2026-07-25)
+    { name: 'PLA Black', label: 'Elegoo PLA Black', hex: '#1c1d20', url: 'https://amzn.to/4fqvv1O', pick: true,
+      pickNote: ' · Joey’s black for faceplate bodies & shells' },
+  ] },
   // Printed Solid (Jessie) PLA — real solid Basic/Premium colors with printedsolid.com
   // product links (hexes = the flat swatches from 3dfilamentprofiles.com/filaments/printed-solid;
   // Pure Magenta/Natural read pale — kept as-sourced). Mystery Orange is Joey's Handle orange.
@@ -2366,81 +2399,109 @@ const FILAMENT_DB = [
     { name: 'Elixir Nightshade',hex: '#501282', url: 'https://www.printedsolid.com/products/jessie-premium-elixir-1-75mm-x-nightshade-1kg' },
     { name: 'Elixir Royal Ruby',hex: '#A91E16', url: 'https://www.printedsolid.com/products/jessie-premium-elixir-1-75mm-x-royal-ruby-1kg' },
   ].map(f => ({ ...f, label: `Printed Solid ${f.name}` })) },
+  // ERYONE Burnt Titanium — the REAL "holo blue" Joey prints Accent panels in
+  // (the presets' _navy placeholder until 2026-08-07). One colour-shift blue,
+  // Amazon listing → isPaidLink marks it automatically like every amzn link.
+  { brand: 'ERYONE', line: 'Burnt Titanium PLA', url: 'https://amzn.to/4fTKtO9', colors: [
+    { name: 'Burnt Titanium', label: 'ERYONE Burnt Titanium', hex: '#31517e', url: 'https://amzn.to/4fTKtO9', pick: true,
+      pickNote: ' · Joey’s colour-shift blue for Accent panels' },
+  ] },
 ];
 
 // ---------- filament presets ----------
-// One click sets a filament per part TYPE. Colors/links are PLACEHOLDERS for now
-// (swap for real Panchroma/Prusa variants + affiliate links later). L/R mirror
-// pairs are single types, so setting e.g. QuickLock covers both.
-const _f = (name, hex, url = '#') => ({ name, hex, url });
-const _blk = _f('Black', '#232427'), _pro = _f('Prusa Orange', '#f5820a'),
-      _proP = _f('Prusa Orange PETG', '#f5820a'), _sil = _f('Silver', '#c7ccd2'),
-      _wht = _f('White', '#eef0f4'), _navy = _f('Holo Blue', '#25316e');
-// REAL, buyable filaments (name matches its FILAMENT_DB `label`, so the picker
-// shows the swatch ringed as active and "Buy …" resolves) — Joey's 2026-07-25
-// spec for the Classic faceplate. Everything else in PRESETS is still a
-// placeholder hex; swap those for real products the same way.
-const _ELEGOO_BLK = _f('Elegoo PLA Black', '#1c1d20', 'https://amzn.to/4fqvv1O');
-const _PS_ORANGE = _f('Printed Solid Mystery Orange', '#F56233',
-  'https://www.printedsolid.com/products/jessie-pla-1-75mm-x-1kg-mystery-orange');
-const _PM_SILK_SIL = _f('Panchroma Silk Silver', '#cdd2d9', PM_SILK);
-// The Classic faceplate's four zones, as one reusable block: black body,
-// orange face + grip, silk-silver accent rod.
+// One click sets a filament per part TYPE. Every colour is pulled from
+// FILAMENT_DB BY LABEL via _db(), so a preset can no longer drift from the
+// catalog — the 2026-08-07 audit found every bare-named entry ('Black',
+// 'Dark Grey', 'Prusa Orange PETG', 'Holo Blue'…) silently failing the
+// picker's active-ring match, which keys on exact labels. Unknown label =
+// loud console warning + a grey stand-in, never a boot failure.
+function _db(label) {
+  for (const b of FILAMENT_DB) {
+    const f = b.colors.find(c => c.label === label);
+    if (f) return { name: f.label, hex: f.hex, url: f.url };
+  }
+  console.warn(`[presets] no catalog colour labelled "${label}"`);
+  return { name: label, hex: '#888a90', url: FILAMENT_DB[0].url };
+}
+// The Classic faceplate's four zones, as one reusable block — Joey's
+// 2026-07-25 spec: black body, orange face + grip, silk-silver accent rod.
 const CLASSIC_FACE = {
-  Faceplate: _ELEGOO_BLK,
-  'Faceplate:FACE': _PS_ORANGE,
-  'Faceplate:GRIP': _PS_ORANGE,
-  'Faceplate:GRIP ACCENT': _PM_SILK_SIL,
+  Faceplate: _db('Elegoo PLA Black'),
+  'Faceplate:FACE': _db('Printed Solid Mystery Orange'),
+  'Faceplate:GRIP': _db('Printed Solid Mystery Orange'),
+  'Faceplate:GRIP ACCENT': _db('Panchroma Silk Silver'),
 };
 // Every preset themes the WHOLE build (Joey 2026-07-13): faceplate zones
 // ('Faceplate:GRIP' drives the EdgeLabel/Classic Pro printed-in grip,
 // ':GRIP ACCENT' the Classic Pro rod) + the dressing (Accent/Label/BackCover)
 // + Rail. L/U pairs (covers, footrails) share ONE color per preset — the
 // two-tone look belongs to the instruction palette only (see applyPalette's
-// alt-shade gate).
+// alt-shade gate). NB Magnet/Screw entries are inert (colorLocked purchased
+// hardware always renders its manifest colour) — kept for completeness.
 const PRESETS = [
-  { name: 'The Jerrari', swatches: ['#232427', '#f5820a', '#c7ccd2'], colors: {
-    Case: _blk, Drawer: _blk, CoverL: _blk, CoverU: _blk, Bracket: _blk,
-    FootrailL: _blk, FootrailU: _blk, Foot: _blk, Rail: _blk,
-    ...CLASSIC_FACE, // black body / orange face + grip / silk-silver rod (real filaments)
-    Accent: _navy, Label: _wht, BackCover: _ELEGOO_BLK,
-    Handle: _sil,
-    QuickLock: _proP, MagnetClip: _proP, Stopper: _proP, Magnet: _sil, Screw: _sil,
+  // The Jerrari = the build Joey actually prints: Elegoo black shell,
+  // Mystery Orange face/grip, silk-silver rod + handles, Burnt Titanium
+  // accent, PETG-orange hardware (real since the Polymaker PETG line landed).
+  { name: 'The Jerrari', swatches: ['#1c1d20', '#F56233', '#cdd2d9'], colors: {
+    Case: _db('Elegoo PLA Black'), Drawer: _db('Elegoo PLA Black'),
+    CoverL: _db('Elegoo PLA Black'), CoverU: _db('Elegoo PLA Black'),
+    Bracket: _db('Elegoo PLA Black'), FootrailL: _db('Elegoo PLA Black'),
+    FootrailU: _db('Elegoo PLA Black'), Foot: _db('Elegoo PLA Black'),
+    Rail: _db('Elegoo PLA Black'),
+    ...CLASSIC_FACE, // black body / orange face + grip / silk-silver rod
+    Accent: _db('ERYONE Burnt Titanium'), Label: _db('Panchroma Cold White'),
+    BackCover: _db('Elegoo PLA Black'),
+    Handle: _db('Panchroma Silk Silver'),
+    QuickLock: _db('Polymaker PETG Orange'), MagnetClip: _db('Polymaker PETG Orange'),
+    Stopper: _db('Polymaker PETG Orange'),
+    Magnet: _db('Panchroma Silk Silver'), Screw: _db('Panchroma Silk Silver'),
   } },
-  { name: 'Stealth', swatches: ['#232427', '#4a4c51', '#6e7178'], colors: {
-    Case: _blk, Drawer: _f('Dark Grey', '#4a4c51'), CoverL: _blk, CoverU: _blk,
-    Bracket: _blk, FootrailL: _blk, FootrailU: _blk, Foot: _blk, Rail: _blk,
+  { name: 'Stealth', swatches: ['#2b2b2e', '#4a4c51', '#6e7178'], colors: {
+    Case: _db('Panchroma Black'), Drawer: _db('Panchroma Dark Grey'),
+    CoverL: _db('Panchroma Black'), CoverU: _db('Panchroma Black'),
+    Bracket: _db('Panchroma Black'), FootrailL: _db('Panchroma Black'),
+    FootrailU: _db('Panchroma Black'), Foot: _db('Panchroma Black'),
+    Rail: _db('Panchroma Black'),
     // FACE is the Classic plate's front layer — every preset defines all four
     // zones so nothing silently inherits the body (see renderZoneChips)
-    Faceplate: _f('Steel Grey', '#6e7178'), 'Faceplate:FACE': _f('Dark Grey', '#4a4c51'),
-    'Faceplate:GRIP': _f('Dark Grey', '#4a4c51'), 'Faceplate:GRIP ACCENT': _sil,
-    Accent: _blk, Label: _wht, BackCover: _blk,
-    Handle: _sil,
-    QuickLock: _f('Dark Grey', '#4a4c51'), MagnetClip: _f('Dark Grey', '#4a4c51'),
-    Stopper: _f('Dark Grey', '#4a4c51'), Magnet: _sil, Screw: _sil,
+    Faceplate: _db('Panchroma Steel Grey'), 'Faceplate:FACE': _db('Panchroma Dark Grey'),
+    'Faceplate:GRIP': _db('Panchroma Dark Grey'), 'Faceplate:GRIP ACCENT': _db('Panchroma Silk Silver'),
+    Accent: _db('Panchroma Black'), Label: _db('Panchroma Cold White'),
+    BackCover: _db('Panchroma Black'),
+    Handle: _db('Panchroma Silk Silver'),
+    QuickLock: _db('Panchroma Dark Grey'), MagnetClip: _db('Panchroma Dark Grey'),
+    Stopper: _db('Panchroma Dark Grey'),
+    Magnet: _db('Panchroma Silk Silver'), Screw: _db('Panchroma Silk Silver'),
   } },
-  { name: 'Signal', swatches: ['#232427', '#d23a2e', '#00a5a5'], colors: {
-    Case: _blk, Drawer: _f('Red', '#d23a2e'),
-    CoverL: _f('Green', '#3f9b4f'), CoverU: _f('Green', '#3f9b4f'),
-    FootrailL: _f('Blue', '#2f6fbe'), FootrailU: _f('Blue', '#2f6fbe'), Foot: _f('Purple', '#7a4fb0'), Rail: _f('Blue', '#2f6fbe'),
-    Bracket: _f('Steel Grey', '#6e7178'),
-    Faceplate: _pro, 'Faceplate:FACE': _f('Yellow', '#f5c542'),
-    'Faceplate:GRIP': _f('Yellow', '#f5c542'), 'Faceplate:GRIP ACCENT': _f('Polymaker Teal', '#00a5a5'),
-    Accent: _f('Aqua Blue', '#5cc6e0'), Label: _wht, BackCover: _f('Steel Grey', '#6e7178'),
-    Handle: _f('Yellow', '#f5c542'),
-    QuickLock: _f('Polymaker Teal', '#00a5a5'), MagnetClip: _f('Brown', '#7a5236'),
-    Stopper: _f('Magenta', '#d4308f'), Magnet: _sil, Screw: _sil,
+  { name: 'Signal', swatches: ['#2b2b2e', '#d23a2e', '#00a5a5'], colors: {
+    Case: _db('Panchroma Black'), Drawer: _db('Panchroma Red'),
+    CoverL: _db('Panchroma Green'), CoverU: _db('Panchroma Green'),
+    FootrailL: _db('Panchroma Blue'), FootrailU: _db('Panchroma Blue'),
+    Foot: _db('Panchroma Purple'), Rail: _db('Panchroma Blue'),
+    Bracket: _db('Panchroma Steel Grey'),
+    Faceplate: _db('Panchroma Orange'), 'Faceplate:FACE': _db('Panchroma Yellow'),
+    'Faceplate:GRIP': _db('Panchroma Yellow'), 'Faceplate:GRIP ACCENT': _db('Panchroma Polymaker Teal'),
+    Accent: _db('Panchroma Aqua Blue'), Label: _db('Panchroma Cold White'),
+    BackCover: _db('Panchroma Steel Grey'),
+    Handle: _db('Panchroma Yellow'),
+    QuickLock: _db('Panchroma Polymaker Teal'), MagnetClip: _db('Panchroma Brown'),
+    Stopper: _db('Panchroma Magenta'),
+    Magnet: _db('Panchroma Silk Silver'), Screw: _db('Panchroma Silk Silver'),
   } },
   { name: 'Sandstone', swatches: ['#7a5236', '#c8a97e', '#f1e7cf'], colors: {
-    Case: _f('Brown', '#7a5236'), Drawer: _f('Tan', '#c8a97e'),
-    CoverL: _f('Cream', '#f1e7cf'), CoverU: _f('Cream', '#f1e7cf'),
-    Bracket: _f('Brown', '#7a5236'), FootrailL: _f('Brown', '#7a5236'), FootrailU: _f('Brown', '#7a5236'), Foot: _f('Brown', '#7a5236'), Rail: _f('Brown', '#7a5236'),
-    Faceplate: _pro, 'Faceplate:FACE': _f('Brown', '#7a5236'),
-    'Faceplate:GRIP': _f('Brown', '#7a5236'), 'Faceplate:GRIP ACCENT': _f('Steel Grey', '#6e7178'),
-    Accent: _f('Tan', '#c8a97e'), Label: _f('Cream', '#f1e7cf'), BackCover: _f('Brown', '#7a5236'),
-    Handle: _f('Steel Grey', '#6e7178'),
-    QuickLock: _f('Tan', '#c8a97e'), MagnetClip: _f('Brown', '#7a5236'),
-    Stopper: _f('Tan', '#c8a97e'), Magnet: _sil, Screw: _sil,
+    Case: _db('Panchroma Brown'), Drawer: _db('Panchroma Tan'),
+    CoverL: _db('Panchroma Cream'), CoverU: _db('Panchroma Cream'),
+    Bracket: _db('Panchroma Brown'), FootrailL: _db('Panchroma Brown'),
+    FootrailU: _db('Panchroma Brown'), Foot: _db('Panchroma Brown'),
+    Rail: _db('Panchroma Brown'),
+    Faceplate: _db('Panchroma Orange'), 'Faceplate:FACE': _db('Panchroma Brown'),
+    'Faceplate:GRIP': _db('Panchroma Brown'), 'Faceplate:GRIP ACCENT': _db('Panchroma Steel Grey'),
+    Accent: _db('Panchroma Tan'), Label: _db('Panchroma Cream'),
+    BackCover: _db('Panchroma Brown'),
+    Handle: _db('Panchroma Steel Grey'),
+    QuickLock: _db('Panchroma Tan'), MagnetClip: _db('Panchroma Brown'),
+    Stopper: _db('Panchroma Tan'),
+    Magnet: _db('Panchroma Silk Silver'), Screw: _db('Panchroma Silk Silver'),
   } },
 ];
 
