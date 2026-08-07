@@ -2576,6 +2576,56 @@ function renderFilamentBrands() {
   const box = $('fm-brands');
   box.innerHTML = '';
   const q = fmQuery.trim().toLowerCase();
+  // ---- "In this build" — the working palette's picks, deduped by label ----
+  // The agreed kernel of the 2026-08-07 UX review (ChatGPT proposed a whole
+  // palette-first picker LAYER; the counter was that this app's palette is
+  // per-type by construction, so a section — not a second surface — captures
+  // the reuse case): open the menu and the colours you already chose sit
+  // first, one tap to give this part one of them. Hidden while empty, so a
+  // first-run user meets the catalog exactly as before. Works for colours
+  // that aren't in FILAMENT_DB at all (uploaded palettes, preset placeholders)
+  // because the assignment copies the STORED {name,hex,url}, not a DB row.
+  const seen = new Map();
+  for (const c of Object.values(customColors))
+    if (c && c.name && c.hex && !seen.has(c.name)) seen.set(c.name, c);
+  const inBuild = [...seen.values()].filter(c => !q || c.name.toLowerCase().includes(q));
+  if (inBuild.length) {
+    const sec = document.createElement('div');
+    sec.className = 'fm-brand';
+    const head = document.createElement('div');
+    head.className = 'fm-inbuild-head';
+    head.textContent = 'In this build';
+    sec.appendChild(head);
+    const grid = document.createElement('div');
+    grid.className = 'fm-swatches';
+    for (const c of inBuild) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.style.background = c.hex;
+      b.title = c.name + ' · already in this build';
+      if (customColors[fmType]?.name === c.name) b.classList.add('active');
+      b.onclick = () => {
+        // same side-effects as a catalog swatch pick, sourced from the stored colour
+        customColors[fmType] = { name: c.name, hex: c.hex, url: c.url };
+        useCustom = true;
+        snapshotUserPalette();
+        saveColors();
+        applyPalette();
+        renderFilamentBrands();
+        const buy = $('fm-buy');
+        buy.href = c.url || FILAMENT_DB[0].url;
+        buy.textContent = `Buy ${c.name.replace('Panchroma ', '')} →`;
+        markFmBuy();
+        // brand only when the colour resolves to the catalog — reusing an
+        // uploaded/unknown colour is a palette action, not a brand signal
+        const src = FILAMENT_DB.find(br => br.colors.some(f => f.label === c.name));
+        if (src) track('filament:' + slug(src.brand));
+      };
+      grid.appendChild(b);
+    }
+    sec.appendChild(grid);
+    box.appendChild(sec);
+  }
   for (const brand of FILAMENT_DB) {
     const colors = q
       ? brand.colors.filter(f => `${brand.brand} ${brand.line} ${f.label}`.toLowerCase().includes(q))
