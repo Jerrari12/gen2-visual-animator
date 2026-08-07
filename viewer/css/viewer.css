@@ -795,6 +795,11 @@ body.embed-preview.embed-hint-on #embed-hint {
     border-radius: 16px 16px 0 0; padding: 12px 14px 16px;
     z-index: 34; box-shadow: 0 -6px 24px rgba(0,0,0,.18);
   }
+  /* the bottom sheet + step note left only a sliver of model between them
+     (Joey 2026-08-07): while the picker is up the note steps aside entirely —
+     display:none zeroes its rect, so updateViewInset recenters the model in
+     the freed band. Class-only, so the note returns exactly as it was. */
+  body.fm-open #note-panel { display: none; }
   .fm-swatches button { width: 30px; height: 30px; }
   /* bottom sheet: the ✕ is the primary dismiss, so give it a real touch target */
   #fm-close { width: 34px; height: 34px; font-size: 23px; top: -6px; right: -6px; }

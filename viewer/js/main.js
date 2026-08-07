@@ -193,7 +193,7 @@ function resize() {
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
-    viewInsetPx = -1; // canvas size changed — re-apply the note-panel view inset with fresh dims
+    viewInsetPx = NaN; // canvas size changed — force a view-inset re-apply (NaN, not -1: the offset is SIGNED now and -1 is a real value)
     // re-fit a whole-build shot to the new aspect (skip during the cinema, which
     // drives the camera itself, and during drawer/faceplate focus, which park
     // the camera on the part)
@@ -211,17 +211,31 @@ function resize() {
 // through camera.project(), so they track the shift for free.
 let viewInsetPx = 0;
 function updateViewInset() {
-  let inset = 0;
+  // Pan the camera PROJECTION so the model centers in the VISIBLE band of the
+  // canvas: below the note panel (top overlap) and — 2026-08-07, Joey — above
+  // the filament bottom sheet (bottom overlap; picking a colour used to leave
+  // a sliver of model peeking between the two). Signed offset, mobile-only:
+  // the desktop menu is a small floating panel and panning the whole scene
+  // for it reads as a glitch. Rects are re-measured every frame, so the sheet
+  // growing/shrinking with the search filter tracks for free.
+  let top = 0, bottom = 0;
   if (isMobile() && !cinema.on) {
+    const cb = canvas.getBoundingClientRect();
     const note = $('note-panel');
     if (note && !note.classList.contains('hidden') && !note.classList.contains('collapsed')) {
-      const nb = note.getBoundingClientRect(), cb = canvas.getBoundingClientRect();
-      inset = Math.max(0, Math.min(nb.bottom - cb.top, cb.height * 0.5));
+      const nb = note.getBoundingClientRect();
+      top = Math.max(0, Math.min(nb.bottom - cb.top, cb.height * 0.5));
+    }
+    const fm = $('filament-menu');
+    if (fm && !fm.classList.contains('hidden')) {
+      const mb = fm.getBoundingClientRect();
+      bottom = Math.max(0, Math.min(cb.bottom - mb.top, cb.height * 0.5));
     }
   }
-  if (Math.abs(inset - viewInsetPx) < 1) return;
-  viewInsetPx = inset;
-  if (inset > 0) camera.setViewOffset(canvas.clientWidth, canvas.clientHeight, 0, -inset / 2, canvas.clientWidth, canvas.clientHeight);
+  const off = (bottom - top) / 2; // top-only reproduces the old -inset/2 exactly
+  if (Math.abs(off - viewInsetPx) < 1) return;
+  viewInsetPx = off;
+  if (off) camera.setViewOffset(canvas.clientWidth, canvas.clientHeight, 0, off, canvas.clientWidth, canvas.clientHeight);
   else camera.clearViewOffset();
 }
 
@@ -1772,7 +1786,7 @@ function setSelected(id) {
   if (!id) { if (prevOpen) slideDrawer(prevOpen, false); exitFaceplateFocus(); exitDrawerFocus(); card.classList.add('hidden'); $('pointer-line').classList.add('hidden'); return; }
   if (isMobile() || IS_EMBED) setChecklist(false); // mobile + narrow dock: parts list & identify card are mutually exclusive
   const inst = instances.get(id);
-  inst.group.traverse(o => { if (o.isMesh) o.material = materialFor(inst, true, o.userData.zone); });
+  inst.group.traverse(o => { if (o.isMesh) o.material = materialFor(inst, selGlow(inst), o.userData.zone); });
   selAnchor = new THREE.Box3().setFromObject(inst.group).getCenter(new THREE.Vector3()).sub(inst.group.position);
   const info = partInfoByNode[inst.cfg.node] || { label: inst.cfg.node, qty: '?' };
   const selType = typeByNode[inst.cfg.node];
@@ -2620,6 +2634,7 @@ function renderFilamentBrands() {
 function closeFilamentMenu(refresh = true) {
   if ($('filament-menu').classList.contains('hidden')) return;
   $('filament-menu').classList.add('hidden');
+  document.body.classList.remove('fm-open'); // note panel returns as it was
   fmType = null;
   if (refresh) { refreshSelHighlight(); syncZoneChips(); }
 }
@@ -2649,6 +2664,11 @@ function openFilamentMenu(type) {
   buy.textContent = sel ? `Buy ${sel.name.replace('Panchroma ', '')} →` : 'Shop filament →';
   markFmBuy();
   $('filament-menu').classList.remove('hidden');
+  // body.fm-open: on mobile the note panel hides while the picker is up (the
+  // sheet + note left a sliver of model between them, Joey 2026-08-07) — and
+  // because it's ONLY a class, the panel returns in whatever state it was in
+  // (expanded or ✕-collapsed to its badge); updateViewInset recenters per-frame
+  document.body.classList.add('fm-open');
   refreshSelHighlight(); // color mode: drop the emissive glow so picks read true
   syncZoneChips();       // move the active ring to the zone we just targeted
 }
@@ -2656,10 +2676,25 @@ function openFilamentMenu(type) {
 // user is trying to judge (a blue pick reads pink). While the filament menu is
 // open the selected part renders in its plain material; the identify card +
 // pointer line still mark it. Glow returns the moment the menu closes.
+// Should the selected part wear the emissive glow? The glow SKEWS a colour
+// being judged (a blue pick read pink), so it yields twice over:
+// - while the filament menu is open (the 2026-07-07 rule), and
+// - 2026-08-07 (Joey): whenever the part is wearing a USER-picked filament.
+//   Closing the menu used to bring the glow straight back, so the fresh pick
+//   read wrong until the part was deselected — the exact problem the menu-open
+//   rule solved, one click later. Identification-palette parts keep the glow
+//   (finding parts is its job); customized parts are marked by the pointer
+//   line + card instead.
+function selGlow(inst) {
+  if (!$('filament-menu').classList.contains('hidden')) return false;
+  if (!useCustom) return true;
+  const type = typeByNode[inst.cfg.node];
+  return !Object.keys(customColors).some(k => k === type || k.startsWith(type + ':'));
+}
 function refreshSelHighlight() {
   if (!selectedId || !instances.has(selectedId)) return;
   const inst = instances.get(selectedId);
-  const glow = $('filament-menu').classList.contains('hidden');
+  const glow = selGlow(inst);
   inst.group.traverse(o => { if (o.isMesh) o.material = materialFor(inst, glow, o.userData.zone); });
 }
 $('fm-search').oninput = e => { fmQuery = e.target.value; renderFilamentBrands(); };
