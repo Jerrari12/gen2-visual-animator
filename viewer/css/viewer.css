@@ -218,6 +218,7 @@ body {
   background: var(--panel); border: 1px solid var(--panel-border);
   border-left: 4px solid var(--accent);
   border-radius: 12px; padding: 10px 16px;
+  transition: opacity .25s; /* fm-open fades it — see the fm-open block */
   backdrop-filter: blur(4px);
   text-align: left; min-width: 240px;
   box-shadow: 0 4px 18px rgba(0,0,0,.12);
@@ -361,6 +362,25 @@ body {
   backdrop-filter: blur(6px);
   box-shadow: 0 6px 24px rgba(0,0,0,.16);
 }
+/* ---- fm-open: the stage clears while a colour is being judged ----
+   Picking filament means you've temporarily stepped OUT of the instructions
+   (Joey 2026-08-07), so everything except the model and the swatches yields.
+   Class-only mechanism — body.fm-open is set/cleared in openFilamentMenu /
+   closeFilamentMenu — so every panel returns in exactly its prior state. */
+/* the step note hides on EVERY layout (mobile's sliver-of-model problem and
+   the desktop's "not following along anyway" are the same reasoning) */
+body.fm-open #note-panel { display: none; }
+@media (min-width: 561px) {
+  /* the menu used to sit dead-center OVER the model it exists to recolor —
+     dock it right, where the parts panel (now hidden) kept space clear */
+  body.fm-open #filament-menu { left: auto; right: 16px; transform: none; }
+  body.fm-open #checklist-panel, body.fm-open #checklist-tab { display: none; }
+  /* the identify card FADES instead of hiding: its zone chips (Body/Grip
+     retargeting) must stay reachable mid-pick — hover/focus restores it */
+  body.fm-open #identify-card { opacity: .25; }
+  body.fm-open #identify-card:hover, body.fm-open #identify-card:focus-within { opacity: 1; }
+}
+
 /* the ✕ sits on the title row so it costs no vertical space; `position:
    relative` here is what anchors it (the menu itself is the positioned
    ancestor for the bottom-sheet layout, so don't anchor to that) */
@@ -795,11 +815,9 @@ body.embed-preview.embed-hint-on #embed-hint {
     border-radius: 16px 16px 0 0; padding: 12px 14px 16px;
     z-index: 34; box-shadow: 0 -6px 24px rgba(0,0,0,.18);
   }
-  /* the bottom sheet + step note left only a sliver of model between them
-     (Joey 2026-08-07): while the picker is up the note steps aside entirely —
-     display:none zeroes its rect, so updateViewInset recenters the model in
-     the freed band. Class-only, so the note returns exactly as it was. */
-  body.fm-open #note-panel { display: none; }
+  /* fm-open note-hide lives in the UNSCOPED rule beside the base menu styles
+     (one source for every layout); updateViewInset recenters the model in the
+     freed band here because display:none zeroes the note's rect */
   .fm-swatches button { width: 30px; height: 30px; }
   /* bottom sheet: the ✕ is the primary dismiss, so give it a real touch target */
   #fm-close { width: 34px; height: 34px; font-size: 23px; top: -6px; right: -6px; }
