@@ -14,6 +14,9 @@ __pycache__/
 Thumbs.db
 desktop.ini
 
+# Local backup copies (e.g. gen2_jobs.json.bak before a hand-edit)
+*.bak
+
 # Local GoatCounter API token for serve-stats.py — NEVER commit this.
 .goatcounter-token
 # serve-stats.py's hour baseline (survives restarts so the map pulse doesn't
@@ -27,3 +30,9 @@ desktop.ini
 CLAUDE.md
 GEN2-Part-Orientation-Notes.md
 2026-*.md
+# Joey's link/catalogue specs. These were sitting UNTRACKED but un-ignored,
+# which is a different thing: one `git add -A` would have published them.
+GEN2_LINKS_UPDATE_*.md
+# Archived handoffs and run logs. The patterns above are all basename-only, so
+# they keep matching after a move into notes/ — this covers anything else.
+notes/
