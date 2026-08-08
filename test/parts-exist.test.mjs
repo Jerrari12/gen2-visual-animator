@@ -87,7 +87,7 @@ test('all mounts, faceplate families, handle styles and the back cover resolve e
       if (L === 59 && mount === 'tabletop') continue; // hanging-only collection
       assertResolves(`${L}/${mount}`, mk(L, { mount, placed: [unit(2, 2, 'decor')] }));
     }
-    for (const fs of ['essential', 'classic', 'edgelabel', 'classicpro'])
+    for (const fs of ['essential', 'classic', 'edgelabel', 'classicpro', 'chevron'])
       assertResolves(`${L}/face=${fs}`, mk(L, { faceStyle: fs, backCover: true, placed: [unit(1, 2, 'decor')] }));
     for (const hs of ['deco', 'blockbar', 'crystal'])
       assertResolves(`${L}/handle=${hs}`, mk(L, { handleStyle: hs, placed: [unit(1, 2, 'decor')] }));
@@ -97,12 +97,12 @@ test('all mounts, faceplate families, handle styles and the back cover resolve e
 // ---- static kits: the folder must back everything the UI can reach ---------
 
 // mirrors main.js HANDLE_STYLES (all nine ◀▶ stops) and FACEPLATE_STYLES
-// (the four family node templates) — update together with main.js
+// (the five family node templates) — update together with main.js
 const HANDLE_NODES = ['Handle_Deco',
   'Handle_BlockBar_A', 'Handle_BlockBar_B', 'Handle_BlockBar_C',
   'Handle_BlockBar_D', 'Handle_BlockBar_E', 'Handle_BlockBar_F',
   'Handle_Crystal_A', 'Handle_Crystal_B'];
-const FP_FAMILIES = ['Faceplate_Essential_', 'Faceplate_ClassicDecor_', 'Faceplate_EdgeLabel_', 'Faceplate_ClassicPro_'];
+const FP_FAMILIES = ['Faceplate_Essential_', 'Faceplate_ClassicDecor_', 'Faceplate_EdgeLabel_', 'Faceplate_ClassicPro_', 'Faceplate_Chevron_'];
 
 const kitsDir = join(root, 'viewer', 'kits');
 for (const kit of readdirSync(kitsDir)) {
@@ -114,7 +114,7 @@ for (const kit of readdirSync(kitsDir)) {
     // handle ◀▶: any kit with a Handle offers all nine styles
     if (nodes.some(n => n.startsWith('Handle_')))
       for (const h of HANDLE_NODES) assert.ok(has(h), `${kit}: handle cycle offers ${h} but the GLB is missing — ▶ dies silently there`);
-    // faceplate ◀▶: every plate size must exist in all four families
+    // faceplate ◀▶: every plate size must exist in all five families
     for (const n of nodes) {
       const size = (n.match(/^Faceplate_\w+_(\dW-\d+H)$/) || [])[1];
       if (!size) continue;

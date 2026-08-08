@@ -120,6 +120,8 @@ const LINKS = {
   fpc:   { p: 'https://www.printables.com/model/1291210-gen2-decor-faceplates-classic-pro-series', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20Decor%20-%20Faceplates%20-%20Classic%20Pro%20Series-1332444' },
   // the FREE Classic series — not to be confused with `fpc` (Classic Pro, club)
   fpcl:  { p: 'https://www.printables.com/model/1280870-gen2-decor-faceplates-classic-series', t: 'https://than.gs/m/1334047' },
+  // the Chevron series (2026-08-08) — a PREMIUM family (club), not core
+  fpch:  { p: 'https://www.printables.com/model/968654-gen2-decor-faceplates-chevron-series', t: 'https://than.gs/m/1116950' },
   h:     { p: 'https://www.printables.com/model/1044972-gen2-decor-handles-deco-series', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20Decor%20Handles%20-%20Deco%20Series-1159960' },
   hb:    { p: 'https://www.printables.com/model/965604-gen2-decor-handles-blockbar-series', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20Decor%20-%20Handles%20-%20BlockBar-1116949' },
   hc:    { p: 'https://www.printables.com/model/1001155-gen2-decor-handles-crystal', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20Decor%20-%20Handles%20-%20Crystal-1134382' },
@@ -421,6 +423,14 @@ export function generateManifest(build) {
                  // vertical window: the label drops straight down into it
                  labelIn: { rise: 20, back: 0 },
                  accentZ: (faceZ, dz) => faceZ - 7.675 - dz },
+    // z = mounting plane 92.57 + 6.2/2 (thinnest family: 4.2 backer + 2 mm
+    // chevron face). PREMIUM family (planner card: club ✦ + wrench, the first
+    // with both). Essential-like: bolt-on handle + M3 screws (the two holes
+    // at plate-center ±22 — Joey's 2026-08-08 page retired the knob version).
+    // The face strips ship as ONE `FACE` material zone (many print bodies, one
+    // recolorable zone) — renderZoneChips gives Body/Face swatches for free.
+    chevron:   { key: 'chevron', node: c => `Faceplate_Chevron_${c}`, z: 95.67, hasHandle: true,
+                 label: c => `Chevron Faceplate ${c}`, extras: false, links: links.fpch },
     classicpro: { key: 'classicpro', node: c => `Faceplate_ClassicPro_${c}`, z: 107.32, hasHandle: false,
                  label: c => `Classic Pro Faceplate ${c}`, extras: true, links: links.fpc, // club family — Classic Pro Series pages
                  labelNode: 'Label_ClassicPro', labelName: 'Classic Pro Label (universal)',
@@ -1513,6 +1523,8 @@ function imgFor(node) {
   // the free Classic series (2026-07-25 batch). ANCHORED on purpose — a loose
   // startsWith('Faceplate_Classic') would swallow the Classic Pro plates above
   if ((m = node.match(/^Faceplate_ClassicDecor_(\dW-\d+H)$/))) return `img/parts/ClassicDecor_${m[1]}.png`;
+  // the free Chevron series (2026-08-08 batch)
+  if ((m = node.match(/^Faceplate_Chevron_(\dW-\d+H)$/))) return `img/parts/Chevron_${m[1]}.png`;
   // universal faceplate back covers: per-size renders (2026-07-13 batch) —
   // the node's family name is historical, the render set serves every family
   if ((m = node.match(/^BackCover_EdgeLabel_(\dW-\d+H)$/))) return `img/parts/BackCover_${m[1]}.png`;

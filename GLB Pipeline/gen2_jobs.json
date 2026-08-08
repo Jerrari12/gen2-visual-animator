@@ -256,6 +256,17 @@
       "export_materials": "EXPORT"
     },
     {
+      "name": "Chevron Faceplates (185)",
+      "_note": "18 sizes, depth 6.2 (backer 4.2 + face 2.0). 45-degree chevron face made of separate diagonal strips (0.25 mm grooves) on an Essential-style backer; the strips are separate BODIES in the print so each can take its own filament, but the GLB ships TWO zones -- BODY + FACE (all strips) -- like the Classic family. Blend rebuilt 2026-08-08 from the face-UP STLs in 'D:\\Claude - Output\\GEN2 Chevron Faceplate\\STL': import -> split PER POLYGON at the 4.2 mm backer/face interface (loose-part/island splitting does NOT work: the STL merges some strips into the backer shell and into each other at shared corner verts) -> pose rot +90X (face-up local +Z becomes world -Y = front, matches Essential) -> join per size. Strip counts verified against the slicer-validated 3MF part split, all 18 sizes (10-42 strips). NO handle, NO label, NO accent; seats the universal BackCover_EdgeLabel_* covers -- do NOT re-export those. Object names are already part-code -> name_template {name}. Pre-merge backup: '...- Chevron_premerge_backup.blend'.",
+      "blend": "D:\\Code Projects\\GEN2 Visual Animator\\Blender Files\\Decor Faceplates\\GEN2 GLB Exporter - GEN2 Faceplates - Chevron.blend",
+      "out": "D:\\Code Projects\\GEN2 Visual Animator\\GLB Library\\Faceplates\\Chevron",
+      "select": "prefix:Faceplate_Chevron",
+      "code_regex": "",
+      "name_template": "{name}",
+      "depth_mode": "center",
+      "export_materials": "EXPORT"
+    },
+    {
       "name": "Classic Drawers (59)",
       "_note": "All-lengths consolidated exporter blend (lives in GLB Library\\, not Blender Files\\). 2026-07-11: all six lengths exported in-session (88 parts, all canonical_ok). The blend must carry the 2026-07-11 fixes (240-4W rotations zeroed, 115-4W-15H/2H restored, 185-4W-05H/1H appended, spec-order 'Classic Drawer <code>' names) \u2014 save it before any headless re-run or the bugs come back.",
       "blend": "D:\\Code Projects\\GEN2 Visual Animator\\GLB Library\\GEN2 GLB Exporter - GEN2 Classic Drawers.blend",
