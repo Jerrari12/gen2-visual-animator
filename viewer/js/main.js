@@ -206,6 +206,17 @@ const STAGE_THEMES = {
 // so "no key" can't mean light and a blocked localStorage fails safe to the
 // default. ('retrowave' was the stored value's dev-era name — anything but
 // 'light' reads as dark.)
+// A nav link from the PLANNER (a separate origin, so no shared localStorage)
+// can hand its choice over as ?theme=&tt= — newest stamp wins, the same rule
+// the palette and store relays use.
+try {
+  const q = new URLSearchParams(location.search);
+  const v = q.get('theme'), tt = +q.get('tt') || 0;
+  if ((v === 'dark' || v === 'light') && tt >= (+localStorage.getItem('gen2-theme:t') || 0)) {
+    localStorage.setItem('gen2-theme', v);
+    localStorage.setItem('gen2-theme:t', String(tt || Date.now()));
+  }
+} catch (e) { /* private mode */ }
 let stageTheme = 'dark';
 try { if (localStorage.getItem('gen2-theme') === 'light') stageTheme = 'light'; } catch (e) { /* private mode */ }
 function applyStageTheme(name) {
@@ -241,7 +252,8 @@ function labelThemeBtn() {
 btnTheme?.addEventListener('click', () => {
   const next = stageTheme === 'dark' ? 'light' : 'dark';
   applyStageTheme(next);
-  try { localStorage.setItem('gen2-theme', next); } catch (e) { /* private mode */ }
+  // stamp the choice so a cross-site handoff can tell whose pick is newer
+  try { localStorage.setItem('gen2-theme', next); localStorage.setItem('gen2-theme:t', String(Date.now())); } catch (e) { /* private mode */ }
   labelThemeBtn();
   track('theme:' + next);
 });
@@ -1704,7 +1716,17 @@ $('btn-skip-end').onclick = () => { track('skip-to-end'); goTo(PAGES.length - 2,
 // percent-encoded — the planner's decode has no decodeURIComponent, so an
 // encoded hash would silently fail there.
 const PLANNER_URL = 'https://gen2planner.jerrari3d.com/';
-const plannerHandoffUrl = () => PLANNER_URL + '#build=' + btoa(unescape(encodeURIComponent(JSON.stringify(build))));
+// ?theme=&tt= rides along so the planner (a separate origin) can adopt the
+// light/dark choice; the query goes BEFORE the hash — the planner's decoder
+// reads location.hash and never sees it.
+const themeQS = () => {
+  try {
+    const v = localStorage.getItem('gen2-theme');
+    if (v !== 'dark' && v !== 'light') return '';
+    return '?theme=' + v + '&tt=' + encodeURIComponent(localStorage.getItem('gen2-theme:t') || '0');
+  } catch (e) { return ''; }
+};
+const plannerHandoffUrl = () => PLANNER_URL + themeQS() + '#build=' + btoa(unescape(encodeURIComponent(JSON.stringify(build))));
 if (OFFICIAL) {
   const cover = $('btn-customize');
   cover.classList.remove('hidden');

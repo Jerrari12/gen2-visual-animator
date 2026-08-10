@@ -12,8 +12,19 @@
      default, both choices stored explicitly" contract as the viewer — and
      this page is on the VIEWER's origin, so flipping it here flips the
      studio too (the planner is a different origin and keeps its own copy). -->
-<script>document.documentElement.dataset.theme = "dark";
-try { if (localStorage.getItem("gen2-theme") === "light") delete document.documentElement.dataset.theme; } catch (e) {}</script>
+<script>(function () {
+  // a nav link from the PLANNER (separate origin) can hand its choice over as
+  // ?theme=&tt= — newest stamp wins, same rule as the palette/store relays
+  try {
+    var q = new URLSearchParams(location.search), v = q.get("theme"), tt = +q.get("tt") || 0;
+    if ((v === "dark" || v === "light") && tt >= (+localStorage.getItem("gen2-theme:t") || 0)) {
+      localStorage.setItem("gen2-theme", v);
+      localStorage.setItem("gen2-theme:t", String(tt || Date.now()));
+    }
+  } catch (e) {}
+  document.documentElement.dataset.theme = "dark";
+  try { if (localStorage.getItem("gen2-theme") === "light") delete document.documentElement.dataset.theme; } catch (e) {}
+})();</script>
 <style>
 /* A secondary page of the GEN2 Planner — the :root tokens, parallax hero,
    brand bar and footer are all mirrored from gen2-planner css/style.css so the
@@ -396,6 +407,18 @@ html[data-theme="dark"] .filter-chip.on { color: #180d20; }
 const IS_LOCAL_DEV = location.protocol === 'file:' || ['localhost', '127.0.0.1'].includes(location.hostname);
 const PLANNER_URL = IS_LOCAL_DEV ? 'http://localhost:8124/' : 'https://gen2planner.jerrari3d.com/';
 for (const a of document.querySelectorAll('.planner-link, #brand-home')) a.href = PLANNER_URL;
+document.addEventListener('click', (e) => {
+  const a = e.target && e.target.closest && e.target.closest('.planner-link, #brand-home');
+  if (!a) return;
+  try {
+    const v = localStorage.getItem('gen2-theme');
+    if (v !== 'dark' && v !== 'light') return;          // never chosen — let the far side default
+    const u = new URL(a.href, location.href);
+    u.searchParams.set('theme', v);
+    u.searchParams.set('tt', localStorage.getItem('gen2-theme:t') || '0');
+    a.href = u.href;
+  } catch (err) { /* leave the plain link */ }
+}, true);
 
 // Parallax hero — a straight port of the planner's js/hero.js: the photo starts
 // at its top and drifts only a fraction of the way down across the banner's
@@ -722,6 +745,7 @@ function renderCards(kits, main) {
   btn.addEventListener("click", function () {
     if (on()) { delete document.documentElement.dataset.theme; try { localStorage.setItem("gen2-theme", "light"); } catch (e) {} }
     else { document.documentElement.dataset.theme = "dark"; try { localStorage.setItem("gen2-theme", "dark"); } catch (e) {} }
+    try { localStorage.setItem("gen2-theme:t", String(Date.now())); } catch (e) {}
     sync();
   });
   sync();
