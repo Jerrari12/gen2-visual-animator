@@ -1442,7 +1442,10 @@ function renderChecklist() {
   // than adding a row (Joey 2026-07-24): only REQUIRED buys count, so a
   // print-only build simply shows nothing extra — the cleaner line IS the
   // reward. Opt-in magnets never trip it.
-  const toBuy = manifest.parts.filter(p => p.purchased && p.required).reduce((n, p) => n + p.qty, 0);
+  // !styleHidden: the M3 screws are REQUIRED under a bolt-on family but their
+  // row hides under an integrated-grip one — the counter must follow (a
+  // Classic/EdgeLabel swap on a static kit used to keep saying "8 to buy")
+  const toBuy = manifest.parts.filter(p => p.purchased && p.required && !p.styleHidden).reduce((n, p) => n + p.qty, 0);
   $('parts-head').innerHTML = `🧩 ${total} to print` + (toBuy ? ` · ${HW_ICON} ${toBuy} to buy` : '');
   $('checklist-tab').textContent = `Parts · ${total}`;
 }
@@ -3151,7 +3154,9 @@ async function applyFaceplateStyle(style) {
   // Inside the plate isolation everything is hidden anyway; exitFaceplateFocus
   // runs the same reconcile so restored handles reappear on deselect.
   for (const inst of instances.values()) {
-    if (typeByNode[inst.cfg.node] !== 'Handle') continue;
+    // the M3 handle screws are bolt-on hardware too (static kits carry them
+    // as of 2026-08-08) — they hide and return with the handles
+    if (typeByNode[inst.cfg.node] !== 'Handle' && inst.cfg.node !== 'ButtonHeadScrew_M3-6') continue;
     inst.styleHidden = !style.hasHandle;
     if (!fpFocus.id) inst.group.visible = pageVisibility(inst);
     else if (inst.styleHidden) inst.group.visible = false;
@@ -3160,7 +3165,7 @@ async function applyFaceplateStyle(style) {
   // The original rows (labels/links/renders) are backed up on first swap so
   // returning to the manifest's own family restores them exactly.
   for (const row of manifest.parts) {
-    if (row.type === 'Handle') { row.styleHidden = !style.hasHandle; continue; }
+    if (row.type === 'Handle' || row.node === 'ButtonHeadScrew_M3-6') { row.styleHidden = !style.hasHandle; continue; }
     if (row.type !== 'Faceplate') continue;
     const code = fpSizeCode(row.node);
     if (!code) continue;

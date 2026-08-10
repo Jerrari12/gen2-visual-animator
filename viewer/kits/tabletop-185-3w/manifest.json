@@ -62,6 +62,9 @@
       "links": { "p": "https://www.printables.com/model/964559-gen2-decor-faceplates-essential-series", "t": "https://thangs.com/designer/Jerrari/3d-model/GEN2%20Decor%20-%20Faceplates%20-%20Essential%20Series-1116946" } },
     { "node": "Handle_Deco",               "label": "Deco Handle",                "type": "Handle",    "qty": 5,
       "links": { "p": "https://www.printables.com/model/1044972-gen2-decor-handles-deco-series", "t": "https://thangs.com/designer/Jerrari/3d-model/GEN2%20Decor%20Handles%20-%20Deco%20Series-1159960" } },
+    { "node": "ButtonHeadScrew_M3-6",      "label": "M3×6mm Button Head Screw",   "type": "Screw",     "qty": 10, "purchased": true, "required": true,
+      "img": "img/parts/ButtonHeadScrew_M3-6.png",
+      "links": { "buy": [ { "id": "m3-button-head", "label": "Buy M3×6 button head", "url": "https://amzn.to/4x4opHK" } ] } },
     { "node": "MagnetClip_10x2mm",         "label": "Magnet Clip 10×2", "img": "img/parts/Magnet Clip.png",           "type": "MagnetClip", "qty": 10,
       "links": { "p": "https://www.printables.com/model/1012796-gen2-hardware", "t": "https://thangs.com/designer/Jerrari/3d-model/GEN2%20Hardware-1141439" } },
     { "node": "Magnet_10x2mm",             "label": "Magnet 10×2 mm", "img": "img/parts/Magnets.png",             "type": "Magnet",    "qty": 10, "purchased": true }
@@ -162,7 +165,17 @@
     { "id": "hB", "node": "Handle_Deco", "pos": [ 88.46, 43.86, 109.57], "rides": "drwB" },
     { "id": "hC", "node": "Handle_Deco", "pos": [-87.54, 99.86, 109.57], "rides": "drwC" },
     { "id": "hD", "node": "Handle_Deco", "pos": [  0.46, 99.86, 109.57], "rides": "drwD" },
-    { "id": "hE", "node": "Handle_Deco", "pos": [ 88.46, 99.86, 109.57], "rides": "drwE" }
+    { "id": "hE", "node": "Handle_Deco", "pos": [ 88.46, 99.86, 109.57], "rides": "drwE" },
+    { "id": "hsA_0", "node": "ButtonHeadScrew_M3-6", "pos": [-65.52, 45.32, 97.19], "rides": "drwA" },
+    { "id": "hsA_1", "node": "ButtonHeadScrew_M3-6", "pos": [-21.51, 45.32, 97.19], "rides": "drwA" },
+    { "id": "hsB_0", "node": "ButtonHeadScrew_M3-6", "pos": [66.48, 45.32, 97.19], "rides": "drwB" },
+    { "id": "hsB_1", "node": "ButtonHeadScrew_M3-6", "pos": [110.49, 45.32, 97.19], "rides": "drwB" },
+    { "id": "hsC_0", "node": "ButtonHeadScrew_M3-6", "pos": [-109.52, 101.32, 97.19], "rides": "drwC" },
+    { "id": "hsC_1", "node": "ButtonHeadScrew_M3-6", "pos": [-65.51, 101.32, 97.19], "rides": "drwC" },
+    { "id": "hsD_0", "node": "ButtonHeadScrew_M3-6", "pos": [-21.52, 101.32, 97.19], "rides": "drwD" },
+    { "id": "hsD_1", "node": "ButtonHeadScrew_M3-6", "pos": [22.49, 101.32, 97.19], "rides": "drwD" },
+    { "id": "hsE_0", "node": "ButtonHeadScrew_M3-6", "pos": [66.48, 101.32, 97.19], "rides": "drwE" },
+    { "id": "hsE_1", "node": "ButtonHeadScrew_M3-6", "pos": [110.49, 101.32, 97.19], "rides": "drwE" }
   ],
 
   "stages": {
@@ -317,24 +330,39 @@
     },
     {
       "title": "Faceplates & handles",
-      "note": "Pop a drawer out about 40 mm, slide the faceplate DOWN onto the drawer front until it snaps, screw on the Deco handle (2× M3), then push the drawer home. Repeat for every drawer · the kit is done. Tap any part to see its name and download links.",
+      "note": "Assemble the faceplate first: hold the Deco Handle against the front and thread 2× M3×6 button head screws in from behind the plate · go gently and stop as soon as they seat, the screws bite straight into plastic and will strip if you overtighten. Pop a drawer out about 40 mm, slide the assembled faceplate DOWN onto the drawer front until it snaps, then push the drawer home. Repeat for every drawer · the kit is done. Tap any part to see its name and download links.",
       "camera": { "t": 15, "p": 66, "r": 760, "target": [-30, 70, 40] },
       "phases": [
         { "move": [ { "id": "drwA", "by": [0, 0, 40] }, { "id": "dcA", "by": [0, 0, 40], "rides": "drwA" }, { "id": "dmA", "by": [0, 0, 40], "rides": "drwA" } ] },
-        { "enter": [ { "id": "fpA", "at": [0, 0, 40], "from": [0, 45, 0], "rides": "drwA" } ] },
-        { "enter": [ { "id": "hA",  "at": [0, 0, 40], "from": [0, 0, 55], "rides": "drwA" } ] },
+        { "vanish": true, "room": 0, "camera": { "t": 12, "p": 82, "fitR": 139.41, "target": [-43.53, 93.87, 135.07] } },
+        { "enter": [ { "id": "fpA", "at": [0, 45, 40], "from": [0, 30, 0], "rides": "drwA" } ] },
+        { "enter": [ { "id": "hA", "at": [0, 45, 55], "from": [0, 0, 30], "via": [[0, 0, -15]], "rides": "drwA" } ] },
+        { "camera": { "t": 143, "p": 76, "fitR": 100.37, "target": [-43.53, 93.87, 135.07] } },
+        { "enter": [
+          { "id": "hsA_0", "at": [0, 45, 40], "from": [0, 0, -30], "spin": 3, "rides": "drwA" },
+          { "id": "hsA_1", "at": [0, 45, 40], "from": [0, 0, -30], "spin": 3, "rides": "drwA" }
+        ], "sync": true },
+        { "appear": true, "room": 1, "camera": { "t": 15, "p": 66, "r": 760, "target": [-30, 70, 40] } },
         { "move": [
-          { "id": "drwA", "by": [0, 0, -40] },
-          { "id": "dcA",  "by": [0, 0, -40], "rides": "drwA" },
-          { "id": "dmA",  "by": [0, 0, -40], "rides": "drwA" },
-          { "id": "fpA",  "by": [0, 0, -40], "rides": "drwA" },
-          { "id": "hA",   "by": [0, 0, -40], "rides": "drwA" }
+          { "id": "fpA",   "by": [0, -45, 0], "rides": "drwA" },
+          { "id": "hA",    "by": [0, -45, 0], "rides": "drwA" },
+          { "id": "hsA_0", "by": [0, -45, 0], "rides": "drwA" },
+          { "id": "hsA_1", "by": [0, -45, 0], "rides": "drwA" }
+        ], "sync": true },
+        { "move": [
+          { "id": "drwA",  "by": [0, 0, -40] },
+          { "id": "dcA",   "by": [0, 0, -40], "rides": "drwA" },
+          { "id": "dmA",   "by": [0, 0, -40], "rides": "drwA" },
+          { "id": "fpA",   "by": [0, 0, -40], "rides": "drwA" },
+          { "id": "hA",    "by": [0, 0, -40], "rides": "drwA" },
+          { "id": "hsA_0", "by": [0, 0, -40], "rides": "drwA" },
+          { "id": "hsA_1", "by": [0, 0, -40], "rides": "drwA" }
         ] },
         { "fade": [
-          { "id": "fpB" }, { "id": "hB" },
-          { "id": "fpC" }, { "id": "hC" },
-          { "id": "fpD" }, { "id": "hD" },
-          { "id": "fpE" }, { "id": "hE" }
+          { "id": "fpB" }, { "id": "hB" }, { "id": "hsB_0" }, { "id": "hsB_1" },
+          { "id": "fpC" }, { "id": "hC" }, { "id": "hsC_0" }, { "id": "hsC_1" },
+          { "id": "fpD" }, { "id": "hD" }, { "id": "hsD_0" }, { "id": "hsD_1" },
+          { "id": "fpE" }, { "id": "hE" }, { "id": "hsE_0" }, { "id": "hsE_1" }
         ] }
       ]
     }
