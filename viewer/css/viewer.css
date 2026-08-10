@@ -55,6 +55,20 @@ body {
   background: #303469;
   box-shadow: 0 0 8px rgba(56, 220, 255, 0.55);
 }
+/* render-quality cycle pill, beside the light/dark switch — both are "how the
+   stage looks". Fixed width so High/Balanced/Fast don't reflow the topbar. */
+#btn-quality {
+  flex: none; margin-left: 8px; min-width: 74px;
+  padding: 4px 9px; font: inherit; font-size: 12px; font-weight: 700;
+  color: var(--ink-soft); background: #fff;
+  border: 1px solid var(--panel-border); border-radius: 999px; cursor: pointer;
+}
+#btn-quality:hover { border-color: var(--accent); color: var(--ink); }
+/* the tier is legible at a glance without reading the word */
+#btn-quality[data-q="high"] { color: var(--accent); }
+#btn-quality[data-q="fast"] { opacity: 0.75; }
+@media (max-width: 560px) { #btn-quality { display: none; } }
+
 /* the picker's honesty line — only when the showcase (dark) stage is up */
 .fm-accuracy { display: none; font-size: 11.5px; color: var(--ink-soft); margin: 6px 2px 2px; }
 body.stage-dark .fm-accuracy { display: block; }
@@ -933,6 +947,7 @@ body.stage-dark {
 }
 body.stage-dark #topbar,
 body.stage-dark #btn-theme,
+body.stage-dark #btn-quality,
 body.stage-dark .opt-seg button,
 body.stage-dark #identify-style button,
 body.stage-dark .zone-chip,

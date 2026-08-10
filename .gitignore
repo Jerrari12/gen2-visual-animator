@@ -17,6 +17,12 @@ desktop.ini
 # Local backup copies (e.g. gen2_jobs.json.bak before a hand-edit)
 *.bak
 
+# Render-experiment harness. It lives under viewer/ so the local dev server can
+# serve it, which means an untracked file there is one `git add -A` away from
+# being DEPLOYED (Pages serves viewer/). It drives the real scene through the
+# ?debug=1 hook and ships nothing — keep it that way until we decide otherwise.
+viewer/lab/
+
 # Local GoatCounter API token for serve-stats.py — NEVER commit this.
 .goatcounter-token
 # serve-stats.py's hour baseline (survives restarts so the map pulse doesn't

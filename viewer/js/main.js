@@ -242,6 +242,15 @@ function applyStageTheme(name) {
     if (g) g.traverse(o => { if (o.isLineSegments) o.material.color.set(t.dim); });
   }
   document.body.classList.toggle('stage-dark', stageTheme !== 'light');
+  // Grounding is stage-specific: the light stage gets a contact shadow, the dark
+  // stage a faint reflection (a shadow is invisible on a near-black floor, and
+  // lifting the floor to fix that costs the retrowave mood). So a theme flip has
+  // to re-pick the mechanism. Guarded: this also runs at module eval, before the
+  // quality tier exists.
+  // (`var` on purpose: it hoists to `undefined` instead of sitting in a TDZ, so
+  // this stays safe no matter when applyStageTheme first runs. A `let` here would
+  // throw on `typeof` — the same trap that once took the whole boot down.)
+  if (qualityReady) { applyShadowQuality(); applyReflectionQuality(); }
 }
 // NB plain getElementById here — this runs at module eval, BEFORE the `$`
 // helper below is initialized (a `$(...)` call here dies on the TDZ and takes
@@ -262,9 +271,506 @@ btnTheme?.addEventListener('click', () => {
 });
 labelThemeBtn();
 
+// ---- render quality tiers (2026-08-10) -------------------------------------
+// Measured on an Intel UHD iGPU with EXT_disjoint_timer_query_webgl2 (gl.finish()
+// under-reports by 10-40x — see notes). The studio package costs ~2.4x the shipped
+// renderer, and FILL RATE is the axis that decides mobile: at devicePixelRatio 2
+// the GPU ceiling alone is ~54 fps. So pixelRatio is the strongest lever and it is
+// what degrades first.
+//
+// `fast` is deliberately BYTE-IDENTICAL to the pre-2026-08-10 renderer, so the
+// fallback is a known-good state rather than a half-disabled new one.
+const QUALITY = {
+  high:     { env: true,  tone: true,  key: true,  shadow: true,  reflect: true,  ao: true,  dpr: 2 },
+  balanced: { env: true,  tone: true,  key: true,  shadow: true,  reflect: false, ao: false, dpr: 1.5 },
+  fast:     { env: false, tone: false, key: false, shadow: false, reflect: false, ao: false, dpr: 1 },
+};
+const QUALITY_ORDER = ['high', 'balanced', 'fast'];
+var qualityReady = false;   // hoisted (see applyStageTheme) — true once a tier has been applied
+let quality = 'high';
+let qualityLocked = false;   // an explicit user pick stops the auto-downgrade fighting them
+try {
+  const q = localStorage.getItem('gen2-quality');
+  if (QUALITY[q]) { quality = q; qualityLocked = localStorage.getItem('gen2-quality:set') === '1'; }
+} catch (e) { /* private mode */ }
+// ?shot=1 is PINNED: the ten gallery cards must not re-shoot themselves every time
+// the user-facing default moves (captureShot already forces its own palette for
+// the same reason).
+const SHOT_QUALITY = 'high';
+
+// Neutral studio environment. Same PMREM-from-a-tiny-scene trick as partyEnv() —
+// no .hdr fetch, so it stays offline-safe. WHITE and asymmetric: white keeps hue
+// drift ~0 (measured max 2.4 deg vs a tinted room's 121 deg), the asymmetry is
+// what reads as "lit" rather than "brighter".
+let studioEnvTex = null;
+function studioEnv() {
+  if (studioEnvTex) return studioEnvTex;
+  const room = new THREE.Scene();
+  const panel = (hex, boost, w, h, x, y, z) => {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h),
+      new THREE.MeshBasicMaterial({ color: new THREE.Color(hex).multiplyScalar(boost), side: THREE.DoubleSide }));
+    m.position.set(x, y, z); m.lookAt(0, 0, 0); room.add(m);
+  };
+  panel(0xffffff, 5.0, 9, 9, -7, 7, 5);      // key
+  panel(0xffffff, 1.2, 9, 9, 8, 3, 2);       // fill
+  panel(0xffffff, 2.2, 12, 3, 0, 5, -10);    // rim
+  panel(0x9aa3b0, 0.7, 16, 16, 0, -9, 0);    // floor bounce
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  studioEnvTex = pmrem.fromScene(room, 0.04).texture;
+  pmrem.dispose();
+  room.traverse(o => { if (o.isMesh) { o.geometry.dispose(); o.material.dispose(); } });
+  return studioEnvTex;
+}
+// Shipped light rig vs the key-dominant one. Key-dominant is what makes a shadow
+// read at all — with the shipped near-even lighting the shadow is washed out.
+const LIGHT_RIG = {
+  shipped: { hemi: 1.1, sun: 1.6, fill: 0.5 },
+  key:     { hemi: 0.15, sun: 1.2, fill: 0.3 },
+};
+let baseHemi = LIGHT_RIG.shipped.hemi;   // updateCinema fades FROM this, per tier
+
+function applyQuality(name) {
+  quality = QUALITY[name] ? name : 'high';
+  const q = QUALITY[quality];
+
+  renderer.toneMapping = q.tone ? THREE.NeutralToneMapping : THREE.NoToneMapping;
+  // ⚠ NOT ACES. Measured median hue error: none 0.9 deg, Khronos Neutral 2.5 deg,
+  // ACES 5.3 deg. Neutral exists for product rendering where colour is a promise.
+
+  const rig = q.key ? LIGHT_RIG.key : LIGHT_RIG.shipped;
+  baseHemi = rig.hemi;
+  if (!cinema.on) hemi.intensity = rig.hemi;
+  sun.intensity = rig.sun;
+  fill.intensity = rig.fill;
+
+  // The outro owns scene.environment while it runs — don't stomp the party room.
+  if (!cinema.on) scene.environment = q.env ? studioEnv() : null;
+
+  qualityReady = true;
+  applyShadowQuality();
+  guardFx('reflection', applyReflectionQuality);   // also builds the render target
+  labelQualityBtn();
+}
+function setQuality(name, { user = false } = {}) {
+  applyQuality(name);
+  if (user) qualityLocked = true;
+  try {
+    localStorage.setItem('gen2-quality', quality);
+    if (user) localStorage.setItem('gen2-quality:set', '1');
+  } catch (e) { /* private mode */ }
+  if (user) track('quality:' + quality);
+}
+
+// ---- contact shadow (light stage) ------------------------------------------
+// The build is STATIC between steps, so the shadow map is rendered on demand and
+// then left alone — costing nothing per frame until something moves.
+// ⚠ Two r185 traps, both silent: PCFSoftShadowMap is DEPRECATED (three warns and
+// substitutes PCFShadowMap), and the shadow pass bails at the TOP on
+// renderer.shadowMap.needsUpdate — setting light.shadow.needsUpdate alone never
+// reaches the per-light loop and you get a valid-looking 1024² map that is never
+// sampled.
+function shadowsWanted() {
+  return QUALITY[quality].shadow && stageTheme === 'light' && !cinema.on && !isWallBuild && !isUnderTableBuild;
+}
+function applyShadowQuality() {
+  const on = shadowsWanted();
+  if (renderer.shadowMap.enabled === on && !on) return;
+  renderer.shadowMap.enabled = on;
+  renderer.shadowMap.type = THREE.PCFShadowMap;
+  renderer.shadowMap.autoUpdate = false;
+  sun.castShadow = on;
+  for (const inst of instances.values())
+    inst.group.traverse(o => { if (o.isMesh) { o.castShadow = on; o.receiveShadow = on; } });
+  table.receiveShadow = on;
+  if (on) fitShadowCamera();
+  // shadowMap.enabled is in the program cache key and three does NOT auto-detect
+  // the flip — every material must recompile or nothing changes on screen.
+  scene.traverse(o => {
+    if (!o.material) return;
+    for (const m of (Array.isArray(o.material) ? o.material : [o.material])) m.needsUpdate = true;
+  });
+}
+function fitShadowCamera() {
+  if (!sun.castShadow || typeof assembledBox === 'undefined' || assembledBox.isEmpty()) return;
+  const size = new THREE.Vector3(), c = new THREE.Vector3();
+  assembledBox.getSize(size); assembledBox.getCenter(c);
+  const r = Math.max(size.x, size.y, size.z) * 0.85 + 40;
+  const cam = sun.shadow.camera;
+  cam.left = -r; cam.right = r; cam.top = r; cam.bottom = -r;
+  cam.near = 1; cam.far = 3000;
+  cam.updateProjectionMatrix();
+  sun.target.position.copy(c);
+  if (!sun.target.parent) scene.add(sun.target);
+  sun.target.updateMatrixWorld();
+  sun.shadow.mapSize.set(1024, 1024);
+  // world units are MILLIMETRES and parts are 2-3mm thick — normalBias has to be a
+  // fraction of a mm, not the ~0.02 a tutorial suggests
+  sun.shadow.bias = -0.0004;
+  sun.shadow.normalBias = 0.6;
+  renderer.shadowMap.needsUpdate = true;   // THE flag that matters (see above)
+}
+
+// ---- planar floor reflection (dark stage) ----------------------------------
+// The dark stage cannot use a shadow: the floor is already near-black, so there is
+// no luminance range left to darken, and lifting it costs the retrowave mood. A
+// faint blurred reflection grounds the build while keeping the deep navy.
+// Refreshed only when the camera or the build moves.
+const refl = { rt: null, mesh: null, cam: null, tex: new THREE.Matrix4(), key: '' };
+function reflectionWanted() {
+  return QUALITY[quality].reflect && stageTheme !== 'light' && !cinema.on
+    && !isWallBuild && !isUnderTableBuild && !fxDead.reflection;
+}
+function ensureReflector() {
+  if (refl.mesh) return refl.mesh;
+  const S = 512;                                   // low res IS most of the blur
+  refl.rt = new THREE.WebGLRenderTarget(S, S);
+  refl.rt.texture.minFilter = THREE.LinearFilter;
+  refl.rt.texture.magFilter = THREE.LinearFilter;
+  refl.cam = new THREE.PerspectiveCamera();
+  const mat = new THREE.ShaderMaterial({
+    uniforms: { tRefl: { value: refl.rt.texture }, textureMatrix: { value: refl.tex },
+                uOpacity: { value: 0.16 }, uBlur: { value: 1.2 } },
+    vertexShader: `
+      uniform mat4 textureMatrix;
+      varying vec4 vProj; varying vec2 vUv;
+      void main(){ vUv = uv; vProj = textureMatrix * vec4( position, 1.0 );
+        gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 ); }`,
+    fragmentShader: `
+      uniform sampler2D tRefl; uniform float uOpacity, uBlur;
+      varying vec4 vProj; varying vec2 vUv;
+      void main(){
+        vec2 uv = vProj.xy / vProj.w;
+        float d = distance( vUv, vec2( 0.5 ) );
+        float r = uBlur * ( 0.0015 + d * 0.014 );
+        vec3 c = texture2D( tRefl, uv ).rgb * 0.28;
+        c += texture2D( tRefl, uv + vec2( r, 0.0 ) ).rgb * 0.18;
+        c += texture2D( tRefl, uv - vec2( r, 0.0 ) ).rgb * 0.18;
+        c += texture2D( tRefl, uv + vec2( 0.0, r ) ).rgb * 0.18;
+        c += texture2D( tRefl, uv - vec2( 0.0, r ) ).rgb * 0.18;
+        gl_FragColor = vec4( c, uOpacity * smoothstep( 0.5, 0.05, d ) );
+      }`,
+    transparent: true, depthWrite: false,
+  });
+  // ⚠ Geometry stays in its native XY (+Z normal) and the OBJECT is rotated — the
+  // reflection maths reads the normal out of the object's rotation, so baking
+  // rotateX into the vertices would mirror the scene about the wrong plane.
+  refl.mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), mat);
+  refl.mesh.rotation.x = -Math.PI / 2;
+  refl.mesh.renderOrder = 1;
+  refl.mesh.raycast = () => {};      // never a tap-to-identify target
+  refl.mesh.visible = false;
+  scene.add(refl.mesh);
+  return refl.mesh;
+}
+function applyReflectionQuality() {
+  const on = reflectionWanted();
+  if (!on) { if (refl.mesh) refl.mesh.visible = false; return; }
+  ensureReflector();
+  refl.mesh.visible = true;
+  fitReflector();
+  updateReflection(true);
+}
+function fitReflector() {
+  if (!refl.mesh || typeof assembledBox === 'undefined' || assembledBox.isEmpty()) return;
+  const size = new THREE.Vector3(), c = new THREE.Vector3();
+  assembledBox.getSize(size); assembledBox.getCenter(c);
+  const s = Math.max(size.x, size.z) * 4.0;
+  refl.mesh.scale.set(s, s, 1);
+  refl.mesh.position.set(c.x, assembledBox.min.y + 0.08, c.z);
+  refl.mesh.updateMatrixWorld(true);
+}
+const _rRw = new THREE.Vector3(), _rCw = new THREE.Vector3(), _rN = new THREE.Vector3(),
+      _rRot = new THREE.Matrix4(), _rView = new THREE.Vector3(), _rLook = new THREE.Vector3(),
+      _rTgt = new THREE.Vector3();
+function updateReflection(force = false) {
+  if (!refl.mesh || !refl.mesh.visible) return;
+  const key = camera.position.toArray().concat(controls.target.toArray(), refl.mesh.position.toArray())
+    .map(v => v.toFixed(1)).join();
+  if (!force && key === refl.key) return;
+  refl.key = key;
+  _rRw.setFromMatrixPosition(refl.mesh.matrixWorld);
+  _rCw.setFromMatrixPosition(camera.matrixWorld);
+  _rRot.extractRotation(refl.mesh.matrixWorld);
+  _rN.set(0, 0, 1).applyMatrix4(_rRot);
+  _rView.subVectors(_rRw, _rCw);
+  if (_rView.dot(_rN) > 0) return;                 // camera is below the floor
+  _rView.reflect(_rN).negate().add(_rRw);
+  _rRot.extractRotation(camera.matrixWorld);
+  _rLook.set(0, 0, -1).applyMatrix4(_rRot).add(_rCw);
+  _rTgt.subVectors(_rRw, _rLook).reflect(_rN).negate().add(_rRw);
+  // ⚠ must be a RIGID transform (reflect position, reflect up, lookAt the reflected
+  // target). Building it from a determinant -1 reflection matrix flips winding
+  // order and culls every front face.
+  const vc = refl.cam;
+  vc.position.copy(_rView);
+  vc.up.set(0, 1, 0).applyMatrix4(_rRot).reflect(_rN);
+  vc.lookAt(_rTgt);
+  vc.near = camera.near; vc.far = camera.far;
+  vc.updateMatrixWorld();
+  vc.projectionMatrix.copy(camera.projectionMatrix);
+  refl.tex.set(0.5, 0, 0, 0.5, 0, 0.5, 0, 0.5, 0, 0, 0.5, 0.5, 0, 0, 0, 1);
+  refl.tex.multiply(vc.projectionMatrix).multiply(vc.matrixWorldInverse).multiply(refl.mesh.matrixWorld);
+  // Reflect the PRODUCT only — grid, dim callouts and measure markers bounced back
+  // at the viewer read as clutter, not as depth.
+  const hidden = [];
+  const hide = o => { if (o.visible) { o.visible = false; hidden.push(o); } };
+  hide(refl.mesh); hide(grid);
+  scene.traverse(o => { if ((o.isLine || o.isLineSegments || o.isSprite) && o.visible) hide(o); });
+  const prevBg = scene.background;
+  scene.background = null;
+  renderer.setRenderTarget(refl.rt);
+  renderer.clear();
+  renderer.render(scene, vc);
+  renderer.setRenderTarget(null);
+  scene.background = prevBg;
+  for (const o of hidden) o.visible = true;
+}
+
+// ---- ambient occlusion -----------------------------------------------------
+// Hand-rolled half-res SSAO. No EffectComposer: the beauty pass never goes through
+// a render target — AO is rendered into its own buffer and laid over the finished
+// frame as a fullscreen quad, so the normal render path is untouched.
+// Measured cost: +0.18 ms/frame steady, +0.66 ms one-off when the view settles —
+// cheaper than the shadow map and ~3x cheaper than the environment.
+//
+// ⚠ The scene is REAL MILLIMETRES. AO_RADIUS is in mm (~18mm reads the case seams
+// and drawer gaps); a tutorial's 0.5 "units" is a sub-pixel no-op here.
+// ⚠ Do NOT composite with MultiplyBlending. Measured: MultiplyBlending and
+// NoBlending produced byte-identical frames (the blend mode was ignored and the
+// quad simply REPLACED the frame). Black-with-alpha has no such ambiguity.
+const AO_N = 24, AO_RADIUS = 18, AO_STRENGTH = 1.15;
+const ao = { rtN: null, rtAO: null, normalMat: null, aoMat: null, compMat: null,
+             quad: null, qScene: null, qCam: null, key: '', busy: false };
+function aoWanted() { return QUALITY[quality].ao && !cinema.on && !fxDead.ao; }
+function aoKernel(n) {              // deterministic hemisphere kernel (golden angle)
+  const k = [];
+  for (let i = 0; i < n; i++) {
+    const a = i * 2.399963, r = Math.sqrt((i + 0.5) / n), z = Math.sqrt(1 - r * r);
+    k.push(new THREE.Vector3(Math.cos(a) * r, Math.sin(a) * r, z)
+      .multiplyScalar(0.3 + 0.7 * ((i / n) ** 2)));   // cluster near the origin
+  }
+  return k;
+}
+function ensureAO() {
+  if (ao.rtN) return;
+  const w = Math.max(2, Math.floor(canvas.width * 0.5)), h = Math.max(2, Math.floor(canvas.height * 0.5));
+  ao.rtN = new THREE.WebGLRenderTarget(w, h);
+  ao.rtN.depthTexture = new THREE.DepthTexture(w, h);
+  ao.rtN.depthTexture.type = THREE.UnsignedIntType;
+  ao.rtAO = new THREE.WebGLRenderTarget(w, h);
+  ao.normalMat = new THREE.MeshNormalMaterial();     // view-space normals in RGB
+  ao.aoMat = new THREE.ShaderMaterial({
+    defines: { N: AO_N },
+    uniforms: {
+      tNormal: { value: ao.rtN.texture }, tDepth: { value: ao.rtN.depthTexture },
+      uProj: { value: new THREE.Matrix4() }, uProjInv: { value: new THREE.Matrix4() },
+      uKernel: { value: aoKernel(AO_N) },
+      uRadius: { value: AO_RADIUS }, uBias: { value: 0.6 },
+      uRes: { value: new THREE.Vector2(w, h) },
+    },
+    vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4( position.xy, 0.0, 1.0 ); }`,
+    fragmentShader: `
+      uniform sampler2D tNormal; uniform sampler2D tDepth;
+      uniform mat4 uProj, uProjInv; uniform vec3 uKernel[N];
+      uniform float uRadius, uBias; uniform vec2 uRes;
+      varying vec2 vUv;
+      vec3 viewPos( vec2 uv ){
+        float d = texture2D( tDepth, uv ).x;
+        vec4 c = uProjInv * vec4( uv * 2.0 - 1.0, d * 2.0 - 1.0, 1.0 );
+        return c.xyz / c.w;
+      }
+      void main(){
+        float d = texture2D( tDepth, vUv ).x;
+        if ( d >= 1.0 ) { gl_FragColor = vec4( 1.0 ); return; }   // background: no AO
+        vec3 p = viewPos( vUv );
+        vec3 n = normalize( texture2D( tNormal, vUv ).xyz * 2.0 - 1.0 );
+        float ang = fract( sin( dot( vUv * uRes, vec2( 12.9898, 78.233 ) ) ) * 43758.5453 ) * 6.2831853;
+        vec3 rv = vec3( cos( ang ), sin( ang ), 0.0 );
+        vec3 t = normalize( rv - n * dot( rv, n ) );
+        mat3 tbn = mat3( t, cross( n, t ), n );
+        float occ = 0.0;
+        for ( int i = 0; i < N; i++ ){
+          vec3 sp = p + tbn * uKernel[i] * uRadius;
+          vec4 o = uProj * vec4( sp, 1.0 );
+          o.xy = ( o.xy / o.w ) * 0.5 + 0.5;
+          float sz = viewPos( o.xy ).z;
+          float range = smoothstep( 0.0, 1.0, uRadius / max( 0.0001, abs( p.z - sz ) ) );
+          occ += ( sz >= sp.z + uBias ? 1.0 : 0.0 ) * range;
+        }
+        gl_FragColor = vec4( vec3( clamp( 1.0 - occ / float( N ), 0.0, 1.0 ) ), 1.0 );
+      }`,
+    depthTest: false, depthWrite: false,
+  });
+  ao.compMat = new THREE.ShaderMaterial({
+    uniforms: { tAO: { value: ao.rtAO.texture }, uTexel: { value: new THREE.Vector2(1 / w, 1 / h) },
+                uStrength: { value: AO_STRENGTH } },
+    vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4( position.xy, 0.0, 1.0 ); }`,
+    fragmentShader: `
+      uniform sampler2D tAO; uniform vec2 uTexel; uniform float uStrength; varying vec2 vUv;
+      void main(){
+        float a = texture2D( tAO, vUv ).r * 0.4;
+        a += texture2D( tAO, vUv + vec2(  uTexel.x,  uTexel.y ) ).r * 0.15;
+        a += texture2D( tAO, vUv + vec2( -uTexel.x,  uTexel.y ) ).r * 0.15;
+        a += texture2D( tAO, vUv + vec2(  uTexel.x, -uTexel.y ) ).r * 0.15;
+        a += texture2D( tAO, vUv + vec2( -uTexel.x, -uTexel.y ) ).r * 0.15;
+        gl_FragColor = vec4( 0.0, 0.0, 0.0, clamp( ( 1.0 - a ) * uStrength, 0.0, 1.0 ) );
+      }`,
+    transparent: true, depthTest: false, depthWrite: false,
+  });
+  ao.quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), ao.aoMat);
+  ao.quad.frustumCulled = false;
+  ao.qScene = new THREE.Scene(); ao.qScene.add(ao.quad);
+  ao.qCam = new THREE.Camera();
+}
+function aoResize() {
+  const w = Math.max(2, Math.floor(canvas.width * 0.5)), h = Math.max(2, Math.floor(canvas.height * 0.5));
+  if (ao.rtN.width === w && ao.rtN.height === h) return;
+  ao.rtN.setSize(w, h);
+  ao.rtN.depthTexture.image.width = w; ao.rtN.depthTexture.image.height = h;
+  ao.rtAO.setSize(w, h);
+  ao.aoMat.uniforms.uRes.value.set(w, h);
+  ao.compMat.uniforms.uTexel.value.set(1 / w, 1 / h);
+  ao.key = '';                       // force a regen at the new resolution
+}
+// Regenerated only when the view or the build moved — the whole point of a
+// mostly-static viewer.
+function updateAO(force = false) {
+  if (!aoWanted()) return;
+  ensureAO(); aoResize();
+  const key = camera.position.toArray().concat(controls.target.toArray())
+    .map(v => v.toFixed(2)).join() + '|' + instances.size + '|' + cur;
+  if (!force && key === ao.key) return;
+  ao.key = key;
+  ao.busy = true;
+  // depth + view-space normals of the PARTS only — the table would occlude itself
+  // into a grey wash and it isn't what anyone is inspecting
+  const hidden = [];
+  scene.traverse(o => {
+    if ((o === table || o === grid || o === wall || o === surface ||
+         o.isLine || o.isLineSegments || o.isSprite || o === refl.mesh) && o.visible) {
+      o.visible = false; hidden.push(o);
+    }
+  });
+  const prevBg = scene.background, prevOv = scene.overrideMaterial;
+  scene.background = null; scene.overrideMaterial = ao.normalMat;
+  renderer.setRenderTarget(ao.rtN);
+  renderer.clear();
+  renderer.render(scene, camera);
+  scene.overrideMaterial = prevOv; scene.background = prevBg;
+  for (const o of hidden) o.visible = true;
+
+  ao.aoMat.uniforms.uProj.value.copy(camera.projectionMatrix);
+  ao.aoMat.uniforms.uProjInv.value.copy(camera.projectionMatrixInverse);
+  ao.quad.material = ao.aoMat;
+  renderer.setRenderTarget(ao.rtAO);
+  renderer.render(ao.qScene, ao.qCam);
+  renderer.setRenderTarget(null);
+  ao.busy = false;
+}
+// Per-feature kill switch: an optional render effect must never be able to take
+// the render loop with it. First throw disables that effect for the session and
+// reports it once (error:fx-* so a driver-specific failure is actually visible in
+// the telemetry rather than being an invisible "it looked wrong on my phone").
+const fxDead = {};
+function guardFx(name, fn) {
+  if (fxDead[name]) return;
+  try { fn(); }
+  catch (e) {
+    fxDead[name] = true;
+    if (name === 'ao') { ao.busy = false; scene.overrideMaterial = null; }
+    if (name === 'reflection' && refl.mesh) refl.mesh.visible = false;
+    renderer.setRenderTarget(null);
+    console.warn(`[gen2] ${name} disabled after a render error —`, e);
+    track('error:fx-' + name);
+  }
+}
+function compositeAO() {
+  if (!aoWanted() || !ao.rtAO || ao.busy || fxDead.ao) return;
+  ao.quad.material = ao.compMat;
+  // ⚠ autoClear defaults TRUE — without this the quad WIPES the frame it is
+  // meant to shade, and you capture the bare AO buffer on an empty canvas.
+  const prev = renderer.autoClear;
+  renderer.autoClear = false;
+  renderer.render(ao.qScene, ao.qCam);
+  renderer.autoClear = prev;
+}
+
+// ---- the topbar control ----------------------------------------------------
+const btnQuality = document.getElementById('btn-quality');
+const QUALITY_LABEL = { high: 'High', balanced: 'Balanced', fast: 'Fast' };
+function labelQualityBtn() {
+  if (!btnQuality) return;
+  btnQuality.textContent = QUALITY_LABEL[quality];
+  btnQuality.dataset.q = quality;
+  btnQuality.title = `Render quality: ${QUALITY_LABEL[quality]} — click to change`;
+}
+btnQuality?.addEventListener('click', () => {
+  const i = QUALITY_ORDER.indexOf(quality);
+  setQuality(QUALITY_ORDER[(i + 1) % QUALITY_ORDER.length], { user: true });
+});
+
+// ---- progressive quality + silent auto-downgrade ---------------------------
+// This viewer is STATIC almost all the time — only manual orbit and step
+// animations move it. So render cheap while moving and spend the budget the
+// instant everything settles. pixelRatio is the measured strongest lever, so it
+// is what moves; the reflection self-gates on its own view key, and the shadow
+// map switches between per-frame and on-demand.
+//
+// The auto-downgrade is SILENT and ONE-WAY (Joey 2026-08-10): it only ever steps
+// DOWN, never back up, so a brief stall can't start the tier oscillating. An
+// explicit user pick locks it out entirely.
+const perf = { key: '', moving: false, lastChange: 0, dpr: null, frames: [], t0: 0, checked: 0 };
+const SETTLE_MS = 160;
+function qualityTick(now) {
+  const q = QUALITY[quality];
+  const cap = Math.min(q.dpr, devicePixelRatio);
+  if (cinema.on) {                       // the outro drives its own camera constantly
+    if (perf.dpr !== cap) { perf.dpr = cap; renderer.setPixelRatio(cap); renderer.setSize(canvas.clientWidth, canvas.clientHeight, false); }
+    return;
+  }
+  const key = camera.position.toArray().concat(controls.target.toArray())
+    .map(v => v.toFixed(2)).join() + '|' + tweens.size;
+  if (key !== perf.key) { perf.key = key; perf.lastChange = now; perf.moving = true; }
+  else if (perf.moving && now - perf.lastChange > SETTLE_MS) {
+    perf.moving = false;
+    if (renderer.shadowMap.enabled) { renderer.shadowMap.autoUpdate = false; renderer.shadowMap.needsUpdate = true; }
+  }
+  if (perf.moving && renderer.shadowMap.enabled) renderer.shadowMap.autoUpdate = true;
+
+  const want = perf.moving ? Math.min(1, cap) : cap;
+  if (perf.dpr !== want) {
+    perf.dpr = want;
+    renderer.setPixelRatio(want);
+    renderer.setSize(canvas.clientWidth, canvas.clientHeight, false);
+  }
+
+  // sustained-low-fps guard: sample for 3s, need a genuinely bad average before
+  // dropping a tier. Never fires on the first 3s (boot jank) or when locked.
+  if (qualityLocked || quality === 'fast') return;
+  if (!perf.t0) { perf.t0 = now; return; }
+  perf.frames.push(now);
+  if (now - perf.t0 < 3000) return;
+  const fps = perf.frames.length / ((now - perf.t0) / 1000);
+  perf.frames.length = 0; perf.t0 = now;
+  if (perf.checked++ === 0) return;                 // discard the first window
+  if (fps < 24) {
+    const next = QUALITY_ORDER[QUALITY_ORDER.indexOf(quality) + 1];
+    if (next) { setQuality(next); track('quality:auto-' + next); }
+  }
+}
+
 function resize() {
   const w = canvas.clientWidth, h = canvas.clientHeight;
-  if (canvas.width !== w || canvas.height !== h) {
+  // ⚠ canvas.width is the DRAWING BUFFER size (device px); clientWidth is the CSS
+  // layout size. setPixelRatio(2) makes the buffer twice the CSS width, so
+  // comparing them DIRECTLY was never equal on a HiDPI display and this whole body
+  // ran every single frame — measured 2026-08-10 by counting setSize calls: 0/sec
+  // at devicePixelRatio 1, 39/sec (i.e. every frame) at devicePixelRatio 2. That
+  // also re-NaN'd viewInset every frame, so the desktop filament-menu pan snapped
+  // instead of lerping, and it is the likely root cause of the old "violent
+  // vibration" (the 0↔target oscillation worked around in updateViewInset).
+  const dpr = renderer.getPixelRatio();
+  if (canvas.width !== Math.floor(w * dpr) || canvas.height !== Math.floor(h * dpr)) {
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
@@ -3787,6 +4293,12 @@ function startCinema() {
   // party dressing on
   party.fade = 0;
   party.cuts = 0;
+  // The cinema owns a clean stage (it already hides the wall and surface). Without
+  // this the floor reflection survives into the outro, mirroring the confetti and
+  // the dome — and paying a second scene render on the most expensive frames in
+  // the app. reflectionWanted() already says no while cinema.on; it just needs to
+  // be ASKED on the way in, not only on the way out.
+  applyReflectionQuality();
   scene.environment = partyEnv();
   scene.environmentIntensity = 0; // ramps in with the fade
   scene.add(partyRig());
@@ -3816,8 +4328,13 @@ function stopCinema() {
   grid.visible = !isWallBuild && !isUnderTableBuild; // hanging builds never show the floor grid
   wall.visible = isWallBuild;
   surface.visible = isUnderTableBuild;
-  scene.environment = null;
+  // ⚠ restore the QUALITY TIER's environment, not null — otherwise leaving the
+  // outro drops the studio lighting and the build goes flat until something else
+  // re-applies it (same class of bug as the theme clones this function restores).
+  scene.environment = QUALITY[quality].env ? studioEnv() : null;
   scene.environmentIntensity = 1;
+  hemi.intensity = baseHemi;
+  applyShadowQuality(); applyReflectionQuality();
   scene.remove(party.rig);
   if (party.dome) { scene.remove(party.dome); party.dome.material.opacity = 0; }
   scene.remove(confetti.mesh);
@@ -4033,7 +4550,7 @@ function updateCinema(now) {
     scene.background.lerpColors(party.bgDay, party.bgNight, f);
     if (party.dome) party.dome.material.opacity = f;   // the retrowave sky rides the same fade
     table.material.color.lerpColors(party.tableDay, party.tableNight, f);
-    hemi.intensity = 1.1 - 0.75 * f;
+    hemi.intensity = baseHemi - (baseHemi * 0.68) * f;   // fade from the TIER's hemi, not a hardcoded 1.1
     scene.environmentIntensity = 0.55 * f;
   }
   // party lights circle in opposite directions, hues slowly drifting apart
@@ -4258,6 +4775,10 @@ async function mountManifest(m) {
   await loadTemplates();
   buildInstances();
   computeBounds();
+  // (re)apply the tier now that the build exists — the shadow camera and the
+  // reflector plane are both sized off assembledBox, and regenerate() replaces
+  // every instance group, so the shadow casters have to be re-flagged too.
+  applyQuality(quality);
   if (isWallBuild) fitWall();
   if (isUnderTableBuild) fitSurface();
   buildAfterState();
@@ -4390,6 +4911,11 @@ function captureShot() {
     useCustom = true;
     applyPalette();
   }
+  // PINNED tier: the ten committed gallery cards must not re-shoot themselves
+  // every time the user-facing default moves (same reasoning as the forced palette
+  // above). The reflection is stage furniture, so it goes too.
+  applyQuality(SHOT_QUALITY);
+  if (refl.mesh) refl.mesh.visible = false;
   const W = 1200, H = 750;                        // 16:10 — the gallery card's aspect
   renderer.setSize(W, H, false);
   camera.aspect = W / H;
@@ -4403,7 +4929,9 @@ function captureShot() {
   pos.add(slide); target.add(slide);
   camera.position.copy(pos);
   camera.lookAt(target);
+  updateAO(true);
   renderer.render(scene, camera);
+  compositeAO();
   return renderer.domElement.toDataURL('image/png');   // PNG: JPEG has no alpha
 }
 if (new URLSearchParams(location.search).get('shot')) {
@@ -4440,6 +4968,7 @@ if (IS_EMBED && build) setTimeout(() => {
 
 renderer.setAnimationLoop(now => {
   resize();
+  qualityTick(now);
   stepTweens(now);
   if (cinema.on) updateCinema(now); else controls.update();
   // the wall is a backdrop, not part of the model — drop it out of the way when
@@ -4454,13 +4983,27 @@ renderer.setAnimationLoop(now => {
   updateDims();
   updateDrawerDims();
   updateFpEnv();
+  // ⚠ AO and the reflection are the only things here touching driver-dependent
+  // features (render targets, depth textures, an override material). A throw
+  // INSIDE setAnimationLoop kills the whole loop — the screen would freeze
+  // entirely, which is far worse than losing an effect. So each one is guarded
+  // and disables ITSELF permanently on first failure, degrading to the plain
+  // render instead of taking the studio down on some GPU we've never seen.
+  guardFx('reflection', updateReflection);
+  guardFx('ao', updateAO);
   renderer.render(scene, camera);
+  guardFx('ao', compositeAO);   // laid over the finished frame; no composer in the path
 });
 
 // dev-only hook (mirrors the planner's guarded test-hook convention): ?debug=1
 if (new URLSearchParams(location.search).get('debug')) {
   window.__GEN2_VIEWER__ = { THREE, scene, camera, controls, goTo, applyState, instances, manifest, cinema, updateCinema, cinemaScene, party, confetti, confettiPop, fpFocus, fpEnv,
     renderer, table, grid, camPos, captureShot, get buildCenter() { return buildCenter; },
+    // render-quality internals (2026-08-10) — the tier, the AO buffers and the
+    // reflector, so a rendering question can be answered by reading state instead
+    // of squinting at a screenshot
+    QUALITY, get quality() { return quality; }, applyQuality, setQuality,
+    ao, updateAO, compositeAO, aoWanted, refl, updateReflection, studioEnv,
     get build() { return build; }, regenerate, setSelected, get selectedId() { return selectedId; },
     trackLog, track };
 }
