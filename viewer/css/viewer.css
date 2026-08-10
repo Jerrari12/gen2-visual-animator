@@ -169,6 +169,9 @@ body.stage-dark .fm-accuracy { display: block; }
 #build-options { margin-bottom: 8px; padding-bottom: 10px; border-bottom: 1px solid var(--panel-border); }
 .opt-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
 .opt-label { font-size: 12px; font-weight: 600; }
+/* one-line honesty/explainer under an option row (build plate: the effect is a
+   simulation, and the real thing varies with light and angle) */
+.opt-note { font-size: 11px; color: var(--ink-soft); margin: -2px 0 8px; line-height: 1.35; }
 .opt-seg { display: inline-flex; border: 1px solid var(--panel-border); border-radius: 8px; overflow: hidden; }
 .opt-seg button { font: inherit; font-size: 11px; font-weight: 700; padding: 5px 10px; border: none; background: #fff; color: var(--ink-soft); cursor: pointer; }
 .opt-seg button + button { border-left: 1px solid var(--panel-border); }

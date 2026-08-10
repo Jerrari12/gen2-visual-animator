@@ -1060,12 +1060,138 @@ const fallbackMat = new THREE.MeshStandardMaterial({ color: 0xb9bcc2, roughness:
 const zoneKey = (type, zone) => zone ? `${type}:${zone}` : type;
 function ensureMaterials() { // one shared material per type/zone key (idempotent across re-mounts)
   for (const [key, hex] of Object.entries(manifest.colors))
-    if (!materials[key]) materials[key] = new THREE.MeshStandardMaterial({ color: new THREE.Color(hex), roughness: 0.55, metalness: 0.05 });
+    if (!materials[key]) materials[key] = newPartMaterial(key);
 }
 function baseMatFor(type, zone = '') { // shared material per (type, zone) — zones build lazily off the active palette
   const key = zoneKey(type, zone);
-  if (!materials[key]) materials[key] = new THREE.MeshStandardMaterial({ color: new THREE.Color(activeHex(key)), roughness: 0.55, metalness: 0.05 });
+  if (!materials[key]) materials[key] = newPartMaterial(key);
   return materials[key];
+}
+
+// ---- build-plate transfer (2026-08-10) --------------------------------------
+// A faceplate printed FACE-DOWN takes an impression of the build plate it was
+// printed on. Only families whose front is a flat contact surface can do it —
+// Essential and Chevron. This is the first PLATE PROFILE; carbon / textured PEI
+// / geometric are the same mechanism with the diffraction pass turned off, so
+// keep new plates as PROFILE ROWS, never as new material code.
+// ⚠ It is a FINISH, not a paint: the material's colour still comes from
+// activeHex(), so the user's filament pick drives it and the transfer rides on
+// top. Never hardcode a colour here.
+const PLATE_PROFILES = [
+  { key: 'smooth', label: 'Smooth', holo: 0 },
+  { key: 'holographic', label: 'Holographic', holo: 0.07 },
+];
+const PLATE_FAMILIES = new Set(['essential', 'chevron']); // printable face-down
+const plateProfile = () => PLATE_PROFILES.find(p => p.key === (build && build.buildPlate)) || PLATE_PROFILES[0];
+const plateSupported = () => !!build && PLATE_FAMILIES.has(currentFaceplateStyle()?.key);
+const plateActive = () => plateSupported() && plateProfile().holo > 0;
+// which key carries the CONTACT face: Chevron's raised strips are its FACE zone
+// (the recessed backer never touched the plate — its grooves stay dark, as on
+// the real print); Essential is a single-zone plate, so its base key is the face.
+const plateContactKey = key =>
+  currentFaceplateStyle()?.key === 'chevron' ? key === 'Faceplate:FACE' : key === 'Faceplate';
+let holoTex = null;
+function holoTexture() {
+  if (!holoTex) {
+    // plate-space control map derived from a photo of the real plate:
+    // R macro flame envelope · G phase · B diffraction amplitude · A fine detail
+    holoTex = new THREE.TextureLoader().load('img/plates/holo-pattern.png');
+    holoTex.colorSpace = THREE.NoColorSpace;
+    holoTex.wrapS = holoTex.wrapT = THREE.MirroredRepeatWrapping;
+  }
+  return holoTex;
+}
+// planar UVs from each geometry's own bbox — the plate GLBs ship position+normal
+// only, and the transfer has to stay pinned to the plate as the drawer slides
+function ensurePlateUVs() {
+  for (const t of Object.values(templates)) {
+    t.traverse(o => {
+      if (!o.isMesh || o.geometry.attributes.uv) return;
+      const g = o.geometry;
+      g.computeBoundingBox();
+      const bb = g.boundingBox, sx = bb.max.x - bb.min.x || 1, sy = bb.max.y - bb.min.y || 1;
+      const pos = g.attributes.position, uv = new Float32Array(pos.count * 2);
+      for (let i = 0; i < pos.count; i++) {
+        uv[i * 2] = (pos.getX(i) - bb.min.x) / sx;
+        uv[i * 2 + 1] = (pos.getY(i) - bb.min.y) / sy;
+      }
+      g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+    });
+  }
+}
+// The shader. Diffraction is ADDITIVE over an ordinary silk PBR base, and every
+// term is continuous across the plate — one plate is one contiguous first layer,
+// so pattern, phase and hue must not break at the chevron's fold.
+// ⚠ Gated by a CONTACT MASK on the object-space normal: chamfers, sidewalls and
+// groove walls never touched the plate and stay plain filament.
+function attachHolo(m, diffracts) {
+  m.onBeforeCompile = sh => {
+    sh.uniforms.holoTex = { value: holoTexture() };
+    sh.uniforms.uHoloOp = { value: plateProfile().holo };
+    holoUniforms.push(sh.uniforms);
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec2 vHUv;\nvarying vec3 vON;')
+      .replace('#include <beginnormal_vertex>', '#include <beginnormal_vertex>\n\tvON = objectNormal;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\n\tvHUv = uv;');
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', '#include <common>\nvarying vec2 vHUv;\nvarying vec3 vON;\nuniform sampler2D holoTex;\nuniform float uHoloOp;')
+      // print walls are layer-lined, not plate-polished: rougher, less clearcoat
+      .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
+\troughnessFactor = mix( 0.55, roughnessFactor, smoothstep( 0.82, 0.94, normalize( vON ).z ) );`)
+      .replace('#include <lights_physical_fragment>', `#include <lights_physical_fragment>
+#ifdef USE_CLEARCOAT
+\tmaterial.clearcoat *= mix( 0.15, 1.0, smoothstep( 0.82, 0.94, normalize( vON ).z ) );
+#endif`);
+    if (!diffracts) return;
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+{
+\tfloat contact = smoothstep( 0.82, 0.94, normalize( vON ).z );
+\tfloat hA = 1.0 - saturate( dot( normal, normalize( vViewPosition ) ) );
+\tvec4 pat = texture2D( holoTex, vHUv );
+\tfloat macro = pat.r, phaseT = pat.g, amp = pat.b, fine = pat.a;
+\tfloat ramp = ( abs( vHUv.x - 0.5 ) + vHUv.y * 0.7071 ) * 0.9;
+\tfloat gate = pow( smoothstep( 0.09, 0.32, hA ), 1.8 ) * contact;
+\tfloat cycC = fract( 0.45 * phaseT + 0.5 * macro + ramp + hA * 2.4 );
+\tfloat off = cycC - 0.5;
+\tfloat wC = mix( 0.06, 0.55, smoothstep( 0.06, 0.55, hA ) ) * ( 0.9 + 0.4 * macro );
+\tfloat band = smoothstep( wC, wC * 0.7, abs( off ) );
+\tfloat chroma = band * smoothstep( 0.06, 0.30, amp ) * gate;
+\tfloat hue = 6.2832 * ( 0.45 * phaseT + hA * 2.2 ) + off * 6.0 + 3.4;
+\tvec3 rainbow = pow( 0.5 + 0.5 * cos( hue + vec3( 0.0, -2.094, -4.188 ) ), vec3( 0.72 ) );
+\trainbow /= max( max( rainbow.r, max( rainbow.g, rainbow.b ) ), 1e-3 );
+\ttotalEmissiveRadiance += rainbow * chroma * 1.9 * ( 0.8 + fine * 0.35 ) * uHoloOp;
+}`);
+  };
+  m.customProgramCacheKey = () => 'holo' + (diffracts ? 1 : 0);
+  return m;
+}
+const holoUniforms = [];   // live intensity across every holo material
+function newPartMaterial(key) {
+  if (plateActive() && key.split(':')[0] === 'Faceplate') {
+    const face = plateContactKey(key);
+    return attachHolo(new THREE.MeshPhysicalMaterial({
+      color: new THREE.Color(activeHex(key)),
+      metalness: 0, roughness: face ? 0.14 : 0.2,
+      clearcoat: face ? 1.0 : 0.8, clearcoatRoughness: face ? 0.11 : 0.14,
+      envMapIntensity: 1.15,
+    }), face);
+  }
+  return new THREE.MeshStandardMaterial({ color: new THREE.Color(activeHex(key)), roughness: 0.55, metalness: 0.05 });
+}
+// Toggling rebuilds only the faceplate registry entries (a class swap, so it
+// cannot be done in place) and drops their highlight clones; the reassignment
+// onto meshes rides regenerate()'s normal applyState path like every other
+// build option.
+async function setBuildPlate(key) {
+  if (!build) return;
+  track('opt:buildplate:' + key);
+  build.buildPlate = key;
+  holoUniforms.length = 0;
+  for (const k of Object.keys(materials)) if (k.split(':')[0] === 'Faceplate') delete materials[k];
+  for (const k of Object.keys(highlightMats)) if (k.split(':')[0] === 'Faceplate') delete highlightMats[k];
+  if (plateActive()) ensurePlateUVs();
+  await regenerate();
 }
 // Which single colour REPRESENTS a part where only one swatch fits (BOM chip,
 // identify-card header)? Not the base type when a zone covers the whole visible
@@ -1996,6 +2122,19 @@ function renderOptions() {
     const next = document.createElement('button'); next.textContent = '▶'; next.onclick = () => cycleHandleStyle(1);
     grp.append(prev, name, next); row.append(lab, grp); box.appendChild(row);
   }
+  // Build plate — only for families printed FACE-DOWN (Essential, Chevron):
+  // their front IS the plate-contact surface, so it can take a transfer. Sits
+  // under Faceplate/Handle because it describes how that plate was PRINTED.
+  if (plateSupported()) {
+    box.appendChild(optSeg('Build plate', PLATE_PROFILES.map(p => ({ label: p.label, val: p.key })),
+      plateProfile().key, setBuildPlate));
+    const note = document.createElement('div');
+    note.className = 'opt-note';
+    note.textContent = plateProfile().holo
+      ? 'Simulated — the real effect shifts with lighting and angle.'
+      : 'Printed face-down, this plate can take a build-surface pattern.';
+    box.appendChild(note);
+  }
   // faceplate back cover — a universal decor-faceplate accessory (every family
   // seats the same SHARED part, both collections); fills the new open-front
   // Decor drawer's gap, off = older closed-front drawers
@@ -2367,6 +2506,10 @@ function materialFor(inst, highlighted, zone = '') {
   const cache = (inst.alt && !zone) ? altHighlightMats : highlightMats;
   if (!cache[key]) {
     const m = base.clone();
+    // ⚠ Material.copy() does NOT carry onBeforeCompile/customProgramCacheKey, so
+    // a cloned highlight would silently lose a build-plate transfer — and the
+    // selected plate is exactly where it must not vanish.
+    if (base.onBeforeCompile) { m.onBeforeCompile = base.onBeforeCompile; m.customProgramCacheKey = base.customProgramCacheKey; }
     m.emissive = new THREE.Color(0xff8a40);
     m.emissiveIntensity = 0.4;
     cache[key] = m;
@@ -4844,6 +4987,7 @@ async function mountManifest(m) {
   partInfoByNode = Object.fromEntries(m.parts.map(p => [p.node, p]));
   ensureMaterials();
   await loadTemplates();
+  if (plateActive()) ensurePlateUVs();   // plate GLBs ship position+normal only
   buildInstances();
   computeBounds();
   // (re)apply the tier now that the build exists — the shadow camera and the
