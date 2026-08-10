@@ -968,3 +968,12 @@ body.stage-dark #stage-vignette {
 body.stage-dark { --panel: rgba(16, 18, 42, 0.85); }
 /* let the parts list breathe: taller rows, dividers that separate without drawing */
 body.stage-dark .checklist-row { padding: 6px 0; border-top-color: rgba(49, 53, 107, 0.5); }
+
+/* the celebration card: the outro fades the room to night in BOTH modes, so
+   a white slab always read as the odd one out there — on dark it becomes the
+   same dark glass as the rest of the chrome, with the accent spine kept */
+body.stage-dark .outro-card {
+  background: rgba(16, 18, 42, 0.86);
+  box-shadow: 0 8px 34px rgba(0, 0, 0, 0.5);
+}
+body.stage-dark .outro-links a:hover { color: var(--accent); }

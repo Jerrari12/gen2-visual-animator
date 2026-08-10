@@ -3585,10 +3585,56 @@ function updateDims() { // render-loop: pick edges for the camera, then place la
 // never see any of it.
 const party = {
   fade: 0, cuts: 0,
-  env: null, rig: null, spots: [],
+  env: null, sky: null, rig: null, spots: [],
   bgDay: scene.background.clone(), bgNight: new THREE.Color(0x14171e),
   tableDay: table.material.color.clone(), tableNight: new THREE.Color(0x252a32),
 };
+// The outro sky: a retrowave gradient instead of a flat night colour (Joey
+// 2026-08-08). A plain Texture assigned to scene.background is drawn stretched
+// across the viewport, which is exactly what a gradient wants — and it is
+// SEPARATE from scene.environment, so the party room's PMREM keeps lighting and
+// reflecting on the plastic exactly as before. Lazy + cached; 2×256 is plenty
+// for a vertical ramp (linear filtering does the smoothing).
+function partySky() {
+  if (party.sky) return party.sky;
+  const c = document.createElement('canvas');
+  c.width = 2; c.height = 256;
+  const g = c.getContext('2d').createLinearGradient(0, 0, 0, 256);
+  // Canvas top maps to the dome's ZENITH (flipY puts image row 0 at v=1), so
+  // these stops read top-down and the horizon sits near the middle. The hot
+  // band is deliberately just ABOVE 0.5 — the table disc hides everything
+  // below the horizon, so a sunset placed at the true bottom is never seen.
+  g.addColorStop(0.00, '#05061a');   // deep space overhead
+  g.addColorStop(0.30, '#1a0a38');
+  g.addColorStop(0.42, '#4d1566');   // violet
+  g.addColorStop(0.50, '#a82f70');   // magenta
+  g.addColorStop(0.56, '#ff8a40');   // the JERRARI orange sun line, at eye level
+  g.addColorStop(0.62, '#2a0f2e');   // falls off fast under the horizon
+  g.addColorStop(1.00, '#07061a');
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 2, 256);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;   // else the ramp renders washed out
+  party.sky = tex;
+  return tex;
+}
+// …hung on a big BackSide dome rather than assigned to scene.background, for
+// two reasons: it gives a real HORIZON that tracks the camera as the shot
+// orbits (a screen-stretched background can't), and being a mesh it has an
+// opacity to CROSSFADE with — the room's existing day→night lerp keeps running
+// underneath, so the sky arrives without a pop. depthWrite off + renderOrder
+// -1 keep it behind everything; radius sits well inside the 8000 far plane.
+function partyDome() {
+  if (party.dome) return party.dome;
+  const m = new THREE.Mesh(
+    new THREE.SphereGeometry(6000, 32, 24),
+    new THREE.MeshBasicMaterial({ map: partySky(), side: THREE.BackSide,
+      transparent: true, opacity: 0, depthWrite: false, fog: false }));
+  m.renderOrder = -1;
+  party.dome = m;
+  return m;
+}
 function partyEnv() { // lazy: tiny room of glowing panels → PMREM environment
   if (party.env) return party.env;
   const room = new THREE.Scene();
@@ -3708,7 +3754,12 @@ function updateConfetti(dt, t) {
 //   5 macro detail: telephoto close-up creeping in on one part
 // Assembled scenes (0/1/3/5) randomly play a drawer opening and closing.
 // Sun + fill lights drift the whole time. Random per visit.
-const CINEMA_MODES = [0, 1, 2, 3, 4, 5, 5]; // macro gets a double share
+// Mode mix (Joey 2026-08-08): the outro is a FINISHED build, so it should
+// celebrate what the thing DOES, not take it apart again. The two exploded
+// shots (2 = slow explode, 4 = reverse assembly) were 2-in-7 of every cut and
+// are now 2-in-13, while mode 6 — open a drawer and work its faceplate's own
+// feature — gets a triple share. Macro keeps its double.
+const CINEMA_MODES = [0, 0, 1, 1, 2, 3, 3, 4, 5, 5, 6, 6, 6];
 const DETAIL_TYPES = new Set(['Handle', 'QuickLock', 'Foot', 'Faceplate']); // exterior parts only — no macro shots of hidden stoppers/magnets
 const cinema = {
   on: false, last: 0, cut: 99, mode: 0,
@@ -3739,6 +3790,8 @@ function startCinema() {
   scene.environment = partyEnv();
   scene.environmentIntensity = 0; // ramps in with the fade
   scene.add(partyRig());
+  partyDome().material.opacity = 0; // crossfades in behind everything
+  scene.add(partyDome());
   sun.color.set(0xffe0b3); // warm golden sun for the finale
   grid.visible = false;
   wall.visible = false;    // clean cinema stage, even for wall builds
@@ -3766,6 +3819,7 @@ function stopCinema() {
   scene.environment = null;
   scene.environmentIntensity = 1;
   scene.remove(party.rig);
+  if (party.dome) { scene.remove(party.dome); party.dome.material.opacity = 0; }
   scene.remove(confetti.mesh);
   const zero = confetti.m4.makeScale(0, 0, 0); // clear airborne bits for a clean return visit
   confetti.bits.forEach((b, i) => {
@@ -3777,17 +3831,23 @@ function stopCinema() {
   confetti.mesh.instanceMatrix.needsUpdate = true;
 }
 function cinemaScene() {
-  // a cut mid-drawer-glide must not orphan the drawer open
+  // a cut mid-drawer-glide must not orphan the drawer open — nor a mid-trick
+  // label stranded out of its window
   if (cinema.drawer) {
     for (const m of cinema.drawer.members) m.group.position.copy(basePos(m, false));
+    for (const f of (cinema.drawer.trick || [])) {
+      const kid = f.inst.group.children[0];
+      if (kid) kid.position.set(0, 0, 0);
+    }
     cinema.drawer = null;
   }
+  cinema.featureOn = null;
   cinema.cut = 0;
   const mode = cinema.mode = CINEMA_MODES[Math.floor(Math.random() * CINEMA_MODES.length)];
   cinema.az = Math.random() * Math.PI * 2;
   cinema.azV = (0.05 + Math.random() * 0.09) * (Math.random() < 0.5 ? -1 : 1);
-  cinema.pol = [1.25, 0.8, 1.05, 1.18, 1.0, 1.3][mode] + (Math.random() - 0.5) * 0.15;
-  cinema.r = cinema.size * [1.5, 2.7, 2.1, 1.6, 2.4, 2.2][mode]; // macro sits far back — the long lens does the closing in
+  cinema.pol = [1.25, 0.8, 1.05, 1.18, 1.0, 1.3, 1.32][mode] + (Math.random() - 0.5) * 0.15;
+  cinema.r = cinema.size * [1.5, 2.7, 2.1, 1.6, 2.4, 2.2, 1.35][mode]; // macro sits far back — the long lens does the closing in
   cinema.rV = (Math.random() - 0.5) * cinema.size * 0.04;
   cinema.tOff.set(0, 0, 0);
   cinema.tV.set(0, 0, 0);
@@ -3822,6 +3882,20 @@ function cinemaScene() {
     cinema.rV = -cinema.size * 0.015;            // gentle push-in
     cinema.tV.set((Math.random() - .5), (Math.random() - .5) * 0.6, (Math.random() - .5))
       .multiplyScalar(cinema.size * 0.012);      // slight frame drift
+  } else if (mode === 6) {       // FEATURE: open a drawer and work its faceplate
+    // Frame a real drawer three-quarters-on from the FRONT, close enough to
+    // read the plate — the glide scheduler below then opens that exact drawer
+    // (cinema.featureOn) instead of a random one, and lifts its label.
+    const drawers = [...instances.values()].filter(i => typeByNode[i.cfg.node] === 'Drawer' && i.group.visible);
+    const pick = drawers.length ? drawers[Math.floor(Math.random() * drawers.length)] : null;
+    if (pick) {
+      cinema.featureOn = pick;
+      cinema.tOff.copy(pick.group.position).sub(cinema.center).multiplyScalar(0.85);
+      cinema.az = (Math.random() - 0.5) * 1.15;  // near the front, drawers open toward +Z
+    }
+    cinema.fov = 26 + Math.random() * 7;
+    cinema.azV *= 0.28;                          // hold the framing while it works
+    cinema.rV = -cinema.size * 0.02;             // drift in a touch
   }
   // under-table builds: some assembled wide shots dip below the horizon and
   // bring the mounting slab into frame — the build lives under a surface, so
@@ -3835,7 +3909,11 @@ function cinemaScene() {
   camera.fov = cinema.fov;
   camera.updateProjectionMatrix();
   // drawer play only when the build is (or ends up) assembled
-  cinema.drawerAt = (mode === 0 || mode === 1 || mode === 3 || mode === 5) ? 1 + Math.random() * 3 : Infinity;
+  // NB set after the mode chain, so mode 6's short delay lives here or it gets
+  // overwritten — the feature shot is the whole point of that cut, so it opens
+  // almost immediately rather than after the usual idle beat.
+  cinema.drawerAt = mode === 6 ? 0.35
+    : (mode === 0 || mode === 1 || mode === 3 || mode === 5) ? 1 + Math.random() * 3 : Infinity;
   cinema.drawer = null;
   // confetti: the first cut gets a two-sided volley, later cuts usually one pop
   if (party.cuts++ === 0) { confettiPop(90); confettiPop(90); }
@@ -3872,16 +3950,31 @@ function updateCinema(now) {
   if (cinema.cut > cinema.drawerAt && !cinema.drawer && cinema.k < 0.01) {
     const drawers = [...instances.values()].filter(i => typeByNode[i.cfg.node] === 'Drawer' && i.group.visible);
     if (drawers.length) {
-      const carrier = drawers[Math.floor(Math.random() * drawers.length)];
+      // a feature cut opens the drawer it framed; every other cut picks freely
+      const carrier = (cinema.featureOn && drawers.includes(cinema.featureOn))
+        ? cinema.featureOn : drawers[Math.floor(Math.random() * drawers.length)];
+      const feature = carrier === cinema.featureOn;
       const travel = (parseInt(manifest.collection, 10) || 185) - 20; // full pull ≈ case depth − rear engagement
-      const frac = 0.3 + Math.random() * 0.65;                       // 30%..95% open
+      const frac = feature ? 0.55 + Math.random() * 0.25              // enough to read, not a full yank
+        : 0.3 + Math.random() * 0.65;                                 // 30%..95% open
+      const members = [carrier, ...[...instances.values()].filter(x => x.cfg.rides === carrier.cfg.id)];
       cinema.drawer = {
-        members: [carrier, ...[...instances.values()].filter(x => x.cfg.rides === carrier.cfg.id)],
-        t: 0,
+        members, t: 0,
         span: travel * frac,
         tOpen: 0.6 + frac * 0.9 + Math.random() * 0.6,
-        tHold: 0.4 + Math.random() * 2.0,
+        tHold: feature ? 2.6 + Math.random() * 0.8 : 0.4 + Math.random() * 2.0,
         tClose: 0.6 + frac * 0.9 + Math.random() * 0.8,
+        // …and the LABEL lifts out of its window while it sits open, exactly
+        // the way a tap does. Labels only, deliberately: the accent has a
+        // removal ritual too, but a panel detaching reads as the plate coming
+        // APART, and this shot is meant to say "your labels swap" — the one
+        // feature the finished build actually performs. NODE_RITUALS first, so
+        // Classic Pro's angled slot keeps its diagonal for free; a family with
+        // no label finds no rider and the shot is a clean deep pull instead.
+        trick: feature ? members.filter(m => typeByNode[m.cfg.node] === 'Label').map(m => {
+          const path = NODE_RITUALS[m.cfg.node] || RITUALS.Label;
+          return { inst: m, to: path.path[path.path.length - 1] };
+        }) : [],
       };
     }
     cinema.drawerAt = cinema.cut + 3.5 + Math.random() * 3; // maybe another one later
@@ -3898,7 +3991,29 @@ function updateCinema(now) {
       p.z += d.span * off;
       m.group.position.copy(p);
     }
-    if (d.t >= d.tOpen + d.tHold + d.tClose) cinema.drawer = null;
+    // …and while it sits fully open, the dressing performs. Driven straight off
+    // the cinema clock (not slideRitual's tweens, which run on the step clock
+    // and would fight a cut); the offset rides the group's INNER CHILD, the
+    // same place the tap ritual puts it, so nothing else has to know.
+    if (d.trick && d.trick.length) {
+      const inHold = d.t - d.tOpen;
+      const u = inHold <= 0 ? 0
+        : inHold < 0.45 ? easeSm(inHold / 0.45)                       // lift
+        : inHold < d.tHold - 0.5 ? 1                                  // hold it up
+        : inHold < d.tHold ? 1 - easeSm((inHold - (d.tHold - 0.5)) / 0.5)  // reseat
+        : 0;
+      for (const f of d.trick) {
+        const kid = f.inst.group.children[0];
+        if (kid) kid.position.set(f.to[0] * u, f.to[1] * u, f.to[2] * u);
+      }
+    }
+    if (d.t >= d.tOpen + d.tHold + d.tClose) {
+      for (const f of (d.trick || [])) {           // never strand a lifted label
+        const kid = f.inst.group.children[0];
+        if (kid) kid.position.set(0, 0, 0);
+      }
+      cinema.drawer = null;
+    }
   }
   const c = cinema.center.clone().add(cinema.tOff);
   camera.position.set(
@@ -3916,6 +4031,7 @@ function updateCinema(now) {
   if (party.fade < 1) {
     const f = easeSm(party.fade = Math.min(1, party.fade + dt / 1.1));
     scene.background.lerpColors(party.bgDay, party.bgNight, f);
+    if (party.dome) party.dome.material.opacity = f;   // the retrowave sky rides the same fade
     table.material.color.lerpColors(party.tableDay, party.tableNight, f);
     hemi.intensity = 1.1 - 0.75 * f;
     scene.environmentIntensity = 0.55 * f;
