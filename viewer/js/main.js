@@ -292,9 +292,21 @@ const QUALITY_ORDER = ['high', 'balanced', 'fast'];
 var qualityReady = false;   // hoisted (see applyStageTheme) — true once a tier has been applied
 let quality = 'high';
 let qualityLocked = false;   // an explicit user pick stops the auto-downgrade fighting them
+// ⚠ An EXPLICIT pick persists; an AUTO-downgrade does not outlive the tab.
+// It shipped persisting both, which meant one bad three-second window — a
+// throttled tab, a background app, a thermal blip — permanently cost you the good
+// renderer, with no way back on mobile because the pill is hidden under 560px.
+// Auto lives in sessionStorage so it doesn't re-jank within a visit but is
+// re-judged on the next one. A stored value with no `:set` marker is a stale
+// auto-downgrade from the old scheme — drop it.
 try {
   const q = localStorage.getItem('gen2-quality');
-  if (QUALITY[q]) { quality = q; qualityLocked = localStorage.getItem('gen2-quality:set') === '1'; }
+  if (localStorage.getItem('gen2-quality:set') === '1' && QUALITY[q]) { quality = q; qualityLocked = true; }
+  else {
+    if (q) localStorage.removeItem('gen2-quality');   // migrate the old sticky auto value away
+    const s = sessionStorage.getItem('gen2-quality');
+    if (QUALITY[s]) quality = s;
+  }
 } catch (e) { /* private mode */ }
 // ?shot=1 is PINNED: the ten gallery cards must not re-shoot themselves every time
 // the user-facing default moves (captureShot already forces its own palette for
@@ -358,8 +370,8 @@ function setQuality(name, { user = false } = {}) {
   applyQuality(name);
   if (user) qualityLocked = true;
   try {
-    localStorage.setItem('gen2-quality', quality);
-    if (user) localStorage.setItem('gen2-quality:set', '1');
+    if (user) { localStorage.setItem('gen2-quality', quality); localStorage.setItem('gen2-quality:set', '1'); }
+    else sessionStorage.setItem('gen2-quality', quality);   // this visit only — see the boot note
   } catch (e) { /* private mode */ }
   if (user) track('quality:' + quality);
 }
@@ -420,8 +432,16 @@ function fitShadowCamera() {
 // Refreshed only when the camera or the build moves.
 const refl = { rt: null, mesh: null, cam: null, tex: new THREE.Matrix4(), key: '' };
 function reflectionWanted() {
-  return QUALITY[quality].reflect && stageTheme !== 'light' && !cinema.on
-    && !isWallBuild && !isUnderTableBuild && !fxDead.reflection;
+  if (fxDead.reflection || !QUALITY[quality].reflect) return false;
+  // Both hanging mounts are excluded for the same reason: there is no floor
+  // beneath the build to reflect in. A wall build hangs on a backdrop, and an
+  // under-table build hangs BELOW its slab — a mirror plane at the build's
+  // underside would just be floating in mid-air.
+  if (isWallBuild || isUnderTableBuild) return false;
+  // The outro fades the room to night in BOTH themes, so the finale is grounded
+  // even for someone working on the light stage.
+  if (cinema.on) return true;
+  return stageTheme !== 'light';
 }
 function ensureReflector() {
   if (refl.mesh) return refl.mesh;
@@ -4343,11 +4363,10 @@ function startCinema() {
   // party dressing on
   party.fade = 0;
   party.cuts = 0;
-  // The cinema owns a clean stage (it already hides the wall and surface). Without
-  // this the floor reflection survives into the outro, mirroring the confetti and
-  // the dome — and paying a second scene render on the most expensive frames in
-  // the app. reflectionWanted() already says no while cinema.on; it just needs to
-  // be ASKED on the way in, not only on the way out.
+  // Re-pick the grounding for the finale (Joey 2026-08-10: the outro read as a
+  // build floating in space). Tabletop keeps its floor — grid + reflection — and
+  // the reflected confetti and sky are the point, not a cost to avoid. Wall builds
+  // still get the clean stage: there is no floor under a wall mount to reflect in.
   applyReflectionQuality();
   scene.environment = partyEnv();
   scene.environmentIntensity = 0; // ramps in with the fade
@@ -4355,9 +4374,11 @@ function startCinema() {
   partyDome().material.opacity = 0; // crossfades in behind everything
   scene.add(partyDome());
   sun.color.set(0xffe0b3); // warm golden sun for the finale
-  grid.visible = false;
-  wall.visible = false;    // clean cinema stage, even for wall builds
-  surface.visible = false; // …and under-table builds
+  // The floor stays for tabletop builds so the finale is grounded like every other
+  // page. Same rule as a normal page: hanging builds never show the floor grid.
+  grid.visible = !isWallBuild && !isUnderTableBuild;
+  wall.visible = false;    // clean cinema stage for wall builds — no floor to stand on
+  surface.visible = false; // under-table: updateCinema's per-shot `withSlab` owns this
   confettiInit();
   scene.add(confetti.mesh);
 }
