@@ -82,8 +82,10 @@ async function drawCard(kit) {
   roundRect(c, x, y, w, h, R); c.clip();
   c.fillStyle = PANEL; c.fillRect(x, y, w, h);
 
-  // kit render, contain-fit hard right — captured on this exact panel gray
-  const shot = await loadImg('img/' + kit.id + '.jpg');
+  // kit render, contain-fit hard right. The art is TRANSPARENT since
+  // 2026-08-08, so it composites over whatever PANEL was just filled instead
+  // of carrying a baked background of its own.
+  const shot = await loadImg('img/' + kit.id + '.png');
   if (shot) {
     const s = Math.min(w / shot.width, h / shot.height);
     const dw = shot.width * s, dh = shot.height * s;

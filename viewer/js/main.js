@@ -130,7 +130,10 @@ const canvas = document.getElementById('stage');
 // this early. (These visitors were completely invisible before — they just left.)
 let renderer;
 try {
-  renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+  // alpha: true so ?shot=1 can clear to TRANSPARENT and the gallery card art
+  // stops baking a background colour (see captureShot). No effect on normal
+  // pages — scene.background is always set there, so it paints over the clear.
+  renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
 } catch (e) {
   track('error:webgl');
   bootFail('<strong>This browser can’t show 3D</strong><br><br>The Build Studio needs WebGL. Try a different browser, or turn on hardware acceleration in your browser’s settings.',
@@ -4247,7 +4250,13 @@ function captureShot() {
   table.visible = grid.visible = false;
   if (isWallBuild) wall.visible = false;
   if (isUnderTableBuild) surface.visible = false;
-  scene.background = new THREE.Color(0x3a3b3f);
+  // TRANSPARENT, not a baked panel colour (2026-08-08). The art used to carry
+  // the gallery's exact card gray so a contain-fit blended edge to edge, which
+  // silently made the card art theme-DEPENDENT: retinting the card grew a gray
+  // rectangle on every one. With alpha the PNG carries no background at all, so
+  // one capture serves light, dark and any future theme — and new kits (wall,
+  // under-table) never need re-shooting when the palette moves.
+  scene.background = null;
   // Card palette (Joey 2026-07-24): the instruction rainbow made every kit read
   // the same at thumbnail size. Faceplates take the COLLECTION color and the
   // rest of the shell goes graphite, so the length is the thing you see first.
@@ -4279,12 +4288,12 @@ function captureShot() {
   camera.position.copy(pos);
   camera.lookAt(target);
   renderer.render(scene, camera);
-  return renderer.domElement.toDataURL('image/jpeg', 0.92);
+  return renderer.domElement.toDataURL('image/png');   // PNG: JPEG has no alpha
 }
 if (new URLSearchParams(location.search).get('shot')) {
   const a = document.createElement('a');
   a.href = captureShot();
-  a.download = (OFFICIAL ? OFFICIAL.id : 'build') + '.jpg';
+  a.download = (OFFICIAL ? OFFICIAL.id : 'build') + '.png';
   a.click();
 }
 // introduce this tab to the planner (opener tab OR split-view parent) so live

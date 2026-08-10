@@ -36,6 +36,9 @@
   --text: #ececee;
   --muted: #a6a8ad;
   --accent: #ff8a40;
+  /* channels of the page colour — the card gradient fades to it, so the
+     card reads as sitting ON the page instead of on a fixed grey */
+  --kit-fade: 44, 45, 49;
   --radius: 10px;
   font-size: 16px;
 }
@@ -177,8 +180,9 @@ a { color: var(--accent); }
   border-radius: 14px;
   overflow: hidden;
   background-color: var(--panel);
-  /* the ?shot=1 render (if present) is captured on this exact panel gray, so
-     contain-fit blends seamlessly and the build is never cropped */
+  /* the ?shot=1 render is captured on TRANSPARENT (2026-08-08), so contain-fit
+     sits on whatever the card colour is and the build is never cropped —
+     one capture serves every theme, and new kits need no re-shoot */
   background-size: contain;
   background-position: right center;
   background-repeat: no-repeat;
@@ -195,7 +199,8 @@ a { color: var(--accent); }
   /* holds all the way to the right edge (…,0.20) so the art sits back a little
      and the copy always wins — Joey asked for the image to drop in opacity */
   background: linear-gradient(90deg,
-    rgba(44,45,49,0.97) 0%, rgba(44,45,49,0.90) 44%, rgba(44,45,49,0.45) 74%, rgba(44,45,49,0.20) 100%);
+    rgba(var(--kit-fade),0.97) 0%, rgba(var(--kit-fade),0.90) 44%,
+    rgba(var(--kit-fade),0.45) 74%, rgba(var(--kit-fade),0.20) 100%);
   pointer-events: none;
 }
 .kit-body { padding: 18px 20px; max-width: 78%; }
@@ -283,9 +288,11 @@ a { color: var(--accent); }
    them navy means re-capturing all ten shots (ideally on transparent). */
 html[data-theme="dark"] {
   --bg: #0d0e21;
+  --panel: #151735;
   --line: #303469;
   --text: #edeffd;
   --muted: #a7abdb;
+  --kit-fade: 13, 14, 33;
 }
 html[data-theme="dark"] body {
   background:
@@ -443,7 +450,7 @@ document.addEventListener('click', (e) => {
 
 // The kit list is data (builds/index.json, stats precomputed at authoring
 // time) — this page just renders cards. Card background = the kit's ?shot=1
-// render (builds/img/<id>.jpg). Length colors mirror the planner's
+// render (builds/img/<id>.png, transparent). Length colors mirror the planner's
 // GEN2.lengths palette exactly.
 const LENGTH_COLORS = { 59: '#f2f2f2', 115: '#9ea3a8', 165: '#3aa0e8', 185: '#ff8a40', 240: '#3ecfa0', 270: '#e8453c' };
 
@@ -620,8 +627,8 @@ function renderCards(kits, main) {
     if (LENGTH_COLORS[k.length]) card.style.setProperty('--len', LENGTH_COLORS[k.length]);
     // probe the render first so a missing image never flashes a broken bg
     const probe = new Image();
-    probe.onload = () => { card.style.backgroundImage = `url("img/${k.id}.jpg")`; };
-    probe.src = 'img/' + k.id + '.jpg';
+    probe.onload = () => { card.style.backgroundImage = `url("img/${k.id}.png")`; };
+    probe.src = 'img/' + k.id + '.png';
 
     const body = document.createElement('div');
     body.className = 'kit-body';
