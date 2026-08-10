@@ -664,17 +664,35 @@ function aoResize() {
 }
 // Regenerated only when the view or the build moved — the whole point of a
 // mostly-static viewer.
+// ⚠ The AO buffer is only valid for the EXACT camera it was rendered from, so
+// the freshness test compares the full world + projection matrices — not a
+// rounded position string. A slow glide (an eased tween tailing off, orbit
+// damping) or a projection-only change (fov settling, setViewOffset's pan, an
+// aspect change) moves the picture while a rounded position stays put; the
+// overlay then sits offset from the geometry it is meant to shade, which reads
+// as a ghosted second copy of the build.
+const _aoCam = new Float32Array(32);
+function aoCamMoved() {
+  const m = camera.matrixWorld.elements, p = camera.projectionMatrix.elements;
+  for (let i = 0; i < 16; i++) if (_aoCam[i] !== m[i] || _aoCam[16 + i] !== p[i]) return true;
+  return false;
+}
+function aoCamStore() {
+  const m = camera.matrixWorld.elements, p = camera.projectionMatrix.elements;
+  for (let i = 0; i < 16; i++) { _aoCam[i] = m[i]; _aoCam[16 + i] = p[i]; }
+}
 function updateAO(force = false) {
   // Coming back from a blocked spell (an animation, the outro) the camera may be
-  // exactly where it was, so the key would match and we'd composite the buffer
-  // from BEFORE the parts moved. Force one regeneration on resume.
+  // exactly where it was, so nothing would look changed and we'd composite the
+  // buffer from BEFORE the parts moved. Force one regeneration on resume.
   if (!aoWanted()) { ao.blocked = true; return; }
   if (ao.blocked) { ao.blocked = false; force = true; }
   ensureAO(); aoResize();
-  const key = camera.position.toArray().concat(controls.target.toArray())
-    .map(v => v.toFixed(2)).join() + '|' + instances.size + '|' + cur;
-  if (!force && key === ao.key) return;
+  camera.updateMatrixWorld();
+  const key = instances.size + '|' + cur;   // scene identity; the camera is matrix-compared
+  if (!force && key === ao.key && !aoCamMoved()) return;
   ao.key = key;
+  aoCamStore();
   ao.busy = true;
   // depth + view-space normals of the PARTS only — the table would occlude itself
   // into a grey wash and it isn't what anyone is inspecting
@@ -720,6 +738,10 @@ function guardFx(name, fn) {
 }
 function compositeAO() {
   if (!aoWanted() || !ao.rtAO || ao.busy || fxDead.ao) return;
+  // safety net: never lay the overlay over a frame drawn from a different camera
+  // than the buffer was rendered from. Losing AO for one frame is invisible; a
+  // mismatched overlay is a ghost of the build sitting beside the build.
+  if (aoCamMoved()) return;
   ao.quad.material = ao.compMat;
   // ⚠ autoClear defaults TRUE — without this the quad WIPES the frame it is
   // meant to shade, and you capture the bare AO buffer on an empty canvas.
