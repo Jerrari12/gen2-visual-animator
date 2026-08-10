@@ -25,7 +25,39 @@ body {
   background: #fff; border-bottom: 1px solid var(--panel-border);
 }
 #kit-title { font-weight: 700; font-size: 15px; }
-#step-counter { font-size: 13px; color: var(--ink-soft); }
+/* auto margin keeps the counter on the right exactly as before now that the
+   theme pill sits after it (space-between alone would center it) */
+#step-counter { font-size: 13px; color: var(--ink-soft); margin-left: auto; }
+/* the dark-mode switch — a small sun/moon slider (state = aria-checked, set
+   by main.js; same component as the planner's hero-bar switch) */
+#btn-theme {
+  position: relative; flex: none; margin-left: 10px;
+  width: 46px; height: 24px; padding: 0;
+  border: 1px solid var(--panel-border); border-radius: 999px;
+  background: #fff; cursor: pointer;
+}
+#btn-theme:hover { border-color: var(--accent); }
+#btn-theme .tt-sun, #btn-theme .tt-moon {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  width: 13px; height: 13px; color: var(--ink-soft); pointer-events: none;
+}
+#btn-theme .tt-sun { left: 5px; }
+#btn-theme .tt-moon { right: 5px; }
+#btn-theme .tt-knob {
+  position: absolute; top: 2px; left: 2px;
+  width: 18px; height: 18px; border-radius: 50%;
+  background: #d7d9e0;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+  transition: transform 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
+}
+#btn-theme[aria-checked="true"] .tt-knob {
+  transform: translateX(22px);
+  background: #303469;
+  box-shadow: 0 0 8px rgba(56, 220, 255, 0.55);
+}
+/* the picker's honesty line — only when the showcase (dark) stage is up */
+.fm-accuracy { display: none; font-size: 11.5px; color: var(--ink-soft); margin: 6px 2px 2px; }
+body.stage-dark .fm-accuracy { display: block; }
 
 #stage-wrap { position: relative; flex: 1; min-height: 0; }
 #stage { width: 100%; height: 100%; display: block; touch-action: none; }
@@ -535,6 +567,14 @@ body.fm-open #note-panel { display: none; }
   filter: blur(8px);
 }
 #cover-logo { width: 100%; height: auto; }
+/* dark-mode cover (Joey 2026-08-08): NO halo - the "Bright" logo variant +
+   white lockup text carry the contrast instead */
+#cover-logo-bright { display: none; width: 100%; height: auto; }
+body.stage-dark .cover-right::before { display: none; }
+body.stage-dark #cover-logo { display: none; }
+body.stage-dark #cover-logo-bright { display: block; }
+body.stage-dark .cover-dynamic { text-shadow: none; }
+body.stage-dark .cover-manual { color: #f2f4ff; text-shadow: none; }
 /* one-line lockup: italic blue "3D" + black all-caps "BUILD STUDIO" */
 .cover-lede {
   margin-top: 22px; padding-top: 18px; position: relative;
@@ -876,3 +916,55 @@ body.embed-preview.embed-hint-on #embed-hint {
      column the moment Resume cam appeared (4 tools + 15 dots never fit 360px) */
   #step-dots { order: -1; flex-basis: 100%; }
 }
+
+/* ---- dark-glass chrome while the retrowave stage is up (Phase 3B) ----------
+   Scoped to body.stage-dark so the LIGHT stage keeps today's white panels
+   untouched. The token override re-skins every var()-consuming surface (note
+   panel, checklist, identify card, filament menu, dim labels); the rules
+   below catch the hardcoded-white surfaces. White-on-accent text stays white
+   everywhere, and #identify-img stays a LIGHT well on purpose - the part
+   renders are transparent PNGs and a black case dissolves on dark. */
+body.stage-dark {
+  --ink: #e9ebfa;
+  --ink-soft: #a2a8cf;
+  --panel: rgba(18, 20, 46, 0.9);
+  --panel-border: #31356b;
+  --bg: #0d0e21;
+}
+body.stage-dark #topbar,
+body.stage-dark #btn-theme,
+body.stage-dark .opt-seg button,
+body.stage-dark #identify-style button,
+body.stage-dark .zone-chip,
+body.stage-dark #identify-label-gen,
+body.stage-dark .outro-btn,
+body.stage-dark .blocked-card,
+body.stage-dark #controls,
+body.stage-dark #controls button { background: #141634; }
+body.stage-dark .opt-seg button { color: var(--ink-soft); }
+body.stage-dark .opt-seg button.on { background: var(--accent); color: #fff; }
+body.stage-dark #identify-img { background: #e8eaf0; }
+body.stage-dark #identify-remove:hover { background: rgba(229, 83, 75, 0.16); }
+body.stage-dark #identify-open-drawer:hover,
+body.stage-dark #identify-close-drawer:hover,
+body.stage-dark #identify-label-gen:hover { background: rgba(255, 138, 64, 0.14); }
+body.stage-dark #btn-slow.on { background: rgba(255, 138, 64, 0.14); }
+
+/* ---- dark-mode focal control + breathing room (refinement pass 2026-08-08) --
+   Measured first, then tuned: dark-mode text already cleared WCAG AAA
+   (7.6-15.3:1), so this pass is NOT a contrast rescue - it is focus. The
+   stage's grid ran edge-to-edge at one brightness and competed with the
+   build, so a vignette pulls the eye back to the model, the parts list gets
+   room to breathe, and the note panel reads as an overlay instead of a slab.
+   Light mode is deliberately untouched. */
+#stage-vignette { display: none; }
+body.stage-dark #stage-vignette {
+  display: block;
+  position: absolute; inset: 0; pointer-events: none; z-index: 1;
+  background: radial-gradient(115% 92% at 50% 47%,
+    rgba(5, 6, 18, 0) 40%, rgba(5, 6, 18, 0.42) 76%, rgba(5, 6, 18, 0.8) 100%);
+}
+/* the panels are overlays on a lit stage, not opaque cards */
+body.stage-dark { --panel: rgba(16, 18, 42, 0.85); }
+/* let the parts list breathe: taller rows, dividers that separate without drawing */
+body.stage-dark .checklist-row { padding: 6px 0; border-top-color: rgba(49, 53, 107, 0.5); }

@@ -26,10 +26,23 @@
     <header id="topbar">
       <div id="kit-title">Loading…</div>
       <div id="step-counter"></div>
+      <!-- dark-mode switch (standalone only — the embed follows the planner's
+           switch via the {gen2:'theme'} relay and #topbar is hidden there
+           anyway). aria-checked is set from the stored mode in main.js. -->
+      <button id="btn-theme" type="button" role="switch" aria-checked="false" aria-label="Dark mode">
+        <svg class="tt-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4.6" fill="currentColor" stroke="none"/><path d="M12 2.5v2.6M12 18.9v2.6M2.5 12h2.6M18.9 12h2.6M5.2 5.2l1.9 1.9M16.9 16.9l1.9 1.9M18.8 5.2l-1.9 1.9M7.1 16.9l-1.9 1.9"/></svg>
+        <svg class="tt-moon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20.6 14.2A8.6 8.6 0 0 1 9.8 3.4a8.6 8.6 0 1 0 10.8 10.8z"/></svg>
+        <span class="tt-knob"></span>
+      </button>
     </header>
 
     <div id="stage-wrap">
       <canvas id="stage"></canvas>
+      <!-- dark mode only: screen-edge falloff so the brightest part of the
+           stage sits around the build and the grid recedes into the frame.
+           Sits between the canvas and #cover-bg (both z-index 1, DOM order
+           decides) so the cover's own spotlight still wins on page 0. -->
+      <div id="stage-vignette"></div>
       <div id="cover-bg"></div>
 
       <div id="note-panel">
@@ -104,6 +117,9 @@
           <button id="fm-close" type="button" aria-label="Close filament colors" title="Close">&times;</button>
         </div>
         <input id="fm-search" type="search" placeholder="Search filaments&hellip;" autocomplete="off">
+        <!-- shown only on the dark stage (body.stage-dark) — Joey's call
+             2026-08-08: dark mode keeps the picker, with honesty about it -->
+        <div class="fm-accuracy">Screen colors are approximate - the light stage gives the truest read.</div>
         <div id="fm-brands"></div>
         <div class="fm-foot">
           <a id="fm-buy" href="#" target="_blank" rel="noopener">Shop filament &rarr;</a>
@@ -141,6 +157,10 @@
         <div id="cover-ribbon"><div class="cr-band"><b id="cover-ribbon-num"></b><span>Collection</span></div></div>
         <div class="cover-right">
           <img id="cover-logo" src="img/gen2-logo.png" alt="GEN2 QuickLock Modular System" onerror="this.classList.add('hidden')" />
+          <!-- dark-mode twin (the "Bright" brand variant): CSS swaps the pair
+               under body.stage-dark - the halo is gone there, this logo reads
+               on dark without it -->
+          <img id="cover-logo-bright" src="img/gen2-logo-bright.svg" alt="GEN2 QuickLock Modular System" onerror="this.classList.add('hidden')" />
           <div class="cover-lede">
             <span class="cover-dynamic">3D</span>
             <span class="cover-manual">Build Studio</span>

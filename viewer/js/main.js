@@ -187,6 +187,66 @@ const surface = new THREE.Mesh(
 surface.visible = false;
 scene.add(surface);
 
+// ---- stage themes: light / dark mode (retrowave look, 2026-08-08) ----------
+// light = the color-accurate default the filament picks are judged against;
+// dark = the retrowave showcase stage (navy room, cyan grid). ONLY the room
+// is themed — part materials, lights and the identification palette are never
+// touched, and shot mode (?shot=1) still forces its own background. The
+// planner relays its hero-bar switch here ({gen2:'theme'}, replayed on every
+// viewerReady like the palette relay); standalone gets its own topbar switch.
+// The 'light' grid entry is null because the light grid keeps GridHelper's
+// two-tone vertex colors; dark flattens to one cyan via material.color.
+const STAGE_THEMES = {
+  light: { bg: 0xeef0f3, bgWall: 0xd7d4ce, table: 0xdadce0, wall: 0xe6e3dd,
+           surface: 0xd9cfc0, grid: null, dim: 0x656a73 },
+  dark:  { bg: 0x0d0e21, bgWall: 0x150f30, table: 0x14163a, wall: 0x1c1442,
+           surface: 0x171a40, grid: 0x2b7f9e, dim: 0x8f9ad8 },
+};
+// DARK IS THE DEFAULT (Joey 2026-08-08). Both choices are stored explicitly,
+// so "no key" can't mean light and a blocked localStorage fails safe to the
+// default. ('retrowave' was the stored value's dev-era name — anything but
+// 'light' reads as dark.)
+let stageTheme = 'dark';
+try { if (localStorage.getItem('gen2-theme') === 'light') stageTheme = 'light'; } catch (e) { /* private mode */ }
+function applyStageTheme(name) {
+  stageTheme = STAGE_THEMES[name] ? name : 'light';
+  const t = STAGE_THEMES[stageTheme];
+  const wallish = typeof manifest !== 'undefined' && manifest && manifest.mount === 'wall';
+  scene.background.set(wallish ? t.bgWall : t.bg);
+  table.material.color.set(t.table);
+  wall.material.color.set(t.wall);
+  surface.material.color.set(t.surface);
+  if (t.grid === null) { grid.material.vertexColors = true; grid.material.color.set(0xffffff); }
+  else { grid.material.vertexColors = false; grid.material.color.set(t.grid); }
+  grid.material.needsUpdate = true;
+  // the outro cinema restores "day" from these clones — keep them honest so
+  // leaving the outro lands back on the CURRENT stage, not the boot one
+  if (typeof party !== 'undefined') { party.bgDay.set(scene.background); party.tableDay.set(t.table); }
+  // dim callouts + drawer interior dims rebuild often, but retint any that
+  // are alive right now so a theme flip never strands gray-on-navy lines
+  for (const g of [typeof dims !== 'undefined' && dims.group, typeof dFocus !== 'undefined' && dFocus.group]) {
+    if (g) g.traverse(o => { if (o.isLineSegments) o.material.color.set(t.dim); });
+  }
+  document.body.classList.toggle('stage-dark', stageTheme !== 'light');
+}
+// NB plain getElementById here — this runs at module eval, BEFORE the `$`
+// helper below is initialized (a `$(...)` call here dies on the TDZ and takes
+// the whole boot with it)
+const btnTheme = document.getElementById('btn-theme');
+function labelThemeBtn() {
+  if (!btnTheme) return;
+  btnTheme.setAttribute('aria-checked', stageTheme === 'dark' ? 'true' : 'false');
+  btnTheme.title = stageTheme === 'dark' ? 'Light mode — the color-accurate stage' : 'Dark mode';
+}
+btnTheme?.addEventListener('click', () => {
+  const next = stageTheme === 'dark' ? 'light' : 'dark';
+  applyStageTheme(next);
+  try { localStorage.setItem('gen2-theme', next); } catch (e) { /* private mode */ }
+  labelThemeBtn();
+  track('theme:' + next);
+});
+labelThemeBtn();
+
 function resize() {
   const w = canvas.clientWidth, h = canvas.clientHeight;
   if (canvas.width !== w || canvas.height !== h) {
@@ -393,7 +453,7 @@ if (isWallBuild) {
   table.visible = false;
   grid.visible = false;
   wall.visible = true;
-  scene.background = new THREE.Color(0xd7d4ce); // slightly deeper than the wall, for depth
+  scene.background = new THREE.Color(STAGE_THEMES[stageTheme].bgWall); // slightly deeper than the wall, for depth
   controls.maxPolarAngle = Math.PI * 0.85;      // allow a 3/4 view from below (watch rows hang up under the row above)
 }
 // under-table builds hang below a surface slab — no floor table/grid (they'd
@@ -2060,7 +2120,7 @@ function enterDrawerFocus(carrier) {
   };
   const geo = new THREE.BufferGeometry().setFromPoints(segs);
   dFocus.group = new THREE.Group();
-  dFocus.group.add(new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color: 0x656a73, transparent: true, opacity: 0.9 })));
+  dFocus.group.add(new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color: STAGE_THEMES[stageTheme].dim, transparent: true, opacity: 0.9 })));
   carrier.group.add(dFocus.group);
   // camera: frame the drawer's OPEN position from front-above (≈50° down) on
   // whichever side the camera is already on — floor + back wall both visible
@@ -3394,7 +3454,7 @@ function buildDimLines(wFront, lRight, hsx, hsz) {
   // depth-tested (unlike the measure tool): the lines sit OUTSIDE the box, so
   // any segment the model hides is genuinely behind the build — occluding it
   // reads as physical, and nothing draws over the model
-  dims.group.add(new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color: 0x656a73, transparent: true, opacity: 0.85 })));
+  dims.group.add(new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color: STAGE_THEMES[stageTheme].dim, transparent: true, opacity: 0.85 })));
   scene.add(dims.group);
 }
 const dimRay = new THREE.Raycaster();
@@ -3997,6 +4057,15 @@ addEventListener('message', async (e) => {
   if (d.gen2 === 'layout' && d.build) { await applyRemoteLayout(d.build); return; }
   if (d.gen2 === 'colors') { applyRemoteColors(d); return; }
   if (d.gen2 === 'store') { applyRemoteStore(d); return; }
+  if (d.gen2 === 'theme') { // the planner's dark-mode switch, relayed like the palette
+    const th = (d.theme === 'dark' || d.theme === 'retrowave') ? 'dark' : 'light';
+    if (th !== stageTheme) {
+      applyStageTheme(th); // no track() here — the planner already counted its own switch
+      try { localStorage.setItem('gen2-theme', th); } catch (e) { /* private mode */ }
+      labelThemeBtn();
+    }
+    return;
+  }
   if (d.gen2 !== 'buildOptions' || !d.opts || regenBusy) return;
   const o = d.opts;
   // ignore a message that matches our current state — this is what breaks the
@@ -4054,6 +4123,7 @@ async function mountManifest(m) {
   buildExploded();
   buildPages();
   renderChecklist();
+  applyStageTheme(stageTheme); // re-assert the stage (boot, regenerate, and the wall-mount bg path)
 }
 
 // regenerate: re-run the generator on the (mutated) build and re-mount, keeping
