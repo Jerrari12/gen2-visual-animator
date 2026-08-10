@@ -251,6 +251,9 @@ function applyStageTheme(name) {
   // this stays safe no matter when applyStageTheme first runs. A `let` here would
   // throw on `typeof` — the same trap that once took the whole boot down.)
   if (qualityReady) { applyShadowQuality(); applyReflectionQuality(); }
+  // the dark stage substitutes part of the instruction palette (see
+  // DARK_STAGE_PALETTE), so a theme flip has to repaint the materials
+  if (typeof manifest !== 'undefined' && manifest && typeof applyPalette === 'function') applyPalette();
 }
 // NB plain getElementById here — this runs at module eval, BEFORE the `$`
 // helper below is initialized (a `$(...)` call here dies on the TDZ and takes
@@ -541,7 +544,14 @@ function updateReflection(force = false) {
 const AO_N = 24, AO_RADIUS = 18, AO_STRENGTH = 1.15;
 const ao = { rtN: null, rtAO: null, normalMat: null, aoMat: null, compMat: null,
              quad: null, qScene: null, qCam: null, key: '', busy: false };
-function aoWanted() { return QUALITY[quality].ao && !cinema.on && !fxDead.ao; }
+// ⚠ `!tweens.size` is load-bearing, not an optimisation. The AO buffer is
+// regenerated off a key built from the CAMERA — but a step animation moves the
+// PARTS while the camera sits still, so the key never changes, the stale buffer
+// keeps compositing, and the occlusion stays painted where the part used to be.
+// That showed up on a real device as a shadow floating behind every moving piece
+// (Joey 2026-08-10, worst on the light stage). Parts in motion get no AO at all;
+// it comes back on settle, which also drops the cost during the busiest frames.
+function aoWanted() { return QUALITY[quality].ao && !cinema.on && !fxDead.ao && !tweens.size; }
 function aoKernel(n) {              // deterministic hemisphere kernel (golden angle)
   const k = [];
   for (let i = 0; i < n; i++) {
@@ -635,7 +645,11 @@ function aoResize() {
 // Regenerated only when the view or the build moved — the whole point of a
 // mostly-static viewer.
 function updateAO(force = false) {
-  if (!aoWanted()) return;
+  // Coming back from a blocked spell (an animation, the outro) the camera may be
+  // exactly where it was, so the key would match and we'd composite the buffer
+  // from BEFORE the parts moved. Force one regeneration on resume.
+  if (!aoWanted()) { ao.blocked = true; return; }
+  if (ao.blocked) { ao.blocked = false; force = true; }
   ensureAO(); aoResize();
   const key = camera.position.toArray().concat(controls.target.toArray())
     .map(v => v.toFixed(2)).join() + '|' + instances.size + '|' + cur;
@@ -704,6 +718,9 @@ function labelQualityBtn() {
   btnQuality.dataset.q = quality;
   btnQuality.title = `Render quality: ${QUALITY_LABEL[quality]} — click to change`;
 }
+// returning from a background tab starts a FRESH window — the frames either side
+// of the gap describe two different situations
+document.addEventListener('visibilitychange', () => { perf.t0 = 0; perf.frames.length = 0; });
 btnQuality?.addEventListener('click', () => {
   const i = QUALITY_ORDER.indexOf(quality);
   setQuality(QUALITY_ORDER[(i + 1) % QUALITY_ORDER.length], { user: true });
@@ -719,7 +736,8 @@ btnQuality?.addEventListener('click', () => {
 // The auto-downgrade is SILENT and ONE-WAY (Joey 2026-08-10): it only ever steps
 // DOWN, never back up, so a brief stall can't start the tier oscillating. An
 // explicit user pick locks it out entirely.
-const perf = { key: '', moving: false, lastChange: 0, dpr: null, frames: [], t0: 0, checked: 0 };
+const perf = { key: '', moving: false, lastChange: 0, dpr: null, frames: [], t0: 0, checked: 0,
+               thrifty: false };   // one-way: set once the device proves it needs the resolution drop
 const SETTLE_MS = 160;
 function qualityTick(now) {
   const q = QUALITY[quality];
@@ -737,23 +755,46 @@ function qualityTick(now) {
   }
   if (perf.moving && renderer.shadowMap.enabled) renderer.shadowMap.autoUpdate = true;
 
-  const want = perf.moving ? Math.min(1, cap) : cap;
+  // ⚠ The resolution drop is CONDITIONAL — it only engages on a device that has
+  // actually shown it needs the help (perf.thrifty). It shipped unconditional and
+  // that was wrong: every animation resized the canvas down and back up, and thin
+  // geometry — the cyber grid above all — visibly shimmered on each switch (Joey
+  // caught it on a phone that never needed the saving). A rescue mechanism should
+  // cost nothing on hardware that is coping.
+  const want = (perf.thrifty && perf.moving) ? Math.min(1, cap) : cap;
   if (perf.dpr !== want) {
     perf.dpr = want;
     renderer.setPixelRatio(want);
     renderer.setSize(canvas.clientWidth, canvas.clientHeight, false);
   }
 
-  // sustained-low-fps guard: sample for 3s, need a genuinely bad average before
-  // dropping a tier. Never fires on the first 3s (boot jank) or when locked.
-  if (qualityLocked || quality === 'fast') return;
+  // Sustained-low-fps guard, sampled over 3s. TWO stages, cheapest first:
+  //   < 30 fps -> turn on the resolution drop during motion (invisible when idle)
+  //   < 24 fps -> step the whole tier down
+  // 30 not 45: the drop is VISIBLE (thin geometry shimmers as the canvas resizes),
+  // so it has to mean "genuinely struggling", not "fine but not a solid 60". A
+  // 45 threshold tripped on a merely-throttled tab in testing.
+  // Both are ONE-WAY, so a brief stall can't start anything oscillating, and the
+  // first window is discarded because boot jank is not a verdict.
+  if (quality === 'fast' && perf.thrifty) return;
+  // ⚠ A BACKGROUNDED TAB IS NOT A SLOW DEVICE. Browsers throttle rAF to ~1Hz (or
+  // stop it) when the tab is hidden, and an unguarded sampler reads that as a
+  // struggling GPU and silently downgrades — so backgrounding the studio and
+  // coming back would quietly cost you the good renderer, for nothing. Caught in
+  // testing, where the throttled pane tripped it every time.
+  // Two guards: skip while hidden, and refuse to judge a window that didn't
+  // collect enough frames to mean anything.
+  if (document.hidden) { perf.t0 = 0; perf.frames.length = 0; return; }
   if (!perf.t0) { perf.t0 = now; return; }
   perf.frames.push(now);
   if (now - perf.t0 < 3000) return;
-  const fps = perf.frames.length / ((now - perf.t0) / 1000);
+  const elapsed = (now - perf.t0) / 1000;
+  const fps = perf.frames.length / elapsed;
+  const enough = perf.frames.length >= 30;          // < 10fps of samples = untrustworthy window
   perf.frames.length = 0; perf.t0 = now;
-  if (perf.checked++ === 0) return;                 // discard the first window
-  if (fps < 24) {
+  if (perf.checked++ === 0 || !enough) return;      // discard the first window and any junk one
+  if (fps < 30 && !perf.thrifty) { perf.thrifty = true; track('quality:thrifty'); return; }
+  if (fps < 24 && !qualityLocked) {
     const next = QUALITY_ORDER[QUALITY_ORDER.indexOf(quality) + 1];
     if (next) { setQuality(next); track('quality:auto-' + next); }
   }
@@ -3166,8 +3207,17 @@ const colorLocked = type => {
 // key = a part TYPE ('Faceplate') or a zone of one ('Faceplate:GRIP'). A zone
 // with no explicit pick and no manifest color FOLLOWS THE BODY — one
 // identification color per part by default; a zone forks only when chosen.
+// ⚠ The identification palette paints cases near-black (#34373c — "Joey's one
+// rule"), which was chosen against the LIGHT stage. On the dark stage that puts a
+// near-black shell on a near-black floor and the largest part in the build — the
+// one you are meant to be locating — disappears. So the instruction palette gets a
+// dark-stage substitution for exactly those types.
+// ONLY the instruction palette: a user's own filament pick is the colour they will
+// actually print, and must never be second-guessed by the stage they're viewing on.
+const DARK_STAGE_PALETTE = { Case: '#dfe3ec' };
 const activeHex = key => {
   if (useCustom && customColors[key] && !colorLocked(key)) return customColors[key].hex;
+  if (stageTheme !== 'light' && DARK_STAGE_PALETTE[key]) return DARK_STAGE_PALETTE[key];
   if (manifest.colors[key]) return manifest.colors[key];
   const base = key.split(':')[0];
   return base !== key ? activeHex(base) : '#b9bcc2';
@@ -5004,6 +5054,7 @@ if (new URLSearchParams(location.search).get('debug')) {
     // of squinting at a screenshot
     QUALITY, get quality() { return quality; }, applyQuality, setQuality,
     ao, updateAO, compositeAO, aoWanted, refl, updateReflection, studioEnv,
+    fxDead, perf, get tweenCount() { return tweens.size; },
     get build() { return build; }, regenerate, setSelected, get selectedId() { return selectedId; },
     trackLog, track };
 }
