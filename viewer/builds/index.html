@@ -8,6 +8,12 @@
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="icon" href="/favicon.ico" sizes="32x32">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<!-- Dark mode, applied before first paint. Same key and same "dark is the
+     default, both choices stored explicitly" contract as the viewer — and
+     this page is on the VIEWER's origin, so flipping it here flips the
+     studio too (the planner is a different origin and keeps its own copy). -->
+<script>document.documentElement.dataset.theme = "dark";
+try { if (localStorage.getItem("gen2-theme") === "light") delete document.documentElement.dataset.theme; } catch (e) {}</script>
 <style>
 /* A secondary page of the GEN2 Planner — the :root tokens, parallax hero,
    brand bar and footer are all mirrored from gen2-planner css/style.css so the
@@ -254,6 +260,73 @@ a { color: var(--accent); }
 .kit-more-item:hover { color: #fff; background: rgba(255,255,255,0.10); }
 #empty { text-align: center; color: var(--muted); font-size: 0.9rem; padding: 40px 0; }
 
+
+/* ---------- DARK MODE (retrowave) ----------------------------------------
+   Mirrors the planner's scoped block: html[data-theme="dark"] outranks :root,
+   so deleting this and the switch removes the mode without a trace.
+   ⚠ --panel is DELIBERATELY NOT overridden. It is the .kit-card surface, and
+   every card render bakes that exact gray as its own background (?shot=1 sets
+   scene bg to #3a3b3f so the contain-fit art blends edge to edge). Retint the
+   token and each card grows a visible gray rectangle. The cards therefore
+   stay the warm gray and read as elevated surfaces on the navy page; making
+   them navy means re-capturing all ten shots (ideally on transparent). */
+html[data-theme="dark"] {
+  --bg: #0d0e21;
+  --line: #303469;
+  --text: #edeffd;
+  --muted: #a7abdb;
+}
+html[data-theme="dark"] body {
+  background:
+    radial-gradient(1100px 480px at 50% -120px, rgba(255, 62, 165, 0.06), transparent 70%),
+    var(--bg);
+}
+/* the hero photo stays; the tint rides the shade layer + a cyan floor grid on
+   the ::after, neither of which the parallax pans (same trick as the planner) */
+html[data-theme="dark"] .hero-shade {
+  background:
+    linear-gradient(to bottom,
+      rgba(22, 8, 46, 0.5) 0%, rgba(34, 16, 70, 0.28) 42%,
+      rgba(13, 14, 33, 0.88) 86%, var(--bg) 100%),
+    radial-gradient(620px 300px at 74% 82%, rgba(255, 62, 165, 0.2), transparent 70%);
+}
+html[data-theme="dark"] .hero-bg::after {
+  content: ''; position: absolute; left: -18%; right: -18%; bottom: -14px; height: 44%;
+  background:
+    repeating-linear-gradient(to right, rgba(56, 220, 255, 0.30) 0 1px, transparent 1px 86px),
+    repeating-linear-gradient(to top, rgba(56, 220, 255, 0.33) 0 1px, transparent 1px 36px);
+  transform: perspective(340px) rotateX(58deg); transform-origin: 50% 100%;
+  opacity: 0.28; pointer-events: none;
+}
+html[data-theme="dark"] .kit-card:hover { box-shadow: 0 8px 26px rgba(0, 0, 0, 0.55), 0 0 16px rgba(56, 220, 255, 0.16); }
+html[data-theme="dark"] .kit-more-menu { background: #141634; border-color: rgba(56, 220, 255, 0.22); }
+html[data-theme="dark"] .filter-chip.on { color: #180d20; }
+
+/* the dark-mode switch — same component as the planner hero bar + viewer topbar */
+#theme-toggle {
+  position: relative; flex: none;
+  width: 46px; height: 24px; padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 999px;
+  background: rgba(20, 21, 23, 0.35); cursor: pointer;
+}
+#theme-toggle:hover { border-color: var(--accent); }
+#theme-toggle .tt-sun, #theme-toggle .tt-moon {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  width: 13px; height: 13px; color: #d7d8db; opacity: 0.85; pointer-events: none;
+}
+#theme-toggle .tt-sun { left: 5px; }
+#theme-toggle .tt-moon { right: 5px; }
+#theme-toggle .tt-knob {
+  position: absolute; top: 2px; left: 2px;
+  width: 18px; height: 18px; border-radius: 50%;
+  background: #fff; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+  transition: transform 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
+}
+#theme-toggle[aria-checked="true"] .tt-knob {
+  transform: translateX(22px); background: #303469;
+  box-shadow: 0 0 8px rgba(56, 220, 255, 0.55);
+}
+
 /* ---------- planner footer ---------- */
 .footer {
   text-align: center; padding: 24px;
@@ -290,6 +363,11 @@ a { color: var(--accent); }
       <span class="brand-word"><span class="brand-mark">GEN2</span><span class="brand-sub">KITS</span></span>
     </a>
     <span class="hero-bar-actions">
+      <button id="theme-toggle" type="button" role="switch" aria-checked="false" aria-label="Dark mode" title="Dark mode">
+        <svg class="tt-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4.6" fill="currentColor" stroke="none"/><path d="M12 2.5v2.6M12 18.9v2.6M2.5 12h2.6M18.9 12h2.6M5.2 5.2l1.9 1.9M16.9 16.9l1.9 1.9M18.8 5.2l-1.9 1.9M7.1 16.9l-1.9 1.9"/></svg>
+        <svg class="tt-moon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20.6 14.2A8.6 8.6 0 0 1 9.8 3.4a8.6 8.6 0 1 0 10.8 10.8z"/></svg>
+        <span class="tt-knob"></span>
+      </button>
       <a class="nav-pill planner-link" href="https://gen2planner.jerrari3d.com/">&#8592; GEN2 Planner</a>
       <a class="brand-link" href="https://www.jerrari3d.com/gen2-modular-system" target="_blank" rel="noopener">JERRARI3D.com →</a>
     </span>
@@ -633,5 +711,21 @@ function renderCards(kits, main) {
      it's separate from the planner's). -->
 <script data-goatcounter="https://jerrari-build.goatcounter.com/count"
         async src="https://gc.zgo.at/count.js"></script>
+<script>
+// dark-mode switch — mirrors the viewer's (same origin, same gen2-theme key,
+// both choices stored explicitly because dark is the default)
+(function () {
+  var btn = document.getElementById("theme-toggle");
+  if (!btn) return;
+  var on = function () { return document.documentElement.dataset.theme === "dark"; };
+  var sync = function () { btn.setAttribute("aria-checked", on() ? "true" : "false"); };
+  btn.addEventListener("click", function () {
+    if (on()) { delete document.documentElement.dataset.theme; try { localStorage.setItem("gen2-theme", "light"); } catch (e) {} }
+    else { document.documentElement.dataset.theme = "dark"; try { localStorage.setItem("gen2-theme", "dark"); } catch (e) {} }
+    sync();
+  });
+  sync();
+})();
+</script>
 </body>
 </html>
