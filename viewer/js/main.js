@@ -5219,12 +5219,31 @@ function fitPartCamera() {
 // grid with stronger 50 mm majors, usable-area outline). No turntable — a
 // print layout is studied, not admired. A "Top" pill swaps between the high
 // 3/4 and a straight-down view.
-const plateStage = { group: null, top: false };
+const plateStage = { group: null, top: false, yawed: false };
 function seatOnPlate() {
-  // the print pose rotated the part about its product-pose bottom-center —
-  // measure the rotated bounds once and BAKE the correction into cfg.pos, so
-  // applyState/computeBounds (which re-derive from cfg) stay deterministic
+  // a plate manifest is ONE bare primary by construction — anything else is a
+  // resolver bug, and this feature fails CLOSED, never half-renders
+  if (instances.size !== 1) {
+    postToEmbedder({ gen2: 'partError', reason: 'load-failed', message: 'plate view expected exactly one part, got ' + instances.size });
+    bootFail('<strong>Plate preview error</strong><br><br>• unexpected part count', 'plate: ' + instances.size + ' instances');
+  }
   const inst = instances.values().next().value;
+  // rotate-to-fit (review catch): the site's fit rule accepts EITHER in-plane
+  // orientation, so a part that only fits the bed rotated 90° must be shown
+  // rotated — otherwise the plate contradicts a green "Fits" verdict with a
+  // fake overhang. A world-Y yaw can never change which face is down. Only
+  // yaw when the default does NOT fit and the rotation DOES; if neither fits,
+  // the honest overhang stays.
+  const pre = new THREE.Box3().setFromObject(inst.group);
+  const s = pre.getSize(new THREE.Vector3());
+  if (!(s.x <= PART_PLATE.w && s.z <= PART_PLATE.d) && (s.z <= PART_PLATE.w && s.x <= PART_PLATE.d)) {
+    inst.group.rotateOnWorldAxis(new THREE.Vector3(0, 1, 0), Math.PI / 2);
+    plateStage.yawed = true; // group.rotation is set once in buildInstances and applyState never touches it
+  }
+  // the print pose rotated the part about its product-pose bottom-center —
+  // measure the posed (and possibly yawed) bounds once and BAKE the correction
+  // into cfg.pos, so applyState/computeBounds (which re-derive from cfg) stay
+  // deterministic
   const box = new THREE.Box3().setFromObject(inst.group);
   const c = box.getCenter(new THREE.Vector3());
   inst.cfg.pos = [inst.cfg.pos[0] - c.x, inst.cfg.pos[1] - box.min.y, inst.cfg.pos[2] - c.z];
@@ -5544,6 +5563,6 @@ if (new URLSearchParams(location.search).get('debug')) {
     get build() { return build; }, regenerate, setSelected, get selectedId() { return selectedId; },
     // part-preview internals (2026-08-19) — the mode flag, the view state and
     // the resolver, so an embed question is answerable by reading state
-    IS_PART, partView, resolvePartPreview, fitPartCamera,
+    IS_PART, partView, resolvePartPreview, fitPartCamera, PART_PLATE, plateStage,
     trackLog, track };
 }

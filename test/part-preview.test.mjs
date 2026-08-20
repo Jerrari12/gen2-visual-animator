@@ -193,6 +193,20 @@ test('plate view: confirmed print poses only, bare primary, fail-closed elsewher
   // plate-capable census: 94 cases + 94 classic + 94 decor + 90 faceplates
   const n = [...resolved.values()].filter(r => !r.fail && r.part.platePreview).length;
   assert.equal(n, 372, 'plate-capable slug count');
+
+  // sweep EVERY plate-capable slug's plate boot (not just samples): exactly
+  // one bare instance, and the rotation matches its family's confirmed pose
+  const expectRot = s =>
+    /-faceplate-/.test(s)
+      ? (/^(essential|chevron)-/.test(s) ? [90, 0, 0] : [-90, 0, 0])
+      : undefined;
+  for (const [s, r] of resolved) {
+    if (r.fail || !r.part.platePreview) continue;
+    const pb = resolvePartPreview(s, { plate: true });
+    assert.ok(!pb.fail, s + ': plate boot must resolve');
+    assert.equal(pb.manifest.instances.length, 1, s + ': plate boot is one bare instance');
+    assert.deepEqual(pb.manifest.instances[0].rot, expectRot(s), s + ': confirmed pose');
+  }
 });
 
 test('failure modes are typed correctly', () => {
