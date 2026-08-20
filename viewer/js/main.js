@@ -47,6 +47,7 @@ const PART_PLATE = (() => {
   return (w >= 50 && w <= 1000 && d >= 50 && d <= 1000) ? { w, d } : null;
 })();
 document.body.classList.toggle('part-preview', IS_PART);
+document.body.classList.toggle('part-plate', !!PART_PLATE); // pill layout: Top view owns the corner on plate boots
 function postToEmbedder(msg) {
   if (!IS_PART || window.parent === window) return;
   try {
@@ -4207,7 +4208,11 @@ canvas.addEventListener('pointerup', e => {
   // kit repro, 2026-07-23 — latent on every cover; the telephoto framing makes
   // a face-on plate the likeliest hit). Orbit/zoom stay free; identify starts
   // with the instruction pages.
-  if (PAGES[cur]?.cover || PAGES[cur]?.outro) return;
+  // part-preview measure is the ONE tap path allowed past the cover guard —
+  // identify stays inert there (cur is 0 by design), but the measure pill is
+  // a deliberate mode the user switched on (2026-08-20, the site's expanded
+  // inspection view)
+  if ((PAGES[cur]?.cover || PAGES[cur]?.outro) && !(IS_PART && measure.on)) return;
   if (!downXY || Math.hypot(e.clientX - downXY[0], e.clientY - downXY[1]) > 6) return;
   const r = canvas.getBoundingClientRect();
   ray.setFromCamera(new THREE.Vector2(
@@ -4220,7 +4225,13 @@ canvas.addEventListener('pointerup', e => {
     (!fpFocus.id || i.cfg.id === fpFocus.id || fpFocus.mates.has(i.cfg.id)));
   const hits = ray.intersectObjects(pickable.map(i => i.group), true);
   if (measure.on) { // measure mode swallows taps: surface point, not part identity
-    if (hits.length) addMeasurePoint(hits[0].point);
+    // on a plate boot the slab is a legitimate target too — free points on the
+    // plate SURFACE, measured manually (never claimed as an edge-clearance
+    // result; that precision is a future automatic callout)
+    const targets = pickable.map(i => i.group);
+    if (IS_PART && plateStage.group) targets.push(plateStage.group.children[0]);
+    const mhits = ray.intersectObjects(targets, true);
+    if (mhits.length) addMeasurePoint(mhits[0].point);
     else clearMeasure(); // empty tap wipes the current measurement (stay in mode)
     return;
   }
@@ -4268,8 +4279,13 @@ function addMeasurePoint(p) {
       new THREE.LineBasicMaterial({ color: 0xff8a40, depthTest: false, transparent: true }));
     measure.line.renderOrder = 998;
     scene.add(measure.line);
+    // Case honesty hint (part-preview only): measured geometry is the PHYSICAL
+    // part — a case reads 3mm taller than its installed height because the
+    // dovetail nests into the unit above (the locked calibration rule)
+    const caseHint = IS_PART && manifest.parts[0]?.type === 'Case'
+      ? '<small>physical geometry - a case measures 3mm taller than its installed height (the dovetail nests into the unit above)</small>' : '';
     $('measure-label').innerHTML = `${a.distanceTo(b).toFixed(1)} mm` +
-      `<small>&#916;X ${Math.abs(b.x - a.x).toFixed(1)} &middot; &#916;Y ${Math.abs(b.y - a.y).toFixed(1)} &middot; &#916;Z ${Math.abs(b.z - a.z).toFixed(1)}</small>`;
+      `<small>&#916;X ${Math.abs(b.x - a.x).toFixed(1)} &middot; &#916;Y ${Math.abs(b.y - a.y).toFixed(1)} &middot; &#916;Z ${Math.abs(b.z - a.z).toFixed(1)}</small>` + caseHint;
   }
 }
 function updateMeasure() { // render-loop: constant marker screen-size + label tracking
@@ -5360,19 +5376,40 @@ function startPartIdle() {
     // yanks the camera off the restored framing on the next frames. One
     // NON-damped update() consumes and explicitly ZEROES the deltas (vendored
     // OrbitControls, the non-damping branch) — exact, unlike an iterative
-    // drain. It may move the camera wildly, but the pose copy below lands
+    // drain. It may move the camera wildly, but the recompute below lands
     // before anything renders (all synchronous).
     controls.autoRotate = false;
     controls.enableDamping = false;
     controls.update();
     controls.enableDamping = true;
-    camera.position.copy(partView.pose.pos);
-    controls.target.copy(partView.pose.target);
-    controls.update();
+    // RECOMPUTE the canonical fit for the CURRENT canvas rather than copying
+    // the saved pose: the site's expand overlay resizes the iframe, and a pose
+    // saved at one aspect restores mis-framed at another (review catch,
+    // 2026-08-20). fitPartCamera/fitPlateCamera re-save partView.pose.
+    if (PART_PLATE) fitPlateCamera(plateStage.top); else fitPartCamera();
     partView.interacted = false;
     controls.autoRotate = spin;
     $('part-reset').classList.add('hidden');
   };
+  // ---- measure (2026-08-20, the site's expanded inspection view) ----
+  // The pill drives the EXISTING mm engine; the tap path lets it past the
+  // cover guard in this mode. Toggling off clears (setMeasure's own rule), so
+  // the pill's Done state is also the visible clear affordance on touch.
+  const mBtn = $('part-measure');
+  mBtn.classList.remove('hidden');
+  mBtn.onclick = () => {
+    const on = !measure.on;
+    if (on) trackOnce('tool:measure');
+    setMeasure(on);
+    mBtn.classList.toggle('on', on);
+    mBtn.innerHTML = on ? '&#10005; Done' : '&#128207; Measure';
+  };
+  // Escape must reach the EMBEDDING page even while focus sits inside this
+  // cross-origin iframe (it swallows the key) — outbound-only protocol, the
+  // site validates origin/source/part/rid before collapsing its overlay.
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') postToEmbedder({ gen2: 'partEscape' });
+  });
   // offscreen product cards must cost nothing: the render loop skips entirely
   // while the iframe is scrolled out (browsers throttle offscreen-iframe rAF
   // inconsistently — this makes it deterministic)
