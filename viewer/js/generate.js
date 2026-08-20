@@ -1691,6 +1691,12 @@ function previewProbe(slug) {
     return { build: one(185, +m[2], H_FROM_SLUG[m[3]], 'decor', { faceStyle: m[1] }), pick: { type: 'Faceplate' } };
   if ((m = s.match(new RegExp(`^faceplate-back-cover-([1-4])w-${H}h$`))))
     return { build: one(185, +m[1], H_FROM_SLUG[m[2]], 'decor', { backCover: true }), pick: { type: 'BackCover' } };
+  // wall-mount bracket sections (2026-08-20, the site's hardware restructure):
+  // a single w-wide wall case tiles exactly one <w>W bracket course, so the
+  // pick is unambiguous. Turntable only - no confirmed print pose yet, so the
+  // plate view fails closed like every unpoosed family.
+  if ((m = s.match(/^wall-mount-bracket-([1-3])w$/)))
+    return { build: one(185, +m[1], 2), pick: { type: 'Bracket' } };
   return { fail: { reason: 'unknown-part', message: "This part id isn't recognized." } };
 }
 // Print-orientation whitelist for the ?plate= view (Joey's confirmations,

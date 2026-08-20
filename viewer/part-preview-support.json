@@ -1930,10 +1930,6 @@
       "preview": true,
       "platePreview": false
     },
-    "drawer-stoppers": {
-      "preview": true,
-      "platePreview": true
-    },
     "quicklock-a-v1-11": {
       "preview": true,
       "platePreview": true
@@ -1941,6 +1937,10 @@
     "quicklock-b-bi-directional-optional": {
       "preview": false,
       "reason": "This hardware part doesn't have a 3D model in the part library yet."
+    },
+    "drawer-stoppers": {
+      "preview": true,
+      "platePreview": true
     },
     "magnet-insert-10x2mm": {
       "preview": true,
@@ -1953,6 +1953,18 @@
     "tpu-foot": {
       "preview": true,
       "platePreview": true
+    },
+    "wall-mount-bracket-1w": {
+      "preview": true,
+      "platePreview": false
+    },
+    "wall-mount-bracket-2w": {
+      "preview": true,
+      "platePreview": false
+    },
+    "wall-mount-bracket-3w": {
+      "preview": true,
+      "platePreview": false
     }
   }
 }

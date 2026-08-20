@@ -64,7 +64,7 @@ test('every production slug is accounted for — resolved or intentionally unsup
   }
   assert.deepEqual(unknown, [], 'production slugs the resolver does not recognize (grammar drift)');
   assert.deepEqual(wrongBucket, [], 'slugs in the wrong support bucket');
-  assert.equal(supported, 462, 'supported preview count');
+  assert.equal(supported, 465, 'supported preview count');
   assert.equal(unsupported, 26, 'intentionally-unsupported count (24 extenders + 2 no-GLB hardware)');
 });
 

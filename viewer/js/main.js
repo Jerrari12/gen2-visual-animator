@@ -5195,6 +5195,7 @@ const PART_CAM = {
   Faceplate: { t: 24, p: 72 }, BackCover: { t: 24, p: 72 },
   CoverL: { t: 30, p: 52 }, CoverU: { t: 30, p: 52 },
   FootrailL: { t: 30, p: 52 }, FootrailU: { t: 30, p: 52 }, Rail: { t: 30, p: 52 },
+  Bracket: { t: 30, p: 52 }, // wall-bracket sections read like rails (2026-08-20)
   // hardware (2026-08-20): stoppers lie flat — the default 3/4 box angle reads
   // too grazing; the clip stands like a small plate. QuickLock + Foot keep the
   // default box angle.

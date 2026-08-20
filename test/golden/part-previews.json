@@ -4389,13 +4389,6 @@
     "label": "Faceplate Back Cover 2W-3H",
     "platePreview": false
   },
-  "drawer-stoppers": {
-    "node": "Drawer_Stoppers_L",
-    "collection": "185",
-    "type": "Stopper",
-    "label": "Drawer Stoppers (Left + Right)",
-    "platePreview": true
-  },
   "quicklock-a-v1-11": {
     "node": "QuickLock-L",
     "collection": "185",
@@ -4405,6 +4398,13 @@
   },
   "quicklock-b-bi-directional-optional": {
     "unsupported": "unsupported"
+  },
+  "drawer-stoppers": {
+    "node": "Drawer_Stoppers_L",
+    "collection": "185",
+    "type": "Stopper",
+    "label": "Drawer Stoppers (Left + Right)",
+    "platePreview": true
   },
   "magnet-insert-10x2mm": {
     "node": "MagnetClip_10x2mm",
@@ -4422,5 +4422,26 @@
     "type": "Foot",
     "label": "TPU Foot",
     "platePreview": true
+  },
+  "wall-mount-bracket-1w": {
+    "node": "WallMount_Lite_1W",
+    "collection": "185",
+    "type": "Bracket",
+    "label": "Wall Mount Lite 1W",
+    "platePreview": false
+  },
+  "wall-mount-bracket-2w": {
+    "node": "WallMount_Lite_2W",
+    "collection": "185",
+    "type": "Bracket",
+    "label": "Wall Mount Lite 2W",
+    "platePreview": false
+  },
+  "wall-mount-bracket-3w": {
+    "node": "WallMount_Lite_3W",
+    "collection": "185",
+    "type": "Bracket",
+    "label": "Wall Mount Lite 3W",
+    "platePreview": false
   }
 }
