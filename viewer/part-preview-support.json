@@ -1,0 +1,1500 @@
+{
+  "v": 1,
+  "source": "MODULITH search-index v2608",
+  "parts": {
+    "59-case-1w-0-5h": {
+      "preview": true
+    },
+    "59-case-2w-0-5h": {
+      "preview": true
+    },
+    "59-case-1w-1h": {
+      "preview": true
+    },
+    "59-case-2w-1h": {
+      "preview": true
+    },
+    "59-classic-drawer-1w-0-5h": {
+      "preview": true
+    },
+    "59-classic-drawer-2w-0-5h": {
+      "preview": true
+    },
+    "59-classic-drawer-1w-1h": {
+      "preview": true
+    },
+    "59-classic-drawer-2w-1h": {
+      "preview": true
+    },
+    "59-decor-drawer-1w-0-5h": {
+      "preview": true
+    },
+    "59-decor-drawer-2w-0-5h": {
+      "preview": true
+    },
+    "59-decor-drawer-1w-1h": {
+      "preview": true
+    },
+    "59-decor-drawer-2w-1h": {
+      "preview": true
+    },
+    "59-cover-upper-1w": {
+      "preview": true
+    },
+    "59-cover-lower-1w": {
+      "preview": true
+    },
+    "59-cover-upper-2w": {
+      "preview": true
+    },
+    "59-cover-lower-2w": {
+      "preview": true
+    },
+    "59-case-extender-1w-1h": {
+      "preview": false,
+      "reason": "Case extenders aren't in the 3D part library yet."
+    },
+    "59-case-extender-2w-1h": {
+      "preview": false,
+      "reason": "Case extenders aren't in the 3D part library yet."
+    },
+    "59-case-extender-3w-1h": {
+      "preview": false,
+      "reason": "Case extenders aren't in the 3D part library yet."
+    },
+    "59-case-extender-4w-1h": {
+      "preview": false,
+      "reason": "Case extenders aren't in the 3D part library yet."
+    },
+    "59-under-table-rail-1w": {
+      "preview": true
+    },
+    "59-under-table-rail-2w": {
+      "preview": true
+    },
+    "59-under-table-rail-3w": {
+      "preview": true
+    },
+    "59-under-table-rail-4w": {
+      "preview": true
+    },
+    "115-case-1w-0-5h": {
+      "preview": true
+    },
+    "115-case-2w-0-5h": {
+      "preview": true
+    },
+    "115-case-3w-0-5h": {
+      "preview": true
+    },
+    "115-case-4w-0-5h": {
+      "preview": true
+    },
+    "115-case-1w-1h": {
+      "preview": true
+    },
+    "115-case-2w-1h": {
+      "preview": true
+    },
+    "115-case-3w-1h": {
+      "preview": true
+    },
+    "115-case-4w-1h": {
+      "preview": true
+    },
+    "115-case-1w-1-5h": {
+      "preview": true
+    },
+    "115-case-2w-1-5h": {
+      "preview": true
+    },
+    "115-case-3w-1-5h": {
+      "preview": true
+    },
+    "115-case-4w-1-5h": {
+      "preview": true
+    },
+    "115-case-1w-2h": {
+      "preview": true
+    },
+    "115-case-2w-2h": {
+      "preview": true
+    },
+    "115-case-3w-2h": {
+      "preview": true
+    },
+    "115-case-4w-2h": {
+      "preview": true
+    },
+    "115-case-1w-3h": {
+      "preview": true
+    },
+    "115-case-2w-3h": {
+      "preview": true
+    },
+    "115-classic-drawer-1w-0-5h": {
+      "preview": true
+    },
+    "115-classic-drawer-2w-0-5h": {
+      "preview": true
+    },
+    "115-classic-drawer-3w-0-5h": {
+      "preview": true
+    },
+    "115-classic-drawer-4w-0-5h": {
+      "preview": true
+    },
+    "115-classic-drawer-1w-1h": {
+      "preview": true
+    },
+    "115-classic-drawer-2w-1h": {
+      "preview": true
+    },
+    "115-classic-drawer-3w-1h": {
+      "preview": true
+    },
+    "115-classic-drawer-4w-1h": {
+      "preview": true
+    },
+    "115-classic-drawer-1w-1-5h": {
+      "preview": true
+    },
+    "115-classic-drawer-2w-1-5h": {
+      "preview": true
+    },
+    "115-classic-drawer-3w-1-5h": {
+      "preview": true
+    },
+    "115-classic-drawer-4w-1-5h": {
+      "preview": true
+    },
+    "115-classic-drawer-1w-2h": {
+      "preview": true
+    },
+    "115-classic-drawer-2w-2h": {
+      "preview": true
+    },
+    "115-classic-drawer-3w-2h": {
+      "preview": true
+    },
+    "115-classic-drawer-4w-2h": {
+      "preview": true
+    },
+    "115-classic-drawer-1w-3h": {
+      "preview": true
+    },
+    "115-classic-drawer-2w-3h": {
+      "preview": true
+    },
+    "115-decor-drawer-1w-0-5h": {
+      "preview": true
+    },
+    "115-decor-drawer-2w-0-5h": {
+      "preview": true
+    },
+    "115-decor-drawer-3w-0-5h": {
+      "preview": true
+    },
+    "115-decor-drawer-4w-0-5h": {
+      "preview": true
+    },
+    "115-decor-drawer-1w-1h": {
+      "preview": true
+    },
+    "115-decor-drawer-2w-1h": {
+      "preview": true
+    },
+    "115-decor-drawer-3w-1h": {
+      "preview": true
+    },
+    "115-decor-drawer-4w-1h": {
+      "preview": true
+    },
+    "115-decor-drawer-1w-1-5h": {
+      "preview": true
+    },
+    "115-decor-drawer-2w-1-5h": {
+      "preview": true
+    },
+    "115-decor-drawer-3w-1-5h": {
+      "preview": true
+    },
+    "115-decor-drawer-4w-1-5h": {
+      "preview": true
+    },
+    "115-decor-drawer-1w-2h": {
+      "preview": true
+    },
+    "115-decor-drawer-2w-2h": {
+      "preview": true
+    },
+    "115-decor-drawer-3w-2h": {
+      "preview": true
+    },
+    "115-decor-drawer-4w-2h": {
+      "preview": true
+    },
+    "115-decor-drawer-1w-3h": {
+      "preview": true
+    },
+    "115-decor-drawer-2w-3h": {
+      "preview": true
+    },
+    "115-cover-upper-1w": {
+      "preview": true
+    },
+    "115-cover-lower-1w": {
+      "preview": true
+    },
+    "115-cover-upper-2w": {
+      "preview": true
+    },
+    "115-cover-lower-2w": {
+      "preview": true
+    },
+    "115-foot-rail-upper-1w": {
+      "preview": true
+    },
+    "115-foot-rail-lower-1w": {
+      "preview": true
+    },
+    "115-foot-rail-upper-2w": {
+      "preview": true
+    },
+    "115-foot-rail-lower-2w": {
+      "preview": true
+    },
+    "115-case-extender-1w-1h": {
+      "preview": false,
+      "reason": "Case extenders aren't in the 3D part library yet."
+    },
+    "115-case-extender-2w-1h": {
+      "preview": false,
+      "reason": "Case extenders aren't in the 3D part library yet."
+    },
+    "115-case-extender-3w-1h": {
+      "preview": false,
+      "reason": "Case extenders aren't in the 3D part library yet."
+    },
+    "115-case-extender-4w-1h": {
+      "preview": false,
+      "reason": "Case extenders aren't in the 3D part library yet."
+    },
+    "115-under-table-rail-1w": {
+      "preview": true
+    },
+    "115-under-table-rail-2w": {
+      "preview": true
+    },
+    "115-under-table-rail-3w": {
+      "preview": true
+    },
+    "115-under-table-rail-4w": {
+      "preview": true
+    },
+    "165-case-1w-0-5h": {
+      "preview": true
+    },
+    "165-case-2w-0-5h": {
+      "preview": true
+    },
+    "165-case-3w-0-5h": {
+      "preview": true
+    },
+    "165-case-4w-0-5h": {
+      "preview": true
+    },
+    "165-case-1w-1h": {
+      "preview": true
+    },
+    "165-case-2w-1h": {
+      "preview": true
+    },
+    "165-case-3w-1h": {
+      "preview": true
+    },
+    "165-case-4w-1h": {
+      "preview": true
+    },
+    "165-case-1w-1-5h": {
+      "preview": true
+    },
+    "165-case-2w-1-5h": {
+      "preview": true
+    },
+    "165-case-3w-1-5h": {
+      "preview": true
+    },
+    "165-case-4w-1-5h": {
+      "preview": true
+    },
+    "165-case-1w-2h": {
+      "preview": true
+    },
+    "165-case-2w-2h": {
+      "preview": true
+    },
+    "165-case-3w-2h": {
+      "preview": true
+    },
+    "165-case-4w-2h": {
+      "preview": true
+    },
+    "165-case-1w-3h": {
+      "preview": true
+    },
+    "165-case-2w-3h": {
+      "preview": true
+    },
+    "165-classic-drawer-1w-0-5h": {
+      "preview": true
+    },
+    "165-classic-drawer-2w-0-5h": {
+      "preview": true
+    },
+    "165-classic-drawer-3w-0-5h": {
+      "preview": true
+    },
+    "165-classic-drawer-4w-0-5h": {
+      "preview": true
+    },
+    "165-classic-drawer-1w-1h": {
+      "preview": true
+    },
+    "165-classic-drawer-2w-1h": {
+      "preview": true
+    },
+    "165-classic-drawer-3w-1h": {
+      "preview": true
+    },
+    "165-classic-drawer-4w-1h": {
+      "preview": true
+    },
+    "165-classic-drawer-1w-1-5h": {
+      "preview": true
+    },
+    "165-classic-drawer-2w-1-5h": {
+      "preview": true
+    },
+    "165-classic-drawer-3w-1-5h": {
+      "preview": true
+    },
+    "165-classic-drawer-4w-1-5h": {
+      "preview": true
+    },
+    "165-classic-drawer-1w-2h": {
+      "preview": true
+    },
+    "165-classic-drawer-2w-2h": {
+      "preview": true
+    },
+    "165-classic-drawer-3w-2h": {
+      "preview": true
+    },
+    "165-classic-drawer-4w-2h": {
+      "preview": true
+    },
+    "165-classic-drawer-1w-3h": {
+      "preview": true
+    },
+    "165-classic-drawer-2w-3h": {
+      "preview": true
+    },
+    "165-decor-drawer-1w-0-5h": {
+      "preview": true
+    },
+    "165-decor-drawer-2w-0-5h": {
+      "preview": true
+    },
+    "165-decor-drawer-3w-0-5h": {
+      "preview": true
+    },
+    "165-decor-drawer-4w-0-5h": {
+      "preview": true
+    },
+    "165-decor-drawer-1w-1h": {
+      "preview": true
+    },
+    "165-decor-drawer-2w-1h": {
+      "preview": true
+    },
+    "165-decor-drawer-3w-1h": {
+      "preview": true
+    },
+    "165-decor-drawer-4w-1h": {
+      "preview": true
+    },
+    "165-decor-drawer-1w-1-5h": {
+      "preview": true
+    },
+    "165-decor-drawer-2w-1-5h": {
+      "preview": true
+    },
+    "165-decor-drawer-3w-1-5h": {
+      "preview": true
+    },
+    "165-decor-drawer-4w-1-5h": {
+      "preview": true
+    },
+    "165-decor-drawer-1w-2h": {
+      "preview": true
+    },
+    "165-decor-drawer-2w-2h": {
+      "preview": true
+    },
+    "165-decor-drawer-3w-2h": {
+      "preview": true
+    },
+    "165-decor-drawer-4w-2h": {
+      "preview": true
+    },
+    "165-decor-drawer-1w-3h": {
+      "preview": true
+    },
+    "165-decor-drawer-2w-3h": {
+      "preview": true
+    },
+    "165-cover-upper-1w": {
+      "preview": true
+    },
+    "165-cover-lower-1w": {
+      "preview": true
+    },
+    "165-cover-upper-2w": {
+      "preview": true
+    },
+    "165-cover-lower-2w": {
+      "preview": true
+    },
+    "165-foot-rail-upper-1w": {
+      "preview": true
+    },
+    "165-foot-rail-lower-1w": {
+      "preview": true
+    },
+    "165-foot-rail-upper-2w": {
+      "preview": true
+    },
+    "165-foot-rail-lower-2w": {
+      "preview": true
+    },
+    "165-case-extender-1w-1h": {
+      "preview": false,
+      "reason": "Case extenders aren't in the 3D part library yet."
+    },
+    "165-case-extender-2w-1h": {
+      "preview": false,
+      "reason": "Case extenders aren't in the 3D part library yet."
+    },
+    "165-case-extender-3w-1h": {
+      "preview": false,
+      "reason": "Case extenders aren't in the 3D part library yet."
+    },
+    "165-case-extender-4w-1h": {
+      "preview": false,
+      "reason": "Case extenders aren't in the 3D part library yet."
+    },
+    "165-under-table-rail-1w": {
+      "preview": true
+    },
+    "165-under-table-rail-2w": {
+      "preview": true
+    },
+    "165-under-table-rail-3w": {
+      "preview": true
+    },
+    "165-under-table-rail-4w": {
+      "preview": true
+    },
+    "185-case-1w-0-5h": {
+      "preview": true
+    },
+    "185-case-2w-0-5h": {
+      "preview": true
+    },
+    "185-case-3w-0-5h": {
+      "preview": true
+    },
+    "185-case-4w-0-5h": {
+      "preview": true
+    },
+    "185-case-1w-1h": {
+      "preview": true
+    },
+    "185-case-2w-1h": {
+      "preview": true
+    },
+    "185-case-3w-1h": {
+      "preview": true
+    },
+    "185-case-4w-1h": {
+      "preview": true
+    },
+    "185-case-1w-1-5h": {
+      "preview": true
+    },
+    "185-case-2w-1-5h": {
+      "preview": true
+    },
+    "185-case-3w-1-5h": {
+      "preview": true
+    },
+    "185-case-4w-1-5h": {
+      "preview": true
+    },
+    "185-case-1w-2h": {
+      "preview": true
+    },
+    "185-case-2w-2h": {
+      "preview": true
+    },
+    "185-case-3w-2h": {
+      "preview": true
+    },
+    "185-case-4w-2h": {
+      "preview": true
+    },
+    "185-case-1w-3h": {
+      "preview": true
+    },
+    "185-case-2w-3h": {
+      "preview": true
+    },
+    "185-classic-drawer-1w-0-5h": {
+      "preview": true
+    },
+    "185-classic-drawer-2w-0-5h": {
+      "preview": true
+    },
+    "185-classic-drawer-3w-0-5h": {
+      "preview": true
+    },
+    "185-classic-drawer-4w-0-5h": {
+      "preview": true
+    },
+    "185-classic-drawer-1w-1h": {
+      "preview": true
+    },
+    "185-classic-drawer-2w-1h": {
+      "preview": true
+    },
+    "185-classic-drawer-3w-1h": {
+      "preview": true
+    },
+    "185-classic-drawer-4w-1h": {
+      "preview": true
+    },
+    "185-classic-drawer-1w-1-5h": {
+      "preview": true
+    },
+    "185-classic-drawer-2w-1-5h": {
+      "preview": true
+    },
+    "185-classic-drawer-3w-1-5h": {
+      "preview": true
+    },
+    "185-classic-drawer-4w-1-5h": {
+      "preview": true
+    },
+    "185-classic-drawer-1w-2h": {
+      "preview": true
+    },
+    "185-classic-drawer-2w-2h": {
+      "preview": true
+    },
+    "185-classic-drawer-3w-2h": {
+      "preview": true
+    },
+    "185-classic-drawer-4w-2h": {
+      "preview": true
+    },
+    "185-classic-drawer-1w-3h": {
+      "preview": true
+    },
+    "185-classic-drawer-2w-3h": {
+      "preview": true
+    },
+    "185-decor-drawer-1w-0-5h": {
+      "preview": true
+    },
+    "185-decor-drawer-2w-0-5h": {
+      "preview": true
+    },
+    "185-decor-drawer-3w-0-5h": {
+      "preview": true
+    },
+    "185-decor-drawer-4w-0-5h": {
+      "preview": true
+    },
+    "185-decor-drawer-1w-1h": {
+      "preview": true
+    },
+    "185-decor-drawer-2w-1h": {
+      "preview": true
+    },
+    "185-decor-drawer-3w-1h": {
+      "preview": true
+    },
+    "185-decor-drawer-4w-1h": {
+      "preview": true
+    },
+    "185-decor-drawer-1w-1-5h": {
+      "preview": true
+    },
+    "185-decor-drawer-2w-1-5h": {
+      "preview": true
+    },
+    "185-decor-drawer-3w-1-5h": {
+      "preview": true
+    },
+    "185-decor-drawer-4w-1-5h": {
+      "preview": true
+    },
+    "185-decor-drawer-1w-2h": {
+      "preview": true
+    },
+    "185-decor-drawer-2w-2h": {
+      "preview": true
+    },
+    "185-decor-drawer-3w-2h": {
+      "preview": true
+    },
+    "185-decor-drawer-4w-2h": {
+      "preview": true
+    },
+    "185-decor-drawer-1w-3h": {
+      "preview": true
+    },
+    "185-decor-drawer-2w-3h": {
+      "preview": true
+    },
+    "185-cover-upper-1w": {
+      "preview": true
+    },
+    "185-cover-lower-1w": {
+      "preview": true
+    },
+    "185-cover-upper-2w": {
+      "preview": true
+    },
+    "185-cover-lower-2w": {
+      "preview": true
+    },
+    "185-foot-rail-upper-1w": {
+      "preview": true
+    },
+    "185-foot-rail-lower-1w": {
+      "preview": true
+    },
+    "185-foot-rail-upper-2w": {
+      "preview": true
+    },
+    "185-foot-rail-lower-2w": {
+      "preview": true
+    },
+    "185-case-extender-1w-1h": {
+      "preview": false,
+      "reason": "Case extenders aren't in the 3D part library yet."
+    },
+    "185-case-extender-2w-1h": {
+      "preview": false,
+      "reason": "Case extenders aren't in the 3D part library yet."
+    },
+    "185-case-extender-3w-1h": {
+      "preview": false,
+      "reason": "Case extenders aren't in the 3D part library yet."
+    },
+    "185-case-extender-4w-1h": {
+      "preview": false,
+      "reason": "Case extenders aren't in the 3D part library yet."
+    },
+    "185-under-table-rail-1w": {
+      "preview": true
+    },
+    "185-under-table-rail-2w": {
+      "preview": true
+    },
+    "185-under-table-rail-3w": {
+      "preview": true
+    },
+    "185-under-table-rail-4w": {
+      "preview": true
+    },
+    "240-case-1w-0-5h": {
+      "preview": true
+    },
+    "240-case-2w-0-5h": {
+      "preview": true
+    },
+    "240-case-3w-0-5h": {
+      "preview": true
+    },
+    "240-case-4w-0-5h": {
+      "preview": true
+    },
+    "240-case-1w-1h": {
+      "preview": true
+    },
+    "240-case-2w-1h": {
+      "preview": true
+    },
+    "240-case-3w-1h": {
+      "preview": true
+    },
+    "240-case-4w-1h": {
+      "preview": true
+    },
+    "240-case-1w-1-5h": {
+      "preview": true
+    },
+    "240-case-2w-1-5h": {
+      "preview": true
+    },
+    "240-case-3w-1-5h": {
+      "preview": true
+    },
+    "240-case-4w-1-5h": {
+      "preview": true
+    },
+    "240-case-1w-2h": {
+      "preview": true
+    },
+    "240-case-2w-2h": {
+      "preview": true
+    },
+    "240-case-3w-2h": {
+      "preview": true
+    },
+    "240-case-4w-2h": {
+      "preview": true
+    },
+    "240-case-1w-3h": {
+      "preview": true
+    },
+    "240-case-2w-3h": {
+      "preview": true
+    },
+    "240-classic-drawer-1w-0-5h": {
+      "preview": true
+    },
+    "240-classic-drawer-2w-0-5h": {
+      "preview": true
+    },
+    "240-classic-drawer-3w-0-5h": {
+      "preview": true
+    },
+    "240-classic-drawer-4w-0-5h": {
+      "preview": true
+    },
+    "240-classic-drawer-1w-1h": {
+      "preview": true
+    },
+    "240-classic-drawer-2w-1h": {
+      "preview": true
+    },
+    "240-classic-drawer-3w-1h": {
+      "preview": true
+    },
+    "240-classic-drawer-4w-1h": {
+      "preview": true
+    },
+    "240-classic-drawer-1w-1-5h": {
+      "preview": true
+    },
+    "240-classic-drawer-2w-1-5h": {
+      "preview": true
+    },
+    "240-classic-drawer-3w-1-5h": {
+      "preview": true
+    },
+    "240-classic-drawer-4w-1-5h": {
+      "preview": true
+    },
+    "240-classic-drawer-1w-2h": {
+      "preview": true
+    },
+    "240-classic-drawer-2w-2h": {
+      "preview": true
+    },
+    "240-classic-drawer-3w-2h": {
+      "preview": true
+    },
+    "240-classic-drawer-4w-2h": {
+      "preview": true
+    },
+    "240-classic-drawer-1w-3h": {
+      "preview": true
+    },
+    "240-classic-drawer-2w-3h": {
+      "preview": true
+    },
+    "240-decor-drawer-1w-0-5h": {
+      "preview": true
+    },
+    "240-decor-drawer-2w-0-5h": {
+      "preview": true
+    },
+    "240-decor-drawer-3w-0-5h": {
+      "preview": true
+    },
+    "240-decor-drawer-4w-0-5h": {
+      "preview": true
+    },
+    "240-decor-drawer-1w-1h": {
+      "preview": true
+    },
+    "240-decor-drawer-2w-1h": {
+      "preview": true
+    },
+    "240-decor-drawer-3w-1h": {
+      "preview": true
+    },
+    "240-decor-drawer-4w-1h": {
+      "preview": true
+    },
+    "240-decor-drawer-1w-1-5h": {
+      "preview": true
+    },
+    "240-decor-drawer-2w-1-5h": {
+      "preview": true
+    },
+    "240-decor-drawer-3w-1-5h": {
+      "preview": true
+    },
+    "240-decor-drawer-4w-1-5h": {
+      "preview": true
+    },
+    "240-decor-drawer-1w-2h": {
+      "preview": true
+    },
+    "240-decor-drawer-2w-2h": {
+      "preview": true
+    },
+    "240-decor-drawer-3w-2h": {
+      "preview": true
+    },
+    "240-decor-drawer-4w-2h": {
+      "preview": true
+    },
+    "240-decor-drawer-1w-3h": {
+      "preview": true
+    },
+    "240-decor-drawer-2w-3h": {
+      "preview": true
+    },
+    "240-cover-upper-1w": {
+      "preview": true
+    },
+    "240-cover-lower-1w": {
+      "preview": true
+    },
+    "240-cover-upper-2w": {
+      "preview": true
+    },
+    "240-cover-lower-2w": {
+      "preview": true
+    },
+    "240-foot-rail-upper-1w": {
+      "preview": true
+    },
+    "240-foot-rail-lower-1w": {
+      "preview": true
+    },
+    "240-foot-rail-upper-2w": {
+      "preview": true
+    },
+    "240-foot-rail-lower-2w": {
+      "preview": true
+    },
+    "240-case-extender-1w-1h": {
+      "preview": false,
+      "reason": "Case extenders aren't in the 3D part library yet."
+    },
+    "240-case-extender-2w-1h": {
+      "preview": false,
+      "reason": "Case extenders aren't in the 3D part library yet."
+    },
+    "240-case-extender-3w-1h": {
+      "preview": false,
+      "reason": "Case extenders aren't in the 3D part library yet."
+    },
+    "240-case-extender-4w-1h": {
+      "preview": false,
+      "reason": "Case extenders aren't in the 3D part library yet."
+    },
+    "240-under-table-rail-1w": {
+      "preview": true
+    },
+    "240-under-table-rail-2w": {
+      "preview": true
+    },
+    "240-under-table-rail-3w": {
+      "preview": true
+    },
+    "240-under-table-rail-4w": {
+      "preview": true
+    },
+    "270-case-1w-0-5h": {
+      "preview": true
+    },
+    "270-case-2w-0-5h": {
+      "preview": true
+    },
+    "270-case-3w-0-5h": {
+      "preview": true
+    },
+    "270-case-4w-0-5h": {
+      "preview": true
+    },
+    "270-case-1w-1h": {
+      "preview": true
+    },
+    "270-case-2w-1h": {
+      "preview": true
+    },
+    "270-case-3w-1h": {
+      "preview": true
+    },
+    "270-case-4w-1h": {
+      "preview": true
+    },
+    "270-case-1w-1-5h": {
+      "preview": true
+    },
+    "270-case-2w-1-5h": {
+      "preview": true
+    },
+    "270-case-3w-1-5h": {
+      "preview": true
+    },
+    "270-case-4w-1-5h": {
+      "preview": true
+    },
+    "270-case-1w-2h": {
+      "preview": true
+    },
+    "270-case-2w-2h": {
+      "preview": true
+    },
+    "270-case-3w-2h": {
+      "preview": true
+    },
+    "270-case-4w-2h": {
+      "preview": true
+    },
+    "270-case-1w-3h": {
+      "preview": true
+    },
+    "270-case-2w-3h": {
+      "preview": true
+    },
+    "270-classic-drawer-1w-0-5h": {
+      "preview": true
+    },
+    "270-classic-drawer-2w-0-5h": {
+      "preview": true
+    },
+    "270-classic-drawer-3w-0-5h": {
+      "preview": true
+    },
+    "270-classic-drawer-4w-0-5h": {
+      "preview": true
+    },
+    "270-classic-drawer-1w-1h": {
+      "preview": true
+    },
+    "270-classic-drawer-2w-1h": {
+      "preview": true
+    },
+    "270-classic-drawer-3w-1h": {
+      "preview": true
+    },
+    "270-classic-drawer-4w-1h": {
+      "preview": true
+    },
+    "270-classic-drawer-1w-1-5h": {
+      "preview": true
+    },
+    "270-classic-drawer-2w-1-5h": {
+      "preview": true
+    },
+    "270-classic-drawer-3w-1-5h": {
+      "preview": true
+    },
+    "270-classic-drawer-4w-1-5h": {
+      "preview": true
+    },
+    "270-classic-drawer-1w-2h": {
+      "preview": true
+    },
+    "270-classic-drawer-2w-2h": {
+      "preview": true
+    },
+    "270-classic-drawer-3w-2h": {
+      "preview": true
+    },
+    "270-classic-drawer-4w-2h": {
+      "preview": true
+    },
+    "270-classic-drawer-1w-3h": {
+      "preview": true
+    },
+    "270-classic-drawer-2w-3h": {
+      "preview": true
+    },
+    "270-decor-drawer-1w-0-5h": {
+      "preview": true
+    },
+    "270-decor-drawer-2w-0-5h": {
+      "preview": true
+    },
+    "270-decor-drawer-3w-0-5h": {
+      "preview": true
+    },
+    "270-decor-drawer-4w-0-5h": {
+      "preview": true
+    },
+    "270-decor-drawer-1w-1h": {
+      "preview": true
+    },
+    "270-decor-drawer-2w-1h": {
+      "preview": true
+    },
+    "270-decor-drawer-3w-1h": {
+      "preview": true
+    },
+    "270-decor-drawer-4w-1h": {
+      "preview": true
+    },
+    "270-decor-drawer-1w-1-5h": {
+      "preview": true
+    },
+    "270-decor-drawer-2w-1-5h": {
+      "preview": true
+    },
+    "270-decor-drawer-3w-1-5h": {
+      "preview": true
+    },
+    "270-decor-drawer-4w-1-5h": {
+      "preview": true
+    },
+    "270-decor-drawer-1w-2h": {
+      "preview": true
+    },
+    "270-decor-drawer-2w-2h": {
+      "preview": true
+    },
+    "270-decor-drawer-3w-2h": {
+      "preview": true
+    },
+    "270-decor-drawer-4w-2h": {
+      "preview": true
+    },
+    "270-decor-drawer-1w-3h": {
+      "preview": true
+    },
+    "270-decor-drawer-2w-3h": {
+      "preview": true
+    },
+    "270-cover-upper-1w": {
+      "preview": true
+    },
+    "270-cover-lower-1w": {
+      "preview": true
+    },
+    "270-cover-upper-2w": {
+      "preview": true
+    },
+    "270-cover-lower-2w": {
+      "preview": true
+    },
+    "270-foot-rail-upper-1w": {
+      "preview": true
+    },
+    "270-foot-rail-lower-1w": {
+      "preview": true
+    },
+    "270-foot-rail-upper-2w": {
+      "preview": true
+    },
+    "270-foot-rail-lower-2w": {
+      "preview": true
+    },
+    "270-case-extender-1w-1h": {
+      "preview": false,
+      "reason": "Case extenders aren't in the 3D part library yet."
+    },
+    "270-case-extender-2w-1h": {
+      "preview": false,
+      "reason": "Case extenders aren't in the 3D part library yet."
+    },
+    "270-case-extender-3w-1h": {
+      "preview": false,
+      "reason": "Case extenders aren't in the 3D part library yet."
+    },
+    "270-case-extender-4w-1h": {
+      "preview": false,
+      "reason": "Case extenders aren't in the 3D part library yet."
+    },
+    "270-under-table-rail-1w": {
+      "preview": true
+    },
+    "270-under-table-rail-2w": {
+      "preview": true
+    },
+    "270-under-table-rail-3w": {
+      "preview": true
+    },
+    "270-under-table-rail-4w": {
+      "preview": true
+    },
+    "essential-faceplate-1w-0-5h": {
+      "preview": true
+    },
+    "essential-faceplate-2w-0-5h": {
+      "preview": true
+    },
+    "essential-faceplate-3w-0-5h": {
+      "preview": true
+    },
+    "essential-faceplate-4w-0-5h": {
+      "preview": true
+    },
+    "essential-faceplate-1w-1h": {
+      "preview": true
+    },
+    "essential-faceplate-2w-1h": {
+      "preview": true
+    },
+    "essential-faceplate-3w-1h": {
+      "preview": true
+    },
+    "essential-faceplate-4w-1h": {
+      "preview": true
+    },
+    "essential-faceplate-1w-1-5h": {
+      "preview": true
+    },
+    "essential-faceplate-2w-1-5h": {
+      "preview": true
+    },
+    "essential-faceplate-3w-1-5h": {
+      "preview": true
+    },
+    "essential-faceplate-4w-1-5h": {
+      "preview": true
+    },
+    "essential-faceplate-1w-2h": {
+      "preview": true
+    },
+    "essential-faceplate-2w-2h": {
+      "preview": true
+    },
+    "essential-faceplate-3w-2h": {
+      "preview": true
+    },
+    "essential-faceplate-4w-2h": {
+      "preview": true
+    },
+    "essential-faceplate-1w-3h": {
+      "preview": true
+    },
+    "essential-faceplate-2w-3h": {
+      "preview": true
+    },
+    "classic-faceplate-1w-0-5h": {
+      "preview": true
+    },
+    "classic-faceplate-2w-0-5h": {
+      "preview": true
+    },
+    "classic-faceplate-3w-0-5h": {
+      "preview": true
+    },
+    "classic-faceplate-4w-0-5h": {
+      "preview": true
+    },
+    "classic-faceplate-1w-1h": {
+      "preview": true
+    },
+    "classic-faceplate-2w-1h": {
+      "preview": true
+    },
+    "classic-faceplate-3w-1h": {
+      "preview": true
+    },
+    "classic-faceplate-4w-1h": {
+      "preview": true
+    },
+    "classic-faceplate-1w-1-5h": {
+      "preview": true
+    },
+    "classic-faceplate-2w-1-5h": {
+      "preview": true
+    },
+    "classic-faceplate-3w-1-5h": {
+      "preview": true
+    },
+    "classic-faceplate-4w-1-5h": {
+      "preview": true
+    },
+    "classic-faceplate-1w-2h": {
+      "preview": true
+    },
+    "classic-faceplate-2w-2h": {
+      "preview": true
+    },
+    "classic-faceplate-3w-2h": {
+      "preview": true
+    },
+    "classic-faceplate-4w-2h": {
+      "preview": true
+    },
+    "classic-faceplate-1w-3h": {
+      "preview": true
+    },
+    "classic-faceplate-2w-3h": {
+      "preview": true
+    },
+    "edgelabel-faceplate-1w-0-5h": {
+      "preview": true
+    },
+    "edgelabel-faceplate-2w-0-5h": {
+      "preview": true
+    },
+    "edgelabel-faceplate-3w-0-5h": {
+      "preview": true
+    },
+    "edgelabel-faceplate-4w-0-5h": {
+      "preview": true
+    },
+    "edgelabel-faceplate-1w-1h": {
+      "preview": true
+    },
+    "edgelabel-faceplate-2w-1h": {
+      "preview": true
+    },
+    "edgelabel-faceplate-3w-1h": {
+      "preview": true
+    },
+    "edgelabel-faceplate-4w-1h": {
+      "preview": true
+    },
+    "edgelabel-faceplate-1w-1-5h": {
+      "preview": true
+    },
+    "edgelabel-faceplate-2w-1-5h": {
+      "preview": true
+    },
+    "edgelabel-faceplate-3w-1-5h": {
+      "preview": true
+    },
+    "edgelabel-faceplate-4w-1-5h": {
+      "preview": true
+    },
+    "edgelabel-faceplate-1w-2h": {
+      "preview": true
+    },
+    "edgelabel-faceplate-2w-2h": {
+      "preview": true
+    },
+    "edgelabel-faceplate-3w-2h": {
+      "preview": true
+    },
+    "edgelabel-faceplate-4w-2h": {
+      "preview": true
+    },
+    "edgelabel-faceplate-1w-3h": {
+      "preview": true
+    },
+    "edgelabel-faceplate-2w-3h": {
+      "preview": true
+    },
+    "classicpro-faceplate-1w-0-5h": {
+      "preview": true
+    },
+    "classicpro-faceplate-2w-0-5h": {
+      "preview": true
+    },
+    "classicpro-faceplate-3w-0-5h": {
+      "preview": true
+    },
+    "classicpro-faceplate-4w-0-5h": {
+      "preview": true
+    },
+    "classicpro-faceplate-1w-1h": {
+      "preview": true
+    },
+    "classicpro-faceplate-2w-1h": {
+      "preview": true
+    },
+    "classicpro-faceplate-3w-1h": {
+      "preview": true
+    },
+    "classicpro-faceplate-4w-1h": {
+      "preview": true
+    },
+    "classicpro-faceplate-1w-1-5h": {
+      "preview": true
+    },
+    "classicpro-faceplate-2w-1-5h": {
+      "preview": true
+    },
+    "classicpro-faceplate-3w-1-5h": {
+      "preview": true
+    },
+    "classicpro-faceplate-4w-1-5h": {
+      "preview": true
+    },
+    "classicpro-faceplate-1w-2h": {
+      "preview": true
+    },
+    "classicpro-faceplate-2w-2h": {
+      "preview": true
+    },
+    "classicpro-faceplate-3w-2h": {
+      "preview": true
+    },
+    "classicpro-faceplate-4w-2h": {
+      "preview": true
+    },
+    "classicpro-faceplate-1w-3h": {
+      "preview": true
+    },
+    "classicpro-faceplate-2w-3h": {
+      "preview": true
+    },
+    "chevron-faceplate-1w-0-5h": {
+      "preview": true
+    },
+    "chevron-faceplate-2w-0-5h": {
+      "preview": true
+    },
+    "chevron-faceplate-3w-0-5h": {
+      "preview": true
+    },
+    "chevron-faceplate-4w-0-5h": {
+      "preview": true
+    },
+    "chevron-faceplate-1w-1h": {
+      "preview": true
+    },
+    "chevron-faceplate-2w-1h": {
+      "preview": true
+    },
+    "chevron-faceplate-3w-1h": {
+      "preview": true
+    },
+    "chevron-faceplate-4w-1h": {
+      "preview": true
+    },
+    "chevron-faceplate-1w-1-5h": {
+      "preview": true
+    },
+    "chevron-faceplate-2w-1-5h": {
+      "preview": true
+    },
+    "chevron-faceplate-3w-1-5h": {
+      "preview": true
+    },
+    "chevron-faceplate-4w-1-5h": {
+      "preview": true
+    },
+    "chevron-faceplate-1w-2h": {
+      "preview": true
+    },
+    "chevron-faceplate-2w-2h": {
+      "preview": true
+    },
+    "chevron-faceplate-3w-2h": {
+      "preview": true
+    },
+    "chevron-faceplate-4w-2h": {
+      "preview": true
+    },
+    "chevron-faceplate-1w-3h": {
+      "preview": true
+    },
+    "chevron-faceplate-2w-3h": {
+      "preview": true
+    },
+    "faceplate-back-cover-1w-0-5h": {
+      "preview": true
+    },
+    "faceplate-back-cover-2w-0-5h": {
+      "preview": true
+    },
+    "faceplate-back-cover-3w-0-5h": {
+      "preview": true
+    },
+    "faceplate-back-cover-4w-0-5h": {
+      "preview": true
+    },
+    "faceplate-back-cover-1w-1h": {
+      "preview": true
+    },
+    "faceplate-back-cover-2w-1h": {
+      "preview": true
+    },
+    "faceplate-back-cover-3w-1h": {
+      "preview": true
+    },
+    "faceplate-back-cover-4w-1h": {
+      "preview": true
+    },
+    "faceplate-back-cover-1w-1-5h": {
+      "preview": true
+    },
+    "faceplate-back-cover-2w-1-5h": {
+      "preview": true
+    },
+    "faceplate-back-cover-3w-1-5h": {
+      "preview": true
+    },
+    "faceplate-back-cover-4w-1-5h": {
+      "preview": true
+    },
+    "faceplate-back-cover-1w-2h": {
+      "preview": true
+    },
+    "faceplate-back-cover-2w-2h": {
+      "preview": true
+    },
+    "faceplate-back-cover-3w-2h": {
+      "preview": true
+    },
+    "faceplate-back-cover-4w-2h": {
+      "preview": true
+    },
+    "faceplate-back-cover-1w-3h": {
+      "preview": true
+    },
+    "faceplate-back-cover-2w-3h": {
+      "preview": true
+    },
+    "drawer-stoppers": {
+      "preview": false,
+      "reason": "This hardware part doesn't have a 3D preview yet."
+    },
+    "quicklock-a-v1-11": {
+      "preview": false,
+      "reason": "This hardware part doesn't have a 3D preview yet."
+    },
+    "quicklock-b-bi-directional-optional": {
+      "preview": false,
+      "reason": "This hardware part doesn't have a 3D preview yet."
+    },
+    "magnet-insert-10x2mm": {
+      "preview": false,
+      "reason": "This hardware part doesn't have a 3D preview yet."
+    },
+    "magnet-insert-6x2mm": {
+      "preview": false,
+      "reason": "This hardware part doesn't have a 3D preview yet."
+    },
+    "tpu-foot": {
+      "preview": false,
+      "reason": "This hardware part doesn't have a 3D preview yet."
+    }
+  }
+}

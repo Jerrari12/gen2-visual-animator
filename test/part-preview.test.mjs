@@ -144,6 +144,28 @@ test('catalog output matches the golden snapshot (UPDATE_GOLDEN=1 to refresh)', 
     'a generator change altered a product-page preview — review the diff, then UPDATE_GOLDEN=1 npm test if intended');
 });
 
+test('the deployed support manifest matches the resolver (UPDATE_GOLDEN=1 to refresh)', () => {
+  // viewer/part-preview-support.json is the VIEWER-OWNED capability artifact
+  // the MODULITH site vendors (data/sources/) so its build only offers a 3D
+  // button where a preview actually exists — one authority, no doomed iframes,
+  // and cross-repo drift fails a gate instead of accumulating silently
+  // (2026-08-19 integration review). Deployed with the viewer, so the live
+  // copy is inspectable at /part-preview-support.json. Deliberately carries
+  // NO node names — those are internal, and the site must never learn them.
+  const SUPPORT_PATH = join(root, 'viewer', 'part-preview-support.json');
+  const parts = {};
+  for (const [s, r] of resolved)
+    parts[s] = r.fail ? { preview: false, reason: r.fail.message } : { preview: true };
+  const now = { v: 1, source: 'MODULITH search-index v2608', parts };
+  if (process.env.UPDATE_GOLDEN) {
+    writeFileSync(SUPPORT_PATH, JSON.stringify(now, null, 2) + '\n');
+    return;
+  }
+  assert.ok(existsSync(SUPPORT_PATH), 'support manifest missing — run UPDATE_GOLDEN=1 npm test once');
+  assert.deepEqual(JSON.parse(readFileSync(SUPPORT_PATH, 'utf8')), now,
+    'viewer/part-preview-support.json is stale — UPDATE_GOLDEN=1 npm test, then re-vendor it into the MODULITH site');
+});
+
 test('failure modes are typed correctly', () => {
   assert.equal(resolvePartPreview('garbage-slug').fail.reason, 'unknown-part');
   assert.equal(resolvePartPreview('').fail.reason, 'unknown-part');
