@@ -207,7 +207,7 @@ test('plate view: confirmed print poses only, bare primary, fail-closed elsewher
   // (Rz+90 / Rz−90) — one shared rotation laid R on its snap tab, caught by
   // Joey's live check on the deployed page
   assert.deepEqual(rot('quicklock-a-v1-11'), [0, 0, 90], 'QuickLock L prints flat (thickness off X)');
-  assert.equal(rot('drawer-stoppers'), undefined, 'stoppers print as authored');
+  assert.deepEqual(rot('drawer-stoppers'), [180, 0, 0], 'stoppers flip to their print face (Joey plate check)');
   assert.deepEqual(rot('magnet-insert-10x2mm'), [90, 0, 0], 'clip prints flat (thickness off Z)');
   assert.equal(rot('tpu-foot'), undefined, 'foot prints upright as authored');
   const qlPlate = resolvePartPreview('quicklock-a-v1-11', { plate: true });
@@ -229,6 +229,7 @@ test('plate view: confirmed print poses only, bare primary, fail-closed elsewher
     /-faceplate-/.test(s)
       ? (/^(essential|chevron)-/.test(s) ? [90, 0, 0] : [-90, 0, 0])
       : s === 'quicklock-a-v1-11' ? (node === 'QuickLock-L' ? [0, 0, 90] : [0, 0, -90])
+      : s === 'drawer-stoppers' ? [180, 0, 0]
       : s === 'magnet-insert-10x2mm' ? [90, 0, 0]
       : undefined;
   for (const [s, r] of resolved) {
@@ -273,6 +274,7 @@ test('hardware sets: exact membership, STL-authored layout, footprint law', asyn
     if (key === '0,0,90') return { x: [-hi[1], -lo[1]], z: [lo[2], hi[2]] };  // x' = -y
     if (key === '0,0,-90') return { x: [lo[1], hi[1]], z: [lo[2], hi[2]] };   // x' = +y
     if (key === '90,0,0') return { x: [lo[0], hi[0]], z: [lo[1], hi[1]] };    // z' = +y
+    if (key === '180,0,0') return { x: [lo[0], hi[0]], z: [-hi[2], -lo[2]] }; // z' = -z (face flip)
     assert.fail('unmapped plate rotation ' + key);
   };
   const STL_FOOTPRINT = {

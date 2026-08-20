@@ -1627,7 +1627,12 @@ const HARDWARE_PREVIEW = {
     label: 'Drawer Stoppers (Left + Right)', type: 'Stopper',
     nodes: ['Drawer_Stoppers_L', 'Drawer_Stoppers_R'],
     dx: 25.6, stl: [45.18, 28.0],
-    plateRot: [],           // the GLB already lies flat (4.5mm on Y) — prints as authored
+    // the GLB lies flat (4.5mm on Y) but on the WRONG face — Joey's plate
+    // check: flip 180° to print flat. A COMMON flip for both hands (same
+    // authored orientation, same correction — unlike the QuickLock ±90
+    // chirality case); footprint and spacing are untouched (x stays, z
+    // mirrors about center).
+    plateRot: [180, 0, 0],
   },
   'magnet-insert-10x2mm': {
     label: 'Magnet Clip (10×2mm)', type: 'MagnetClip',
