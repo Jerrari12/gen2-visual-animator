@@ -188,6 +188,9 @@
       <button id="embed-begin" title="Step-by-step assembly for this exact build">&#9654; Begin the instructions</button>
       <div id="embed-hint"><span>🖱 Drag to orbit &middot; scroll to zoom &middot; tap parts to color them</span></div>
 
+      <!-- ?part=&mode=preview only: restore the framed view + idle spin after the user orbits -->
+      <button id="part-reset" class="hidden" type="button" title="Reset the view">&#10226; Reset view</button>
+
       <div id="loading-overlay"><div class="spinner"></div><div id="loading-text">Loading parts…</div></div>
       <!-- Live-sync guard: while the planner reports an instructions-blocked
            layout (floating case, non-flat top, …) the scene pauses under this

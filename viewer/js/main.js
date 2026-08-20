@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
-import { generateManifest, migrateOfficialBuild } from './generate.js';
+import { generateManifest, migrateOfficialBuild, resolvePartPreview } from './generate.js';
 
 const KIT = new URLSearchParams(location.search).get('kit') || 'tabletop-185';
 const KIT_URL = `kits/${KIT}/`;
@@ -18,6 +18,28 @@ const BUILD_HASH = (location.hash || '').match(/build=([^&]+)/);
 // location.search, so the mount/length-change self-reload keeps it.
 const IS_EMBED = new URLSearchParams(location.search).has('embed') && !!BUILD_HASH;
 document.body.classList.toggle('embed', IS_EMBED);
+// ?part=<slug>&mode=preview — the MODULITH product-page embed (2026-08-19): a
+// TRANSPARENT iframe showing one part, poster-fast, slow idle spin until
+// interaction, orbit/zoom/reset and nothing else. The slug is the SITE'S frozen
+// /parts/ id — resolution to node names is viewer-owned (resolvePartPreview in
+// generate.js). Protocol v1 to the embedding parent, matching the house
+// {gen2:...} relay shape: partReady after the first real rendered frame,
+// partError on any failure (the site keeps its static poster either way —
+// "fail loud, never blank"). `rid` is an optional correlation token the site
+// puts in the URL and gets echoed on every message, so a rapid A→B→A size
+// switch can't act on a stale iframe's message. Incoming messages are ignored
+// in this mode; the parent contract (validate origin+source+part+rid, timeout,
+// poster crossfade) lives in the MODULITH repo's integration handoff.
+const PART_SLUG = new URLSearchParams(location.search).get('part');
+const IS_PART = new URLSearchParams(location.search).get('mode') === 'preview' && !!PART_SLUG;
+const PART_RID = new URLSearchParams(location.search).get('rid') || '';
+document.body.classList.toggle('part-preview', IS_PART);
+function postToEmbedder(msg) {
+  if (!IS_PART || window.parent === window) return;
+  try {
+    window.parent.postMessage({ ...msg, part: PART_SLUG, ...(PART_RID ? { rid: PART_RID } : {}), v: 1 }, '*');
+  } catch (e) { /* parent gone — nothing to tell */ }
+}
 // ?build=<id> — a named OFFICIAL kit. The build data lives in a COMMITTED file
 // (builds/<id>.json), not in the URL — that's what makes printed links
 // (Printables descriptions, QR codes) permanent: short, un-manglable, and
@@ -136,10 +158,23 @@ try {
   renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
 } catch (e) {
   track('error:webgl');
+  postToEmbedder({ gen2: 'partError', reason: 'webgl', message: 'WebGL unavailable' });
   bootFail('<strong>This browser can’t show 3D</strong><br><br>The Build Studio needs WebGL. Try a different browser, or turn on hardware acceleration in your browser’s settings.',
     'WebGL unavailable: ' + e.message);
 }
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+// runtime context loss (GPU reset, tab pressure) — the constructor catch above
+// can't see it. Only the embed cares: the site restores its poster on partError.
+// Failure is TERMINAL for the ready handshake: three's render() returns without
+// drawing while the context is lost, so without the flag the loop would post a
+// false partReady right after this error (review catch, 2026-08-19).
+canvas.addEventListener('webglcontextlost', () => {
+  // partView is declared later in the module, but events can't dispatch during
+  // module eval, so this callback never sees the TDZ (and a typeof "guard"
+  // would THROW there, not protect — the documented let/const trap)
+  partView.failed = true;
+  postToEmbedder({ gen2: 'partError', reason: 'webgl', message: 'WebGL context lost' });
+});
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0xeef0f3);
 
@@ -222,11 +257,20 @@ try {
 } catch (e) { /* private mode */ }
 let stageTheme = 'dark';
 try { if (localStorage.getItem('gen2-theme') === 'light') stageTheme = 'light'; } catch (e) { /* private mode */ }
+// part-preview iframes always run the LIGHT stage machinery, whatever the
+// stored theme: the stage itself is invisible (transparent background, no
+// furniture), but 'dark' would substitute DARK_STAGE_PALETTE's light Case
+// color into the product palette and turn the light-stage-only shadow gates on.
+if (IS_PART) stageTheme = 'light';
 function applyStageTheme(name) {
   stageTheme = STAGE_THEMES[name] ? name : 'light';
   const t = STAGE_THEMES[stageTheme];
   const wallish = typeof manifest !== 'undefined' && manifest && manifest.mount === 'wall';
-  scene.background.set(wallish ? t.bgWall : t.bg);
+  // part-preview: the iframe is TRANSPARENT — the embedding page's panel is the
+  // background. Applied here (not at module eval): `party` clones the boot
+  // Color at init, and this runs first inside mountManifest, safely after that.
+  if (IS_PART) scene.background = null;
+  else scene.background.set(wallish ? t.bgWall : t.bg);
   table.material.color.set(t.table);
   wall.material.color.set(t.wall);
   surface.material.color.set(t.surface);
@@ -235,7 +279,7 @@ function applyStageTheme(name) {
   grid.material.needsUpdate = true;
   // the outro cinema restores "day" from these clones — keep them honest so
   // leaving the outro lands back on the CURRENT stage, not the boot one
-  if (typeof party !== 'undefined') { party.bgDay.set(scene.background); party.tableDay.set(t.table); }
+  if (typeof party !== 'undefined' && scene.background) { party.bgDay.set(scene.background); party.tableDay.set(t.table); }
   // dim callouts + drawer interior dims rebuild often, but retint any that
   // are alive right now so a theme flip never strands gray-on-navy lines
   for (const g of [typeof dims !== 'undefined' && dims.group, typeof dFocus !== 'undefined' && dFocus.group]) {
@@ -385,7 +429,8 @@ function setQuality(name, { user = false } = {}) {
 // reaches the per-light loop and you get a valid-looking 1024² map that is never
 // sampled.
 function shadowsWanted() {
-  return QUALITY[quality].shadow && stageTheme === 'light' && !cinema.on && !isWallBuild && !isUnderTableBuild;
+  // part-preview floats the part on a transparent stage — no floor, no catcher
+  return QUALITY[quality].shadow && stageTheme === 'light' && !cinema.on && !isWallBuild && !isUnderTableBuild && !IS_PART;
 }
 function applyShadowQuality() {
   const on = shadowsWanted();
@@ -433,6 +478,7 @@ function fitShadowCamera() {
 const refl = { rt: null, mesh: null, cam: null, tex: new THREE.Matrix4(), key: '' };
 function reflectionWanted() {
   if (fxDead.reflection || !QUALITY[quality].reflect) return false;
+  if (IS_PART) return false; // no floor to reflect in on the preview's clean float
   // Both hanging mounts are excluded for the same reason: there is no floor
   // beneath the build to reflect in. A wall build hangs on a backdrop, and an
   // under-table build hangs BELOW its slab — a mirror plane at the build's
@@ -571,7 +617,11 @@ const ao = { rtN: null, rtAO: null, normalMat: null, aoMat: null, compMat: null,
 // That showed up on a real device as a shadow floating behind every moving piece
 // (Joey 2026-08-10, worst on the light stage). Parts in motion get no AO at all;
 // it comes back on settle, which also drops the cost during the busiest frames.
-function aoWanted() { return QUALITY[quality].ao && !cinema.on && !fxDead.ao && !tweens.size; }
+// !IS_PART: the AO composite is a blurred black-alpha quad — on the preview's
+// TRANSPARENT background its half-res bleed draws a dark halo just outside the
+// part's silhouette, over the embedding page's panel (2026-08-19 design
+// review). And the idle turntable would invalidate it every frame anyway.
+function aoWanted() { return QUALITY[quality].ao && !cinema.on && !fxDead.ao && !tweens.size && !IS_PART; }
 function aoKernel(n) {              // deterministic hemisphere kernel (golden angle)
   const k = [];
   for (let i = 0; i < n; i++) {
@@ -844,6 +894,10 @@ function qualityTick(now) {
 
 function resize() {
   const w = canvas.clientWidth, h = canvas.clientHeight;
+  // a zero-area canvas (display:none iframe whose rAF still ticks) must never
+  // reach setSize/aspect — 0/0 writes a NaN projection and a 0×0 buffer that
+  // "renders" successfully showing nothing (the partReady gate also refuses it)
+  if (!w || !h) return;
   // ⚠ canvas.width is the DRAWING BUFFER size (device px); clientWidth is the CSS
   // layout size. setPixelRatio(2) makes the buffer twice the CSS width, so
   // comparing them DIRECTLY was never equal on a HiDPI display and this whole body
@@ -865,6 +919,9 @@ function resize() {
       const { pos, target } = camPos(curCamPreset);
       camera.position.copy(pos); controls.target.copy(target); controls.update();
     }
+    // part-preview: the iframe resizes with the site's media column — keep the
+    // part fitted until the user has taken the camera over
+    if (IS_PART && manifest && !partView.interacted) fitPartCamera();
   }
 }
 // Mobile: the step-note panel overlays the top of the canvas (long wall notes
@@ -972,7 +1029,29 @@ function bootFail(html, log) {
   document.getElementById('loading-text').innerHTML = html;
   throw new Error(log);
 }
-if (BUILD_HASH) {
+if (IS_PART) {
+  // product-preview embed: the slug resolves through the REAL generator
+  // (resolvePartPreview) into a one-part manifest the normal mount consumes.
+  // Every failure posts partError to the embedding page FIRST — the site keeps
+  // its static poster ("fail loud, never blank") — then halts with a readable
+  // message for anyone looking at the iframe directly.
+  let res;
+  try {
+    res = resolvePartPreview(PART_SLUG);
+  } catch (e) {
+    // a resolver THROW is our bug, not a bad slug — the site still needs a
+    // typed message so its poster stays up
+    res = { fail: { reason: 'load-failed', message: 'preview resolver crashed: ' + ((e && e.message) || e) } };
+  }
+  if (res.fail) {
+    postToEmbedder({ gen2: 'partError', reason: res.fail.reason, message: res.fail.message });
+    track('error:part-' + (res.fail.reason === 'unknown-part' ? 'unknown' : 'unsupported'));
+    bootFail('<strong>No 3D preview for this part</strong><br><br>• ' + res.fail.message,
+      'part preview "' + PART_SLUG + '": ' + res.fail.message);
+  }
+  manifest = res.manifest;
+  PARTS_BASE = 'parts/' + (manifest.collection || '185') + '/';
+} else if (BUILD_HASH) {
   // The message is the same either way, but the EVENT distinguishes three very
   // different problems: a mangled/truncated hash (the link), a build the
   // generator knowingly refuses (a capability gap), and a generator that threw
@@ -1039,7 +1118,11 @@ if (BUILD_HASH) {
 // Funnel entry — which door they came in by, and what they're building. The
 // official id is safe to name here: an unmatched one threw above, so only
 // committed kit slugs reach this line (~20 values, not a long tail).
-track(OFFICIAL_ID ? 'open:' + OFFICIAL_ID
+// part previews report ONE row (`open:part`), never the slug: the site's own
+// analytics already record which part page was visited, and 458 slug rows
+// would bury the dashboard's funnel.
+track(IS_PART ? 'open:part'
+  : OFFICIAL_ID ? 'open:' + OFFICIAL_ID
   : BUILD_HASH ? (IS_EMBED ? 'open:embed' : 'open:planner-link')
   : 'open:kit-' + KIT);
 track('collection:' + (manifest.collection || '185'));
@@ -1068,6 +1151,17 @@ if (isUnderTableBuild) {
   grid.visible = false;
   surface.visible = true;
   controls.maxPolarAngle = Math.PI * 0.85;      // the whole build is viewed from a 3/4-below angle
+}
+// part-preview: a clean float — no furniture, and the DOCUMENT itself goes
+// transparent so the iframe shows the embedding page's panel color (the
+// renderer already runs alpha:true for ?shot=1; applyStageTheme nulls
+// scene.background in this mode). Full orbit: there's no table to dip under.
+if (IS_PART) {
+  table.visible = false;
+  grid.visible = false;
+  controls.maxPolarAngle = Math.PI * 0.9;
+  document.documentElement.style.background = 'transparent';
+  document.body.style.background = 'transparent';
 }
 
 const loader = new GLTFLoader();
@@ -2509,6 +2603,7 @@ document.addEventListener('pointerdown', () => { if (tapHintShown) dismissTapHin
 // for every pointer/wheel interaction on the canvas)
 controls.addEventListener('start', dismissTapHint);
 addEventListener('keydown', e => {
+  if (IS_PART) return; // the preview has no pages — arrows must not walk into the step machinery
   if (e.key === 'ArrowRight') goTo(cur + 1);
   if (e.key === 'ArrowLeft') goTo(cur - 1, { animate: false });
 });
@@ -3363,7 +3458,9 @@ let customColors = {}, useCustom = false; // customColors: type -> {name, hex, u
 // hours of picking. A "★ My palette" chip (renderPresets) restores it.
 let userPalette = {};
 let colorsT = 0; // stamp of the last palette save — newest-wins when the planner relays palettes between viewer contexts
-try {
+// part-preview never reads OR writes saved palettes: its manifest carries the
+// product palette, and a user's studio picks must not leak into catalog cards
+if (!IS_PART) try {
   const saved = JSON.parse(localStorage.getItem(COLOR_STORE_KEY) || 'null');
   if (saved) {
     customColors = saved.colors || {};
@@ -4945,6 +5042,10 @@ async function applyRemoteLayout(nb) {
   } finally { applyingRemote = false; }
 }
 addEventListener('message', async (e) => {
+  // part-preview accepts NO incoming messages (v1 protocol is outbound-only) —
+  // explicit, not just the !build guard below: this mode lives inside a page we
+  // don't control, and the planner relay handlers must be unreachable from it
+  if (IS_PART) return;
   const d = e.data;
   if (!d || !build) return;
   if (d.gen2 === 'layoutBlocked' && typeof d.reason === 'string') { showBlocked(d.reason); return; }
@@ -5067,6 +5168,69 @@ async function regenerate() {
   syncBuildToPlanner(); // keep the opener planner tab in step (no-op if opened cold)
 }
 
+// ---------- part-preview mode (?part=&mode=preview) ----------
+// Camera: per-TYPE angle table — flat front-facing parts near-frontal, boxes a
+// classic 3/4, horizontal tiles (covers/rails) more top-down so the working
+// face reads. Distance is aspect-aware off the part's real bounding sphere, so
+// the site's square 300px column and a full-width phone both fill correctly.
+const PART_CAM = {
+  Faceplate: { t: 24, p: 72 }, BackCover: { t: 24, p: 72 },
+  CoverL: { t: 30, p: 52 }, CoverU: { t: 30, p: 52 },
+  FootrailL: { t: 30, p: 52 }, FootrailU: { t: 30, p: 52 }, Rail: { t: 30, p: 52 },
+};
+// lifecycle: loading → ready (posted) | failed — failed is a SINK: once set,
+// partReady can never post (context loss / mount failure must leave the site
+// on its poster, not hand it a blank canvas)
+const partView = { interacted: false, pose: null, visible: true, posted: false, failed: false };
+function fitPartCamera() {
+  const a = PART_CAM[manifest.parts[0]?.type] || { t: 33, p: 66 }; // default: 3/4 box
+  camera.fov = 38;
+  camera.updateProjectionMatrix();
+  const { pos, target } = camPos({ t: a.t, p: a.p, fitR: buildRadius * 1.12, fov: 38, target: buildCenter.toArray() });
+  camera.position.copy(pos);
+  controls.target.copy(target);
+  controls.minDistance = buildRadius * 0.9;      // don't fly inside the part
+  controls.maxDistance = camera.position.distanceTo(target) * 4;
+  controls.update();
+  partView.pose = { pos: camera.position.clone(), target: controls.target.clone() };
+}
+function startPartIdle() {
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  controls.autoRotate = !still;                  // slow turntable until first touch
+  controls.autoRotateSpeed = 0.9;
+  controls.addEventListener('start', () => {     // any orbit/zoom = the user takes over
+    if (!partView.interacted) {
+      partView.interacted = true;
+      controls.autoRotate = false;
+      $('part-reset').classList.remove('hidden');
+    }
+  });
+  $('part-reset').onclick = () => {
+    // zero OrbitControls' residual damping velocity BEFORE restoring the pose —
+    // a fling + instant reset otherwise carries leftover sphericalDelta that
+    // yanks the camera off the restored framing on the next frames. One
+    // NON-damped update() consumes and explicitly ZEROES the deltas (vendored
+    // OrbitControls, the non-damping branch) — exact, unlike an iterative
+    // drain. It may move the camera wildly, but the pose copy below lands
+    // before anything renders (all synchronous).
+    controls.autoRotate = false;
+    controls.enableDamping = false;
+    controls.update();
+    controls.enableDamping = true;
+    camera.position.copy(partView.pose.pos);
+    controls.target.copy(partView.pose.target);
+    controls.update();
+    partView.interacted = false;
+    controls.autoRotate = !still;
+    $('part-reset').classList.add('hidden');
+  };
+  // offscreen product cards must cost nothing: the render loop skips entirely
+  // while the iframe is scrolled out (browsers throttle offscreen-iframe rAF
+  // inconsistently — this makes it deterministic)
+  if ('IntersectionObserver' in window)
+    new IntersectionObserver(es => { partView.visible = es.some(x => x.isIntersecting); }, { threshold: 0.01 }).observe(canvas);
+}
+
 // ---------- boot ----------
 const X_URL = 'https://x.com/jerrari3D';
 if (X_URL) { const a = $('outro-x'); a.href = X_URL; a.classList.remove('hidden'); }
@@ -5093,14 +5257,25 @@ try {
   await mountManifest(manifest);
 } catch (e) {
   // a mount failure here is almost always a missing GLB (loadTemplates names
-  // them) — without this catch the spinner spins forever with no message
+  // them) — without this catch the spinner spins forever with no message.
+  // The part-preview embed learns of it as a TYPED load-failed (its poster
+  // stays); bootFail's throw halts the module either way.
+  partView.failed = true;
+  postToEmbedder({ gen2: 'partError', reason: 'load-failed', message: (e && e.message) || String(e) });
   bootFail('<strong>Can’t load this build</strong><br><br>• ' + ((e && e.message) || e) +
     '<br><br>Please report it - this is a library gap on our side, not your build.',
     'mount failed: ' + ((e && e.message) || e));
 }
 applyPalette(); // restore any saved filament colors
 $('loading-overlay').remove();
-if (IS_EMBED && build) {
+if (IS_PART) {
+  // product-preview: no pages, no goTo — snap the part in and frame it. cur
+  // stays 0 (the cover page), which keeps tap-identify inert for free (the
+  // pointerup handler early-returns on cover/outro pages).
+  applyState(0);
+  fitPartCamera();
+  startPartIdle();
+} else if (IS_EMBED && build) {
   // docked split view: land on the live PREVIEW (finished build, dims on,
   // parts panel minimized to its tab) instead of the box-art cover
   goTo(PAGES.length - 2, { animate: false });
@@ -5204,6 +5379,9 @@ if (IS_EMBED && build) setTimeout(() => {
 }, 2000);
 
 renderer.setAnimationLoop(now => {
+  // offscreen part-preview cards stop rendering entirely (only after the ready
+  // frame was posted — the site must never wait on a suspended first frame)
+  if (IS_PART && partView.posted && !partView.visible) return;
   resize();
   qualityTick(now);
   stepTweens(now);
@@ -5230,6 +5408,22 @@ renderer.setAnimationLoop(now => {
   guardFx('ao', updateAO);
   renderer.render(scene, camera);
   guardFx('ao', compositeAO);   // laid over the finished frame; no composer in the path
+  // partReady only after a REAL rendered frame exists — posted from inside the
+  // loop, not after mount, so the site never drops its poster onto a blank
+  // canvas (the parent contract adds a short crossfade on top: render
+  // submitted is not render composited)
+  if (IS_PART && !partView.posted && !partView.failed &&
+      canvas.clientWidth > 0 && canvas.clientHeight > 0 &&
+      canvas.width > 0 && canvas.height > 0 &&
+      !renderer.getContext().isContextLost() &&
+      renderer.info.render.calls > 0) {
+    // ready only from a PROVEN frame: nonzero layout AND buffer (a display:none
+    // iframe can tick rAF with a 0×0 canvas — render "succeeds" showing
+    // nothing), a live context (render() returns without drawing while lost),
+    // and actual draw calls this frame. failed is terminal — see partView.
+    partView.posted = true;
+    postToEmbedder({ gen2: 'partReady' });
+  }
 });
 
 // dev-only hook (mirrors the planner's guarded test-hook convention): ?debug=1
@@ -5243,5 +5437,8 @@ if (new URLSearchParams(location.search).get('debug')) {
     ao, updateAO, compositeAO, aoWanted, refl, updateReflection, studioEnv,
     fxDead, perf, get tweenCount() { return tweens.size; },
     get build() { return build; }, regenerate, setSelected, get selectedId() { return selectedId; },
+    // part-preview internals (2026-08-19) — the mode flag, the view state and
+    // the resolver, so an embed question is answerable by reading state
+    IS_PART, partView, resolvePartPreview, fitPartCamera,
     trackLog, track };
 }

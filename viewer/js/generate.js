@@ -1549,3 +1549,155 @@ const FIT = 1.18; // whole-build framing margin
 function camUp(tx, ty, totalW, gridBottom) {
   return { ...cam(tx, ty, totalW, gridBottom), p: 116, target: [tx, ty + 15, 0] };
 }
+
+// ---- ?part= product-preview resolver (2026-08-19) ---------------------------
+// The MODULITH site embeds this viewer per part page (?part=<slug>&mode=preview,
+// iframe). The URL carries the SITE'S frozen /parts/ slug — never a GLB node
+// name (node names have a rename history; the slugs are frozen by the site's
+// URL-permanence law). Resolution is viewer-owned and derived from the REAL
+// generator: each slug maps to a minimal PROBE build, generateManifest runs on
+// it, and the part is picked out of the resulting BOM by TYPE — so node names,
+// labels, links, renders and validation all flow from the same code that mints
+// them for instructions, and can never drift from it. The full catalog output
+// is pinned by test/golden/part-previews.json (the official-kits durability
+// mechanism): a generator change that alters any preview fails npm test as a
+// reviewable diff, never ships silently.
+//
+// Fail-closed rules (2026-08-19 design review): a lookup must land on EXACTLY
+// one BOM row or it fails; assembly context (pos/stage/rides/yaw) is stripped —
+// the preview shows the part's canonical GLB pose at the origin, because an
+// installation transform is not a product pose. Unsupported-on-purpose: case
+// extenders (no GLBs exist) and the 6 hardware slugs (pair-vs-single product
+// composition needs Joey's call — 'unsupported' keeps the site on its poster).
+const H_FROM_SLUG = { '0-5': 1, '1': 2, '1-5': 3, '2': 4, '3': 6 }; // site h token → planner hh
+// Collection colors for collection-scoped parts — the site's poster renders are
+// tinted per collection (planner lineup palette; siblings: main.js
+// SHOT_LEN_COLORS, planner data.js GEN2.lengths), and the poster→3D swap must
+// not change the part's color family.
+const PREVIEW_LEN_COLORS = { 59: '#f2f2f2', 115: '#9ea3a8', 165: '#3aa0e8', 185: '#ff8a40', 240: '#3ecfa0', 270: '#e8453c' };
+function previewColors(L) {
+  const lc = PREVIEW_LEN_COLORS[parseInt(L, 10)] || '#ff8a40';
+  return {
+    ...COLORS,
+    // collection-scoped families wear the collection color, like their posters
+    Case: lc, Drawer: lc, CoverL: lc, CoverU: lc, FootrailL: lc, FootrailU: lc, Rail: lc,
+    // universal parts wear their poster-render hues (faceplates: dark
+    // navy-charcoal body + the render palette's orange grip/face + silver rod)
+    Faceplate: '#31333f',
+    'Faceplate:GRIP': '#ff6f1b', 'Faceplate:FACE': '#ff6f1b', 'Faceplate:GRIP ACCENT': '#8d939e',
+    BackCover: '#c25c28', Label: '#eef0f4',
+  };
+}
+// slug → { build: <probe planner-build>, pick: {type, suffix?} } | { fail }
+function previewProbe(slug) {
+  const s = String(slug || '').toLowerCase();
+  const un = (message) => ({ fail: { reason: 'unsupported', message } });
+  const unit = (w, hh, fill) => ({ id: 'u1', x: 0, y: 0, w, hh, fill });
+  // single-unit probe. Mount is WALL on purpose: it serves all six collections
+  // with one code path (the 59 forbids tabletop — noTabletop), and wall builds
+  // emit cases, drawers, faceplates, back covers AND per-top-case covers alike.
+  const one = (L, w, hh, fill = 'decor', extra = {}) =>
+    ({ mount: 'wall', length: L, gridH: hh / 2, placed: [unit(w, hh, fill)], ...extra });
+  let m;
+  const H = '(0-5|1|1-5|2|3)';
+  // recognized-but-unsupported families first (the site falls back to its poster)
+  if (/^\d+-case-extender-\d+w-1h$/.test(s))
+    return un("Case extenders aren't in the 3D part library yet.");
+  if (/^(drawer-stoppers|tpu-foot|magnet-insert-(6|10)x2mm|quicklock-a-v1-11|quicklock-b-bi-directional-optional)$/.test(s))
+    return un("This hardware part doesn't have a 3D preview yet.");
+  if ((m = s.match(new RegExp(`^(\\d+)-case-([1-4])w-${H}h$`))))
+    return { build: one(+m[1], +m[2], H_FROM_SLUG[m[3]]), pick: { type: 'Case' } };
+  if ((m = s.match(new RegExp(`^(\\d+)-(classic|decor)-drawer-([1-4])w-${H}h$`))))
+    return { build: one(+m[1], +m[3], H_FROM_SLUG[m[4]], m[2]), pick: { type: 'Drawer' } };
+  if ((m = s.match(/^(\d+)-cover-(lower|upper)-([12])w$/)))
+    return { build: one(+m[1], +m[3], 2), pick: { type: m[2] === 'lower' ? 'CoverL' : 'CoverU' } };
+  if ((m = s.match(/^(\d+)-foot-rail-(lower|upper)-([12])w$/))) {
+    // foot rails only exist on a TABLETOP frame, and a single-unit build takes
+    // feet in the case instead (caseFeet) — so the probe is a bottom ROW: two
+    // 1W cases tile [2W] on both layers; three tile [2W,1W]/[1W,2W], which is
+    // the only shape that yields a 1W rail. The pick disambiguates by the
+    // library's universal -<w>W size suffix.
+    const w = +m[3], n = w === 2 ? 2 : 3;
+    const placed = Array.from({ length: n }, (_, i) => ({ id: 'u' + (i + 1), x: i, y: 0, w: 1, hh: 2, fill: 'decor' }));
+    return { build: { mount: 'tabletop', length: +m[1], gridH: 1, placed },
+             pick: { type: m[2] === 'lower' ? 'FootrailL' : 'FootrailU', suffix: `-${w}W` } };
+  }
+  if ((m = s.match(/^(\d+)-under-table-rail-([1-4])w$/))) {
+    // a ROW of 1W cases, not one w-wide case: rails tile biggest-first over the
+    // top run (a w-wide run → exactly one <w>W rail), and the 59 collection
+    // sells 3W/4W rails while its cases stop at 2W — the production slug sweep
+    // caught a single-case probe failing exactly there.
+    const w = +m[2];
+    const placed = Array.from({ length: w }, (_, i) => ({ id: 'u' + (i + 1), x: i, y: 0, w: 1, hh: 2, fill: 'decor' }));
+    return { build: { mount: 'under-table', length: +m[1], gridH: 1, placed }, pick: { type: 'Rail' } };
+  }
+  // universal families (no length prefix on the site): probe on the calibrated 185
+  if ((m = s.match(new RegExp(`^(essential|classic|classicpro|edgelabel|chevron)-faceplate-([1-4])w-${H}h$`))))
+    return { build: one(185, +m[2], H_FROM_SLUG[m[3]], 'decor', { faceStyle: m[1] }), pick: { type: 'Faceplate' } };
+  if ((m = s.match(new RegExp(`^faceplate-back-cover-([1-4])w-${H}h$`))))
+    return { build: one(185, +m[1], H_FROM_SLUG[m[2]], 'decor', { backCover: true }), pick: { type: 'BackCover' } };
+  return { fail: { reason: 'unknown-part', message: "This part id isn't recognized." } };
+}
+export function resolvePartPreview(slug) {
+  const probe = previewProbe(slug);
+  if (probe.fail) return { fail: probe.fail };
+  const gen = generateManifest(probe.build);
+  // the generator is the validator: per-collection size caps, illegal sizes and
+  // library gaps all surface here with their real user-facing messages
+  if (!gen.manifest)
+    return { fail: { reason: 'unsupported', message: gen.errors.join(' · ') } };
+  const rows = gen.manifest.parts.filter(p => p.type === probe.pick.type &&
+    (!probe.pick.suffix || p.node.endsWith(probe.pick.suffix)));
+  // fail CLOSED on anything but exactly one match — never guess which physical
+  // part a permanent product page means
+  if (rows.length !== 1)
+    return { fail: { reason: 'unsupported', message: `Part lookup was ambiguous (${rows.length} matches).` } };
+  const row = rows[0];
+  const primary = gen.manifest.instances.find(i => i.node === row.node);
+  if (!primary)
+    return { fail: { reason: 'unsupported', message: 'Part has no placed instance in the probe build.' } };
+  // Extras families (EdgeLabel / Classic Pro) preview DRESSED — accent panel +
+  // label in their windows — because that is the product as sold (both ship in
+  // the series download) and the site's posters render them dressed; a bare
+  // plate shows an open label window and reads as a regression at the
+  // poster→3D swap. The offsets are PLATE-relative (product geometry, not
+  // installation context), and the accent keeps its generator-minted
+  // corrective rot (the GLB exports upside down).
+  const typeOf = Object.fromEntries(gen.manifest.parts.map(p => [p.node, p.type]));
+  const extras = row.type === 'Faceplate'
+    ? gen.manifest.instances.filter(i => i.rides === primary.rides &&
+        (typeOf[i.node] === 'Accent' || typeOf[i.node] === 'Label'))
+    : [];
+  const L = gen.manifest.collection;
+  return {
+    part: { node: row.node, label: row.label, type: row.type,
+            ...(extras.length ? { extras: extras.map(x => x.node) } : {}) },
+    manifest: {
+      title: row.label,
+      collection: L,
+      generated: true,
+      preview: true,
+      // 'tabletop' regardless of the probe's mount: the preview stage is a clean
+      // float and must not trigger main.js's wall/under-table backdrop machinery
+      mount: 'tabletop',
+      pitch: { x: PITCH_X, y: 56 },
+      colors: previewColors(L),
+      parts: [{ ...row, qty: 1 }, ...extras.map(x => ({ ...gen.manifest.parts.find(p => p.node === x.node), qty: 1 }))],
+      // canonical pose: the primary sits identity at the origin (parts are
+      // bottom-anchored, X/Z-centered). Assembly context — pos, stage, rides,
+      // owner, yaw — is deliberately NOT inherited; every previewable family's
+      // canonical pose is its GLB pose. Extras keep their PLATE-relative
+      // offsets (+ any corrective rot) — that is product geometry.
+      instances: [
+        { id: 'p0', node: row.node, pos: [0, 0, 0] },
+        ...extras.map((x, n) => ({ id: 'p' + (n + 1), node: x.node,
+          pos: [x.pos[0] - primary.pos[0], x.pos[1] - primary.pos[1], x.pos[2] - primary.pos[2]],
+          ...(x.rot ? { rot: x.rot } : {}) })),
+      ],
+      stages: {},
+      steps: [{ title: row.label, note: '', camera: { t: 32, p: 64, r: 600, target: [0, 0, 0] },
+                phases: [{ enter: [{ id: 'p0', from: [0, 0, 0] },
+                                   ...extras.map((x, n) => ({ id: 'p' + (n + 1), from: [0, 0, 0] }))] }] }],
+    },
+  };
+}

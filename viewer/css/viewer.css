@@ -995,3 +995,23 @@ body.stage-dark .outro-card {
   box-shadow: 0 8px 34px rgba(0, 0, 0, 0.5);
 }
 body.stage-dark .outro-links a:hover { color: var(--accent); }
+
+/* ---- ?part=&mode=preview — the MODULITH product-page embed (2026-08-19) ----
+   A transparent one-part iframe: the DOCUMENT background goes transparent (JS
+   sets it inline; scene.background is nulled), the site's media panel shows
+   through, and every piece of instruction chrome is off. The only DOM this
+   mode owns is the loading spinner and the reset pill. */
+body.part-preview #topbar, body.part-preview #controls, body.part-preview #note-panel,
+body.part-preview #checklist-tab, body.part-preview #checklist-panel, body.part-preview #color-toggle,
+body.part-preview #measure-toggle, body.part-preview #measure-label, body.part-preview #identify-card,
+body.part-preview #filament-menu, body.part-preview #cover-overlay, body.part-preview #outro-overlay,
+body.part-preview #cover-bg, body.part-preview #tap-hint, body.part-preview #stage-vignette,
+body.part-preview #embed-hint, body.part-preview #embed-begin { display: none !important; }
+body.part-preview #loading-overlay { background: transparent; }
+#part-reset {
+  position: absolute; right: 10px; bottom: 10px; z-index: 3;
+  padding: 6px 12px; border: 1px solid var(--panel-border); border-radius: 999px;
+  background: var(--panel); color: var(--ink-soft); font-size: 12px; font-weight: 700;
+  cursor: pointer;
+}
+#part-reset:hover { color: var(--ink); border-color: var(--accent); }
