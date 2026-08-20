@@ -1614,6 +1614,14 @@ const HARDWARE_PREVIEW = {
     // Joey's live check caught R resting on its snap tab (2026-08-20). For a
     // mirror image, the corrective rotation mirrors too: Rz(+90) ↔ Rz(−90).
     plateRot: { 'QuickLock-L': [0, 0, 90], 'QuickLock-R': [0, 0, -90] },
+    // the GLBs are BOTTOM-ANCHORED, so a ±90° swing displaces each body's
+    // center by half its 23.3mm width to opposite sides of its anchor —
+    // without this compensation the mirrored poses silently widened the pair
+    // to a ~25mm gap (Joey caught it on the live plate; the file's gap is
+    // 1.81mm). plateCenterOff = the rotated body-center's X offset from the
+    // instance anchor; plate positions subtract it so BODY centers, not
+    // anchors, sit dx apart.
+    plateCenterOff: { 'QuickLock-L': -11.65, 'QuickLock-R': 11.65 },
   },
   'drawer-stoppers': {
     label: 'Drawer Stoppers (Left + Right)', type: 'Stopper',
@@ -1773,7 +1781,9 @@ export function resolvePartPreview(slug, opts = {}) {
         instances: hw.nodes.map((n, i) => {
           // plateRot is one array for the whole job, or per-node for chiral sets
           const r = Array.isArray(platePose) ? platePose : platePose[n];
-          return { id: 'p' + i, node: n, pos: [off[i], 0, 0],
+          // on the plate, anchors shift so rotated BODY centers sit dx apart
+          const x = off[i] - (opts.plate && hw.plateCenterOff ? hw.plateCenterOff[n] || 0 : 0);
+          return { id: 'p' + i, node: n, pos: [x, 0, 0],
             ...(opts.plate && r && r.length ? { rot: r } : {}) };
         }),
         stages: {},

@@ -43,7 +43,7 @@ const xform = (m, [x, y, z]) => [
   m[1] * x + m[5] * y + m[9] * z + m[13],
   m[2] * x + m[6] * y + m[10] * z + m[14],
 ];
-export function worldSpans(file) {
+export function worldExtents(file) {
   const g = glbJson(file);
   const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
   const walk = (ni, parent) => {
@@ -70,5 +70,9 @@ export function worldSpans(file) {
   };
   const I = mat4FromTRS();
   for (const ni of g.scenes[g.scene || 0].nodes) walk(ni, I);
+  return { lo, hi };
+}
+export function worldSpans(file) {
+  const { lo, hi } = worldExtents(file);
   return [hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]].map(v => +v.toFixed(1));
 }

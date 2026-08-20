@@ -242,7 +242,7 @@ test('plate view: confirmed print poses only, bare primary, fail-closed elsewher
 });
 
 test('hardware sets: exact membership, STL-authored layout, footprint law', async () => {
-  const { worldSpans } = await import('./lib/glb-spans.mjs');
+  const { worldExtents } = await import('./lib/glb-spans.mjs');
   // membership is exact and by node, never row order
   assert.deepEqual(resolved.get('quicklock-a-v1-11').part.set, ['QuickLock-L', 'QuickLock-R']);
   assert.deepEqual(resolved.get('drawer-stoppers').part.set, ['Drawer_Stoppers_L', 'Drawer_Stoppers_R']);
@@ -256,39 +256,44 @@ test('hardware sets: exact membership, STL-authored layout, footprint law', asyn
     assert.equal(resolved.get(s).fail.reason, 'unsupported');
     assert.match(resolved.get(s).fail.message, /3D model/);
   }
-  // THE FOOTPRINT LAW: the plate arrangement must reproduce the real STL's
-  // combined print footprint (the site's fit verdict judges that file), so
-  // baked pose + spacing applied to the measured GLB spans must land on the
-  // STL ground truth within 0.5mm. STL numbers measured 2026-08-20 from the
-  // v2608 files (per-body bboxes; see HARDWARE_PREVIEW in generate.js).
-  const spanAfter = (spans, rotKey) => {
-    // axis permutation for the exact rotations HARDWARE_PREVIEW uses — a new
-    // pose must extend this map consciously. ±90 about one axis permute spans
-    // identically; the SIGN picks which face is down (chirality, eye-checked)
-    if (rotKey === '') return [spans[0], spans[2]];          // as authored: X, Z
-    if (rotKey === '0,0,90' || rotKey === '0,0,-90') return [spans[1], spans[2]]; // Z-yaw: Y→X, Z stays
-    if (rotKey === '90,0,0') return [spans[0], spans[1]];    // X-roll: Y→Z, X stays
-    assert.fail('unmapped plate rotation ' + rotKey);
+  // THE FOOTPRINT LAW, judged on the RESOLVED OUTCOME: rotate each body's
+  // MEASURED extents through its resolver-assigned pose, place it at its
+  // resolver-assigned position, and assert the union footprint equals the
+  // STL's within 0.5mm. The first version of this law did arithmetic on the
+  // baked constants and stayed green while the chirality fix silently
+  // widened the pair to a ~25mm gap (bottom-anchored GLBs: a ±90° swing
+  // displaces the body center by half its width) - Joey caught it on the
+  // live plate. Outcomes, not intentions.
+  const rotExtents = ({ lo, hi }, rot) => {
+    // exact extent mapping for the rotations HARDWARE_PREVIEW uses - a new
+    // pose must extend this consciously. Signs matter: they are what caught
+    // the anchor-displacement bug.
+    const key = (rot || []).join();
+    if (key === '') return { x: [lo[0], hi[0]], z: [lo[2], hi[2]] };
+    if (key === '0,0,90') return { x: [-hi[1], -lo[1]], z: [lo[2], hi[2]] };  // x' = -y
+    if (key === '0,0,-90') return { x: [lo[1], hi[1]], z: [lo[2], hi[2]] };   // x' = +y
+    if (key === '90,0,0') return { x: [lo[0], hi[0]], z: [lo[1], hi[1]] };    // z' = +y
+    assert.fail('unmapped plate rotation ' + key);
   };
-  const CASES = [
-    { slug: 'quicklock-a-v1-11', node: 'QuickLock-L', rot: '0,0,90', dx: 25.11, stl: [48.41, 18.42] },
-    { slug: 'quicklock-a-v1-11', node: 'QuickLock-R', rot: '0,0,-90', dx: 25.11, stl: [48.41, 18.42] },
-    { slug: 'drawer-stoppers', node: 'Drawer_Stoppers_L', rot: '', dx: 25.6, stl: [45.18, 28.0] },
-    { slug: 'drawer-stoppers', node: 'Drawer_Stoppers_R', rot: '', dx: 25.6, stl: [45.18, 28.0] },
-    { slug: 'magnet-insert-10x2mm', node: 'MagnetClip_10x2mm', rot: '90,0,0', dx: 0, stl: [19.82, 20.0] },
-    { slug: 'tpu-foot', node: 'Tabletop-Kit-Foot', rot: '', dx: 0, stl: [20.6, 20.6] },
-  ];
-  for (const c of CASES) {
-    const spans = worldSpans(join(root, 'viewer', 'parts', '185', c.node + '.lib.glb'));
-    const [w, d] = spanAfter(spans, c.rot);
-    assert.ok(Math.abs(w + c.dx - c.stl[0]) <= 0.5,
-      `${c.slug}: posed width ${w} + dx ${c.dx} must match the STL footprint ${c.stl[0]}`);
-    assert.ok(Math.abs(d - c.stl[1]) <= 0.5,
-      `${c.slug}: posed depth ${d} must match the STL footprint ${c.stl[1]}`);
-    // and the resolver's own constants agree with this table
-    const pb = resolvePartPreview(c.slug, { plate: true });
-    const xs = pb.manifest.instances.map(i => i.pos[0]).sort((a, b) => a - b);
-    if (c.dx) assert.ok(Math.abs(xs[1] - xs[0] - c.dx) < 1e-9, `${c.slug}: instance spacing is the STL's`);
+  const STL_FOOTPRINT = {
+    'quicklock-a-v1-11': [48.41, 18.42],
+    'drawer-stoppers': [45.18, 28.0],
+    'magnet-insert-10x2mm': [19.82, 20.0],
+    'tpu-foot': [20.6, 20.6],
+  };
+  for (const [slug, stl] of Object.entries(STL_FOOTPRINT)) {
+    const pb = resolvePartPreview(slug, { plate: true });
+    let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+    for (const inst of pb.manifest.instances) {
+      const ext = worldExtents(join(root, 'viewer', 'parts', '185', inst.node + '.lib.glb'));
+      const r = rotExtents(ext, inst.rot);
+      x0 = Math.min(x0, inst.pos[0] + r.x[0]); x1 = Math.max(x1, inst.pos[0] + r.x[1]);
+      z0 = Math.min(z0, inst.pos[2] + r.z[0]); z1 = Math.max(z1, inst.pos[2] + r.z[1]);
+    }
+    assert.ok(Math.abs((x1 - x0) - stl[0]) <= 0.5,
+      `${slug}: resolved plate footprint width ${(x1 - x0).toFixed(2)} must match the STL's ${stl[0]}`);
+    assert.ok(Math.abs((z1 - z0) - stl[1]) <= 0.5,
+      `${slug}: resolved plate footprint depth ${(z1 - z0).toFixed(2)} must match the STL's ${stl[1]}`);
   }
 });
 
