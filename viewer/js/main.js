@@ -5236,7 +5236,13 @@ function seatOnPlate() {
   // the honest overhang stays.
   const pre = new THREE.Box3().setFromObject(inst.group);
   const s = pre.getSize(new THREE.Vector3());
-  if (!(s.x <= PART_PLATE.w && s.z <= PART_PLATE.d) && (s.z <= PART_PLATE.w && s.x <= PART_PLATE.d)) {
+  // +0.5mm tolerance: the site's verdict works in integer registry mm, and an
+  // exact edge-to-edge part (the 250-deep classic on a 250 bed) must not flap
+  // on GLB float noise
+  const E = 0.5;
+  const fitsAs = s.x <= PART_PLATE.w + E && s.z <= PART_PLATE.d + E;
+  const fitsRot = s.z <= PART_PLATE.w + E && s.x <= PART_PLATE.d + E;
+  if (!fitsAs && fitsRot) {
     inst.group.rotateOnWorldAxis(new THREE.Vector3(0, 1, 0), Math.PI / 2);
     plateStage.yawed = true; // group.rotation is set once in buildInstances and applyState never touches it
   }
@@ -5295,10 +5301,14 @@ function buildPlateStage() {
 function fitPlateCamera(top) {
   plateStage.top = !!top;
   const R = Math.max(buildRadius, Math.hypot(PART_PLATE.w, PART_PLATE.d) / 2);
-  camera.fov = 38;
+  // the TOP view is near-telephoto: at fov 38 a tall part's raised rim spills
+  // past its flush footprint by parallax, and an exact-fit part reads as
+  // overhanging — fov 14 reads near-orthographic, like a slicer's top view
+  const fov = top ? 14 : 38;
+  camera.fov = fov;
   camera.updateProjectionMatrix();
   const a = top ? { t: 0, p: 3 } : { t: 30, p: 55 };
-  const { pos, target } = camPos({ t: a.t, p: a.p, fitR: R * 1.12, fov: 38,
+  const { pos, target } = camPos({ t: a.t, p: a.p, fitR: R * 1.12, fov,
     target: [0, top ? 0 : Math.min(40, assembledBox.max.y / 3), 0] });
   camera.position.copy(pos);
   controls.target.copy(target);
