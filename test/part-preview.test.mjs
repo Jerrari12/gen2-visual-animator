@@ -38,11 +38,12 @@ const GOLDEN_PATH = join(root, 'test', 'golden', 'part-previews.json');
 const glbExists = (L, node) => existsSync(join(root, 'viewer', 'parts', String(L), node + '.lib.glb'));
 
 // families with no 3D model ON PURPOSE (the site keeps its static poster):
-// case extenders have no GLBs; the six hardware pages await Joey's product-
-// composition call (pair vs single — see the resolver's comment).
+// case extenders have no GLBs, and neither do QuickLock B or the 6x2 magnet
+// insert. The other four hardware pages preview since 2026-08-20 (Joey's
+// composition call: a handed pair is ONE product — see HARDWARE_PREVIEW).
 const expectUnsupported = s =>
   /-case-extender-/.test(s) ||
-  /^(drawer-stoppers|tpu-foot|magnet-insert-(6|10)x2mm|quicklock-a-v1-11|quicklock-b-bi-directional-optional)$/.test(s);
+  /^(magnet-insert-6x2mm|quicklock-b-bi-directional-optional)$/.test(s);
 
 // resolve the whole catalog once — every test reads from this
 const resolved = new Map();
@@ -63,8 +64,8 @@ test('every production slug is accounted for — resolved or intentionally unsup
   }
   assert.deepEqual(unknown, [], 'production slugs the resolver does not recognize (grammar drift)');
   assert.deepEqual(wrongBucket, [], 'slugs in the wrong support bucket');
-  assert.equal(supported, 458, 'supported preview count');
-  assert.equal(unsupported, 30, 'intentionally-unsupported count (24 extenders + 6 hardware)');
+  assert.equal(supported, 462, 'supported preview count');
+  assert.equal(unsupported, 26, 'intentionally-unsupported count (24 extenders + 2 no-GLB hardware)');
 });
 
 test('every resolved preview references GLBs that exist in its collection pool', () => {
@@ -83,20 +84,33 @@ test('preview manifests are canonical: primary at the origin, no assembly contex
   for (const [s, r] of resolved) {
     if (r.fail) continue;
     const m = r.manifest;
-    const nExtras = r.part.extras?.length || 0;
-    if (m.parts.length !== 1 + nExtras || m.parts.some(p => !p || p.qty !== 1)) bad.push(`${s}: parts rows`);
-    if (m.instances.length !== 1 + nExtras) bad.push(`${s}: instance count`);
-    const [prim, ...extras] = m.instances;
-    if (prim.pos.join() !== '0,0,0') bad.push(`${s}: primary pos ${prim.pos}`);
-    // primaries are pure GLB pose; extras keep plate-relative pos and a
-    // corrective rot (the accent's flip) — but NEVER assembly bookkeeping
-    for (const k of ['stage', 'rides', 'owner', 'stopperKey', 'yaw', 'rot'])
-      if (k in prim) bad.push(`${s}: primary carries assembly field "${k}"`);
-    for (const x of extras)
-      for (const k of ['stage', 'rides', 'owner', 'stopperKey', 'yaw'])
-        if (k in x) bad.push(`${s}: extra ${x.node} carries assembly field "${k}"`);
-    // extras only ever dress faceplates, and only the two extras families
-    if (nExtras && (m.parts[0].type !== 'Faceplate')) bad.push(`${s}: extras on a non-faceplate`);
+    if (r.part.set) {
+      // a handed SET: both bodies, symmetric about the origin at the STL's
+      // own spacing, pure GLB pose (no assembly fields, no rot off-plate)
+      if (m.parts.length !== r.part.set.length || m.instances.length !== r.part.set.length) bad.push(`${s}: set row/instance count`);
+      const xs = m.instances.map(i => i.pos[0]);
+      if (Math.abs(xs.reduce((a, b) => a + b, 0)) > 1e-9) bad.push(`${s}: set not centered (${xs})`);
+      if (m.instances.some(i => i.pos[1] !== 0 || i.pos[2] !== 0)) bad.push(`${s}: set body off the ground line`);
+      for (const i of m.instances)
+        for (const k of ['stage', 'rides', 'owner', 'stopperKey', 'yaw', 'rot'])
+          if (k in i) bad.push(`${s}: set body carries "${k}"`);
+    } else {
+      const nExtras = r.part.extras?.length || 0;
+      if (m.parts.length !== 1 + nExtras || m.parts.some(p => !p || p.qty !== 1)) bad.push(`${s}: parts rows`);
+      if (m.instances.length !== 1 + nExtras) bad.push(`${s}: instance count`);
+      const [prim, ...extras] = m.instances;
+      if (prim.pos.join() !== '0,0,0') bad.push(`${s}: primary pos ${prim.pos}`);
+      // primaries are pure GLB pose; extras keep plate-relative pos and a
+      // corrective rot (the accent's flip) — but NEVER assembly bookkeeping
+      for (const k of ['stage', 'rides', 'owner', 'stopperKey', 'yaw', 'rot'])
+        if (k in prim) bad.push(`${s}: primary carries assembly field "${k}"`);
+      for (const x of extras)
+        for (const k of ['stage', 'rides', 'owner', 'stopperKey', 'yaw'])
+          if (k in x) bad.push(`${s}: extra ${x.node} carries assembly field "${k}"`);
+      // extras only ever dress faceplates, and only the two extras families
+      if (nExtras && (m.parts[0].type !== 'Faceplate')) bad.push(`${s}: extras on a non-faceplate`);
+    }
+    if (m.parts.some(p => !p || p.qty !== 1)) bad.push(`${s}: parts qty`);
     if (m.mount !== 'tabletop') bad.push(`${s}: mount ${m.mount}`);
     if (m.parts.some(p => !m.colors[p.type])) bad.push(`${s}: missing palette entry`);
     if (m.steps.length !== 1) bad.push(`${s}: step count`);
@@ -187,25 +201,87 @@ test('plate view: confirmed print poses only, bare primary, fail-closed elsewher
   const p = resolvePartPreview('edgelabel-faceplate-2w-1h', { plate: true });
   assert.equal(p.manifest.instances.length, 1, 'plate view is the primary alone');
   assert.equal(p.manifest.platePose, true);
+  // hardware poses (2026-08-20): the pair prints together and BOTH hands ride
+  // the plate — unlike dressing extras, the second hand IS the same print job
+  assert.deepEqual(rot('quicklock-a-v1-11'), [0, 0, 90], 'QuickLock prints flat (thickness off X)');
+  assert.equal(rot('drawer-stoppers'), undefined, 'stoppers print as authored');
+  assert.deepEqual(rot('magnet-insert-10x2mm'), [90, 0, 0], 'clip prints flat (thickness off Z)');
+  assert.equal(rot('tpu-foot'), undefined, 'foot prints upright as authored');
+  const qlPlate = resolvePartPreview('quicklock-a-v1-11', { plate: true });
+  assert.equal(qlPlate.manifest.instances.length, 2, 'a pair plate shows both hands');
+  assert.ok(qlPlate.manifest.instances.every(i => i.rot?.join() === '0,0,90'), 'both hands wear the print pose');
   // fail closed on anything without a confirmed pose
   for (const s of ['185-cover-lower-2w', '270-foot-rail-upper-1w', '115-under-table-rail-2w', 'faceplate-back-cover-2w-1h'])
     assert.equal(resolvePartPreview(s, { plate: true }).fail.reason, 'unsupported', s + ' must fail closed');
   // plate-capable census: 94 cases + 94 classic + 94 decor + 90 faceplates
+  // + 4 hardware (2026-08-20)
   const n = [...resolved.values()].filter(r => !r.fail && r.part.platePreview).length;
-  assert.equal(n, 372, 'plate-capable slug count');
+  assert.equal(n, 376, 'plate-capable slug count');
 
-  // sweep EVERY plate-capable slug's plate boot (not just samples): exactly
-  // one bare instance, and the rotation matches its family's confirmed pose
+  // sweep EVERY plate-capable slug's plate boot (not just samples): the bare
+  // print JOB (one body, or every member of a handed set), rotations matching
+  // the confirmed pose
   const expectRot = s =>
     /-faceplate-/.test(s)
       ? (/^(essential|chevron)-/.test(s) ? [90, 0, 0] : [-90, 0, 0])
+      : s === 'quicklock-a-v1-11' ? [0, 0, 90]
+      : s === 'magnet-insert-10x2mm' ? [90, 0, 0]
       : undefined;
   for (const [s, r] of resolved) {
     if (r.fail || !r.part.platePreview) continue;
     const pb = resolvePartPreview(s, { plate: true });
     assert.ok(!pb.fail, s + ': plate boot must resolve');
-    assert.equal(pb.manifest.instances.length, 1, s + ': plate boot is one bare instance');
-    assert.deepEqual(pb.manifest.instances[0].rot, expectRot(s), s + ': confirmed pose');
+    assert.equal(pb.manifest.instances.length, (r.part.set || [1]).length, s + ': plate boot is the bare print job');
+    for (const i of pb.manifest.instances)
+      assert.deepEqual(i.rot, expectRot(s), s + ': confirmed pose');
+  }
+});
+
+test('hardware sets: exact membership, STL-authored layout, footprint law', async () => {
+  const { worldSpans } = await import('./lib/glb-spans.mjs');
+  // membership is exact and by node, never row order
+  assert.deepEqual(resolved.get('quicklock-a-v1-11').part.set, ['QuickLock-L', 'QuickLock-R']);
+  assert.deepEqual(resolved.get('drawer-stoppers').part.set, ['Drawer_Stoppers_L', 'Drawer_Stoppers_R']);
+  assert.equal(resolved.get('magnet-insert-10x2mm').part.set, undefined, 'a single clip is not a set');
+  assert.equal(resolved.get('tpu-foot').part.set, undefined);
+  // composite product labels, not one hand's name
+  assert.equal(resolved.get('quicklock-a-v1-11').part.label, 'QuickLock (Left + Right)');
+  assert.equal(resolved.get('drawer-stoppers').part.label, 'Drawer Stoppers (Left + Right)');
+  // the two library gaps stay honestly unsupported
+  for (const s of ['quicklock-b-bi-directional-optional', 'magnet-insert-6x2mm']) {
+    assert.equal(resolved.get(s).fail.reason, 'unsupported');
+    assert.match(resolved.get(s).fail.message, /3D model/);
+  }
+  // THE FOOTPRINT LAW: the plate arrangement must reproduce the real STL's
+  // combined print footprint (the site's fit verdict judges that file), so
+  // baked pose + spacing applied to the measured GLB spans must land on the
+  // STL ground truth within 0.5mm. STL numbers measured 2026-08-20 from the
+  // v2608 files (per-body bboxes; see HARDWARE_PREVIEW in generate.js).
+  const spanAfter = (spans, rotKey) => {
+    // axis permutation for the exact rotations HARDWARE_PREVIEW uses — a new
+    // pose must extend this map consciously
+    if (rotKey === '') return [spans[0], spans[2]];          // as authored: X, Z
+    if (rotKey === '0,0,90') return [spans[1], spans[2]];    // Z-yaw: Y→X, Z stays
+    if (rotKey === '90,0,0') return [spans[0], spans[1]];    // X-roll: Y→Z, X stays
+    assert.fail('unmapped plate rotation ' + rotKey);
+  };
+  const CASES = [
+    { slug: 'quicklock-a-v1-11', node: 'QuickLock-L', rot: '0,0,90', dx: 25.11, stl: [48.41, 18.42] },
+    { slug: 'drawer-stoppers', node: 'Drawer_Stoppers_L', rot: '', dx: 25.6, stl: [45.18, 28.0] },
+    { slug: 'magnet-insert-10x2mm', node: 'MagnetClip_10x2mm', rot: '90,0,0', dx: 0, stl: [19.82, 20.0] },
+    { slug: 'tpu-foot', node: 'Tabletop-Kit-Foot', rot: '', dx: 0, stl: [20.6, 20.6] },
+  ];
+  for (const c of CASES) {
+    const spans = worldSpans(join(root, 'viewer', 'parts', '185', c.node + '.lib.glb'));
+    const [w, d] = spanAfter(spans, c.rot);
+    assert.ok(Math.abs(w + c.dx - c.stl[0]) <= 0.5,
+      `${c.slug}: posed width ${w} + dx ${c.dx} must match the STL footprint ${c.stl[0]}`);
+    assert.ok(Math.abs(d - c.stl[1]) <= 0.5,
+      `${c.slug}: posed depth ${d} must match the STL footprint ${c.stl[1]}`);
+    // and the resolver's own constants agree with this table
+    const pb = resolvePartPreview(c.slug, { plate: true });
+    const xs = pb.manifest.instances.map(i => i.pos[0]).sort((a, b) => a - b);
+    if (c.dx) assert.ok(Math.abs(xs[1] - xs[0] - c.dx) < 1e-9, `${c.slug}: instance spacing is the STL's`);
   }
 });
 

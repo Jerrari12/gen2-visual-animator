@@ -4390,21 +4390,37 @@
     "platePreview": false
   },
   "drawer-stoppers": {
-    "unsupported": "unsupported"
+    "node": "Drawer_Stoppers_L",
+    "collection": "185",
+    "type": "Stopper",
+    "label": "Drawer Stoppers (Left + Right)",
+    "platePreview": true
   },
   "quicklock-a-v1-11": {
-    "unsupported": "unsupported"
+    "node": "QuickLock-L",
+    "collection": "185",
+    "type": "QuickLock",
+    "label": "QuickLock (Left + Right)",
+    "platePreview": true
   },
   "quicklock-b-bi-directional-optional": {
     "unsupported": "unsupported"
   },
   "magnet-insert-10x2mm": {
-    "unsupported": "unsupported"
+    "node": "MagnetClip_10x2mm",
+    "collection": "185",
+    "type": "MagnetClip",
+    "label": "Magnet Clip (10×2mm)",
+    "platePreview": true
   },
   "magnet-insert-6x2mm": {
     "unsupported": "unsupported"
   },
   "tpu-foot": {
-    "unsupported": "unsupported"
+    "node": "Tabletop-Kit-Foot",
+    "collection": "185",
+    "type": "Foot",
+    "label": "TPU Foot",
+    "platePreview": true
   }
 }

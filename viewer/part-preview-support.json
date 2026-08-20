@@ -1931,28 +1931,28 @@
       "platePreview": false
     },
     "drawer-stoppers": {
-      "preview": false,
-      "reason": "This hardware part doesn't have a 3D preview yet."
+      "preview": true,
+      "platePreview": true
     },
     "quicklock-a-v1-11": {
-      "preview": false,
-      "reason": "This hardware part doesn't have a 3D preview yet."
+      "preview": true,
+      "platePreview": true
     },
     "quicklock-b-bi-directional-optional": {
       "preview": false,
-      "reason": "This hardware part doesn't have a 3D preview yet."
+      "reason": "This hardware part doesn't have a 3D model in the part library yet."
     },
     "magnet-insert-10x2mm": {
-      "preview": false,
-      "reason": "This hardware part doesn't have a 3D preview yet."
+      "preview": true,
+      "platePreview": true
     },
     "magnet-insert-6x2mm": {
       "preview": false,
-      "reason": "This hardware part doesn't have a 3D preview yet."
+      "reason": "This hardware part doesn't have a 3D model in the part library yet."
     },
     "tpu-foot": {
-      "preview": false,
-      "reason": "This hardware part doesn't have a 3D preview yet."
+      "preview": true,
+      "platePreview": true
     }
   }
 }

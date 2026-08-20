@@ -1586,8 +1586,49 @@ function previewColors(L) {
     Faceplate: '#31333f',
     'Faceplate:GRIP': '#ff6f1b', 'Faceplate:FACE': '#ff6f1b', 'Faceplate:GRIP ACCENT': '#8d939e',
     BackCover: '#c25c28', Label: '#eef0f4',
+    // hardware wears the poster orange too (the site's card art) — the K'nex
+    // identification palette is an instructions affordance, not a product shot
+    QuickLock: '#ff6f1b', Stopper: '#ff6f1b', MagnetClip: '#ff6f1b', Foot: '#ff6f1b',
   };
 }
+// Hardware previews (Joey's composition decision 2026-08-20): a handed pair is
+// ONE product — "they function exactly the same and are typically both
+// needed" — so the set previews AND prints together, exactly as each STL
+// ships both hands in one file. All numbers below are STL GROUND TRUTH,
+// measured from the v2608 files (per-body bboxes + centers): `dx` is the
+// body-center spacing, `stl` the combined print footprint W×D the site's fit
+// verdict judges — the plate must reproduce the real print job, never invent
+// a layout that could contradict a green Fits. `plateRot` maps the GLB
+// assembly pose flat onto the bed ([] = already flat as authored); rotation
+// AXES are derived from measured spans, SIGNS (which face is down) go through
+// Joey's eye-gate like every plate pose. quicklock-b and the 6x2 insert have
+// NO GLB in the library and stay unsupported (fail closed) until one lands.
+const HARDWARE_PREVIEW = {
+  'quicklock-a-v1-11': {
+    label: 'QuickLock (Left + Right)', type: 'QuickLock',
+    nodes: ['QuickLock-L', 'QuickLock-R'],
+    dx: 25.11, stl: [48.41, 18.42],
+    plateRot: [0, 0, 90],   // 3.9mm thickness lies on GLB X (installed upright) → swing vertical
+  },
+  'drawer-stoppers': {
+    label: 'Drawer Stoppers (Left + Right)', type: 'Stopper',
+    nodes: ['Drawer_Stoppers_L', 'Drawer_Stoppers_R'],
+    dx: 25.6, stl: [45.18, 28.0],
+    plateRot: [],           // the GLB already lies flat (4.5mm on Y) — prints as authored
+  },
+  'magnet-insert-10x2mm': {
+    label: 'Magnet Clip (10×2mm)', type: 'MagnetClip',
+    nodes: ['MagnetClip_10x2mm'],
+    dx: 0, stl: [19.82, 20.0],
+    plateRot: [90, 0, 0],   // 2.4mm thickness lies on GLB Z (clips face forward) → lay flat
+  },
+  'tpu-foot': {
+    label: 'TPU Foot', type: 'Foot',
+    nodes: ['Tabletop-Kit-Foot'],
+    dx: 0, stl: [20.6, 20.6],
+    plateRot: [],           // prints upright as authored (20.6 × 20.6 footprint, 10.6 tall)
+  },
+};
 // slug → { build: <probe planner-build>, pick: {type, suffix?} } | { fail }
 function previewProbe(slug) {
   const s = String(slug || '').toLowerCase();
@@ -1603,8 +1644,22 @@ function previewProbe(slug) {
   // recognized-but-unsupported families first (the site falls back to its poster)
   if (/^\d+-case-extender-\d+w-1h$/.test(s))
     return un("Case extenders aren't in the 3D part library yet.");
-  if (/^(drawer-stoppers|tpu-foot|magnet-insert-(6|10)x2mm|quicklock-a-v1-11|quicklock-b-bi-directional-optional)$/.test(s))
-    return un("This hardware part doesn't have a 3D preview yet.");
+  if (/^(quicklock-b-bi-directional-optional|magnet-insert-6x2mm)$/.test(s))
+    return un("This hardware part doesn't have a 3D model in the part library yet.");
+  // hardware (sets + singles) — the probe mounts are chosen so the REAL
+  // generator bills exactly the expected rows: a wall single-unit emits the
+  // QuickLock pair AND the stopper pair (bench covers carry the stopper
+  // slots); the magnet clip needs the unit's closure opted in; feet exist
+  // only on a tabletop frame. All probe on the calibrated 185.
+  if (HARDWARE_PREVIEW[s]) {
+    const hw = HARDWARE_PREVIEW[s];
+    const build = s === 'tpu-foot'
+      ? { mount: 'tabletop', length: 185, gridH: 1, placed: [unit(1, 2, 'decor')] }
+      : s === 'magnet-insert-10x2mm'
+        ? { mount: 'wall', length: 185, gridH: 1, placed: [{ ...unit(1, 2, 'decor'), closure: 'magnet' }] }
+        : one(185, 1, 2);
+    return { build, hw };
+  }
   if ((m = s.match(new RegExp(`^(\\d+)-case-([1-4])w-${H}h$`))))
     return { build: one(+m[1], +m[2], H_FROM_SLUG[m[3]]), pick: { type: 'Case' } };
   if ((m = s.match(new RegExp(`^(\\d+)-(classic|decor)-drawer-([1-4])w-${H}h$`))))
@@ -1656,6 +1711,7 @@ const PLATE_POSE = {
   'faceplate:chevron': [90, 0, 0],
 };
 function platePoseFor(probe) {
+  if (probe.hw) return probe.hw.plateRot; // hardware poses live on the entry ([] = as authored)
   const k = probe.pick.type === 'Case' ? 'case'
     : probe.pick.type === 'Drawer' ? 'drawer'
     : probe.pick.type === 'Faceplate' ? 'faceplate:' + probe.build.faceStyle
@@ -1674,6 +1730,43 @@ export function resolvePartPreview(slug, opts = {}) {
   // library gaps all surface here with their real user-facing messages
   if (!gen.manifest)
     return { fail: { reason: 'unsupported', message: gen.errors.join(' · ') } };
+  if (probe.hw) {
+    const hw = probe.hw;
+    // exact node-set membership, both directions: every expected node has a
+    // BOM row, and NO OTHER row of the type exists — never pick by row order
+    const rows = hw.nodes.map(n => gen.manifest.parts.find(p => p.node === n));
+    if (rows.some(r => !r))
+      return { fail: { reason: 'unsupported', message: 'Hardware row missing from the probe BOM.' } };
+    const typeNodes = gen.manifest.parts.filter(p => p.type === hw.type).map(p => p.node).sort().join('|');
+    if (typeNodes !== [...hw.nodes].sort().join('|'))
+      return { fail: { reason: 'unsupported', message: `Hardware set membership was ambiguous (${typeNodes}).` } };
+    const L = gen.manifest.collection;
+    // a pair sits at the STL's own body spacing, centered — instances are
+    // SYNTHESIZED from the rows (a probe places 2-6 physical copies; insertion
+    // order must never pick the canonical one)
+    const off = hw.nodes.length === 2 ? [-hw.dx / 2, hw.dx / 2] : [0];
+    return {
+      part: { node: hw.nodes[0], label: hw.label, type: hw.type,
+              platePreview: !!platePose,
+              ...(hw.nodes.length > 1 ? { set: hw.nodes } : {}) },
+      manifest: {
+        title: hw.label,
+        collection: L,
+        generated: true,
+        preview: true,
+        mount: 'tabletop',
+        pitch: { x: PITCH_X, y: 56 },
+        colors: previewColors(L),
+        parts: rows.map(r => ({ ...r, qty: 1 })),
+        ...(opts.plate ? { platePose: true } : {}),
+        instances: hw.nodes.map((n, i) => ({ id: 'p' + i, node: n, pos: [off[i], 0, 0],
+          ...(opts.plate && platePose.length ? { rot: platePose } : {}) })),
+        stages: {},
+        steps: [{ title: hw.label, note: '', camera: { t: 32, p: 64, r: 600, target: [0, 0, 0] },
+                  phases: [{ enter: hw.nodes.map((n, i) => ({ id: 'p' + i, from: [0, 0, 0] })) }] }],
+      },
+    };
+  }
   const rows = gen.manifest.parts.filter(p => p.type === probe.pick.type &&
     (!probe.pick.suffix || p.node.endsWith(probe.pick.suffix)));
   // fail CLOSED on anything but exactly one match — never guess which physical

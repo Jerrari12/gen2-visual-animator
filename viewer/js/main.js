@@ -5195,6 +5195,10 @@ const PART_CAM = {
   Faceplate: { t: 24, p: 72 }, BackCover: { t: 24, p: 72 },
   CoverL: { t: 30, p: 52 }, CoverU: { t: 30, p: 52 },
   FootrailL: { t: 30, p: 52 }, FootrailU: { t: 30, p: 52 }, Rail: { t: 30, p: 52 },
+  // hardware (2026-08-20): stoppers lie flat — the default 3/4 box angle reads
+  // too grazing; the clip stands like a small plate. QuickLock + Foot keep the
+  // default box angle.
+  Stopper: { t: 30, p: 52 }, MagnetClip: { t: 24, p: 72 },
 };
 // lifecycle: loading → ready (posted) | failed — failed is a SINK: once set,
 // partReady can never post (context loss / mount failure must leave the site
@@ -5221,20 +5225,28 @@ function fitPartCamera() {
 // 3/4 and a straight-down view.
 const plateStage = { group: null, top: false, yawed: false };
 function seatOnPlate() {
-  // a plate manifest is ONE bare primary by construction — anything else is a
-  // resolver bug, and this feature fails CLOSED, never half-renders
-  if (instances.size !== 1) {
-    postToEmbedder({ gen2: 'partError', reason: 'load-failed', message: 'plate view expected exactly one part, got ' + instances.size });
-    bootFail('<strong>Plate preview error</strong><br><br>• unexpected part count', 'plate: ' + instances.size + ' instances');
+  // a plate manifest is the bare PRINT JOB by construction — one body, or a
+  // handed pair whose two bodies ship in one STL (the resolver's goldens pin
+  // exactly which). Zero instances is a resolver bug; fail CLOSED.
+  if (!instances.size) {
+    postToEmbedder({ gen2: 'partError', reason: 'load-failed', message: 'plate view got an empty manifest' });
+    bootFail('<strong>Plate preview error</strong><br><br>• unexpected part count', 'plate: 0 instances');
   }
-  const inst = instances.values().next().value;
+  const job = [...instances.values()];
+  const unionBox = () => {
+    const b = new THREE.Box3();
+    for (const i of job) b.union(new THREE.Box3().setFromObject(i.group));
+    return b;
+  };
   // rotate-to-fit (review catch): the site's fit rule accepts EITHER in-plane
   // orientation, so a part that only fits the bed rotated 90° must be shown
   // rotated — otherwise the plate contradicts a green "Fits" verdict with a
   // fake overhang. A world-Y yaw can never change which face is down. Only
   // yaw when the default does NOT fit and the rotation DOES; if neither fits,
-  // the honest overhang stays.
-  const pre = new THREE.Box3().setFromObject(inst.group);
+  // the honest overhang stays. A multi-body job is RIGID: every body's
+  // orientation AND its offset rotate together about the job's center —
+  // yawing bodies around their own origins would break the STL's layout.
+  const pre = unionBox();
   const s = pre.getSize(new THREE.Vector3());
   // +0.5mm tolerance: the site's verdict works in integer registry mm, and an
   // exact edge-to-edge part (the 250-deep classic on a 250 bed) must not flap
@@ -5243,16 +5255,24 @@ function seatOnPlate() {
   const fitsAs = s.x <= PART_PLATE.w + E && s.z <= PART_PLATE.d + E;
   const fitsRot = s.z <= PART_PLATE.w + E && s.x <= PART_PLATE.d + E;
   if (!fitsAs && fitsRot) {
-    inst.group.rotateOnWorldAxis(new THREE.Vector3(0, 1, 0), Math.PI / 2);
-    plateStage.yawed = true; // group.rotation is set once in buildInstances and applyState never touches it
+    const c = pre.getCenter(new THREE.Vector3());
+    for (const i of job) {
+      i.group.rotateOnWorldAxis(new THREE.Vector3(0, 1, 0), Math.PI / 2); // group.rotation is set once in buildInstances and applyState never touches it
+      // +90° about world Y at the job center: (x,z) → (c.x + (z−c.z), c.z − (x−c.x))
+      const [x, y, z] = i.cfg.pos;
+      i.cfg.pos = [c.x + (z - c.z), y, c.z - (x - c.x)];
+    }
+    plateStage.yawed = true;
+    applyState(0); // reposition from the rotated cfg before the seating measurement
   }
-  // the print pose rotated the part about its product-pose bottom-center —
-  // measure the posed (and possibly yawed) bounds once and BAKE the correction
-  // into cfg.pos, so applyState/computeBounds (which re-derive from cfg) stay
-  // deterministic
-  const box = new THREE.Box3().setFromObject(inst.group);
+  // the print pose rotated each body about its product-pose bottom-center —
+  // measure the posed (and possibly yawed) JOB bounds once and BAKE one shared
+  // correction into every cfg.pos, so applyState/computeBounds (which
+  // re-derive from cfg) stay deterministic and the bodies keep their spacing
+  const box = unionBox();
   const c = box.getCenter(new THREE.Vector3());
-  inst.cfg.pos = [inst.cfg.pos[0] - c.x, inst.cfg.pos[1] - box.min.y, inst.cfg.pos[2] - c.z];
+  for (const i of job)
+    i.cfg.pos = [i.cfg.pos[0] - c.x, i.cfg.pos[1] - box.min.y, i.cfg.pos[2] - c.z];
   applyState(0);
   computeBounds();
 }
