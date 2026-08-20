@@ -1608,7 +1608,12 @@ const HARDWARE_PREVIEW = {
     label: 'QuickLock (Left + Right)', type: 'QuickLock',
     nodes: ['QuickLock-L', 'QuickLock-R'],
     dx: 25.11, stl: [48.41, 18.42],
-    plateRot: [0, 0, 90],   // 3.9mm thickness lies on GLB X (installed upright) → swing vertical
+    // 3.9mm thickness lies on GLB X (installed upright) → swing flat. PER-NODE
+    // and MIRRORED on purpose: L and R are chiral twins, and the rotation that
+    // lays L on its correct face lays the mirror twin on its WRONG face —
+    // Joey's live check caught R resting on its snap tab (2026-08-20). For a
+    // mirror image, the corrective rotation mirrors too: Rz(+90) ↔ Rz(−90).
+    plateRot: { 'QuickLock-L': [0, 0, 90], 'QuickLock-R': [0, 0, -90] },
   },
   'drawer-stoppers': {
     label: 'Drawer Stoppers (Left + Right)', type: 'Stopper',
@@ -1765,8 +1770,12 @@ export function resolvePartPreview(slug, opts = {}) {
         colors: previewColors(L),
         parts: rows.map(r => ({ ...r, qty: 1 })),
         ...(opts.plate ? { platePose: true } : {}),
-        instances: hw.nodes.map((n, i) => ({ id: 'p' + i, node: n, pos: [off[i], 0, 0],
-          ...(opts.plate && platePose.length ? { rot: platePose } : {}) })),
+        instances: hw.nodes.map((n, i) => {
+          // plateRot is one array for the whole job, or per-node for chiral sets
+          const r = Array.isArray(platePose) ? platePose : platePose[n];
+          return { id: 'p' + i, node: n, pos: [off[i], 0, 0],
+            ...(opts.plate && r && r.length ? { rot: r } : {}) };
+        }),
         stages: {},
         steps: [{ title: hw.label, note: '', camera: { t: 32, p: 64, r: 600, target: [0, 0, 0] },
                   phases: [{ enter: hw.nodes.map((n, i) => ({ id: 'p' + i, from: [0, 0, 0] })) }] }],

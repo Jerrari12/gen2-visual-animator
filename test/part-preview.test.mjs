@@ -202,14 +202,18 @@ test('plate view: confirmed print poses only, bare primary, fail-closed elsewher
   assert.equal(p.manifest.instances.length, 1, 'plate view is the primary alone');
   assert.equal(p.manifest.platePose, true);
   // hardware poses (2026-08-20): the pair prints together and BOTH hands ride
-  // the plate — unlike dressing extras, the second hand IS the same print job
-  assert.deepEqual(rot('quicklock-a-v1-11'), [0, 0, 90], 'QuickLock prints flat (thickness off X)');
+  // the plate — unlike dressing extras, the second hand IS the same print job.
+  // The QuickLock hands are CHIRAL twins, so their corrective rotations MIRROR
+  // (Rz+90 / Rz−90) — one shared rotation laid R on its snap tab, caught by
+  // Joey's live check on the deployed page
+  assert.deepEqual(rot('quicklock-a-v1-11'), [0, 0, 90], 'QuickLock L prints flat (thickness off X)');
   assert.equal(rot('drawer-stoppers'), undefined, 'stoppers print as authored');
   assert.deepEqual(rot('magnet-insert-10x2mm'), [90, 0, 0], 'clip prints flat (thickness off Z)');
   assert.equal(rot('tpu-foot'), undefined, 'foot prints upright as authored');
   const qlPlate = resolvePartPreview('quicklock-a-v1-11', { plate: true });
   assert.equal(qlPlate.manifest.instances.length, 2, 'a pair plate shows both hands');
-  assert.ok(qlPlate.manifest.instances.every(i => i.rot?.join() === '0,0,90'), 'both hands wear the print pose');
+  assert.deepEqual(Object.fromEntries(qlPlate.manifest.instances.map(i => [i.node, i.rot])),
+    { 'QuickLock-L': [0, 0, 90], 'QuickLock-R': [0, 0, -90] }, 'chiral hands wear MIRRORED print poses');
   // fail closed on anything without a confirmed pose
   for (const s of ['185-cover-lower-2w', '270-foot-rail-upper-1w', '115-under-table-rail-2w', 'faceplate-back-cover-2w-1h'])
     assert.equal(resolvePartPreview(s, { plate: true }).fail.reason, 'unsupported', s + ' must fail closed');
@@ -221,10 +225,10 @@ test('plate view: confirmed print poses only, bare primary, fail-closed elsewher
   // sweep EVERY plate-capable slug's plate boot (not just samples): the bare
   // print JOB (one body, or every member of a handed set), rotations matching
   // the confirmed pose
-  const expectRot = s =>
+  const expectRot = (s, node) =>
     /-faceplate-/.test(s)
       ? (/^(essential|chevron)-/.test(s) ? [90, 0, 0] : [-90, 0, 0])
-      : s === 'quicklock-a-v1-11' ? [0, 0, 90]
+      : s === 'quicklock-a-v1-11' ? (node === 'QuickLock-L' ? [0, 0, 90] : [0, 0, -90])
       : s === 'magnet-insert-10x2mm' ? [90, 0, 0]
       : undefined;
   for (const [s, r] of resolved) {
@@ -233,7 +237,7 @@ test('plate view: confirmed print poses only, bare primary, fail-closed elsewher
     assert.ok(!pb.fail, s + ': plate boot must resolve');
     assert.equal(pb.manifest.instances.length, (r.part.set || [1]).length, s + ': plate boot is the bare print job');
     for (const i of pb.manifest.instances)
-      assert.deepEqual(i.rot, expectRot(s), s + ': confirmed pose');
+      assert.deepEqual(i.rot, expectRot(s, i.node), s + ': confirmed pose');
   }
 });
 
@@ -259,15 +263,18 @@ test('hardware sets: exact membership, STL-authored layout, footprint law', asyn
   // v2608 files (per-body bboxes; see HARDWARE_PREVIEW in generate.js).
   const spanAfter = (spans, rotKey) => {
     // axis permutation for the exact rotations HARDWARE_PREVIEW uses — a new
-    // pose must extend this map consciously
+    // pose must extend this map consciously. ±90 about one axis permute spans
+    // identically; the SIGN picks which face is down (chirality, eye-checked)
     if (rotKey === '') return [spans[0], spans[2]];          // as authored: X, Z
-    if (rotKey === '0,0,90') return [spans[1], spans[2]];    // Z-yaw: Y→X, Z stays
+    if (rotKey === '0,0,90' || rotKey === '0,0,-90') return [spans[1], spans[2]]; // Z-yaw: Y→X, Z stays
     if (rotKey === '90,0,0') return [spans[0], spans[1]];    // X-roll: Y→Z, X stays
     assert.fail('unmapped plate rotation ' + rotKey);
   };
   const CASES = [
     { slug: 'quicklock-a-v1-11', node: 'QuickLock-L', rot: '0,0,90', dx: 25.11, stl: [48.41, 18.42] },
+    { slug: 'quicklock-a-v1-11', node: 'QuickLock-R', rot: '0,0,-90', dx: 25.11, stl: [48.41, 18.42] },
     { slug: 'drawer-stoppers', node: 'Drawer_Stoppers_L', rot: '', dx: 25.6, stl: [45.18, 28.0] },
+    { slug: 'drawer-stoppers', node: 'Drawer_Stoppers_R', rot: '', dx: 25.6, stl: [45.18, 28.0] },
     { slug: 'magnet-insert-10x2mm', node: 'MagnetClip_10x2mm', rot: '90,0,0', dx: 0, stl: [19.82, 20.0] },
     { slug: 'tpu-foot', node: 'Tabletop-Kit-Foot', rot: '', dx: 0, stl: [20.6, 20.6] },
   ];
