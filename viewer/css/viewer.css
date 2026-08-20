@@ -1009,14 +1009,17 @@ body.part-preview #cover-bg, body.part-preview #tap-hint, body.part-preview #sta
 body.part-preview #embed-hint, body.part-preview #embed-begin { display: none !important; }
 body.part-preview #loading-overlay { background: transparent; }
 #part-reset {
-  position: absolute; right: 10px; bottom: 10px; z-index: 3;
+  /* TOP corners, both pills: the embedding site overlays its own Image|3D|Plate
+     toggle on the iframe's bottom edge, and a 300px media stage has no room
+     for both (caught on the live page - the pills collided) */
+  position: absolute; right: 10px; top: 10px; z-index: 3;
   padding: 6px 12px; border: 1px solid var(--panel-border); border-radius: 999px;
   background: var(--panel); color: var(--ink-soft); font-size: 12px; font-weight: 700;
   cursor: pointer;
 }
 #part-reset:hover { color: var(--ink); border-color: var(--accent); }
 #part-top {
-  position: absolute; left: 10px; bottom: 10px; z-index: 3;
+  position: absolute; left: 10px; top: 10px; z-index: 3;
   padding: 6px 12px; border: 1px solid var(--panel-border); border-radius: 999px;
   background: var(--panel); color: var(--ink-soft); font-size: 12px; font-weight: 700;
   cursor: pointer;
