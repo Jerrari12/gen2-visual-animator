@@ -33,6 +33,19 @@ document.body.classList.toggle('embed', IS_EMBED);
 const PART_SLUG = new URLSearchParams(location.search).get('part');
 const IS_PART = new URLSearchParams(location.search).get('mode') === 'preview' && !!PART_SLUG;
 const PART_RID = new URLSearchParams(location.search).get('rid') || '';
+// &plate=<W>x<D> (usable mm, 50-1000 each) — the PRINT-ORIENTATION view: the
+// bare part in its confirmed print pose on a true-scale build plate. The dims
+// come from the SITE's printer profile (the viewer can't read a cross-origin
+// localStorage); which parts have a confirmed pose is viewer-owned
+// (resolvePartPreview's whitelist + the support manifest's platePreview).
+const PLATE_RAW = IS_PART && new URLSearchParams(location.search).has('plate');
+const PART_PLATE = (() => {
+  if (!PLATE_RAW) return null;
+  const m = (new URLSearchParams(location.search).get('plate') || '').match(/^(\d{2,4})[xX](\d{2,4})$/);
+  if (!m) return null;
+  const w = +m[1], d = +m[2];
+  return (w >= 50 && w <= 1000 && d >= 50 && d <= 1000) ? { w, d } : null;
+})();
 document.body.classList.toggle('part-preview', IS_PART);
 function postToEmbedder(msg) {
   if (!IS_PART || window.parent === window) return;
@@ -920,8 +933,9 @@ function resize() {
       camera.position.copy(pos); controls.target.copy(target); controls.update();
     }
     // part-preview: the iframe resizes with the site's media column — keep the
-    // part fitted until the user has taken the camera over
-    if (IS_PART && manifest && !partView.interacted) fitPartCamera();
+    // part (or the plate scene) fitted until the user has taken the camera over
+    if (IS_PART && manifest && !partView.interacted)
+      PART_PLATE ? fitPlateCamera(plateStage.top) : fitPartCamera();
   }
 }
 // Mobile: the step-note panel overlays the top of the canvas (long wall notes
@@ -1037,7 +1051,11 @@ if (IS_PART) {
   // message for anyone looking at the iframe directly.
   let res;
   try {
-    res = resolvePartPreview(PART_SLUG);
+    // a plate= param that doesn't parse is a hard failure, not a silent
+    // fall-through to the product view — the site must keep its poster
+    res = (PLATE_RAW && !PART_PLATE)
+      ? { fail: { reason: 'unsupported', message: 'Bad plate size (want <width>x<depth> in mm, 50-1000 each).' } }
+      : resolvePartPreview(PART_SLUG, { plate: !!PART_PLATE });
   } catch (e) {
     // a resolver THROW is our bug, not a bad slug — the site still needs a
     // typed message so its poster stays up
@@ -1121,7 +1139,7 @@ if (IS_PART) {
 // part previews report ONE row (`open:part`), never the slug: the site's own
 // analytics already record which part page was visited, and 458 slug rows
 // would bury the dashboard's funnel.
-track(IS_PART ? 'open:part'
+track(IS_PART ? (PART_PLATE ? 'open:part-plate' : 'open:part')
   : OFFICIAL_ID ? 'open:' + OFFICIAL_ID
   : BUILD_HASH ? (IS_EMBED ? 'open:embed' : 'open:planner-link')
   : 'open:kit-' + KIT);
@@ -5194,9 +5212,89 @@ function fitPartCamera() {
   controls.update();
   partView.pose = { pos: camera.position.clone(), target: controls.target.clone() };
 }
+// ---- the &plate= print-orientation stage ----
+// True-scale build plate under the part's confirmed PRINT pose (the resolver
+// applied the rotation; here the rotated part is SEATED — lifted and
+// recentered onto the plate — and the plate itself is drawn: slab, 10 mm
+// grid with stronger 50 mm majors, usable-area outline). No turntable — a
+// print layout is studied, not admired. A "Top" pill swaps between the high
+// 3/4 and a straight-down view.
+const plateStage = { group: null, top: false };
+function seatOnPlate() {
+  // the print pose rotated the part about its product-pose bottom-center —
+  // measure the rotated bounds once and BAKE the correction into cfg.pos, so
+  // applyState/computeBounds (which re-derive from cfg) stay deterministic
+  const inst = instances.values().next().value;
+  const box = new THREE.Box3().setFromObject(inst.group);
+  const c = box.getCenter(new THREE.Vector3());
+  inst.cfg.pos = [inst.cfg.pos[0] - c.x, inst.cfg.pos[1] - box.min.y, inst.cfg.pos[2] - c.z];
+  applyState(0);
+  computeBounds();
+}
+function buildPlateStage() {
+  const { w, d } = PART_PLATE;
+  const g = new THREE.Group();
+  const slab = new THREE.Mesh(
+    new THREE.BoxGeometry(w, 2, d),
+    new THREE.MeshStandardMaterial({ color: 0x26282e, roughness: 0.9 }));
+  slab.position.y = -1;                       // top face at y=0 — the part sits on it
+  g.add(slab);
+  // grid drawn CENTER-OUT like a real slicer plate, so 0 is always a line and
+  // the pattern stays symmetric on non-multiple-of-10 beds
+  const minor = [], major = [];
+  const line = (arr, x0, y0, x1, y1) => arr.push(x0, 0, y0, x1, 0, y1);
+  for (let x = 0; x <= w / 2; x += 10) {
+    const a = x % 50 === 0 ? major : minor;
+    line(a, x, -d / 2, x, d / 2);
+    if (x) line(a, -x, -d / 2, -x, d / 2);
+  }
+  for (let z = 0; z <= d / 2; z += 10) {
+    const a = z % 50 === 0 ? major : minor;
+    line(a, -w / 2, z, w / 2, z);
+    if (z) line(a, -w / 2, -z, w / 2, -z);
+  }
+  const mkLines = (arr, color, opacity, y) => {
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(arr, 3));
+    const l = new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color, transparent: true, opacity }));
+    l.position.y = y;
+    return l;
+  };
+  g.add(mkLines(minor, 0x3d414b, 0.85, 0.15));
+  g.add(mkLines(major, 0x5c6272, 0.95, 0.2));
+  // usable-area outline, slightly proud of the grid
+  const corners = [[-w / 2, -d / 2], [w / 2, -d / 2], [w / 2, d / 2], [-w / 2, d / 2]];
+  const outline = [];
+  for (let i = 0; i < 4; i++) {
+    const [x0, z0] = corners[i], [x1, z1] = corners[(i + 1) % 4];
+    outline.push(x0, 0, z0, x1, 0, z1);
+  }
+  g.add(mkLines(outline, 0x8b93a5, 1, 0.25));
+  scene.add(g);
+  plateStage.group = g;
+}
+function fitPlateCamera(top) {
+  plateStage.top = !!top;
+  const R = Math.max(buildRadius, Math.hypot(PART_PLATE.w, PART_PLATE.d) / 2);
+  camera.fov = 38;
+  camera.updateProjectionMatrix();
+  const a = top ? { t: 0, p: 3 } : { t: 30, p: 55 };
+  const { pos, target } = camPos({ t: a.t, p: a.p, fitR: R * 1.12, fov: 38,
+    target: [0, top ? 0 : Math.min(40, assembledBox.max.y / 3), 0] });
+  camera.position.copy(pos);
+  controls.target.copy(target);
+  controls.minDistance = R * 0.4;
+  controls.maxDistance = camera.position.distanceTo(controls.target) * 4;
+  controls.update();
+  partView.pose = { pos: camera.position.clone(), target: controls.target.clone() };
+  const tb = $('part-top');
+  tb.textContent = top ? '3/4 view' : 'Top view';
+  tb.classList.remove('hidden');
+}
 function startPartIdle() {
   const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  controls.autoRotate = !still;                  // slow turntable until first touch
+  const spin = !still && !PART_PLATE;            // the plate view never turns on its own
+  controls.autoRotate = spin;                    // slow turntable until first touch
   controls.autoRotateSpeed = 0.9;
   controls.addEventListener('start', () => {     // any orbit/zoom = the user takes over
     if (!partView.interacted) {
@@ -5205,6 +5303,7 @@ function startPartIdle() {
       $('part-reset').classList.remove('hidden');
     }
   });
+  $('part-top').onclick = () => fitPlateCamera(!plateStage.top);
   $('part-reset').onclick = () => {
     // zero OrbitControls' residual damping velocity BEFORE restoring the pose —
     // a fling + instant reset otherwise carries leftover sphericalDelta that
@@ -5221,7 +5320,7 @@ function startPartIdle() {
     controls.target.copy(partView.pose.target);
     controls.update();
     partView.interacted = false;
-    controls.autoRotate = !still;
+    controls.autoRotate = spin;
     $('part-reset').classList.add('hidden');
   };
   // offscreen product cards must cost nothing: the render loop skips entirely
@@ -5273,7 +5372,13 @@ if (IS_PART) {
   // stays 0 (the cover page), which keeps tap-identify inert for free (the
   // pointerup handler early-returns on cover/outro pages).
   applyState(0);
-  fitPartCamera();
+  if (PART_PLATE) {
+    seatOnPlate();
+    buildPlateStage();
+    fitPlateCamera(false);
+  } else {
+    fitPartCamera();
+  }
   startPartIdle();
 } else if (IS_EMBED && build) {
   // docked split view: land on the live PREVIEW (finished build, dims on,

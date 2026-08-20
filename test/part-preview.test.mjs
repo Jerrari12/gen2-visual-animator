@@ -128,6 +128,7 @@ test('catalog output matches the golden snapshot (UPDATE_GOLDEN=1 to refresh)', 
     now[s] = r.fail
       ? { unsupported: r.fail.reason }
       : { node: r.part.node, collection: r.manifest.collection, type: r.part.type, label: r.part.label,
+          platePreview: !!r.part.platePreview,
           // dressed previews pin the extras' plate-relative GEOMETRY too — the
           // canonical test already constrains bare previews to identity-at-
           // origin, but a generator offset change could silently move the
@@ -155,7 +156,9 @@ test('the deployed support manifest matches the resolver (UPDATE_GOLDEN=1 to ref
   const SUPPORT_PATH = join(root, 'viewer', 'part-preview-support.json');
   const parts = {};
   for (const [s, r] of resolved)
-    parts[s] = r.fail ? { preview: false, reason: r.fail.message } : { preview: true };
+    parts[s] = r.fail
+      ? { preview: false, reason: r.fail.message }
+      : { preview: true, platePreview: !!r.part.platePreview }; // plate = confirmed print pose only
   const now = { v: 1, source: 'MODULITH search-index v2608', parts };
   if (process.env.UPDATE_GOLDEN) {
     writeFileSync(SUPPORT_PATH, JSON.stringify(now, null, 2) + '\n');
@@ -164,6 +167,32 @@ test('the deployed support manifest matches the resolver (UPDATE_GOLDEN=1 to ref
   assert.ok(existsSync(SUPPORT_PATH), 'support manifest missing — run UPDATE_GOLDEN=1 npm test once');
   assert.deepEqual(JSON.parse(readFileSync(SUPPORT_PATH, 'utf8')), now,
     'viewer/part-preview-support.json is stale — UPDATE_GOLDEN=1 npm test, then re-vendor it into the MODULITH site');
+});
+
+test('plate view: confirmed print poses only, bare primary, fail-closed elsewhere', () => {
+  // Joey's 2026-08-19 confirmations — the ONLY families with a plate view:
+  // cases + both drawer fills print as-authored; integrated-grip faceplates
+  // (EdgeLabel/Classic/Classic Pro) print back-down (grip up); Essential and
+  // Chevron print face-down (build-plate texture transfers onto the face).
+  const rot = s => resolvePartPreview(s, { plate: true }).manifest?.instances[0].rot;
+  assert.deepEqual(rot('edgelabel-faceplate-2w-1h'), [-90, 0, 0], 'EdgeLabel prints back-down');
+  assert.deepEqual(rot('classic-faceplate-2w-1h'), [-90, 0, 0], 'Classic prints back-down');
+  assert.deepEqual(rot('classicpro-faceplate-2w-1h'), [-90, 0, 0], 'Classic Pro prints back-down');
+  assert.deepEqual(rot('essential-faceplate-2w-1h'), [90, 0, 0], 'Essential prints face-down');
+  assert.deepEqual(rot('chevron-faceplate-2w-1h'), [90, 0, 0], 'Chevron prints face-down');
+  assert.equal(rot('185-case-2w-1h'), undefined, 'cases print as authored — no rotation');
+  assert.equal(rot('270-classic-drawer-1w-1h'), undefined, 'drawers print as authored');
+  // the plate shows the BARE print body — dressed extras have no confirmed
+  // individual print pose or plate arrangement yet
+  const p = resolvePartPreview('edgelabel-faceplate-2w-1h', { plate: true });
+  assert.equal(p.manifest.instances.length, 1, 'plate view is the primary alone');
+  assert.equal(p.manifest.platePose, true);
+  // fail closed on anything without a confirmed pose
+  for (const s of ['185-cover-lower-2w', '270-foot-rail-upper-1w', '115-under-table-rail-2w', 'faceplate-back-cover-2w-1h'])
+    assert.equal(resolvePartPreview(s, { plate: true }).fail.reason, 'unsupported', s + ' must fail closed');
+  // plate-capable census: 94 cases + 94 classic + 94 decor + 90 faceplates
+  const n = [...resolved.values()].filter(r => !r.fail && r.part.platePreview).length;
+  assert.equal(n, 372, 'plate-capable slug count');
 });
 
 test('failure modes are typed correctly', () => {

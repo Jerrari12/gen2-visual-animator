@@ -1638,9 +1638,37 @@ function previewProbe(slug) {
     return { build: one(185, +m[1], H_FROM_SLUG[m[2]], 'decor', { backCover: true }), pick: { type: 'BackCover' } };
   return { fail: { reason: 'unknown-part', message: "This part id isn't recognized." } };
 }
-export function resolvePartPreview(slug) {
+// Print-orientation whitelist for the ?plate= view (Joey's confirmations,
+// 2026-08-19): cases and both drawer fills print AS AUTHORED; the three
+// integrated-grip faceplate families print BACK-DOWN (grip up: rot -90° about
+// X maps the product pose's -Z back face onto the plate); Essential and
+// Chevron print FACE-DOWN by preference (+90° about X - it transfers the
+// build-plate texture onto the face). Everything else has NO confirmed print
+// pose and gets no plate view until Joey confirms one - fail closed, never
+// guess an orientation onto a permanent product page.
+const PLATE_POSE = {
+  case: [],
+  drawer: [],
+  'faceplate:edgelabel': [-90, 0, 0],
+  'faceplate:classic': [-90, 0, 0],
+  'faceplate:classicpro': [-90, 0, 0],
+  'faceplate:essential': [90, 0, 0],
+  'faceplate:chevron': [90, 0, 0],
+};
+function platePoseFor(probe) {
+  const k = probe.pick.type === 'Case' ? 'case'
+    : probe.pick.type === 'Drawer' ? 'drawer'
+    : probe.pick.type === 'Faceplate' ? 'faceplate:' + probe.build.faceStyle
+    : null;
+  return k != null && k in PLATE_POSE ? PLATE_POSE[k] : null;
+}
+
+export function resolvePartPreview(slug, opts = {}) {
   const probe = previewProbe(slug);
   if (probe.fail) return { fail: probe.fail };
+  const platePose = platePoseFor(probe);
+  if (opts.plate && !platePose)
+    return { fail: { reason: 'unsupported', message: "This part doesn't have a confirmed print orientation yet." } };
   const gen = generateManifest(probe.build);
   // the generator is the validator: per-collection size caps, illegal sizes and
   // library gaps all surface here with their real user-facing messages
@@ -1664,13 +1692,16 @@ export function resolvePartPreview(slug) {
   // installation context), and the accent keeps its generator-minted
   // corrective rot (the GLB exports upside down).
   const typeOf = Object.fromEntries(gen.manifest.parts.map(p => [p.node, p.type]));
-  const extras = row.type === 'Faceplate'
+  // the PLATE view shows only the primary print body: extras (accent/label)
+  // have no confirmed individual print poses or plate arrangement yet
+  const extras = row.type === 'Faceplate' && !opts.plate
     ? gen.manifest.instances.filter(i => i.rides === primary.rides &&
         (typeOf[i.node] === 'Accent' || typeOf[i.node] === 'Label'))
     : [];
   const L = gen.manifest.collection;
   return {
     part: { node: row.node, label: row.label, type: row.type,
+            platePreview: !!platePose,
             ...(extras.length ? { extras: extras.map(x => x.node) } : {}) },
     manifest: {
       title: row.label,
@@ -1687,9 +1718,13 @@ export function resolvePartPreview(slug) {
       // bottom-anchored, X/Z-centered). Assembly context — pos, stage, rides,
       // owner, yaw — is deliberately NOT inherited; every previewable family's
       // canonical pose is its GLB pose. Extras keep their PLATE-relative
-      // offsets (+ any corrective rot) — that is product geometry.
+      // offsets (+ any corrective rot) — that is product geometry. A plate
+      // boot instead applies the confirmed PRINT pose to the bare primary;
+      // main.js seats the rotated part on the plate (bbox lift + recenter).
+      ...(opts.plate ? { platePose: true } : {}),
       instances: [
-        { id: 'p0', node: row.node, pos: [0, 0, 0] },
+        { id: 'p0', node: row.node, pos: [0, 0, 0],
+          ...(opts.plate && platePose.length ? { rot: platePose } : {}) },
         ...extras.map((x, n) => ({ id: 'p' + (n + 1), node: x.node,
           pos: [x.pos[0] - primary.pos[0], x.pos[1] - primary.pos[1], x.pos[2] - primary.pos[2]],
           ...(x.rot ? { rot: x.rot } : {}) })),

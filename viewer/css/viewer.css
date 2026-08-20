@@ -1015,3 +1015,10 @@ body.part-preview #loading-overlay { background: transparent; }
   cursor: pointer;
 }
 #part-reset:hover { color: var(--ink); border-color: var(--accent); }
+#part-top {
+  position: absolute; left: 10px; bottom: 10px; z-index: 3;
+  padding: 6px 12px; border: 1px solid var(--panel-border); border-radius: 999px;
+  background: var(--panel); color: var(--ink-soft); font-size: 12px; font-weight: 700;
+  cursor: pointer;
+}
+#part-top:hover { color: var(--ink); border-color: var(--accent); }
