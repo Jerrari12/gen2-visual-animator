@@ -2277,6 +2277,13 @@ function renderOptions() {
     box.appendChild(optSeg('Faceplate back cover', [{ label: 'Off', val: false }, { label: 'On', val: true }], !!build.backCover,
       async v => { track('opt:backcover:' + (v ? 'on' : 'off')); build.backCover = v; await regenerate(); }));
   }
+  // tabletop feet: printed TPU feet or purchased adhesive rubber feet - one-
+  // for-one alternatives (same count, same spots); the BOM bills the pick.
+  // Mirrors the planner's "Feet" control (2026-08-21); the relay carries it.
+  if (build.mount === 'tabletop') {
+    box.appendChild(optSeg('Feet', [{ label: 'Print TPU', val: 'tpu' }, { label: 'Buy adhesive', val: 'adhesive' }], build.feet === 'adhesive' ? 'adhesive' : 'tpu',
+      async v => { track('opt:feet:' + v); build.feet = v; await regenerate(); }));
+  }
   if (isWallBuild) {
     box.appendChild(optSeg('Top cover', [{ label: 'Per-column', val: false }, { label: 'Staggered', val: true }], !!build.wallStagger,
       async v => { track('opt:topcover:' + (v ? 'staggered' : 'per-column')); build.wallStagger = v; await regenerate(); }));
@@ -4964,7 +4971,7 @@ function currentOpts() {
   if (!build) return null;
   const closures = {};
   for (const u of build.placed) if (u.fill === 'decor' || u.fill === 'classic') closures[u.id] = u.closure === 'magnet' ? 'magnet' : 'none';
-  return { closures, removedStoppers: build.removedStoppers || [], wallStagger: !!build.wallStagger, handleStyle: build.handleStyle, faceStyle: build.faceStyle, backCover: !!build.backCover };
+  return { closures, removedStoppers: build.removedStoppers || [], wallStagger: !!build.wallStagger, handleStyle: build.handleStyle, faceStyle: build.faceStyle, backCover: !!build.backCover, feet: build.feet === 'adhesive' ? 'adhesive' : 'tpu' };
 }
 // The planner window, wherever we live: a popped-out tab talks to its opener,
 // the docked split-view iframe talks to its parent.
@@ -5106,6 +5113,7 @@ addEventListener('message', async (e) => {
   if (o.handleStyle && o.handleStyle !== build.handleStyle) changed = true;
   if (o.faceStyle && o.faceStyle !== build.faceStyle) changed = true;
   if (typeof o.backCover === 'boolean' && o.backCover !== !!build.backCover) changed = true;
+  if ((o.feet === 'tpu' || o.feet === 'adhesive') && o.feet !== (build.feet === 'adhesive' ? 'adhesive' : 'tpu')) changed = true;
   if (!changed) return;
   applyingRemote = true;
   try {
@@ -5115,6 +5123,7 @@ addEventListener('message', async (e) => {
     if (o.handleStyle) build.handleStyle = o.handleStyle;
     if (o.faceStyle) build.faceStyle = o.faceStyle;
     if (typeof o.backCover === 'boolean') build.backCover = o.backCover;
+    if (o.feet === 'tpu' || o.feet === 'adhesive') build.feet = o.feet;
     await regenerate();
   } finally { applyingRemote = false; }
 });

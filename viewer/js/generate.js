@@ -163,6 +163,13 @@ const BUY = {
   handleScrews: [
     { id: 'm3-button-head', label: 'Buy M3×6 button head', url: 'https://amzn.to/4x4opHK' },
   ],
+  // the purchased one-for-one alternative to printed TPU feet (2026-08-21,
+  // confirmed): same count, same support spots, stuck to the flat pads around
+  // the slots. Billed INSTEAD of the TPU feet when build.feet === 'adhesive'.
+  // id mirrors the planner's HARDWARE_BUY entry (the analytics identity).
+  rubberFeet: [
+    { id: 'rubber-feet', label: 'Buy rubber feet', url: 'https://amzn.to/4cEanSB' },
+  ],
 };
 
 // Per-length product pages (2026-07-11 refresh — every collection has its own
@@ -456,6 +463,14 @@ export function generateManifest(build) {
   // EdgeLabel exporter blend). Optional: fills the new open-front Decor
   // drawer's gap; off = older closed-front drawers. Shared hardware → −dz.
   const bcOn = !!build.backCover;
+  // Feet (2026-08-21, confirmed): printed TPU feet OR adhesive rubber feet -
+  // one-for-one alternatives with the same count at the same support spots.
+  // The planner's build carries the pick (`feet`); the BOM bills ONLY the
+  // chosen option. The scene keeps the TPU foot geometry either way: with
+  // adhesive feet it MARKS the spots (the step note says so), because the
+  // positions are exactly what the alternative shares.
+  const adhesiveFeet = build.feet === 'adhesive';
+  const FOOT_LABEL = adhesiveFeet ? 'Adhesive rubber foot' : 'Tabletop Kit Foot';
 
   // ---- normalize units to a bottom-left origin ----------------------------
   const gridBottom = build.gridH * 2; // planner y counts half-rows from the TOP
@@ -553,6 +568,11 @@ export function generateManifest(build) {
     }
     bom.get(node).qty += n;
   };
+  // one foot in the BOM: the printed part, or the purchased alternative
+  // (purchased + REQUIRED - a tabletop build cannot stand without its feet)
+  const addFoot = () => adhesiveFeet
+    ? add('Tabletop-Kit-Foot', FOOT_LABEL, 'Foot', { buy: BUY.rubberFeet }, 1, true, true)
+    : add('Tabletop-Kit-Foot', FOOT_LABEL, 'Foot', links.kit);
 
   // frame: rails under contiguous bottom-column runs. The two layers use the
   // planner's brickTiling() stagger (data.js) so seams never align and the
@@ -647,7 +667,7 @@ export function generateManifest(build) {
       const id2 = `f${inst.length}`;
       feetIds[z < 0 ? 'back' : 'front'].push(id2);
       inst.push({ id: id2, node: 'Tabletop-Kit-Foot', pos: [x, 0, z], yaw: z < 0 ? 90 : 270, stage: 'base' });
-      add('Tabletop-Kit-Foot', 'Tabletop Kit Foot', 'Foot', links.kit);
+      addFoot();
     }
   } else {
     for (const r of runs) {
@@ -672,7 +692,7 @@ export function generateManifest(build) {
           const id2 = `f${inst.length}`;
           feetIds[z < 0 ? 'back' : 'front'].push(id2);
           inst.push({ id: id2, node: 'Tabletop-Kit-Foot', pos: [railX(r) + lx, 0, z], yaw, stage: 'base' });
-          add('Tabletop-Kit-Foot', 'Tabletop Kit Foot', 'Foot', links.kit);
+          addFoot();
         }
       }
     });
@@ -1329,8 +1349,10 @@ export function generateManifest(build) {
   } else if (caseFeet) {
     preSteps.push(...baseCaseSteps);
     preSteps.push({
-      title: `Bench: insert the ${nFeet} feet`,
-      note: 'Feet slide into the slots under the case, lengthwise: front feet snap in back-to-front, rear feet front-to-back.' +
+      title: adhesiveFeet ? `Bench: stick on the ${nFeet} feet` : `Bench: insert the ${nFeet} feet`,
+      note: (adhesiveFeet
+        ? 'Adhesive rubber feet: stick one to the flat pad around each slot marked here - the printed feet shown only mark the spots. Same count, same positions as the printed feet.'
+        : 'Feet slide into the slots under the case, lengthwise: front feet snap in back-to-front, rear feet front-to-back.') +
         (bottomUnits[0].w > 1 ? ' Where the middle slots sit close together, fill just one per row.' : ''),
       camera: cam(spanCenter(bottomUnits[0]), 125, totalW, gridBottom, FIT),
       phases: [
@@ -1348,8 +1370,10 @@ export function generateManifest(build) {
       phases: [{ enter: frlIds.map(id => ({ id, from: [0, 90, 0] })) }],
     },
     {
-      title: `Bench: insert the ${nFeet} feet`,
-      note: 'Pointy end slides in first · outer feet toward the rail ends, middle feet left to right.' +
+      title: adhesiveFeet ? `Bench: stick on the ${nFeet} feet` : `Bench: insert the ${nFeet} feet`,
+      note: (adhesiveFeet
+        ? 'Adhesive rubber feet: stick one to the flat pad around each lower-rail slot marked here - the printed feet shown only mark the spots. Same count, same positions as the printed feet.'
+        : 'Pointy end slides in first · outer feet toward the rail ends, middle feet left to right.') +
         (rails.length > 1 ? ' Where two rails meet, install that slot pair on ONE rail only.' : ''),
       camera: cam(0, 115, totalW, gridBottom, FIT),
       phases: [
