@@ -49,6 +49,31 @@ test('adhesive: the same six feet as a purchased, required row - and no printed 
   assert.deepEqual(feet.map(i => i.pos), feetDefault.map(i => i.pos));
 });
 
+test('adhesive feet are a placement MARKER, not the printed part', () => {
+  const m = gen(build({ feet: 'adhesive' }));
+  const r = rows(m)[0];
+  // its own TYPE is what lets the viewer render + label it as a marker
+  assert.equal(r.type, 'FootMarker');
+  // and the marker colour only exists on builds that have one
+  assert.ok(m.colors.FootMarker, 'the marker type carries a colour');
+  assert.equal(gen(build({})).colors.FootMarker, undefined, 'a printed-feet build emits no marker colour');
+  // NO printed-foot render under the label "Adhesive rubber foot"
+  assert.equal(r.img, undefined, 'the adhesive row shows no render (there is no photo of the bought part)');
+  assert.ok(rows(gen(build({})))[0].img, 'the printed row keeps its render');
+  // stuck on, not slid in: the marker materialises at the pad position
+  const step = m.steps.find(s => /stick on/.test(s.title));
+  assert.ok(step.phases.every(p => p.fade && !p.enter), 'the adhesive step fades in place, never slides into slots');
+  const printedStep = gen(build({})).steps.find(s => /insert the/.test(s.title));
+  assert.ok(printedStep.phases.every(p => p.enter), 'the printed step still slides in');
+});
+
+test('the printed-feet manifest is byte-identical to before the feet option existed', () => {
+  // the ten committed kit goldens depend on this: the option must be additive
+  const m = gen(build({}));
+  assert.equal(m.parts.filter(p => p.type === 'FootMarker').length, 0);
+  assert.equal(JSON.stringify(m), JSON.stringify(gen(build({ feet: 'tpu' }))), 'explicit tpu === default');
+});
+
 test('an unknown value falls back to printed feet (the planner sanitizes the same way)', () => {
   const m = gen(build({ feet: 'nonsense' }));
   assert.equal(rows(m)[0].label, 'Tabletop Kit Foot');

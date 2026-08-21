@@ -223,6 +223,8 @@ body.stage-dark .fm-accuracy { display: block; }
 .checklist-row .qty { margin-left: auto; font-weight: 700; color: var(--ink-soft); align-self: flex-start; }
 .checklist-row { align-items: flex-start; }
 .cl-mid { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+/* optional per-row note: an alternative or condition the label can't carry */
+.cl-note { font-size: .78rem; color: var(--ink-soft); line-height: 1.35; }
 
 .dl-link {
   display: inline-block; font-size: 11px; font-weight: 700;

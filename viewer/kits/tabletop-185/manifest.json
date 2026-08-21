@@ -26,7 +26,7 @@
       "links": { "p": "https://www.printables.com/model/1777823-gen2-185-foot-rails" } },
     { "node": "FR-U_185-2W",               "label": "Footrail Upper 185-2W", "img": "img/parts/FR-U_185-2W.png",      "type": "FootrailU",  "qty": 1,
       "links": { "p": "https://www.printables.com/model/1777823-gen2-185-foot-rails" } },
-    { "node": "Tabletop-Kit-Foot",         "label": "Tabletop Kit Foot", "img": "img/parts/TPU Foot.png", "type": "Foot",      "qty": 6,
+    { "node": "Tabletop-Kit-Foot",         "label": "Tabletop Kit Foot", "note": "Or buy adhesive rubber feet instead - same count, same spots (they stick to the flat pads around the slots), and 6 fewer prints.", "img": "img/parts/TPU Foot.png", "type": "Foot",      "qty": 6,
       "links": { "p": "https://www.printables.com/model/1118906-gen2-185-tabletop-starter-kit", "t": "https://thangs.com/designer/Jerrari/3d-model/GEN2%20185%20Tabletop%20Starter%20Kit-1231757" } },
     { "node": "185-1W-1H_Case",            "label": "Case 185-1W-1H", "img": "img/parts/Case 185-1W-1H.png",             "type": "Case",      "qty": 4,
       "links": { "p": "https://www.printables.com/model/1658700-gen2-185-cases-all", "t": "https://thangs.com/designer/Jerrari/3d-model/GEN2%20185%20Cases%20-%20All-1535455" } },
@@ -164,7 +164,7 @@
     },
     {
       "title": "Bench: insert the six feet",
-      "note": "Pointy end slides in first. Outer feet slide toward the rail ends; the middle pair slides left to right.",
+      "note": "Pointy end slides in first. Outer feet slide toward the rail ends; the middle pair slides left to right. Prefer not to print them? Adhesive rubber feet from the hardware store are a one-for-one swap: same count, same positions, stuck to the flat pads around these slots.",
       "camera": { "t": 30, "p": 55, "r": 620, "target": [0, 115, 0] },
       "phases": [
         { "enter": [

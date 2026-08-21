@@ -45,6 +45,7 @@
     {
       "node": "Tabletop-Kit-Foot",
       "label": "Tabletop Kit Foot",
+      "note": "Or buy adhesive rubber feet instead - same count, same spots (they stick to the flat pads around the slots), and 6 fewer prints.",
       "img": "img/parts/TPU Foot.png",
       "type": "Foot",
       "qty": 6,
@@ -929,7 +930,7 @@
     },
     {
       "title": "Bench: insert the six feet",
-      "note": "Pointy end slides in first. Outer feet slide toward the rail ends; the middle pair slides left to right.",
+      "note": "Pointy end slides in first. Outer feet slide toward the rail ends; the middle pair slides left to right. Prefer not to print them? Adhesive rubber feet from the hardware store are a one-for-one swap: same count, same positions, stuck to the flat pads around these slots.",
       "camera": {
         "t": 30,
         "p": 55,

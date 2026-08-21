@@ -453,8 +453,10 @@ function applyShadowQuality() {
   renderer.shadowMap.type = THREE.PCFShadowMap;
   renderer.shadowMap.autoUpdate = false;
   sun.castShadow = on;
-  for (const inst of instances.values())
-    inst.group.traverse(o => { if (o.isMesh) { o.castShadow = on; o.receiveShadow = on; } });
+  for (const inst of instances.values()) {
+    const mark = isMarkerGroup(inst.group); // an annotation casts no shadow
+    inst.group.traverse(o => { if (o.isMesh) { o.castShadow = on && !mark; o.receiveShadow = on && !mark; } });
+  }
   table.receiveShadow = on;
   if (on) fitShadowCamera();
   // shadowMap.enabled is in the program cache key and three does NOT auto-detect
@@ -598,7 +600,7 @@ function updateReflection(force = false) {
   const hidden = [];
   const hide = o => { if (o.visible) { o.visible = false; hidden.push(o); } };
   hide(refl.mesh); hide(grid);
-  scene.traverse(o => { if ((o.isLine || o.isLineSegments || o.isSprite) && o.visible) hide(o); });
+  scene.traverse(o => { if ((o.isLine || o.isLineSegments || o.isSprite || isMarkerGroup(o)) && o.visible) hide(o); });
   const prevBg = scene.background;
   scene.background = null;
   renderer.setRenderTarget(refl.rt);
@@ -763,7 +765,7 @@ function updateAO(force = false) {
   const hidden = [];
   scene.traverse(o => {
     if ((o === table || o === grid || o === wall || o === surface ||
-         o.isLine || o.isLineSegments || o.isSprite || o === refl.mesh) && o.visible) {
+         o.isLine || o.isLineSegments || o.isSprite || o === refl.mesh || isMarkerGroup(o)) && o.visible) {
       o.visible = false; hidden.push(o);
     }
   });
@@ -1312,8 +1314,37 @@ function newPartMaterial(key) {
       envMapIntensity: 1.15,
     }), face);
   }
+  /* A PLACEMENT MARKER, not a part (adhesive feet, 2026-08-21): the geometry
+     is the printed foot's, because the SUPPORT POSITIONS are ground truth
+     while the bought foot's shape is not - so it is drawn translucent and
+     declines to assert a solid shape. A WIREFRAME was tried first and
+     rejected on screen: a 96-triangle foot renders as a few faint lines,
+     invisible at any normal viewing distance, and a marker you cannot see
+     fails its only job.
+     ⚠ It RESTS translucent, which every opacity animation in this engine
+     predates - they were written when opacity 1 was universal. `rest` is
+     stamped HERE, at mint time, so it reaches every path: Material.clone()
+     carries userData, so the highlight clone and each fade clone inherit it,
+     and even the un-cloned collection in `appear`/`solid` finds it. */
+  if (key === 'FootMarker') {
+    const m = new THREE.MeshStandardMaterial({
+      color: new THREE.Color(activeHex(key)), roughness: 0.6, metalness: 0,
+      transparent: true, opacity: 0.42, depthWrite: false,
+    });
+    m.userData.rest = m.opacity;
+    return m;
+  }
   return new THREE.MeshStandardMaterial({ color: new THREE.Color(activeHex(key)), roughness: 0.55, metalness: 0.05 });
 }
+// marker instances are annotations: no shadow, no reflection, no AO occlusion
+const isMarkerGroup = o => !!(o.userData && o.userData.marker);
+/* A material's RESTING opacity. Every fade in this engine used to drive
+   opacity from/to a hardcoded 1, which is only true while every part is
+   opaque; a part that rests translucent (the adhesive-feet placement marker)
+   popped fully opaque the moment one ran. Each clone stamps its rest value on
+   creation, so the tweens scale by it - and for an opaque part rest === 1,
+   leaving every existing animation arithmetically identical. */
+const restOf = m => (m.userData && m.userData.rest != null) ? m.userData.rest : 1;
 // Toggling rebuilds only the faceplate registry entries (a class swap, so it
 // cannot be done in place) and drops their highlight clones; the reassignment
 // onto meshes rides regenerate()'s normal applyState path like every other
@@ -1423,6 +1454,7 @@ function buildInstances() {
     group.userData.instanceId = cfg.id;
     scene.add(group);
     const type = typeByNode[cfg.node];
+    if (type === 'FootMarker') group.userData.marker = true;
     let alt = false;
     if (TILED_TYPES.has(type)) {
       const n = tileSeen[type] = (tileSeen[type] || 0) + 1;
@@ -1500,8 +1532,11 @@ function computeBounds() {
     if (inst.styleHidden) continue; // style-suppressed (handles under an EdgeLabel plate) — not part of the build
     box.expandByObject(inst.group);
     // screws sink INTO the mounting surface (wall/wood) — not part of the
-    // build's physical envelope (same rule as fitWall/fitSurface)
-    if (!inst.cfg.node.startsWith('WoodScrew')) assembledBox.expandByObject(inst.group);
+    // build's physical envelope (same rule as fitWall/fitSurface). Placement
+    // markers are excluded for the same reason and a stronger one: the
+    // envelope is published as the TRUE physical size, and a marker's height
+    // is the PRINTED foot's, which an adhesive build does not have.
+    if (!inst.cfg.node.startsWith('WoodScrew') && !isMarkerGroup(inst.group)) assembledBox.expandByObject(inst.group);
   }
   if (!box.isEmpty()) {
     box.getCenter(buildCenter);
@@ -1577,7 +1612,7 @@ function buildExploded() {
   const SCALE = new THREE.Vector3(1.35, 1.75, 1.35);
   const PUSH = {
     QuickLock: [0, 55, 0], Stopper: [0, 55, 0], MagnetClip: [0, 0, -70], Magnet: [0, 0, -100],
-    Foot: [0, -25, 0], Drawer: [0, 0, 170], CoverU: [0, 45, 0], FootrailU: [0, 25, 0],
+    Foot: [0, -25, 0], FootMarker: [0, -25, 0], Drawer: [0, 0, 170], CoverU: [0, 45, 0], FootrailU: [0, 25, 0],
   };
   const RIDER_PUSH = { Faceplate: [0, 0, 70], Handle: [0, 0, 115] };
   const eFor = inst => {
@@ -1710,13 +1745,14 @@ async function playStep(i) {
         inst.group.traverse(o => {
           if (!o.isMesh) return;
           const m = materialFor(inst, false, o.userData.zone).clone();
+          m.userData.rest = m.opacity; // 1 for a normal part, 0.42 for a marker
           m.transparent = true;
           o.material = m; mats.push(m);
         });
         vanished.add(inst.cfg.id);
         jobs.push(tween({
           duration: DUR.fade,
-          onUpdate: k => mats.forEach(m => { m.opacity = 1 - k; }),
+          onUpdate: k => mats.forEach(m => { m.opacity = restOf(m) * (1 - k); }),
           onDone: () => { inst.group.visible = false; },
         }));
       }
@@ -1731,7 +1767,7 @@ async function playStep(i) {
         inst.group.traverse(o => { if (o.isMesh && o.material.transparent) mats.push(o.material); });
         jobs.push(tween({
           duration: DUR.fade,
-          onUpdate: k => mats.forEach(m => { m.opacity = k; }),
+          onUpdate: k => mats.forEach(m => { m.opacity = restOf(m) * k; }),
           onDone: () => inst.group.traverse(o => { if (o.isMesh) o.material = materialFor(inst, false, o.userData.zone); }),
         }));
       }
@@ -1745,10 +1781,11 @@ async function playStep(i) {
       inst.group.traverse(o => {
         if (!o.isMesh) return;
         const m = materialFor(inst, false, o.userData.zone).clone();
-        m.transparent = true; m.opacity = 1;
+        m.userData.rest = m.opacity;
+        m.transparent = true;
         o.material = m; mats.push(m);
       });
-      jobs.push(tween({ duration: DUR.fade, onUpdate: k => mats.forEach(m => { m.opacity = 1 - 0.85 * k; }) }));
+      jobs.push(tween({ duration: DUR.fade, onUpdate: k => mats.forEach(m => { const r = restOf(m); m.opacity = r - 0.85 * r * k; }) }));
     });
     (ph.solid || []).forEach(g => {
       const inst = instances.get(g.id);
@@ -1756,7 +1793,7 @@ async function playStep(i) {
       inst.group.traverse(o => { if (o.isMesh && o.material.transparent) mats.push(o.material); });
       jobs.push(tween({
         duration: DUR.fade,
-        onUpdate: k => mats.forEach(m => { m.opacity = 0.15 + 0.85 * k; }),
+        onUpdate: k => mats.forEach(m => { const r = restOf(m); m.opacity = r * (0.15 + 0.85 * k); }),
         onDone: () => inst.group.traverse(o => { if (o.isMesh) o.material = materialFor(inst, false, o.userData.zone); })
       }));
     });
@@ -1839,6 +1876,7 @@ async function playStep(i) {
       inst.group.traverse(o => {
         if (!o.isMesh) return;
         const m = materialFor(inst, false, o.userData.zone).clone();
+        m.userData.rest = m.opacity;
         m.transparent = true;
         m.opacity = 0;
         o.material = m;
@@ -1846,7 +1884,7 @@ async function playStep(i) {
       });
       jobs.push(tween({
         duration: DUR.fade, delay: n * 80,
-        onUpdate: k => mats.forEach(m => { m.opacity = k; }),
+        onUpdate: k => mats.forEach(m => { m.opacity = restOf(m) * k; }),
         onDone: () => inst.group.traverse(o => { if (o.isMesh) o.material = materialFor(inst, false, o.userData.zone); })
       }));
     });
@@ -2324,7 +2362,9 @@ function renderChecklist() {
     chip.style.background = activeHex(pk); // reflects custom filament colors
     if (colorLocked(p.type)) { // purchased hardware: no filament picker
       chip.classList.add('locked');
-      chip.title = 'Hardware-store item · shown in its real finish';
+      chip.title = p.type === 'FootMarker'
+        ? 'Hardware-store item · the 3D shows a placement marker, not the product'
+        : 'Hardware-store item · shown in its real finish';
     } else {
       const zoned = pk !== p.type;
       chip.title = (useCustom && customColors[pk] ? customColors[pk].name + ' · ' : '') +
@@ -2343,6 +2383,16 @@ function renderChecklist() {
       // purchased hardware: Amazon affiliate buy options (generate.js BUY)
       for (const b of p.links.buy || []) lnks.appendChild(linkEl(b.label, b.url, buyEvent(b)));
       mid.appendChild(lnks);
+    }
+    // optional per-row note (manifest-driven, like the planner's BOM rows):
+    // where a row has an alternative or a condition the label can't carry -
+    // the static kits use it to name the adhesive-feet option, which has no
+    // Build options selector to discover (generated builds have the picker)
+    if (p.note) {
+      const note = document.createElement('span');
+      note.className = 'cl-note';
+      note.textContent = p.note;
+      mid.appendChild(note);
     }
     const qty = document.createElement('span');
     qty.className = 'qty';
@@ -2403,6 +2453,7 @@ function bomRows() {
   return manifest.parts.filter(p => p.qty > 0 && !p.styleHidden).map(p => ({
     qty: p.qty,
     name: p.label + (p.purchased ? ' (buy)' : ''),
+    note: p.note || '',   // an alternative or condition the label can't carry
     printables: p.links?.p || '',
     thangs: p.links?.t || '',
   }));
@@ -2411,6 +2462,7 @@ function copyBom() {
   let txt = `${manifest.title}\n3D assembly instructions · jerrari3d.com\n`;
   for (const r of bomRows()) {
     txt += `\n${r.qty}× ${r.name}\n`;
+    if (r.note) txt += `    ${r.note}\n`;
     if (r.printables) txt += `    Printables: ${r.printables}\n`;
     if (r.thangs) txt += `    Thangs:     ${r.thangs}\n`;
   }
@@ -2419,8 +2471,8 @@ function copyBom() {
 function downloadCsv() {
   track('bom:csv');
   const esc = s => `"${String(s).replace(/"/g, '""')}"`;
-  let csv = 'Qty,Part,Printables,Thangs\n';
-  for (const r of bomRows()) csv += [r.qty, esc(r.name), esc(r.printables), esc(r.thangs)].join(',') + '\n';
+  let csv = 'Qty,Part,Note,Printables,Thangs\n';
+  for (const r of bomRows()) csv += [r.qty, esc(r.name), esc(r.note), esc(r.printables), esc(r.thangs)].join(',') + '\n';
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
   a.download = `gen2-${manifest.collection || 'build'}-parts.csv`;
@@ -2813,7 +2865,8 @@ function setSelected(id) {
   const selKey = primaryKey(inst.cfg.node); // the visible front, not the hidden base
   sw.style.background = activeHex(selKey);
   sw.classList.toggle('locked', selLocked);
-  sw.title = selLocked ? 'Hardware-store item · shown in its real finish'
+  sw.title = selLocked
+      ? (selType === 'FootMarker' ? 'Hardware-store item · the 3D shows a placement marker, not the product' : 'Hardware-store item · shown in its real finish')
     : selKey !== selType ? 'Pick the face filament · the chips below cover every zone'
     : 'Pick a filament color';
   renderZoneChips(inst); // 2-zone parts get Body + Grip swatches; others hide the row
@@ -3099,6 +3152,7 @@ function fadeOutInstance(inst) {
   inst.group.traverse(o => {
     if (!o.isMesh) return;
     const m = materialFor(inst, false, o.userData.zone).clone();
+    m.userData.rest = m.opacity;
     m.transparent = true;
     m.userData.fpFade = true; // exit only reclaims meshes that still hold OUR clone
     o.material = m;
@@ -3107,7 +3161,7 @@ function fadeOutInstance(inst) {
   fpFocus.mats.set(inst.cfg.id, mats);
   tween({
     duration: DUR.fade,
-    onUpdate: k => mats.forEach(m => { m.opacity = 1 - (1 - FP_FADE) * k; }),
+    onUpdate: k => mats.forEach(m => { const r = restOf(m); m.opacity = r - (r - FP_FADE) * k; }),
     // fully faded → stop drawing it (an invisible part must not catch taps or
     // occlude anything; skipped if the focus already ended / hopped away)
     onDone: () => { if (fpFocus.id && fpFocus.mats.has(inst.cfg.id)) inst.group.visible = false; },
@@ -3120,7 +3174,7 @@ function unfadeInstance(inst) {
   inst.group.visible = true; // only instances that were visible at focus time ever get faded
   tween({
     duration: DUR.fade,
-    onUpdate: k => mats.forEach(m => { m.opacity = FP_FADE + (1 - FP_FADE) * k; }),
+    onUpdate: k => mats.forEach(m => { const r = restOf(m); m.opacity = FP_FADE + (r - FP_FADE) * k; }),
     // only reclaim meshes that still hold OUR clone — a step phase, applyState
     // or a handle-style swap may have replaced materials while we faded back
     onDone: () => inst.group.traverse(o => { if (o.isMesh && o.material.userData?.fpFade) o.material = materialFor(inst, false, o.userData.zone); }),
@@ -4235,7 +4289,9 @@ canvas.addEventListener('pointerup', e => {
     // on a plate boot the slab is a legitimate target too — free points on the
     // plate SURFACE, measured manually (never claimed as an edge-clearance
     // result; that precision is a future automatic callout)
-    const targets = pickable.map(i => i.group);
+    // markers are annotations, not parts: measuring them would return
+    // millimetres from geometry that is explicitly not the product
+    const targets = pickable.filter(i => !isMarkerGroup(i.group)).map(i => i.group);
     if (IS_PART && plateStage.group) targets.push(plateStage.group.children[0]);
     const mhits = ray.intersectObjects(targets, true);
     if (mhits.length) addMeasurePoint(mhits[0].point);

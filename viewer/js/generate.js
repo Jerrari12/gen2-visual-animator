@@ -471,6 +471,14 @@ export function generateManifest(build) {
   // positions are exactly what the alternative shares.
   const adhesiveFeet = build.feet === 'adhesive';
   const FOOT_LABEL = adhesiveFeet ? 'Adhesive rubber foot' : 'Tabletop Kit Foot';
+  // With adhesive feet the scene shows the printed foot's geometry at the
+  // verified support POSITIONS - it is a placement marker, not the product,
+  // whose real shape and colour are an off-the-shelf item nobody measured.
+  // Its own TYPE ('FootMarker') is what lets the viewer render and label it
+  // as a marker: materials/highlights/palette are all type-keyed, so this
+  // costs no new registry. Emitted ONLY on adhesive builds, so the default
+  // manifest (and the ten committed kit goldens) stays byte-identical.
+  const FOOT_TYPE = adhesiveFeet ? 'FootMarker' : 'Foot';
 
   // ---- normalize units to a bottom-left origin ----------------------------
   const gridBottom = build.gridH * 2; // planner y counts half-rows from the TOP
@@ -562,7 +570,7 @@ export function generateManifest(build) {
   // "· N to buy" counter reports (main.js renderChecklist).
   const add = (node, label, type, links, n = 1, purchased = false, required = false) => {
     if (!bom.has(node)) {
-      const img = imgFor(node);
+      const img = imgFor(node, type);
       bom.set(node, { node, label, type, qty: 0, ...(links ? { links } : {}), ...(img ? { img } : {}),
         ...(purchased ? { purchased } : {}), ...(required ? { required } : {}) });
     }
@@ -571,8 +579,8 @@ export function generateManifest(build) {
   // one foot in the BOM: the printed part, or the purchased alternative
   // (purchased + REQUIRED - a tabletop build cannot stand without its feet)
   const addFoot = () => adhesiveFeet
-    ? add('Tabletop-Kit-Foot', FOOT_LABEL, 'Foot', { buy: BUY.rubberFeet }, 1, true, true)
-    : add('Tabletop-Kit-Foot', FOOT_LABEL, 'Foot', links.kit);
+    ? add('Tabletop-Kit-Foot', FOOT_LABEL, FOOT_TYPE, { buy: BUY.rubberFeet }, 1, true, true)
+    : add('Tabletop-Kit-Foot', FOOT_LABEL, FOOT_TYPE, links.kit);
 
   // frame: rails under contiguous bottom-column runs. The two layers use the
   // planner's brickTiling() stagger (data.js) so seams never align and the
@@ -1355,7 +1363,14 @@ export function generateManifest(build) {
         : 'Feet slide into the slots under the case, lengthwise: front feet snap in back-to-front, rear feet front-to-back.') +
         (bottomUnits[0].w > 1 ? ' Where the middle slots sit close together, fill just one per row.' : ''),
       camera: cam(spanCenter(bottomUnits[0]), 125, totalW, gridBottom, FIT),
-      phases: [
+      // adhesive feet are STUCK ON, not slid in: the markers materialise at
+      // the pad positions instead of sliding into the slots (a note saying
+      // "stick on" over a sliding animation is the same contradiction the
+      // marker itself was fixing)
+      phases: adhesiveFeet ? [
+        { fade: feetIds.back.map(id => ({ id })) },
+        { fade: feetIds.front.map(id => ({ id })) },
+      ] : [
         { enter: feetIds.back.map(id => ({ id, from: [0, 0, 35] })) },
         { enter: feetIds.front.map(id => ({ id, from: [0, 0, -35] })) },
       ],
@@ -1376,7 +1391,11 @@ export function generateManifest(build) {
         : 'Pointy end slides in first · outer feet toward the rail ends, middle feet left to right.') +
         (rails.length > 1 ? ' Where two rails meet, install that slot pair on ONE rail only.' : ''),
       camera: cam(0, 115, totalW, gridBottom, FIT),
-      phases: [
+      // stuck on, not slid in - see the case-feet step above
+      phases: adhesiveFeet ? [
+        { fade: feetIds.back.map(id => ({ id })) },
+        { fade: feetIds.front.map(id => ({ id })) },
+      ] : [
         { enter: feetIds.back.map((id, n) => ({ id, from: [n === 0 ? 30 : -30, 0, 0] })) },
         { enter: feetIds.front.map((id, n) => ({ id, from: [n === 0 ? 30 : -30, 0, 0] })) },
       ],
@@ -1495,7 +1514,9 @@ export function generateManifest(build) {
     generated: true,
     mount: build.mount,
     pitch: { x: PITCH_X, y: 56 },
-    colors: COLORS,
+    // FootMarker rides in only when it exists, so a printed-feet build emits
+    // exactly the colours it always did
+    colors: adhesiveFeet ? { ...COLORS, FootMarker: COLORS.Foot } : COLORS,
     parts: [...bom.values()],
     instances: inst,
     stages,
@@ -1505,7 +1526,7 @@ export function generateManifest(build) {
 }
 
 // part image for the identify card / checklist — same renders as the planner BOM
-function imgFor(node) {
+function imgFor(node, type) {
   let m;
   // Case / decor renders are per-collection — ALL six lengths copied from the
   // planner's per-length batches (2026-07-10). The identify card's <img>
@@ -1534,7 +1555,12 @@ function imgFor(node) {
   // TPU foot — ONE universal render: the foot is length-agnostic (it seats in
   // the foot rail / case underside slots, which are the same on every
   // collection), so there's no per-length set like the cases or drawers.
-  if (node === 'Tabletop-Kit-Foot') return 'img/parts/TPU Foot.png';
+  // ⚠ NODE-keyed, and both feet options share this node: an adhesive build
+  // passes type 'FootMarker' so the row shows NO render rather than the
+  // printed foot's photo under the label "Adhesive rubber foot" (imgFor
+  // returning null degrades gracefully - the BOM row omits img, the identify
+  // card hides its <img>).
+  if (node === 'Tabletop-Kit-Foot') return type === 'FootMarker' ? null : 'img/parts/TPU Foot.png';
   // handle fastener (2026-07-24) — rendered at full thread detail, unlike the
   // deliberately decimated GLB
   if (node === 'ButtonHeadScrew_M3-6') return 'img/parts/ButtonHeadScrew_M3-6.png';
