@@ -1,5 +1,15 @@
 # Normalize text line endings; let git auto-detect binaries (GLB, PNG, etc.)
 * text=auto
+
+# ⚠ GOLDEN FILES ARE COMPARED AS EXACT STRINGS, so they must check out as LF on
+# every platform. `* text=auto` above stores them as LF (verified: zero CRLF in
+# any golden blob) but checks them out using core.eol, which is NATIVE by
+# default - so a fresh clone on Windows gets CRLF while JSON.stringify() emits
+# LF, and all ten official-kit tests fail with a full-file diff that reads
+# exactly like a real generator regression. Measured: Windows fresh clone
+# 57/67, the same clone with core.eol=lf (what a Linux CI runner does) 67/67.
+# CI was never affected; a Windows contributor always was.
+test/golden/** text eol=lf
 *.glb binary
 *.png binary
 *.jpg binary
