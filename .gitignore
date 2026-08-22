@@ -64,3 +64,7 @@ AGENTS.md
 # Archived handoffs and run logs. The patterns above are all basename-only, so
 # they keep matching after a move into notes/ — this covers anything else.
 notes/
+
+# dependencies (jsdom is a devDependency for the cross-tool parity test only)
+node_modules/
+package-lock.json

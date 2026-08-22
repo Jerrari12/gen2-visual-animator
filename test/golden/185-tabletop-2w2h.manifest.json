@@ -107,7 +107,19 @@
     "p": "https://www.printables.com/model/1012796-gen2-hardware",
     "t": "https://thangs.com/designer/Jerrari/3d-model/GEN2%20Hardware-1141439"
    },
-   "img": "img/parts/Magnet Clip.png"
+   "img": "img/parts/Magnet Clip.png",
+   "requirement": {
+    "scope": "option",
+    "obligationId": "drawer.closure",
+    "optionId": "drawer.closure.magnet"
+   },
+   "basis": {
+    "axis": "drawer.closure",
+    "choice": "magnet",
+    "subjectType": "unit",
+    "selectedCount": 3
+   },
+   "required": true
   },
   {
    "node": "Magnet_10x2mm",
@@ -139,7 +151,19 @@
     ]
    },
    "img": "img/parts/Magnets.png",
-   "purchased": true
+   "purchased": true,
+   "requirement": {
+    "scope": "option",
+    "obligationId": "drawer.closure",
+    "optionId": "drawer.closure.magnet"
+   },
+   "basis": {
+    "axis": "drawer.closure",
+    "choice": "magnet",
+    "subjectType": "unit",
+    "selectedCount": 3
+   },
+   "required": true
   },
   {
    "node": "185-2W-1H_Case",
@@ -162,7 +186,11 @@
     "p": "https://www.printables.com/model/1012796-gen2-hardware",
     "t": "https://thangs.com/designer/Jerrari/3d-model/GEN2%20Hardware-1141439"
    },
-   "img": "img/parts/Drawer Stopper.png"
+   "img": "img/parts/Drawer Stopper.png",
+   "requirement": {
+    "scope": "enhancement",
+    "obligationId": "drawer.retention"
+   }
   },
   {
    "node": "Drawer_Stoppers_R",
@@ -173,7 +201,11 @@
     "p": "https://www.printables.com/model/1012796-gen2-hardware",
     "t": "https://thangs.com/designer/Jerrari/3d-model/GEN2%20Hardware-1141439"
    },
-   "img": "img/parts/Drawer Stopper.png"
+   "img": "img/parts/Drawer Stopper.png",
+   "requirement": {
+    "scope": "enhancement",
+    "obligationId": "drawer.retention"
+   }
   },
   {
    "node": "CL-185-2W",
@@ -185,7 +217,13 @@
     "t": "https://than.gs/m/1574319",
     "m": "https://makerworld.com/en/models/3093827-gen2-185-covers"
    },
-   "img": "img/parts/CL-185-2W.png"
+   "img": "img/parts/CL-185-2W.png",
+   "requirement": {
+    "scope": "option",
+    "obligationId": "drawer.stopper.seat",
+    "optionId": "drawer.stoppers"
+   },
+   "required": true
   },
   {
    "node": "CU-185-2W",
@@ -197,7 +235,12 @@
     "t": "https://than.gs/m/1574319",
     "m": "https://makerworld.com/en/models/3093827-gen2-185-covers"
    },
-   "img": "img/parts/CU-185-2W.png"
+   "img": "img/parts/CU-185-2W.png",
+   "requirement": {
+    "scope": "core",
+    "obligationId": "top.enclosure"
+   },
+   "required": true
   },
   {
    "node": "DecorDrawer_185-1W-1H",

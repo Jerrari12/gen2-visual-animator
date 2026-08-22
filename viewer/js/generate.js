@@ -10,6 +10,29 @@
 // 2026-07-10: too shallow to be stable on rails) — feet go into every bottom
 // case's own underside slots instead.
 
+/* THE REQUIREMENT-SCOPE CONTRACT - resolved, never reimplemented.
+   In the browser, viewer/js/vendor/requirement-scope.js is a classic script
+   loaded before this module and attaches GEN2_REQ to the global. In node (the
+   test suites import this file directly, no DOM) there is no such global, so
+   the same vendored file is read and evaluated here. Either way the bytes are
+   the planner's, gated by test/requirement-scope-vendor.test.mjs.
+   ⚠ FAIL LOUD. A generator that silently ran without the contract would emit
+   unclassified rows that every consumer downstream would misread as "never
+   migrated" rather than "broken" - the exact silent failure this replaces. */
+const REQ = (() => {
+  if (typeof globalThis.GEN2_REQ === 'object' && globalThis.GEN2_REQ) return globalThis.GEN2_REQ;
+  if (typeof process !== 'undefined' && process.versions && process.versions.node) {
+    // node: evaluate the vendored classic script the way a browser would
+    const { readFileSync } = process.getBuiltinModule('node:fs');
+    const { fileURLToPath } = process.getBuiltinModule('node:url');
+    const { join, dirname } = process.getBuiltinModule('node:path');
+    const here = dirname(fileURLToPath(import.meta.url));
+    (0, eval)(readFileSync(join(here, 'vendor', 'requirement-scope.js'), 'utf8'));
+    if (globalThis.GEN2_REQ) return globalThis.GEN2_REQ;
+  }
+  throw new Error('requirement-scope contract is not loaded: viewer/js/vendor/requirement-scope.js must precede generate.js (see index.html)');
+})();
+
 const PITCH_X = 88, PITCH_HALF_Y = 28;        // 1W column / half-row pitch
 const ROW0_BOTTOM = 17.65;                    // bottom-row case bottom (7.65 + 10.00)
 const FRL_Y = 7.65, FRU_Y = 12.75;
@@ -310,6 +333,34 @@ export function generateManifest(build) {
   // a drawer. Shared verbatim with the planner so removals round-trip.
   const removedStoppers = new Set(build.removedStoppers || []);
   const stopperOff = (u, c) => removedStoppers.has(`${u.id}:${c - u.col}`);
+
+  /* REQUIREMENT FACTS this generator knows and the shared classifier does not.
+     The policy - what makes a Cover Lower core, option or enhancement - lives
+     in the vendored contract and in the planner's buildCoverItems(); this file
+     only establishes the FACTS and hands them over:
+       - does any top cover run need the staggered two-layer tiling?  A run of
+         3W+ tiles 1W+2W with offset seams and the lower layer ties the sections
+         together (the same rule the planner's brickTiling() encodes as
+         lowerOptional === false). 1W and 2W are a single piece per layer.
+       - are there any drawer stoppers? They seat INTO the Cover Lower.
+     Both are resolved lazily, after units/runs exist, via coverReq(). */
+  const REQ_MOUNT = { 'under-table': 'under-table', wall: 'wall', tabletop: 'tabletop' }[build.mount] || build.mount;
+  const mountCore = (obligationId) => ({
+    requirement: REQ.core(obligationId),
+    basis: REQ.basis('mount', REQ_MOUNT, 'build'),
+  });
+  let coverFacts = null;   // { staggerRequired, hasStoppers } - filled once units exist
+  // stoppers are recommended and removable; omitting them keeps every selected capability intact
+  const STOPPER_REQ = { requirement: REQ.enhancement('drawer.retention') };
+  const coverReq = (layer) => {
+    if (layer === 'upper') return { requirement: REQ.core('top.enclosure') };
+    const f = coverFacts || { staggerRequired: false, hasStoppers: false };
+    const reasons = [];
+    if (f.staggerRequired) reasons.push(Object.assign(REQ.core('top.enclosure'), { basis: REQ.basis('cover.layout', 'staggered', 'build') }));
+    if (f.hasStoppers) reasons.push(Object.assign(REQ.option('drawer.stopper.seat', 'drawer.stoppers'), { basis: REQ.basis('drawer.stoppers', 'on', 'build') }));
+    if (!reasons.length) reasons.push(REQ.enhancement('top.rigidity'));
+    return REQ.resolveReasons(reasons);
+  };
   // wallStagger = one connected staggered cover across the whole top row (built
   // and hung as a unit); false = per-column cover on each top case.
   const isStaggered = isWall && !!build.wallStagger;
@@ -575,13 +626,43 @@ export function generateManifest(build) {
   // purpose — they're an opt-in closure with "None" right beside it, so a
   // magnet build is still print-and-build-today. That distinction is what the
   // "· N to buy" counter reports (main.js renderChecklist).
-  const add = (node, label, type, links, n = 1, purchased = false, required = false) => {
+  /* `req` is the row's requirement metadata - { requirement, basis?, reasons? }
+     built with the SHARED classifiers in GEN2_REQ (viewer/js/vendor/
+     requirement-scope.js, vendored byte-for-byte from the planner). This
+     generator keeps computing its own geometry, instances and counts; what it
+     must never do is restate what core / option / enhancement MEAN. It passes
+     the facts it knows (this drawer chose magnets; this build is under-table)
+     into the planner-owned constructors and emits whatever comes back.
+     ⚠ `required` survives as a DERIVED legacy boolean for readers not yet
+     moved, computed by the contract as scope !== 'enhancement' - never set by
+     hand here any more, so it cannot disagree with the requirement. */
+  const add = (node, label, type, links, n = 1, purchased = false, required = false, req = null) => {
     if (!bom.has(node)) {
       const img = imgFor(node, type);
-      bom.set(node, { node, label, type, qty: 0, ...(links ? { links } : {}), ...(img ? { img } : {}),
-        ...(purchased ? { purchased } : {}), ...(required ? { required } : {}) });
+      const row = { node, label, type, qty: 0, ...(links ? { links } : {}), ...(img ? { img } : {}),
+        ...(purchased ? { purchased } : {}) };
+      if (req && req.requirement) {
+        row.requirement = req.requirement;
+        // COPY the basis: per-unit rows accumulate selectedCount across calls
+        // below, and the caller's object must not be mutated under it. It
+        // starts at 0 so the increment after this block counts the first
+        // subject exactly once.
+        if (req.basis) row.basis = { ...req.basis, ...('selectedCount' in req.basis ? { selectedCount: 0 } : {}) };
+        if (req.reasons) row.reasons = req.reasons;
+        // the legacy boolean is DERIVED, and `required` passed alongside is ignored
+        const derived = REQ.selectedPlanRows([row]).length === 1;
+        if (derived) row.required = true;
+      } else if (required) {
+        row.required = true;   // unmigrated row - the ratchet counts these
+      }
+      bom.set(node, row);
     }
-    bom.get(node).qty += n;
+    const row = bom.get(node);
+    row.qty += n;
+    // an aggregated per-unit basis keeps counting the subjects that chose it
+    if (req && req.basis && typeof req.basis.selectedCount === 'number' && row.basis) {
+      row.basis.selectedCount = (row.basis.selectedCount || 0) + req.basis.selectedCount;
+    }
   };
   // one foot in the BOM: the printed part, or the purchased alternative
   // (purchased + REQUIRED - a tabletop build cannot stand without its feet)
@@ -631,7 +712,7 @@ export function generateManifest(build) {
       const id = `utr${utIds.length}`;
       utIds.push(id);
       inst.push({ id, node: `UnderTableRail_${L}-${w}W`, pos: [railX(t), flatTopY + UT.railBottom, railZ] });
-      add(`UnderTableRail_${L}-${w}W`, `Under-Table Rail ${L}-${w}W`, 'Rail', links.rail);
+      add(`UnderTableRail_${L}-${w}W`, `Under-Table Rail ${L}-${w}W`, 'Rail', links.rail, 1, false, false, mountCore('mount.install'));
       // screws: one x-position at each rail end (inset 5) + every internal 88 mm
       // seam, × 2 depth rows (front/back) → 2(W+1) per tile = planner railScrews(w).
       // Pitched 90° about X so they stand tip-up into the surface.
@@ -642,7 +723,7 @@ export function generateManifest(build) {
         const sid = `uts${utScrewIds.length}`;
         utScrewIds.push(sid);
         inst.push({ id: sid, node: 'WoodScrew', pos: [railX(t) + lx, flatTopY + UT.screwY, z], rot: [90, 0, 0] });
-        add('WoodScrew', 'Wood Screw', 'Screw', { ...links.rail, buy: BUY.woodScrews }, 1, true, true); // purchased + REQUIRED (the rail can't mount without them)
+        add('WoodScrew', 'Wood Screw', 'Screw', { ...links.rail, buy: BUY.woodScrews }, 1, true, true, mountCore('mount.install')); // purchased + core: the rail can't mount without them
       }
       c += w;
     }
@@ -657,14 +738,14 @@ export function generateManifest(build) {
       const id = `br${bracketIds.length}`;
       bracketIds.push(id);
       inst.push({ id, node: `WallMount_Lite_${w}W`, pos: [railX(r), bracketBaseY, WALL.bracketZ + dz] });
-      add(`WallMount_Lite_${w}W`, `Wall Mount Lite ${w}W`, 'Bracket', links.wall);
+      add(`WallMount_Lite_${w}W`, `Wall Mount Lite ${w}W`, 'Bracket', links.wall, 1, false, false, mountCore('mount.install'));
       c += w;
     }
     for (let c = 0; c < totalW; c++) for (const dx of [-WALL.screwDX, WALL.screwDX]) {
       const id = `sc${screwIds.length}`;
       screwIds.push(id);
       inst.push({ id, node: 'WoodScrew', pos: [colCenter(c) + dx, pegY, WALL.screwZ + dz] });
-      add('WoodScrew', 'Wood Screw', 'Screw', { ...links.wall, buy: BUY.woodScrews }, 1, true, true); // purchased + REQUIRED (nothing hangs without them)
+      add('WoodScrew', 'Wood Screw', 'Screw', { ...links.wall, buy: BUY.woodScrews }, 1, true, true, mountCore('mount.install')); // purchased + core: nothing hangs without them
     }
   } else if (caseFeet) {
     // feet slide into the bottom case's own underside slots: 4 per 1W, running
@@ -726,6 +807,39 @@ export function generateManifest(build) {
   const topPlacements = [], topMembers = [];
   const stagHang = { title: 'Hang the top row on the pegs', _stoppers: [], phases: [] };
   let stagCoverStep = null;
+
+  /* The cover FACTS, established once before any cover row is emitted. Which
+     runs get covers depends on mount: a staggered wall covers the whole top
+     row as one run; otherwise each top case is its own run. A run wider than
+     2W needs the two-layer stagger (lower layer structurally required). Any
+     drawer that keeps at least one stopper pair seats those into the CL. */
+  {
+    const topUnits = units.filter(u => u.topIdx === maxTop);
+    /* ⚠ RUN WIDTH IS THE CONTIGUOUS TOP RUN, NOT THE PER-CASE WIDTH. The first
+       version used each top case's own width and classified the 3W starter's
+       Cover Lower as option while the planner said core - caught by the
+       cross-tool parity check. The planner's ctx.runs spans contiguous top
+       columns, and brickTiling(3) on that run is the staggered 1W+2W tiling
+       whose lower layer ties the sections together. This generator tiles the
+       SAME pieces (CL-2W + CL-1W) but had asked the question per case. The
+       fact must be gathered the way the owner of the policy gathers it. */
+    const topCols = new Set();
+    topUnits.forEach(u => { for (let c = u.col; c < u.col + u.w; c++) topCols.add(c); });
+    const contiguousRuns = [];
+    for (let c = 0, run = null; c < totalW; c++) {
+      if (topCols.has(c)) { if (!run) contiguousRuns.push(run = { w: 1 }); else run.w++; }
+      else run = null;
+    }
+    const runWidths = isStaggered ? [totalW] : contiguousRuns.map(r => r.w);
+    const anyDrawerStoppers = units.some(u =>
+      (u.fill === 'decor' || u.fill === 'classic') &&
+      Array.from({ length: u.w }, (_, k) => u.col + k).some(c => !stopperOff(u, c)));
+    coverFacts = {
+      staggerRequired: runWidths.some(w => w > 2),
+      hasStoppers: anyDrawerStoppers,
+    };
+  }
+
   units.forEach((u, i) => {
     const H = H_LABEL[u.hh];
     const caseNode = `${L}-${u.w}W-${H}H_Case`;
@@ -769,8 +883,16 @@ export function generateManifest(build) {
       mcId = `mc${i}`; mgId = `mg${i}`;
       inst.push({ id: mcId, node: 'MagnetClip_10x2mm', pos: [mx, mcy, -85.7 + dz], owner: u.id, ...stg });
       inst.push({ id: mgId, node: 'Magnet_10x2mm', pos: [mx, mcy + 4.2, -86 + dz], owner: u.id, ...stg });
-      add('MagnetClip_10x2mm', 'Magnet Clip 10×2', 'MagnetClip', links.hw, 2);
-      add('Magnet_10x2mm', 'Magnet 10×2 mm', 'Magnet', { buy: BUY.magnets }, 2, true); // purchased but NOT required — an opt-in closure
+      // ⚠ OPTION rows, classified by the SHARED contract, not by this file: they
+      // exist only because THIS drawer chose magnetic closure. Per-unit basis,
+      // so add() accumulates selectedCount across the drawers that opted in -
+      // the shared BOM stores totals; which drawer stays in the instances above.
+      const magReq = {
+        requirement: REQ.option('drawer.closure', 'drawer.closure.magnet'),
+        basis: REQ.basis('drawer.closure', 'magnet', 'unit', 1),
+      };
+      add('MagnetClip_10x2mm', 'Magnet Clip 10×2', 'MagnetClip', links.hw, 2, false, false, magReq);
+      add('Magnet_10x2mm', 'Magnet 10×2 mm', 'Magnet', { buy: BUY.magnets }, 2, true, false, magReq);
       members.push(mcId, mgId);
     }
     const step = {
@@ -818,12 +940,12 @@ export function generateManifest(build) {
       for (const t of tileOut(run, tilesLower(u.w))) {
         const id = `cl${clIds.length}`; clIds.push(id); clLocal.push(id);
         inst.push({ id, node: `CL-${L}-${t.w}W`, pos: [railX(t), flatTopY, 0], ...stg });
-        add(`CL-${L}-${t.w}W`, `Cover Lower ${L}-${t.w}W`, 'CoverL', links.covers);
+        add(`CL-${L}-${t.w}W`, `Cover Lower ${L}-${t.w}W`, 'CoverL', links.covers, 1, false, false, coverReq('lower'));
       }
       for (const t of tileOut(run, tilesUpper(u.w))) {
         const id = `cu${cuIds.length}`; cuIds.push(id); cuLocal.push(id);
         inst.push({ id, node: `CU-${L}-${t.w}W`, pos: [railX(t), flatTopY + 4.3, 0], ...stg });
-        add(`CU-${L}-${t.w}W`, `Cover Upper ${L}-${t.w}W`, 'CoverU', links.covers);
+        add(`CU-${L}-${t.w}W`, `Cover Upper ${L}-${t.w}W`, 'CoverU', links.covers, 1, false, false, coverReq('upper'));
       }
       const coverIds = [...clLocal, ...cuLocal];
       // a top-row drawer's own stoppers go into its CL (handled here, so the
@@ -834,8 +956,8 @@ export function generateManifest(build) {
         const lx = colCenter(c), idL = `tst${i}c${c}L`, idR = `tst${i}c${c}R`, sk = `${u.id}:${c - u.col}`;
         inst.push({ id: idL, node: 'Drawer_Stoppers_L', pos: [lx - 12.6, flatTopY - 2, 76.5 - dz], stopperKey: sk, ...stg });
         inst.push({ id: idR, node: 'Drawer_Stoppers_R', pos: [lx + 12.4, flatTopY - 2, 76.5 - dz], stopperKey: sk, ...stg });
-        add('Drawer_Stoppers_L', 'Drawer Stopper L', 'Stopper', links.hw);
-        add('Drawer_Stoppers_R', 'Drawer Stopper R', 'Stopper', links.hw);
+        add('Drawer_Stoppers_L', 'Drawer Stopper L', 'Stopper', links.hw, 1, false, false, STOPPER_REQ);
+        add('Drawer_Stoppers_R', 'Drawer Stopper R', 'Stopper', links.hw, 1, false, false, STOPPER_REQ);
         stopIds.push(idL, idR);
       }
       members.push(...coverIds, ...stopIds); // all ride the hang together
@@ -961,12 +1083,12 @@ export function generateManifest(build) {
     for (const t of tileOut(run, tilesLower(totalW))) {
       const id = `cl${clIds.length}`; clIds.push(id); clLocal.push(id);
       inst.push({ id, node: `CL-${L}-${t.w}W`, pos: [railX(t), flatTopY, 0], stage: 'wtop' });
-      add(`CL-${L}-${t.w}W`, `Cover Lower ${L}-${t.w}W`, 'CoverL', links.covers);
+      add(`CL-${L}-${t.w}W`, `Cover Lower ${L}-${t.w}W`, 'CoverL', links.covers, 1, false, false, coverReq('lower'));
     }
     for (const t of tileOut(run, tilesUpper(totalW))) {
       const id = `cu${cuIds.length}`; cuIds.push(id); cuLocal.push(id);
       inst.push({ id, node: `CU-${L}-${t.w}W`, pos: [railX(t), flatTopY + 4.3, 0], stage: 'wtop' });
-      add(`CU-${L}-${t.w}W`, `Cover Upper ${L}-${t.w}W`, 'CoverU', links.covers);
+      add(`CU-${L}-${t.w}W`, `Cover Upper ${L}-${t.w}W`, 'CoverU', links.covers, 1, false, false, coverReq('upper'));
     }
     // stoppers into the CL for each top-row drawer column (before the CU caps them)
     units.filter(u => u.topIdx === maxTop && (u.fill === 'decor' || u.fill === 'classic')).forEach(u => {
@@ -975,8 +1097,8 @@ export function generateManifest(build) {
         const lx = colCenter(c), idL = `tst${c}L`, idR = `tst${c}R`, sk = `${u.id}:${c - u.col}`;
         inst.push({ id: idL, node: 'Drawer_Stoppers_L', pos: [lx - 12.6, flatTopY - 2, 76.5 - dz], stopperKey: sk, stage: 'wtop' });
         inst.push({ id: idR, node: 'Drawer_Stoppers_R', pos: [lx + 12.4, flatTopY - 2, 76.5 - dz], stopperKey: sk, stage: 'wtop' });
-        add('Drawer_Stoppers_L', 'Drawer Stopper L', 'Stopper', links.hw);
-        add('Drawer_Stoppers_R', 'Drawer Stopper R', 'Stopper', links.hw);
+        add('Drawer_Stoppers_L', 'Drawer Stopper L', 'Stopper', links.hw, 1, false, false, STOPPER_REQ);
+        add('Drawer_Stoppers_R', 'Drawer Stopper R', 'Stopper', links.hw, 1, false, false, STOPPER_REQ);
         stopIds.push(idL, idR);
       }
     });
@@ -1026,8 +1148,8 @@ export function generateManifest(build) {
       stopN++;
       inst.push({ id: idL, node: 'Drawer_Stoppers_L', pos: [lx - 12.6, sy, 76.5 - dz], stopperKey: sk });
       inst.push({ id: idR, node: 'Drawer_Stoppers_R', pos: [lx + 12.4, sy, 76.5 - dz], stopperKey: sk });
-      add('Drawer_Stoppers_L', 'Drawer Stopper L', 'Stopper', links.hw);
-      add('Drawer_Stoppers_R', 'Drawer Stopper R', 'Stopper', links.hw);
+      add('Drawer_Stoppers_L', 'Drawer Stopper L', 'Stopper', links.hw, 1, false, false, STOPPER_REQ);
+      add('Drawer_Stoppers_R', 'Drawer Stopper R', 'Stopper', links.hw, 1, false, false, STOPPER_REQ);
       const host = units.findIndex(v => v.rowIdx === u.topIdx && c >= v.col && c < v.col + v.w);
       const entry = { enter: [{ id: idL, from: [0, 55, 0] }, { id: idR, from: [0, 55, 0] }] };
       // a drawer's stoppers drop into the floor of the case above it (that case's
@@ -1073,13 +1195,13 @@ export function generateManifest(build) {
       const i = clIds.length;
       inst.push({ id: `cl${i}`, node: `CL-${L}-${t.w}W`, pos: [railX(t), clY, 0] });
       clIds.push(`cl${i}`);
-      add(`CL-${L}-${t.w}W`, `Cover Lower ${L}-${t.w}W`, 'CoverL', links.covers);
+      add(`CL-${L}-${t.w}W`, `Cover Lower ${L}-${t.w}W`, 'CoverL', links.covers, 1, false, false, coverReq('lower'));
     }
     for (const t of tileOut(r, tilesUpper(n))) {
       const i = cuIds.length;
       inst.push({ id: `cu${i}`, node: `CU-${L}-${t.w}W`, pos: [railX(t), clY + 4.3, 0] });
       cuIds.push(`cu${i}`);
-      add(`CU-${L}-${t.w}W`, `Cover Upper ${L}-${t.w}W`, 'CoverU', links.covers);
+      add(`CU-${L}-${t.w}W`, `Cover Upper ${L}-${t.w}W`, 'CoverU', links.covers, 1, false, false, coverReq('upper'));
     }
   });
 
