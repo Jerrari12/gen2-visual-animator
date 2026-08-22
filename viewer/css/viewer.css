@@ -650,6 +650,32 @@ body.stage-dark .cover-manual { color: #f2f4ff; text-shadow: none; }
   box-shadow: 0 1px 6px rgba(0,0,0,0.10);
 }
 #btn-customize:hover { background: rgba(255,238,224,0.97); }
+/* the pinned-link pill: same family, deliberately QUIETER than Customize —
+   sharing is a secondary action, and it must not compete with the on-ramp.
+   Sized to hold "✓ Link copied" and, when the clipboard is unavailable, the
+   full URL as selectable text rather than a silent failure. */
+#btn-copylink {
+  margin-top: 6px; padding: 5px 13px;
+  font: inherit; font-size: 12px; font-weight: 700;
+  border: none; cursor: pointer; color: #4a4d56;
+  background: rgba(255,255,255,0.78);
+  border-radius: 999px;
+  box-shadow: 0 1px 5px rgba(0,0,0,0.08);
+  max-width: 100%; overflow-wrap: anywhere;
+}
+#btn-copylink:hover { background: rgba(255,255,255,0.95); color: var(--accent); }
+body.stage-dark #btn-copylink { background: rgba(16,18,42,0.80); color: var(--ink-soft); }
+body.stage-dark #btn-copylink:hover { background: rgba(16,18,42,0.95); color: var(--accent); }
+/* manual-copy field: shown only when the clipboard API is unavailable
+   (insecure context), focused and pre-selected so Ctrl/Cmd-C just works */
+.copy-fallback {
+  display: block; margin-top: 6px; width: 100%; max-width: 320px;
+  font: inherit; font-size: 12px; padding: 5px 10px;
+  border: 1px solid rgba(0,0,0,0.18); border-radius: 8px;
+  background: #fff; color: #23252b;
+}
+.copy-fallback.hidden { display: none; }
+body.stage-dark .copy-fallback { background: rgba(16,18,42,0.92); color: var(--ink); border-color: rgba(255,255,255,0.22); }
 /* embed cover: the skip link's job is done better by the preview landing —
    swap it for the way back (same quiet-pill look) */
 #cover-preview {

@@ -1,6 +1,25 @@
 # Large local-only source assets — stay local, never pushed (see CLAUDE.md)
 Blender Files/
-GLB Library/
+GLB Library/*
+
+# ...EXCEPT the two files the ADHESIVE FOOT DERIVATION needs (7.4 kB total).
+# Adhesive-Foot.lib.glb is not modelled, it is CUT from the printed foot by
+# GLB Pipeline/derive_adhesive_foot.py - so re-exporting the printed master
+# silently leaves the derivative wrong, and both files still load and still
+# look like feet. `--check` rebuilds the bytes from the master and compares
+# them against every shipped copy, which is the only test that can catch a
+# stale derivation; without the master in the repo it cannot run in CI, and a
+# protection that only runs on one laptop is not a protection on the path that
+# reaches users. Everything else under GLB Library/ stays local.
+# ⚠ git does not descend into an excluded DIRECTORY, so each parent has to be
+# re-included before the file can be - the `dir/*` + `!dir/` ladder below is
+# that idiom, not redundancy. Deleting any line silently re-ignores the file.
+!GLB Library/Hardware/
+GLB Library/Hardware/*
+!GLB Library/Hardware/Adhesive-Foot.lib.glb
+!GLB Library/Hardware/raw/
+GLB Library/Hardware/raw/*
+!GLB Library/Hardware/raw/Tabletop-Kit-Foot.glb
 
 # Python bytecode (GLB Pipeline)
 __pycache__/

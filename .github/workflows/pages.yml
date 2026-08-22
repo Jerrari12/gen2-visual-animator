@@ -25,16 +25,99 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      # ⚠ THE GATE. Pushing main IS a deploy, and until 2026-08-22 this workflow
+      # ran no tests at all - checkout, stamp, upload, live. Every protection in
+      # the repo was therefore local-only and optional, which is the same as
+      # absent on the one path that reaches users. The suite is bare `node
+      # --test` with zero dependencies, so it costs a node setup and ~1s.
+      # It runs BEFORE the sed stamping below, so it judges pristine sources.
+      # Of particular note: test/adhesive-foot.test.mjs is what stops a stale
+      # DERIVED asset shipping. Adhesive-Foot.lib.glb is cut from the printed
+      # foot by GLB Pipeline/derive_adhesive_foot.py, so re-exporting the master
+      # silently leaves the derivative wrong - both files still load, both still
+      # look like feet. The test pins both md5s, the semantic tie between them
+      # (same footprint, exactly 3.00mm shorter) and byte-identity across all
+      # six collection pools.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Test (blocks the deploy)
+        run: npm test
+
+      # THE DERIVATION CHECK. Adhesive-Foot.lib.glb is CUT from the printed
+      # foot by this script, so re-exporting the master silently leaves the
+      # derivative wrong - both files still load, both still look like feet.
+      # npm test proves the two SHIPPED files are mutually consistent, which is
+      # most of the risk; this proves the derivative is what the master actually
+      # implies, by rebuilding the bytes and comparing them against the library
+      # copy and all six pool copies. It also closes the one hole npm test has:
+      # during a golden refresh both md5s move together, and only a rebuild can
+      # tell a legitimate re-derivation from a stale one blessed by mistake.
+      # ⚠ This needs two files out of the otherwise-local GLB Library (7.4 kB,
+      # un-ignored explicitly in .gitignore). It was previously skipped here for
+      # exactly that reason; tracking the master is the cheaper answer than
+      # leaving the check on one laptop. Standard library only - no pip install.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify the adhesive foot is derived from the current master
+        run: python "GLB Pipeline/derive_adhesive_foot.py" --check
+
       # Stamp the app's own JS/CSS URLs with the commit SHA. GitHub Pages caches
       # assets for 10 minutes (max-age=600), so without this a visitor loading
       # right after a deploy can get NEW index.html + STALE main.js (or css) and
       # the viewer dies at boot ("Loading parts…" forever). Versioned URLs make
       # every deploy atomic. Local dev is untouched (stamping happens only here).
+      # ⚠ EVERY module main.js imports must be stamped here, not just the first
+      # one. entry.js was added 2026-08-22 and stamping it is not optional: an
+      # unstamped sibling is cached independently of its stamped importer, which
+      # is precisely the NEW-index/STALE-module split this step exists to stop -
+      # and entry.js decides which kit the front door opens, so a stale copy
+      # would route boots by yesterday's rules. If you add an import to main.js,
+      # add a line here; the guard below fails the deploy if you forget.
       - name: Cache-proof asset URLs
         run: |
           V="${GITHUB_SHA::8}"
           sed -i "s|css/viewer.css|css/viewer.css?v=$V|; s|js/main.js|js/main.js?v=$V|" viewer/index.html
           sed -i "s|'./generate.js'|'./generate.js?v=$V'|" viewer/js/main.js
+          sed -i "s|'./entry.js'|'./entry.js?v=$V'|" viewer/js/main.js
+
+      # Fail the deploy rather than ship a half-stamped module graph. A first
+      # version of this guard was a single grep over main.js for
+      #   ^import .* from './name.js'
+      # which missed every other form that produces the same stale-module bug:
+      # side-effect imports, double quotes, subdirectories, indented or
+      # multi-line imports, `export ... from`, dynamic import(), and - most
+      # importantly - imports inside the OTHER local modules. A freshly stamped
+      # entry.js that imports an unstamped helper.js recreates the exact
+      # mismatch the stamping exists to prevent.
+      # So: scan EVERY local module and flag any relative specifier without ?v=.
+      - name: Verify the whole module graph is stamped
+        run: |
+          node - <<'NODE'
+          const fs = require('fs'), path = require('path');
+          const dir = 'viewer/js';
+          // every relative specifier, whatever syntax introduced it
+          const SPEC = /(?:\bfrom\s*|\bimport\s*\(?\s*|\bexport\s+\*\s+from\s*)(['"])(\.[^'"]*)\1/g;
+          let bad = [];
+          for (const f of fs.readdirSync(dir).filter(n => n.endsWith('.js'))) {
+            const src = fs.readFileSync(path.join(dir, f), 'utf8');
+            for (const m of src.matchAll(SPEC)) {
+              const spec = m[2];
+              if (!spec.endsWith('.js') && !spec.includes('.js?')) continue; // not a module path
+              if (!/[?&]v=/.test(spec)) bad.push(`${dir}/${f} -> ${spec}`);
+            }
+          }
+          if (bad.length) {
+            for (const b of bad) console.log('::error::UNSTAMPED module import: ' + b);
+            console.log('::error::Add a sed line for it above. An unstamped module can be served');
+            console.log('::error::from cache against a freshly deployed importer, which is the');
+            console.log('::error::"new index.html + stale module" boot failure this step prevents.');
+            process.exit(1);
+          }
+          console.log('module graph OK: every relative import is version-stamped');
+          NODE
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

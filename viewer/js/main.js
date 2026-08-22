@@ -6,29 +6,31 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { generateManifest, migrateOfficialBuild, resolvePartPreview } from './generate.js';
+import { resolveEntry } from './entry.js';
 
-const QS = new URLSearchParams(location.search);
-const KIT = QS.get('kit') || 'tabletop-185';
+/* Every entry-routing boolean below is derived by resolveEntry() in entry.js -
+   a pure function of (search, hash) with no DOM or network - so the boot
+   matrix is testable in node (test/entry-routes.test.mjs). The names here are
+   unchanged from when the logic was inline; only where they are COMPUTED
+   moved. Read entry.js for the precedence order and the two presence-vs-
+   truthiness traps it exists to hold. */
+const ENTRY = resolveEntry(location.search, location.hash);
+const QS = ENTRY.QS;
+const KIT = ENTRY.kit;
 const KIT_URL = `kits/${KIT}/`;
 // The BARE ROOT is the front door, and until 2026-08-22 it opened a hand-authored
 // STATIC demo manifest - which has `build === null`, so it silently withheld the
 // whole Build options panel and the Customize CTA. It now opens the canonical
 // starter kit instead, so the door demonstrates the generated workflow the rest
-// of the site is built on. 185 is the deliberate choice: with 165 it is one of
-// only two collections that generate with ZERO runtime warnings (115/240/270
-// each report "hardware positions are scaled from the 185 calibration").
-// ROOT means: no #build=, no ?build=, no ?kit=, not part-preview mode. Tested by
-// PRESENCE, not truthiness - `?kit=` with an empty value is still an explicit
-// request for the static path, and must not be mistaken for a bare root.
-const ROOT_BUILD = '185-tabletop-2w2h';
+// of the site is built on. ROOT_BUILD and the reasoning for 185 live in entry.js.
 // #build=<base64> — the planner's own share-link encoding, generated at runtime
-const BUILD_HASH = (location.hash || '').match(/build=([^&]+)/);
+const BUILD_HASH = ENTRY.buildHash;
 // ?embed=1 — docked inside the planner's split view: slimmer chrome (no top
 // bar, no BOM exports — the planner owns those), and a live "preview" landing
 // (the finished build, orbitable/colorable) instead of the box-art cover; a
 // "Begin the instructions" pill enters the normal page flow. The flag rides
 // location.search, so the mount/length-change self-reload keeps it.
-const IS_EMBED = new URLSearchParams(location.search).has('embed') && !!BUILD_HASH;
+const IS_EMBED = ENTRY.isEmbed;
 document.body.classList.toggle('embed', IS_EMBED);
 // ?part=<slug>&mode=preview — the MODULITH product-page embed (2026-08-19): a
 // TRANSPARENT iframe showing one part, poster-fast, slow idle spin until
@@ -42,22 +44,15 @@ document.body.classList.toggle('embed', IS_EMBED);
 // switch can't act on a stale iframe's message. Incoming messages are ignored
 // in this mode; the parent contract (validate origin+source+part+rid, timeout,
 // poster crossfade) lives in the MODULITH repo's integration handoff.
-const PART_SLUG = new URLSearchParams(location.search).get('part');
-const IS_PART = new URLSearchParams(location.search).get('mode') === 'preview' && !!PART_SLUG;
-const PART_RID = new URLSearchParams(location.search).get('rid') || '';
+const PART_SLUG = ENTRY.partSlug;
+const IS_PART = ENTRY.isPart;
+const PART_RID = ENTRY.partRid;
 // &plate=<W>x<D> (usable mm, 50-1000 each) — the PRINT-ORIENTATION view: the
 // bare part in its confirmed print pose on a true-scale build plate. The dims
 // come from the SITE's printer profile (the viewer can't read a cross-origin
 // localStorage); which parts have a confirmed pose is viewer-owned
 // (resolvePartPreview's whitelist + the support manifest's platePreview).
-const PLATE_RAW = IS_PART && new URLSearchParams(location.search).has('plate');
-const PART_PLATE = (() => {
-  if (!PLATE_RAW) return null;
-  const m = (new URLSearchParams(location.search).get('plate') || '').match(/^(\d{2,4})[xX](\d{2,4})$/);
-  if (!m) return null;
-  const w = +m[1], d = +m[2];
-  return (w >= 50 && w <= 1000 && d >= 50 && d <= 1000) ? { w, d } : null;
-})();
+const PART_PLATE = ENTRY.partPlate;   // parsePlate() in entry.js: 50-1000mm each, else null
 document.body.classList.toggle('part-preview', IS_PART);
 document.body.classList.toggle('part-plate', !!PART_PLATE); // pill layout: Top view owns the corner on plate boots
 function postToEmbedder(msg) {
@@ -72,16 +67,16 @@ function postToEmbedder(msg) {
 // fixable after the fact (replace the file; the id stays). Only files in the
 // repo resolve, so ids are mintable by commit only — nothing for visitors to
 // name or abuse. A #build= hash (the planner hand-off) always wins.
-const OFFICIAL_ID = !BUILD_HASH ? QS.get('build') : null;
-const IS_ROOT = !IS_PART && !BUILD_HASH && !QS.has('build') && !QS.has('kit');
+const OFFICIAL_ID = ENTRY.officialId;
+const IS_ROOT = ENTRY.isRoot;
 // Whether the official branch RUNS, kept separate from what it loads. Branching
 // on the target string would send `?build=` (present but empty) down the static
 // path instead of the official 404 card - the visitor asked for a kit by name
 // and got the demo, silently. Long-standing; the presence test above makes it
 // avoidable, so it is fixed rather than inherited.
-const WANTS_OFFICIAL = !IS_PART && !BUILD_HASH && (QS.has('build') || IS_ROOT);
+const WANTS_OFFICIAL = ENTRY.wantsOfficial;
 // '' (not null) so the id regex below rejects it and it fails as a bad kit id
-const OFFICIAL_TARGET = OFFICIAL_ID || (IS_ROOT ? ROOT_BUILD : '');
+const OFFICIAL_TARGET = ENTRY.officialTarget;
 let OFFICIAL = null; // {id, title, tagline} once the kit file loads
 
 // ---------- analytics (GoatCounter — cookieless; see the tag in index.html) ----------
@@ -1096,7 +1091,7 @@ if (IS_PART) {
   try {
     // a plate= param that doesn't parse is a hard failure, not a silent
     // fall-through to the product view — the site must keep its poster
-    res = (PLATE_RAW && !PART_PLATE)
+    res = (ENTRY.plateRequested && !PART_PLATE)
       ? { fail: { reason: 'unsupported', message: 'Bad plate size (want <width>x<depth> in mm, 50-1000 each).' } }
       : resolvePartPreview(PART_SLUG, { plate: !!PART_PLATE });
   } catch (e) {
@@ -1195,23 +1190,27 @@ if (IS_PART) {
 } else {
   await loadStaticKit();
 }
-// Put the loaded kit in the address bar so a copied link or a bookmark names
-// the real build rather than the bare root. Other params are PRESERVED (?from=
-// store attribution, ?debug=, ?theme=/&tt=), and replaceState adds no history
-// entry, so Back still leaves the site in one press.
-// NB the PAGEVIEW deliberately does NOT follow this - index.html pins the
-// reported path to the arrival URL, so the root keeps its own pageview row and
-// only the `open:` event names the destination.
-// ⚠ SEMANTICS, deliberately chosen: after this the bookmark is THIS KIT, not
-// "whatever the current starter is" — a later change of ROOT_BUILD will not
-// reach anyone who bookmarked the rewritten URL, and a reload takes the
-// explicit ?build= path (so no `entry:root`, and no root fallback). That is the
-// price of the copied link naming the real build, which is what was asked for.
-if (IS_ROOT && OFFICIAL) {
-  const q = new URLSearchParams(location.search);
-  q.set('build', OFFICIAL.id);
-  history.replaceState(null, '', location.pathname + '?' + q + location.hash);
-}
+/* ⚠ THE BARE ROOT DELIBERATELY DOES NOT REWRITE THE ADDRESS BAR (Joey,
+   2026-08-22, reversing the rewrite that shipped the day before).
+   `/` MEANS "open the current recommended starter" - a live promise, not a
+   snapshot. An earlier version replaceState'd it to `?build=<ROOT_BUILD>` so a
+   copied link would name the real kit; the cost was that everyone who
+   bookmarked or shared the rewritten URL was pinned to whatever kit happened
+   to be the starter that day, and moving ROOT_BUILD later could never reach
+   them. Two link semantics are better than one, so they are now BOTH
+   available and each says what it means:
+     /                       -> "send me to the currently recommended starter"
+     ?build=<id>             -> "always open this exact kit"  (the Share pill)
+   Analytics never needed the rewrite: `entry:root` records the door and
+   `open:<actual-id>` records what loaded, so both facts are already reported
+   correctly and independently of the address bar.
+   The other half of the reversal is resilience: the root keeps its fallback
+   (a kit that fails to load degrades to the static demo, loudly, via
+   `entry:root-fallback`), while an EXPLICIT `?build=` still fails visibly with
+   the 404 card rather than silently opening a different build. Someone who
+   named a kit must never be quietly given another one.
+   Pinned by test/entry-routes.test.mjs - do not reintroduce a rewrite here
+   without changing that suite on purpose. */
 
 // Funnel entry — which door they came in by, and what they're building. The
 // official id is safe to name here: an unmatched one threw above, so only
@@ -2724,6 +2723,58 @@ if (OFFICIAL) {
   outro.classList.remove('hidden');
   // anchor: freshen the href as the click starts (build mutates with options)
   outro.addEventListener('click', () => { track('customize:outro'); outro.href = plannerHandoffUrl(); });
+
+  /* THE PINNED LINK. `/` is a live promise ("the current recommended starter")
+     and never rewrites itself, so copying the address bar there deliberately
+     does NOT give you this kit. This button is the other semantic, offered
+     explicitly rather than smuggled into the URL: it always opens THIS id.
+     Built from OFFICIAL.id, not from location.search, so it is correct whether
+     the visitor arrived at the root or at an explicit ?build=. ?from=/?debug=/
+     ?theme= are intentionally dropped - a shared link should carry the kit and
+     nothing about the sharer's session or store attribution. */
+  const copyBtn = $('btn-copylink');
+  copyBtn.classList.remove('hidden');
+  /* ⚠ location.origin is the string "null" under file://, which would mint a
+     link reading "null/?build=..." - so build the base from href instead and
+     strip the query/hash off it. */
+  const kitLink = () => location.href.split('#')[0].split('?')[0] + '?build=' + encodeURIComponent(OFFICIAL.id);
+
+  /* ⚠ THE FALLBACK IS A REAL FIELD, NOT BUTTON TEXT. A first version put the
+     URL into the button's own label for eight seconds - which is not reliably
+     selectable by keyboard or touch, and pressing it again just retried the
+     copy instead of selecting anything. navigator.clipboard needs a secure
+     context, so plain http and file:// land here routinely; it has to be a
+     dead end for nobody. */
+  const manual = document.createElement('input');
+  manual.type = 'text';
+  manual.readOnly = true;
+  manual.className = 'copy-fallback hidden';
+  manual.setAttribute('aria-label', 'Link to this kit - copy it manually');
+  manual.onfocus = () => manual.select();
+  copyBtn.insertAdjacentElement('afterend', manual);
+
+  const say = (msg) => {
+    copyBtn.textContent = msg;
+    clearTimeout(copyBtn._t);
+    copyBtn._t = setTimeout(() => { copyBtn.innerHTML = '🔗 Copy link to this kit'; }, 2200);
+  };
+  copyBtn.onclick = async () => {
+    const url = kitLink();
+    try {
+      if (!navigator.clipboard || !window.isSecureContext) throw new Error('no clipboard');
+      await navigator.clipboard.writeText(url);
+      manual.classList.add('hidden');
+      say('✓ Link copied');
+    } catch (e) {
+      // hand them the text, focused and selected, so ⌘C/Ctrl-C just works
+      manual.value = url;
+      manual.classList.remove('hidden');
+      manual.focus();
+      manual.select();
+      say('Copy it from here →');
+    }
+    track('share:kit-link');
+  };
 }
 // embed preview ⇄ the instruction flow: "Begin" enters at the cover;
 // the 🧪 Preview tool (embed-only, controls bar — hidden on the preview
