@@ -5881,6 +5881,7 @@ renderer.setAnimationLoop(now => {
 // dev-only hook (mirrors the planner's guarded test-hook convention): ?debug=1
 if (new URLSearchParams(location.search).get('debug')) {
   window.__GEN2_VIEWER__ = { THREE, scene, camera, controls, goTo, applyState, instances, manifest, cinema, updateCinema, cinemaScene, party, confetti, confettiPop, fpFocus, fpEnv,
+    wall, surface,   // the mount backdrops, for capture tooling that needs the mounting surface as context
     renderer, table, grid, camPos, captureShot, get buildCenter() { return buildCenter; },
     // render-quality internals (2026-08-10) — the tier, the AO buffers and the
     // reflector, so a rendering question can be answered by reading state instead
