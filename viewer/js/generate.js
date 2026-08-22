@@ -32,6 +32,9 @@ const REQ = (() => {
   }
   throw new Error('requirement-scope contract is not loaded: viewer/js/vendor/requirement-scope.js must precede generate.js (see index.html)');
 })();
+/* Re-exported so main.js reads the SAME resolved contract this generator used,
+   rather than reaching for the global on its own. One resolution, one object. */
+export { REQ as REQUIREMENT };
 
 const PITCH_X = 88, PITCH_HALF_Y = 28;        // 1W column / half-row pitch
 const ROW0_BOTTOM = 17.65;                    // bottom-row case bottom (7.65 + 10.00)

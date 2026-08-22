@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
-import { generateManifest, migrateOfficialBuild, resolvePartPreview } from './generate.js';
+import { generateManifest, migrateOfficialBuild, resolvePartPreview, REQUIREMENT as REQ } from './generate.js';
 import { resolveEntry } from './entry.js';
 
 /* Every entry-routing boolean below is derived by resolveEntry() in entry.js -
@@ -2422,6 +2422,23 @@ function renderOptions() {
 // as two different ideas (Joey 2026-07-24), so keep these in sync. Head is a
 // C-ring rather than a circle-minus-notch — see the planner comment for why a
 // notch leaves a stray filled square.
+/* Human names for the contract's option and basis ids, fed to REQ.explain().
+   The ids are the planner's stable vocabulary; these are the words a person
+   reads. ⚠ Mirrored in the site (src/lib/requirement-labels.js) - the same id
+   must read the same way on a viewer row and on a site card, or "Required
+   with magnetic closure" here becomes "Required with magnets" there and the
+   two tools look like they disagree about a fact. Keep both in step. */
+const OPTION_LABELS = {
+  'drawer.closure.magnet': 'magnetic closure',
+  'drawer.stoppers': 'drawer stoppers',
+  'faceplate.backCover': 'the back cover',
+  'mount:tabletop': 'tabletop',
+  'mount:under-table': 'under-table',
+  'mount:wall': 'wall-mounted',
+  'cover.layout:staggered': 'staggered-cover',
+  'tabletop.feet:tpu': 'printed-feet',
+  'tabletop.feet:adhesive': 'adhesive-feet',
+};
 // NB the viewBox is the artwork's ROTATED bounds, not 0 0 24 24: the wrench is
 // drawn upright then turned −45°, so inside a square box it only spans ~13.6 of
 // 24 units and rendered ~40% smaller than the text beside it (Joey saw it as
@@ -2479,6 +2496,24 @@ function renderChecklist() {
       note.textContent = p.note;
       mid.appendChild(note);
     }
+    /* WHY this row is in the bill, in the contract's own words. Three tiers
+       and each must read differently, or the counter above is explaining a
+       distinction the list then hides: a core row says nothing (it is the
+       build); an option row names what selected it - "Required with magnetic
+       closure", never a bare "Required"; an enhancement says "Optional". A
+       core row WITH a basis names its variant, so a TPU foot reads "Required
+       for printed-feet builds" and the adhesive alternative the same way. */
+    if (p.requirement && p.requirement.scope !== 'core' || (p.requirement && p.basis)) {
+      const why = document.createElement('span');
+      why.className = 'cl-req ' + p.requirement.scope;
+      why.textContent = REQ.explain(p, OPTION_LABELS);
+      why.title = p.requirement.scope === 'option'
+        ? 'Required by an option you selected · turn the option off and this row goes away'
+        : p.requirement.scope === 'enhancement'
+          ? 'Optional enhancement · the build works without it'
+          : 'Core to this build as configured';
+      mid.appendChild(why);
+    }
     const qty = document.createElement('span');
     qty.className = 'qty';
     qty.textContent = '×' + p.qty + (p.purchased ? ' · buy' : '');
@@ -2503,8 +2538,33 @@ function renderChecklist() {
   // !styleHidden: the M3 screws are REQUIRED under a bolt-on family but their
   // row hides under an integrated-grip one — the counter must follow (a
   // Classic/EdgeLabel swap on a static kit used to keep saying "8 to buy")
-  const toBuy = manifest.parts.filter(p => p.purchased && p.required && !p.styleHidden).reduce((n, p) => n + p.qty, 0);
-  $('parts-head').innerHTML = `🧩 ${total} to print` + (toBuy ? ` · ${HW_ICON} ${toBuy} to buy` : '');
+  /* THE HEAD NAMES ITS TIER. Two readings of "to buy" are both true and used
+     to collide in one number: "hardware this build cannot be finished without"
+     (Joey, 2026-07-24 - opt-in magnets must not trip it, or the starter kits'
+     print-and-build-today promise reads as false) and "hardware this plan as
+     configured needs" (the contract - instructions must never tell someone to
+     skip the magnets they chose). The contract has three tiers precisely so
+     that is not a coin-flip: the CORE buys are the minimum, the OPTION buys
+     are named for what selected them. Scope is read off the shared contract,
+     never off the legacy boolean - `required` is derived from it anyway. */
+  const visible = manifest.parts.filter(p => !p.styleHidden);
+  const qtyOf = rows => rows.reduce((n, p) => n + p.qty, 0);
+  const classified = visible.filter(p => p.requirement);
+  const coreBuy = qtyOf(REQ.minimumRows(classified).filter(p => p.purchased));
+  // purchased rows an OPTION selected (core + option = selected plan, minus core)
+  const optionBuyRows = REQ.selectedPlanRows(classified).filter(p => p.purchased && p.requirement.scope === 'option');
+  const optionBuy = qtyOf(optionBuyRows);
+  // ⚠ legacy rows (no requirement yet) keep the old rule so the ratchet, not a
+  // silent re-classification, decides when they move
+  const legacyBuy = qtyOf(visible.filter(p => !p.requirement && p.purchased && p.required));
+  const mustBuy = coreBuy + legacyBuy;
+  // "with magnetic closure" - the explanation comes from the contract, so it
+  // says the same thing here as on the site's cards
+  const optionWhy = optionBuyRows.length
+    ? REQ.explain(optionBuyRows[0], OPTION_LABELS).replace(/^Required /, '') : '';
+  $('parts-head').innerHTML = `🧩 ${total} to print`
+    + (mustBuy ? ` · ${HW_ICON} ${mustBuy} to buy` : '')
+    + (optionBuy ? ` · ${optionBuy} ${optionWhy}` : '');
   $('checklist-tab').textContent = `Parts · ${total}`;
 }
 

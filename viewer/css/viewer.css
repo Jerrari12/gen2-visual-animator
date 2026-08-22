@@ -225,6 +225,14 @@ body.stage-dark .fm-accuracy { display: block; }
 .cl-mid { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 /* optional per-row note: an alternative or condition the label can't carry */
 .cl-note { font-size: .78rem; color: var(--ink-soft); line-height: 1.35; }
+/* the requirement tier, one chip per non-core row: option (named cause) in
+   the accent, enhancement muted. Core rows with a basis get the same muted
+   treatment - their variant is information, not a warning. */
+.cl-req { display: inline-block; margin-top: 2px; font-size: .72rem; line-height: 1.3;
+  padding: 1px 7px; border-radius: 999px; letter-spacing: .01em; }
+.cl-req.option { color: var(--accent); background: rgba(255,138,64,0.12); }
+.cl-req.enhancement, .cl-req.core { color: var(--ink-soft); background: rgba(0,0,0,0.06); }
+body.stage-dark .cl-req.enhancement, body.stage-dark .cl-req.core { background: rgba(255,255,255,0.08); }
 
 .dl-link {
   display: inline-block; font-size: 11px; font-weight: 700;
