@@ -225,6 +225,16 @@
       <button id="btn-next" title="Next step">Next &#8594;</button>
     </footer>
   </div>
+  <!-- The shared requirement-scope contract, VENDORED BYTE-FOR-BYTE from the
+       planner (gen2-planner-main/js/requirement-scope.js). It is the single
+       author of what core / option / enhancement / basis / reasons MEAN; this
+       app still computes its own geometry, instances and quantities and passes
+       those facts in. Edit it in the planner, then re-vendor - both repos gate
+       on byte equality (test/requirement-scope-vendor.test.mjs).
+       ⚠ CLASSIC script on purpose, and it MUST stay above main.js: classic
+       scripts run before deferred modules, so GEN2_REQ exists by the time
+       generate.js evaluates. -->
+  <script src="js/vendor/requirement-scope.js"></script>
   <script type="module" src="js/main.js"></script>
 <!-- GoatCounter analytics: cookieless, no consent banner. Counts a pageview on
      load; main.js's track() sends custom events (open/step/out/error…).
