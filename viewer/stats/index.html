@@ -545,12 +545,20 @@ const GROUPS = [
   // the plate and the cover seats behind it — so they read together
   { id: 'face',   label: 'FACEPLATES',       pre: ['faceplate','handle','backcover'] },
   { id: 'printer',label: '3D PRINTERS',      pre: ['printer'] },
-  { id: 'build',  label: 'DRAWER HARDWARE',  pre: ['closure','closure-soon','opt'] },
+  // `feet` is the planner's own event for the printed/adhesive pick; the studio
+  // reports the same choice as opt:feet:*, already covered by the `opt` head.
+  { id: 'build',  label: 'BUILD HARDWARE',   pre: ['closure','closure-soon','opt','feet'] },
   // kits:hero|footer are the planner's two links INTO the kits gallery — a
   // cross-tool jump like 3d-instructions (planner→studio) and customize
   // (studio→planner), so they belong with the other intent signals. Split by
   // placement on purpose: it answers whether the hero pill earns its space.
-  { id: 'funnel', label: 'ENTRY & INTENT',   pre: ['collection','from','3d-instructions','resume-build','example','surprise','customize','kits'] },
+  // `entry:*` is the DOOR, kept out of `open:` on purpose - the KPI row and the
+  // funnel sum the open: prefix blindly, so a second open: on one visit would
+  // double-count it as a build started and invent a kit named after the door.
+  // entry:root is the bare front door (which redirects to the canonical starter
+  // kit); entry:root-fallback means that kit could not load and the demo took over.
+  { id: 'funnel', label: 'ENTRY & INTENT',   pre: ['collection','from','3d-instructions','resume-build','example','surprise','customize','kits','entry'],
+    note: 'A count of SIGNALS, not visitors - one visit fires several of these (a door, a collection, sometimes a referral tag).' },
   // The conversion links, split OUT of OUTBOUND on purpose: a handful of Club
   // joins listed under dozens of model-download clicks is unreadable, and these
   // are the rows worth acting on. `club:*` fires from BOTH apps (planner

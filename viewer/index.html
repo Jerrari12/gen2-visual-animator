@@ -228,6 +228,17 @@
      This is a SEPARATE GoatCounter site from the planner's (jerrari.*), so the
      two apps' "/" pageviews don't collapse into one row and event names need
      no app prefix. Keep the two in sync if either ever moves. -->
+<!-- PIN the pageview path to the URL the visitor actually arrived on. count.js
+     computes its default as location.pathname + location.search AT LOAD, and
+     main.js history.replaceState()s the bare root onto the canonical starter
+     kit - on a cold CDN those race, and the root's pageviews would scatter into
+     /?build=185-tabletop-2w2h. A pre-set window.goatcounter is honoured.
+     ⚠ A STRING, never a function: count.js applies a function `path` to EVERY
+     count including ones that pass their own path, which would rewrite all ~60
+     custom event names into this URL. For the same reason, any future
+     goatcounter.count() call must pass an explicit path (track() always does)
+     or it will report this captured path instead of the current one. -->
+<script>window.goatcounter = { path: location.pathname + location.search };</script>
 <!-- Absolute https (not protocol-relative): a //-URL opened via file://
      resolves to a Windows network share and hangs the page for minutes. -->
 <script data-goatcounter="https://jerrari-build.goatcounter.com/count"

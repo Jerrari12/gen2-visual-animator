@@ -11,6 +11,45 @@ folder of `.lib.glb` parts plus a manifest-ready `parts_index.csv`.
 | `gen2_glb_export.py` | inside Blender | Duplicates each part, rebases to canonical origin, exports raw `.glb` (+Y-up, no materials). Non-destructive — your `.blend` is never touched or saved. |
 | `gen2_batch.py` | your machine (Python) | Launches Blender headless per job, meshopt-compresses, verifies canonical origins in world space, writes `parts_index.csv`. |
 | `gen2_jobs.json` | — | The job list. Drawers job is ready; Cases + Quicklocks are `skip` templates. |
+| `derive_adhesive_foot.py` | your machine (Python) | **Not a job.** Derives `Adhesive-Foot.lib.glb` from the printed `Tabletop-Kit-Foot` master by cutting off the dovetail rail and capping the opening — see "Derived parts" below. |
+
+## Derived parts
+
+One part in this library is not exported from a blend. The bought **adhesive
+rubber foot** is the printed TPU foot without its upper dovetail rail (Joey
+confirmed 2026-08-21: same external body, same height, no rail — the rail seats
+inside the case, and a stick-on foot has nothing to seat into), so it is
+DERIVED from the shipped master rather than redrawn:
+
+```bat
+python "GLB Pipeline\derive_adhesive_foot.py"          :: write + verify + copy to every pool
+python "GLB Pipeline\derive_adhesive_foot.py" --check  :: verify only
+```
+
+It finds the rail-base plane empirically, keeps the shell below it, caps the
+six-vertex rim with a 4-triangle fan, and refuses to write unless the result is
+a closed, outward-wound, non-degenerate 2-manifold with a +Y cap and −Y bottom.
+`--check` rebuilds the bytes in memory and diffs them against the library copy
+AND all six shipped pool copies, so a stale artifact fails (exit 1, naming the
+file) rather than passing on a mere existence test.
+
+⚠ Like every blend, `GLB Library/` is gitignored, so the printed master this
+reads lives only on Joey's machine — the script cannot run from a fresh clone.
+The SHIPPED copies under `viewer/parts/<L>/` are committed, which is why
+`test/adhesive-foot.test.mjs` measures those and never the master.
+
+⚠ **Two things about it break the usual conventions, both deliberately:**
+- It ships **UNCOMPRESSED** despite the `.lib.glb` suffix. At 16 triangles the
+  meshopt container's own overhead exceeds the payload — the uncompressed file
+  is 2124 B against the compressed 96-triangle printed foot's 2924 B — and it
+  drops the `EXT_meshopt_compression` requirement entirely. **In this repo
+  `.lib.glb` means "viewer-ready GLB", not "meshopt-compressed";** the viewer's
+  loader hardcodes that suffix, so a derived part still has to wear it.
+- **Re-exporting the printed foot silently invalidates it.** Both files would
+  still load and still look like feet. `test/adhesive-foot.test.mjs` in the repo
+  root is the guard: it fingerprints the printed foot and fails with a message
+  ordering a re-derivation before the golden may be refreshed. Re-run this
+  script whenever `Tabletop-Kit-Foot` changes.
 
 ## Requirements
 

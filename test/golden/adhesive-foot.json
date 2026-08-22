@@ -1,0 +1,19 @@
+{
+  "_": "Fingerprint of the printed foot and its DERIVED adhesive variant. If the printed row changed, the source was re-exported: re-run \"python GLB Pipeline/derive_adhesive_foot.py\" BEFORE refreshing this golden, or the adhesive foot silently keeps the old geometry.",
+  "printed": {
+    "md5": "d41029d1a2e1e5868c3710471822af6d",
+    "spans": [
+      20.6,
+      10.6,
+      20.6
+    ]
+  },
+  "adhesive": {
+    "md5": "09590002e40a53e68fb1d445f7946c1c",
+    "spans": [
+      20.6,
+      7.6,
+      20.6
+    ]
+  }
+}

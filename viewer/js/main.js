@@ -7,8 +7,20 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { generateManifest, migrateOfficialBuild, resolvePartPreview } from './generate.js';
 
-const KIT = new URLSearchParams(location.search).get('kit') || 'tabletop-185';
+const QS = new URLSearchParams(location.search);
+const KIT = QS.get('kit') || 'tabletop-185';
 const KIT_URL = `kits/${KIT}/`;
+// The BARE ROOT is the front door, and until 2026-08-22 it opened a hand-authored
+// STATIC demo manifest - which has `build === null`, so it silently withheld the
+// whole Build options panel and the Customize CTA. It now opens the canonical
+// starter kit instead, so the door demonstrates the generated workflow the rest
+// of the site is built on. 185 is the deliberate choice: with 165 it is one of
+// only two collections that generate with ZERO runtime warnings (115/240/270
+// each report "hardware positions are scaled from the 185 calibration").
+// ROOT means: no #build=, no ?build=, no ?kit=, not part-preview mode. Tested by
+// PRESENCE, not truthiness - `?kit=` with an empty value is still an explicit
+// request for the static path, and must not be mistaken for a bare root.
+const ROOT_BUILD = '185-tabletop-2w2h';
 // #build=<base64> — the planner's own share-link encoding, generated at runtime
 const BUILD_HASH = (location.hash || '').match(/build=([^&]+)/);
 // ?embed=1 — docked inside the planner's split view: slimmer chrome (no top
@@ -60,7 +72,16 @@ function postToEmbedder(msg) {
 // fixable after the fact (replace the file; the id stays). Only files in the
 // repo resolve, so ids are mintable by commit only — nothing for visitors to
 // name or abuse. A #build= hash (the planner hand-off) always wins.
-const OFFICIAL_ID = !BUILD_HASH ? new URLSearchParams(location.search).get('build') : null;
+const OFFICIAL_ID = !BUILD_HASH ? QS.get('build') : null;
+const IS_ROOT = !IS_PART && !BUILD_HASH && !QS.has('build') && !QS.has('kit');
+// Whether the official branch RUNS, kept separate from what it loads. Branching
+// on the target string would send `?build=` (present but empty) down the static
+// path instead of the official 404 card - the visitor asked for a kit by name
+// and got the demo, silently. Long-standing; the presence test above makes it
+// avoidable, so it is fixed rather than inherited.
+const WANTS_OFFICIAL = !IS_PART && !BUILD_HASH && (QS.has('build') || IS_ROOT);
+// '' (not null) so the id regex below rejects it and it fails as a bad kit id
+const OFFICIAL_TARGET = OFFICIAL_ID || (IS_ROOT ? ROOT_BUILD : '');
 let OFFICIAL = null; // {id, title, tagline} once the kit file loads
 
 // ---------- analytics (GoatCounter — cookieless; see the tag in index.html) ----------
@@ -454,8 +475,7 @@ function applyShadowQuality() {
   renderer.shadowMap.autoUpdate = false;
   sun.castShadow = on;
   for (const inst of instances.values()) {
-    const mark = isMarkerGroup(inst.group); // an annotation casts no shadow
-    inst.group.traverse(o => { if (o.isMesh) { o.castShadow = on && !mark; o.receiveShadow = on && !mark; } });
+    inst.group.traverse(o => { if (o.isMesh) { o.castShadow = on; o.receiveShadow = on; } });
   }
   table.receiveShadow = on;
   if (on) fitShadowCamera();
@@ -600,7 +620,7 @@ function updateReflection(force = false) {
   const hidden = [];
   const hide = o => { if (o.visible) { o.visible = false; hidden.push(o); } };
   hide(refl.mesh); hide(grid);
-  scene.traverse(o => { if ((o.isLine || o.isLineSegments || o.isSprite || isMarkerGroup(o)) && o.visible) hide(o); });
+  scene.traverse(o => { if ((o.isLine || o.isLineSegments || o.isSprite) && o.visible) hide(o); });
   const prevBg = scene.background;
   scene.background = null;
   renderer.setRenderTarget(refl.rt);
@@ -765,7 +785,7 @@ function updateAO(force = false) {
   const hidden = [];
   scene.traverse(o => {
     if ((o === table || o === grid || o === wall || o === surface ||
-         o.isLine || o.isLineSegments || o.isSprite || o === refl.mesh || isMarkerGroup(o)) && o.visible) {
+         o.isLine || o.isLineSegments || o.isSprite || o === refl.mesh) && o.visible) {
       o.visible = false; hidden.push(o);
     }
   });
@@ -1037,6 +1057,26 @@ function updateViewInset() {
 // mutates it and regenerate() re-runs the generator + re-mounts the scene, so
 // most manifest-derived state below is (re)built inside mountManifest().
 let manifest, PARTS_BASE, build = null, originalBuild = null;
+// set when the ROOT's official kit could not be shown and the static demo took
+// over; read once below to report the degraded door
+let rootFailure = null;
+// The static path, factored out because the root can land here two ways: an
+// explicit ?kit=, or the official front door failing. It had NO error handling
+// at all — a missing kit folder returns an HTML 404 body, .json() throws, and
+// as top-level await that was an unhandled rejection: spinner forever, no
+// message, no analytics. On the production root that was a silent total loss.
+async function loadStaticKit() {
+  try {
+    const res = await fetch(KIT_URL + 'manifest.json');
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    manifest = await res.json();
+  } catch (e) {
+    track('error:kit-not-found');
+    bootFail('<strong>This build isn’t available - it may have moved or been renamed.</strong>' +
+      '<br><br><a href="builds/">Browse the official GEN2 kits →</a>', 'static kit "' + KIT + '": ' + e.message);
+  }
+  PARTS_BASE = KIT_URL + 'parts/';
+}
 const decodeBuild = h => { const raw = JSON.parse(decodeURIComponent(escape(atob(decodeURIComponent(h))))); return raw.data || raw; };
 // boot failure → the loading overlay becomes the message and the module halts
 // (the throw is deliberate: nothing below can run without a manifest)
@@ -1101,39 +1141,76 @@ if (IS_PART) {
   }
   manifest = gen.manifest;
   PARTS_BASE = 'parts/' + (manifest.collection || '185') + '/';   // one self-contained pool per collection (parts/165, parts/185)
-} else if (OFFICIAL_ID) {
+} else if (WANTS_OFFICIAL) {
   const GALLERY = '<br><br><a href="builds/">Browse the official GEN2 kits →</a>';
   // `ev` names the failure for analytics — never the id itself, which at this
   // point is unvalidated visitor input (and a bad id is the whole story anyway:
   // it means a link we printed somewhere is wrong)
+  //
+  // AT THE ROOT there is no bad link to report and no visitor to blame: the door
+  // must open. So a root failure records the same typed error — a broken front
+  // door has to be VISIBLE in the dashboard, not silently papered over — and
+  // then falls through to the static demo manifest instead of showing a 404
+  // card. Everywhere else the 404 card is still exactly right.
   const kitFail = (msg, ev) => {
     track('error:' + ev);
-    bootFail('<strong>' + msg + '</strong>' + GALLERY, 'official kit "' + OFFICIAL_ID + '": ' + msg);
+    if (IS_ROOT) { rootFailure = ev; return; }
+    bootFail('<strong>' + msg + '</strong>' + GALLERY, 'official kit "' + OFFICIAL_TARGET + '": ' + msg);
   };
-  let file = null;
-  if (/^[a-z0-9][a-z0-9-]*$/.test(OFFICIAL_ID)) {
+  // TRANSACTIONAL: everything lands in locals and the globals (build, OFFICIAL,
+  // originalBuild, manifest, PARTS_BASE) are committed only once the kit is
+  // known good. A half-committed OFFICIAL on a root fallback would put the
+  // static kit's palette in `gen2-colors:official-<id>` and hand it a Customize
+  // button pointing at a build it isn't showing.
+  let file = null, mBuild = null, mGen = null;
+  if (/^[a-z0-9][a-z0-9-]*$/.test(OFFICIAL_TARGET)) {
     try {
-      const res = await fetch(`builds/${OFFICIAL_ID}.json`);
+      const res = await fetch(`builds/${OFFICIAL_TARGET}.json`);
       if (res.ok) file = await res.json();
     } catch (e) { /* network / parse — falls through to the friendly 404 */ }
   }
   if (!file || !file.build)
     kitFail('This kit link isn’t available - it may have moved or been renamed.', 'kit-not-found');
-  if (file.gen2OfficialBuild !== 1)
+  else if (file.gen2OfficialBuild !== 1)
     kitFail('This kit was made for a newer version of the Build Studio - refresh the page and try again.', 'kit-version');
-  build = migrateOfficialBuild(file.build, file.buildVersion ?? 1);
-  if (!build)
+  else if (!(mBuild = migrateOfficialBuild(file.build, file.buildVersion ?? 1)))
     kitFail('This kit was made for a newer version of the Build Studio - refresh the page and try again.', 'kit-version');
-  OFFICIAL = { id: OFFICIAL_ID, title: String(file.title || 'GEN2 Kit'), tagline: typeof file.tagline === 'string' ? file.tagline : '' };
-  originalBuild = structuredClone(build);
-  const gen = generateManifest(build);
-  if (!gen.manifest) // a committed kit failing to generate is OUR bug, not the user's — say so plainly
-    kitFail('This kit can’t be shown right now (' + gen.errors.join(' · ') + ') - please report it.', 'kit-generate');
-  manifest = gen.manifest;
-  PARTS_BASE = 'parts/' + (manifest.collection || '185') + '/';
+  else {
+    // a THROW here used to be an unhandled top-level-await rejection: no message,
+    // no analytics, spinner forever. The #build= path has always caught it; this
+    // one never did, and it is the path every printed kit link takes.
+    try { mGen = generateManifest(mBuild); } catch (e) { console.error(e); mGen = null; }
+    if (!mGen) kitFail('This kit can’t be shown right now - please report it.', 'kit-crash');
+    else if (!mGen.manifest) // a committed kit failing to generate is OUR bug, not the user's — say so plainly
+      kitFail('This kit can’t be shown right now (' + mGen.errors.join(' · ') + ') - please report it.', 'kit-generate');
+    else {
+      build = mBuild;
+      originalBuild = structuredClone(mBuild);
+      OFFICIAL = { id: OFFICIAL_TARGET, title: String(file.title || 'GEN2 Kit'), tagline: typeof file.tagline === 'string' ? file.tagline : '' };
+      manifest = mGen.manifest;
+      PARTS_BASE = 'parts/' + (manifest.collection || '185') + '/';
+    }
+  }
+  if (!manifest) await loadStaticKit();   // root fallback only — kitFail threw otherwise
 } else {
-  manifest = await (await fetch(KIT_URL + 'manifest.json')).json();
-  PARTS_BASE = KIT_URL + 'parts/';
+  await loadStaticKit();
+}
+// Put the loaded kit in the address bar so a copied link or a bookmark names
+// the real build rather than the bare root. Other params are PRESERVED (?from=
+// store attribution, ?debug=, ?theme=/&tt=), and replaceState adds no history
+// entry, so Back still leaves the site in one press.
+// NB the PAGEVIEW deliberately does NOT follow this - index.html pins the
+// reported path to the arrival URL, so the root keeps its own pageview row and
+// only the `open:` event names the destination.
+// ⚠ SEMANTICS, deliberately chosen: after this the bookmark is THIS KIT, not
+// "whatever the current starter is" — a later change of ROOT_BUILD will not
+// reach anyone who bookmarked the rewritten URL, and a reload takes the
+// explicit ?build= path (so no `entry:root`, and no root fallback). That is the
+// price of the copied link naming the real build, which is what was asked for.
+if (IS_ROOT && OFFICIAL) {
+  const q = new URLSearchParams(location.search);
+  q.set('build', OFFICIAL.id);
+  history.replaceState(null, '', location.pathname + '?' + q + location.hash);
 }
 
 // Funnel entry — which door they came in by, and what they're building. The
@@ -1142,8 +1219,21 @@ if (IS_PART) {
 // part previews report ONE row (`open:part`), never the slug: the site's own
 // analytics already record which part page was visited, and 458 slug rows
 // would bury the dashboard's funnel.
+// The DOOR is counted separately from the destination, under its own prefix
+// head. It cannot be `open:root`: the dashboard sums the `open:` prefix blindly
+// into BUILDS STARTED and the funnel's OPENED stage and lists every `open:*` row
+// as a kit, so a second open: on one visit would double-count it and invent a
+// kit called "root". `entry:` groups under ENTRY & INTENT instead.
+// This also survives changing where the root points: the door keeps its own
+// series while `open:` follows the destination.
+if (IS_ROOT) {
+  track('entry:root');
+  if (rootFailure) track('entry:root-fallback'); // door opened, but on the demo kit
+}
+// ONE open: per visit, naming what actually LOADED - so a root that fell back to
+// the static kit reports the static kit, not the official one it failed to show.
 track(IS_PART ? (PART_PLATE ? 'open:part-plate' : 'open:part')
-  : OFFICIAL_ID ? 'open:' + OFFICIAL_ID
+  : OFFICIAL ? 'open:' + OFFICIAL.id
   : BUILD_HASH ? (IS_EMBED ? 'open:embed' : 'open:planner-link')
   : 'open:kit-' + KIT);
 track('collection:' + (manifest.collection || '185'));
@@ -1314,36 +1404,34 @@ function newPartMaterial(key) {
       envMapIntensity: 1.15,
     }), face);
   }
-  /* A PLACEMENT MARKER, not a part (adhesive feet, 2026-08-21): the geometry
-     is the printed foot's, because the SUPPORT POSITIONS are ground truth
-     while the bought foot's shape is not - so it is drawn translucent and
-     declines to assert a solid shape. A WIREFRAME was tried first and
-     rejected on screen: a 96-triangle foot renders as a few faint lines,
-     invisible at any normal viewing distance, and a marker you cannot see
-     fails its only job.
-     ⚠ It RESTS translucent, which every opacity animation in this engine
-     predates - they were written when opacity 1 was universal. `rest` is
-     stamped HERE, at mint time, so it reaches every path: Material.clone()
-     carries userData, so the highlight clone and each fade clone inherit it,
-     and even the un-cloned collection in `appear`/`solid` finds it. */
-  if (key === 'FootMarker') {
-    const m = new THREE.MeshStandardMaterial({
-      color: new THREE.Color(activeHex(key)), roughness: 0.6, metalness: 0,
-      transparent: true, opacity: 0.42, depthWrite: false,
+  /* Bought adhesive rubber feet (2026-08-22). A REAL part in the scene, not an
+     annotation - Joey confirmed the bought foot is the printed one minus its
+     dovetail rail, so `Adhesive-Foot` is derived from the printed master and
+     the shape IS the product. What it must not wear is the identification
+     palette: rubber reads as rubber only if it is matte beside the plastics.
+     Colour comes from activeHex like every other type - and because its BOM row
+     is `purchased`, colorLocked pins it to the manifest colour, so no preset or
+     filament pick can repaint a bought item. */
+  if (key === 'FootAdhesive') {
+    // 0.72, not the 0.95 a "matte rubber" instinct reaches for: a real bumper
+    // foot carries a soft sheen, and at 0.95 there is no specular at all - the
+    // pad's edges disappeared into the dark stage (checked on screen, not
+    // reasoned about).
+    return new THREE.MeshStandardMaterial({
+      color: new THREE.Color(activeHex(key)), roughness: 0.72, metalness: 0,
     });
-    m.userData.rest = m.opacity;
-    return m;
   }
   return new THREE.MeshStandardMaterial({ color: new THREE.Color(activeHex(key)), roughness: 0.55, metalness: 0.05 });
 }
-// marker instances are annotations: no shadow, no reflection, no AO occlusion
-const isMarkerGroup = o => !!(o.userData && o.userData.marker);
 /* A material's RESTING opacity. Every fade in this engine used to drive
    opacity from/to a hardcoded 1, which is only true while every part is
-   opaque; a part that rests translucent (the adhesive-feet placement marker)
-   popped fully opaque the moment one ran. Each clone stamps its rest value on
-   creation, so the tweens scale by it - and for an opaque part rest === 1,
-   leaving every existing animation arithmetically identical. */
+   opaque; a part that rests translucent popped fully opaque the moment one
+   ran. Each clone stamps its rest value on creation, so the tweens scale by it
+   - and for an opaque part rest === 1, leaving every existing animation
+   arithmetically identical. No shipped part rests translucent today (the
+   adhesive-feet marker that forced this became real geometry on 2026-08-22),
+   so it is a currently-inert invariant - KEEP it: it is what makes the next
+   translucent part safe, and it costs one property read. */
 const restOf = m => (m.userData && m.userData.rest != null) ? m.userData.rest : 1;
 // Toggling rebuilds only the faceplate registry entries (a class swap, so it
 // cannot be done in place) and drops their highlight clones; the reassignment
@@ -1454,7 +1542,6 @@ function buildInstances() {
     group.userData.instanceId = cfg.id;
     scene.add(group);
     const type = typeByNode[cfg.node];
-    if (type === 'FootMarker') group.userData.marker = true;
     let alt = false;
     if (TILED_TYPES.has(type)) {
       const n = tileSeen[type] = (tileSeen[type] || 0) + 1;
@@ -1532,11 +1619,12 @@ function computeBounds() {
     if (inst.styleHidden) continue; // style-suppressed (handles under an EdgeLabel plate) — not part of the build
     box.expandByObject(inst.group);
     // screws sink INTO the mounting surface (wall/wood) — not part of the
-    // build's physical envelope (same rule as fitWall/fitSurface). Placement
-    // markers are excluded for the same reason and a stronger one: the
-    // envelope is published as the TRUE physical size, and a marker's height
-    // is the PRINTED foot's, which an adhesive build does not have.
-    if (!inst.cfg.node.startsWith('WoodScrew') && !isMarkerGroup(inst.group)) assembledBox.expandByObject(inst.group);
+    // build's physical envelope (same rule as fitWall/fitSurface). FEET DO
+    // count, and both kinds do: the bought adhesive foot is the printed one
+    // without its dovetail rail, and that rail lives INSIDE the case, so a
+    // build stands at the same height either way and the published envelope
+    // has to say so. (It briefly did not - 2026-08-21 to -22.)
+    if (!inst.cfg.node.startsWith('WoodScrew')) assembledBox.expandByObject(inst.group);
   }
   if (!box.isEmpty()) {
     box.getCenter(buildCenter);
@@ -1612,7 +1700,7 @@ function buildExploded() {
   const SCALE = new THREE.Vector3(1.35, 1.75, 1.35);
   const PUSH = {
     QuickLock: [0, 55, 0], Stopper: [0, 55, 0], MagnetClip: [0, 0, -70], Magnet: [0, 0, -100],
-    Foot: [0, -25, 0], FootMarker: [0, -25, 0], Drawer: [0, 0, 170], CoverU: [0, 45, 0], FootrailU: [0, 25, 0],
+    Foot: [0, -25, 0], FootAdhesive: [0, -25, 0], Drawer: [0, 0, 170], CoverU: [0, 45, 0], FootrailU: [0, 25, 0],
   };
   const RIDER_PUSH = { Faceplate: [0, 0, 70], Handle: [0, 0, 115] };
   const eFor = inst => {
@@ -1745,7 +1833,7 @@ async function playStep(i) {
         inst.group.traverse(o => {
           if (!o.isMesh) return;
           const m = materialFor(inst, false, o.userData.zone).clone();
-          m.userData.rest = m.opacity; // 1 for a normal part, 0.42 for a marker
+          m.userData.rest = m.opacity; // 1 for every part shipping today; see restOf()
           m.transparent = true;
           o.material = m; mats.push(m);
         });
@@ -2362,9 +2450,7 @@ function renderChecklist() {
     chip.style.background = activeHex(pk); // reflects custom filament colors
     if (colorLocked(p.type)) { // purchased hardware: no filament picker
       chip.classList.add('locked');
-      chip.title = p.type === 'FootMarker'
-        ? 'Hardware-store item · the 3D shows a placement marker, not the product'
-        : 'Hardware-store item · shown in its real finish';
+      chip.title = 'Hardware-store item · shown in its real finish';
     } else {
       const zoned = pk !== p.type;
       chip.title = (useCustom && customColors[pk] ? customColors[pk].name + ' · ' : '') +
@@ -2866,7 +2952,7 @@ function setSelected(id) {
   sw.style.background = activeHex(selKey);
   sw.classList.toggle('locked', selLocked);
   sw.title = selLocked
-      ? (selType === 'FootMarker' ? 'Hardware-store item · the 3D shows a placement marker, not the product' : 'Hardware-store item · shown in its real finish')
+      ? 'Hardware-store item · shown in its real finish'
     : selKey !== selType ? 'Pick the face filament · the chips below cover every zone'
     : 'Pick a filament color';
   renderZoneChips(inst); // 2-zone parts get Body + Grip swatches; others hide the row
@@ -4289,9 +4375,7 @@ canvas.addEventListener('pointerup', e => {
     // on a plate boot the slab is a legitimate target too — free points on the
     // plate SURFACE, measured manually (never claimed as an edge-clearance
     // result; that precision is a future automatic callout)
-    // markers are annotations, not parts: measuring them would return
-    // millimetres from geometry that is explicitly not the product
-    const targets = pickable.filter(i => !isMarkerGroup(i.group)).map(i => i.group);
+    const targets = pickable.map(i => i.group);
     if (IS_PART && plateStage.group) targets.push(plateStage.group.children[0]);
     const mhits = ray.intersectObjects(targets, true);
     if (mhits.length) addMeasurePoint(mhits[0].point);
@@ -4695,7 +4779,7 @@ function updateConfetti(dt, t) {
 // are now 2-in-13, while mode 6 — open a drawer and work its faceplate's own
 // feature — gets a triple share. Macro keeps its double.
 const CINEMA_MODES = [0, 0, 1, 1, 2, 3, 3, 4, 5, 5, 6, 6, 6];
-const DETAIL_TYPES = new Set(['Handle', 'QuickLock', 'Foot', 'Faceplate']); // exterior parts only — no macro shots of hidden stoppers/magnets
+const DETAIL_TYPES = new Set(['Handle', 'QuickLock', 'Foot', 'FootAdhesive', 'Faceplate']); // exterior parts only — no macro shots of hidden stoppers/magnets
 const cinema = {
   on: false, last: 0, cut: 99, mode: 0,
   az: 0, azV: 0.1, pol: 1.1, r: 800, rV: 0,

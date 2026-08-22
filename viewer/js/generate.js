@@ -466,19 +466,26 @@ export function generateManifest(build) {
   // Feet (2026-08-21, confirmed): printed TPU feet OR adhesive rubber feet -
   // one-for-one alternatives with the same count at the same support spots.
   // The planner's build carries the pick (`feet`); the BOM bills ONLY the
-  // chosen option. The scene keeps the TPU foot geometry either way: with
-  // adhesive feet it MARKS the spots (the step note says so), because the
-  // positions are exactly what the alternative shares.
+  // chosen option.
+  //
+  // Both are REAL geometry (2026-08-22). Joey confirmed the bought foot has the
+  // same external body and the same height as the printed one and differs ONLY
+  // by not carrying the upper dovetail rail - the rail is what seats into the
+  // case or lower rail, and a stick-on foot has nothing to seat into. So
+  // `Adhesive-Foot` is DERIVED from the printed master by cutting at the
+  // rail-base plane (GLB Pipeline/derive_adhesive_foot.py; guarded by
+  // test/adhesive-foot.test.mjs), and the finished build stands at the same
+  // height either way - which is why the adhesive foot contributes to the
+  // published W/H/L envelope exactly like the printed one.
   const adhesiveFeet = build.feet === 'adhesive';
   const FOOT_LABEL = adhesiveFeet ? 'Adhesive rubber foot' : 'Tabletop Kit Foot';
-  // With adhesive feet the scene shows the printed foot's geometry at the
-  // verified support POSITIONS - it is a placement marker, not the product,
-  // whose real shape and colour are an off-the-shelf item nobody measured.
-  // Its own TYPE ('FootMarker') is what lets the viewer render and label it
-  // as a marker: materials/highlights/palette are all type-keyed, so this
-  // costs no new registry. Emitted ONLY on adhesive builds, so the default
-  // manifest (and the ten committed kit goldens) stays byte-identical.
-  const FOOT_TYPE = adhesiveFeet ? 'FootMarker' : 'Foot';
+  const FOOT_NODE = adhesiveFeet ? 'Adhesive-Foot' : 'Tabletop-Kit-Foot';
+  // Its own TYPE is what gives it a matte rubber finish instead of the
+  // identification palette: materials/highlights/palette are all type-keyed, so
+  // this costs no new registry, and colour-locking falls out of the row being
+  // `purchased`. Emitted ONLY on adhesive builds, so the default manifest (and
+  // the ten committed kit goldens) stays byte-identical.
+  const FOOT_TYPE = adhesiveFeet ? 'FootAdhesive' : 'Foot';
 
   // ---- normalize units to a bottom-left origin ----------------------------
   const gridBottom = build.gridH * 2; // planner y counts half-rows from the TOP
@@ -579,8 +586,8 @@ export function generateManifest(build) {
   // one foot in the BOM: the printed part, or the purchased alternative
   // (purchased + REQUIRED - a tabletop build cannot stand without its feet)
   const addFoot = () => adhesiveFeet
-    ? add('Tabletop-Kit-Foot', FOOT_LABEL, FOOT_TYPE, { buy: BUY.rubberFeet }, 1, true, true)
-    : add('Tabletop-Kit-Foot', FOOT_LABEL, FOOT_TYPE, links.kit);
+    ? add(FOOT_NODE, FOOT_LABEL, FOOT_TYPE, { buy: BUY.rubberFeet }, 1, true, true)
+    : add(FOOT_NODE, FOOT_LABEL, FOOT_TYPE, links.kit);
 
   // frame: rails under contiguous bottom-column runs. The two layers use the
   // planner's brickTiling() stagger (data.js) so seams never align and the
@@ -674,7 +681,7 @@ export function generateManifest(build) {
     for (const x of slots) for (const z of [-73 + dz, 81.15 - dz]) {
       const id2 = `f${inst.length}`;
       feetIds[z < 0 ? 'back' : 'front'].push(id2);
-      inst.push({ id: id2, node: 'Tabletop-Kit-Foot', pos: [x, 0, z], yaw: z < 0 ? 90 : 270, stage: 'base' });
+      inst.push({ id: id2, node: FOOT_NODE, pos: [x, 0, z], yaw: z < 0 ? 90 : 270, stage: 'base' });
       addFoot();
     }
   } else {
@@ -699,7 +706,7 @@ export function generateManifest(build) {
         for (const z of [-73 + dz, 81.15 - dz]) {
           const id2 = `f${inst.length}`;
           feetIds[z < 0 ? 'back' : 'front'].push(id2);
-          inst.push({ id: id2, node: 'Tabletop-Kit-Foot', pos: [railX(r) + lx, 0, z], yaw, stage: 'base' });
+          inst.push({ id: id2, node: FOOT_NODE, pos: [railX(r) + lx, 0, z], yaw, stage: 'base' });
           addFoot();
         }
       }
@@ -1359,17 +1366,16 @@ export function generateManifest(build) {
     preSteps.push({
       title: adhesiveFeet ? `Bench: stick on the ${nFeet} feet` : `Bench: insert the ${nFeet} feet`,
       note: (adhesiveFeet
-        ? 'Adhesive rubber feet: stick one to the flat pad around each slot marked here - the printed feet shown only mark the spots. Same count, same positions as the printed feet.'
+        ? 'Adhesive rubber feet: peel each one and press it onto the flat pad around each slot, same count and same spots as the printed feet. The bought foot is the printed one without its dovetail rail, so the build stands at exactly the same height.'
         : 'Feet slide into the slots under the case, lengthwise: front feet snap in back-to-front, rear feet front-to-back.') +
         (bottomUnits[0].w > 1 ? ' Where the middle slots sit close together, fill just one per row.' : ''),
       camera: cam(spanCenter(bottomUnits[0]), 125, totalW, gridBottom, FIT),
-      // adhesive feet are STUCK ON, not slid in: the markers materialise at
-      // the pad positions instead of sliding into the slots (a note saying
-      // "stick on" over a sliding animation is the same contradiction the
-      // marker itself was fixing)
+      // adhesive feet are PRESSED ON, not slid in - they have no rail to enter a
+      // slot with, so they rise straight onto the pad. (The whole base is staged
+      // 110 mm up at this step, so there is nothing below to clip.)
       phases: adhesiveFeet ? [
-        { fade: feetIds.back.map(id => ({ id })) },
-        { fade: feetIds.front.map(id => ({ id })) },
+        { enter: feetIds.back.map(id => ({ id, from: [0, -18, 0] })) },
+        { enter: feetIds.front.map(id => ({ id, from: [0, -18, 0] })) },
       ] : [
         { enter: feetIds.back.map(id => ({ id, from: [0, 0, 35] })) },
         { enter: feetIds.front.map(id => ({ id, from: [0, 0, -35] })) },
@@ -1387,14 +1393,14 @@ export function generateManifest(build) {
     {
       title: adhesiveFeet ? `Bench: stick on the ${nFeet} feet` : `Bench: insert the ${nFeet} feet`,
       note: (adhesiveFeet
-        ? 'Adhesive rubber feet: stick one to the flat pad around each lower-rail slot marked here - the printed feet shown only mark the spots. Same count, same positions as the printed feet.'
+        ? 'Adhesive rubber feet: peel each one and press it onto the flat pad around each lower-rail slot, same count and same spots as the printed feet. The bought foot is the printed one without its dovetail rail, so the build stands at exactly the same height.'
         : 'Pointy end slides in first · outer feet toward the rail ends, middle feet left to right.') +
         (rails.length > 1 ? ' Where two rails meet, install that slot pair on ONE rail only.' : ''),
       camera: cam(0, 115, totalW, gridBottom, FIT),
-      // stuck on, not slid in - see the case-feet step above
+      // pressed on, not slid in - see the case-feet step above
       phases: adhesiveFeet ? [
-        { fade: feetIds.back.map(id => ({ id })) },
-        { fade: feetIds.front.map(id => ({ id })) },
+        { enter: feetIds.back.map(id => ({ id, from: [0, -18, 0] })) },
+        { enter: feetIds.front.map(id => ({ id, from: [0, -18, 0] })) },
       ] : [
         { enter: feetIds.back.map((id, n) => ({ id, from: [n === 0 ? 30 : -30, 0, 0] })) },
         { enter: feetIds.front.map((id, n) => ({ id, from: [n === 0 ? 30 : -30, 0, 0] })) },
@@ -1514,9 +1520,16 @@ export function generateManifest(build) {
     generated: true,
     mount: build.mount,
     pitch: { x: PITCH_X, y: 56 },
-    // FootMarker rides in only when it exists, so a printed-feet build emits
-    // exactly the colours it always did
-    colors: adhesiveFeet ? { ...COLORS, FootMarker: COLORS.Foot } : COLORS,
+    // FootAdhesive rides in only when it exists, so a printed-feet build emits
+    // exactly the colours it always did. Dark neutral RUBBER, not the
+    // identification purple: it is a bought item shown in its real finish.
+    // PICKED OFF A RENDER LADDER on both stages (#33353b / #3f424a / #4a4d56 /
+    // #565a63): the two darkest vanish against the dark stage's floor, the
+    // lightest starts reading as grey plastic, and this one is dark rubber on
+    // the light stage while staying legible on the dark one. Faking it via
+    // DARK_STAGE_PALETTE was rejected - that would contradict the "shown in its
+    // real finish" promise the colour-locked tooltip makes about a bought item.
+    colors: adhesiveFeet ? { ...COLORS, FootAdhesive: '#4a4d56' } : COLORS,
     parts: [...bom.values()],
     instances: inst,
     stages,
@@ -1555,12 +1568,12 @@ function imgFor(node, type) {
   // TPU foot — ONE universal render: the foot is length-agnostic (it seats in
   // the foot rail / case underside slots, which are the same on every
   // collection), so there's no per-length set like the cases or drawers.
-  // ⚠ NODE-keyed, and both feet options share this node: an adhesive build
-  // passes type 'FootMarker' so the row shows NO render rather than the
-  // printed foot's photo under the label "Adhesive rubber foot" (imgFor
-  // returning null degrades gracefully - the BOM row omits img, the identify
-  // card hides its <img>).
-  if (node === 'Tabletop-Kit-Foot') return type === 'FootMarker' ? null : 'img/parts/TPU Foot.png';
+  if (node === 'Tabletop-Kit-Foot') return 'img/parts/TPU Foot.png';
+  // The bought adhesive foot has no photograph yet, and the printed foot's
+  // render is the wrong product under the label "Adhesive rubber foot". Returning
+  // null degrades gracefully - the BOM row omits img, the identify card hides
+  // its <img> - and matches the MODULITH site, which also shows no stand-in.
+  if (node === 'Adhesive-Foot') return null;
   // handle fastener (2026-07-24) — rendered at full thread detail, unlike the
   // deliberately decimated GLB
   if (node === 'ButtonHeadScrew_M3-6') return 'img/parts/ButtonHeadScrew_M3-6.png';
