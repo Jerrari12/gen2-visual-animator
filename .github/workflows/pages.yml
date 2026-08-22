@@ -80,6 +80,11 @@ jobs:
         run: |
           V="${GITHUB_SHA::8}"
           sed -i "s|css/viewer.css|css/viewer.css?v=$V|; s|js/main.js|js/main.js?v=$V|" viewer/index.html
+          # ⚠ the vendored requirement-scope contract is a CLASSIC script tag,
+          # not a module import, so the module-graph guard below cannot see it.
+          # It still caches independently of index.html, which is the same
+          # stale-asset bug in a different shape.
+          sed -i "s|js/vendor/requirement-scope.js|js/vendor/requirement-scope.js?v=$V|" viewer/index.html
           sed -i "s|'./generate.js'|'./generate.js?v=$V'|" viewer/js/main.js
           sed -i "s|'./entry.js'|'./entry.js?v=$V'|" viewer/js/main.js
 
@@ -101,13 +106,27 @@ jobs:
           // every relative specifier, whatever syntax introduced it
           const SPEC = /(?:\bfrom\s*|\bimport\s*\(?\s*|\bexport\s+\*\s+from\s*)(['"])(\.[^'"]*)\1/g;
           let bad = [];
-          for (const f of fs.readdirSync(dir).filter(n => n.endsWith('.js'))) {
-            const src = fs.readFileSync(path.join(dir, f), 'utf8');
+          // walk js/ AND its subdirectories - vendored code lives in js/vendor/
+          const walk = (d) => fs.readdirSync(d, { withFileTypes: true }).flatMap(e =>
+            e.isDirectory() ? walk(path.join(d, e.name)) : [path.join(d, e.name)]);
+          for (const f of walk(dir).filter(n => n.endsWith('.js'))) {
+            const src = fs.readFileSync(f, 'utf8');
             for (const m of src.matchAll(SPEC)) {
               const spec = m[2];
               if (!spec.endsWith('.js') && !spec.includes('.js?')) continue; // not a module path
-              if (!/[?&]v=/.test(spec)) bad.push(`${dir}/${f} -> ${spec}`);
+              if (!/[?&]v=/.test(spec)) bad.push(`${f} -> ${spec}`);
             }
+          }
+          /* ⚠ AND the CLASSIC <script src> tags in index.html. A module-graph
+             walk cannot see them, and the vendored requirement-scope contract
+             is exactly that shape - it caches independently of index.html, so
+             an unstamped one ships the same stale-asset failure by another
+             route. Absolute URLs (the analytics beacon) are not ours to stamp. */
+          const html = fs.readFileSync('viewer/index.html', 'utf8');
+          for (const m of html.matchAll(/<script[^>]*\ssrc="([^"]+)"/g)) {
+            const src = m[1];
+            if (/^https?:\/\/|^\/\//.test(src)) continue;   // third-party, not cache-stamped by us
+            if (!/[?&]v=/.test(src)) bad.push(`viewer/index.html -> <script src="${src}">`);
           }
           if (bad.length) {
             for (const b of bad) console.log('::error::UNSTAMPED module import: ' + b);
