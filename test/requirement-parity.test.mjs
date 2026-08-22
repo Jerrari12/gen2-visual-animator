@@ -92,9 +92,28 @@ const essence = (rows) => {
   return out;
 };
 
+/* TWO MODES, deliberately different.
+   Standalone CI checks out this repository alone, so a missing planner or a
+   missing jsdom is the normal case and the suite SKIPS - the vendor gate still
+   proves the policy is shared bytes.
+   Under the planner's write-mode sync (GEN2_REQUIRE_PARITY=1) every repository
+   is present by construction, so a missing dependency is a broken setup, not a
+   topology - and the receipt must not be written on a skipped suite. There it
+   FAILS with the fix spelled out. Skipping would let the receipt claim a
+   parity it never ran. */
+const REQUIRE = process.env.GEN2_REQUIRE_PARITY === '1';
 const skipIfNoPlanner = (t) => {
-  if (!existsSync(join(PLANNER, 'js', 'app.js'))) { t.skip('planner checkout not present (GEN2_PLANNER_ROOT)'); return true; }
-  return false;
+  const plannerOk = existsSync(join(PLANNER, 'js', 'app.js'));
+  let jsdomOk = true;
+  try { import.meta.resolve('jsdom'); } catch (e) { jsdomOk = false; }
+  if (plannerOk && jsdomOk) return false;
+  const why = [
+    !plannerOk && `planner checkout not found at ${PLANNER} - set GEN2_PLANNER_ROOT=<path>`,
+    !jsdomOk && 'jsdom is not installed - run `npm install` in this repo (it is a devDependency)',
+  ].filter(Boolean).join('; ');
+  if (REQUIRE) throw new Error('cross-tool parity REQUIRED but cannot run: ' + why);
+  t.skip(why);
+  return true;
 };
 
 for (const magnetic of [0, 1, 2]) {
