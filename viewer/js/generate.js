@@ -95,6 +95,23 @@ const COLL = {
   270: { depth: 270, railDepth: 286 },
 };
 
+// The under-table rail fastener — Joey's default, 2026-08-23: a #6 × 3/4"
+// (19.05 mm) wood screw. The original 31.8 mm `WoodScrew` stays the WALL
+// model on purpose: the right wall fastener or anchor depends on the wall
+// material, so the two mounts keep separate guidance. The 31.8 mm model under
+// a table put its tip 28.75 mm into the top — through any 25 mm worktop —
+// which is what this corrects. GLB canonical like WoodScrew (shank along
+// depth, head at +Z, tip at −Z, base at Y=0), 7.13 × 7.15 × 19.05 mm.
+// `r` is the GLB's Y half-height: pitched 90° about X, the bottom-anchored
+// origin sits that far from the screw's axis, so a MEASURED hole row places
+// the instance at axis − r (the old 3.43 was the 31.8 mm model's).
+// `bite` = len − the 3.025 mm head seat inside the rail plate = how far the
+// tip reaches into the surface; it is what the BOM warning quotes.
+const SCREW_UT = {
+  node: 'WoodScrew_No6-19mm', label: '#6 × 3/4" wood screw', len: 19.05, r: 3.574, bite: 16.0,
+  note: 'Hardware store item · a 3/4" screw reaches about 16 mm into the top - check the surface is thick enough first and choose a length that cannot break through.',
+};
+
 // Wall mount — CALIBRATED 2026-07-05 from Joey's case-to-bracket reference
 // (see GEN2-Part-Orientation-Notes.md "Case → bracket attachment"). Values in
 // viewer/glTF axes; cases centered at Z=0 (back at ~-92.5), Z- = toward wall.
@@ -127,9 +144,9 @@ const UT = {
   railZ: -8.0,            // rail depth-center vs the case column center (front-aligned) — 185; see local railZ
   railBottom: -2.0,       // rail bottom = flatTopY − 2 (channels nest over the case top)
   surface: 6.9,           // table underside = rail top = flatTopY + 6.9
-  screwY: 19.775,         // screw CENTER height above flatTopY (head 3 mm inside the rail plate, tip 28.75 into the wood)
-  screwFrontZ: 77.07,     // 185 front screw row (z ≈ +80.5 − 3.43 radial offset the pitched GLB carries) — see local utScrewFrontZ
-  screwBackZ: -75.93,     // 185 back screw row (z ≈ −72.5 − 3.43) — see local utScrewBackZ
+  screwY: 6.9 - 3.025 + SCREW_UT.len / 2, // screw CENTER height above flatTopY = 13.4: head seated 3 mm inside the rail plate (surface 6.9 − 3.025) + half the #6 × 3/4" length → tip 16.0 into the wood. (The 31.8 mm WoodScrew sat at 19.775 with its tip 28.75 into the wood — through a 25 mm top; corrected 2026-08-23.)
+  screwFrontZ: 76.93,     // 185 front screw row (z ≈ +80.5 − SCREW_UT.r, the radial offset the pitched GLB carries) — see local utScrewFrontZ
+  screwBackZ: -76.07,     // 185 back screw row (z ≈ −72.5 − SCREW_UT.r) — see local utScrewBackZ
   screwInset: 5,          // outer screws 5 mm in from each rail end + one at every 88 mm seam → 2(W+1) per tile = planner railScrews(w)
   fwd: DEPTH + 40,        // cases slide in from a full case-depth out front (same read as the wall's lowerFwd)
 };
@@ -180,8 +197,10 @@ const BUY = {
     { id: 'magnet-n52-10x2', label: 'N52 10×2 strong', url: 'https://amzn.to/4q4JX3Z' },
     { id: 'magnet-n52-6x2', label: 'N52 6×2 strong', url: 'https://amzn.to/49BZyC0' },
   ],
+  // the #6 listing IS the 3/4" screw (Joey, 2026-08-23) — the label says so;
+  // the id is the analytics identity and stays as it was
   woodScrews: [
-    { id: 'woodscrew-6', label: 'Buy #6', url: 'https://amzn.to/4s487gc' },
+    { id: 'woodscrew-6', label: 'Buy #6 × 3/4"', url: 'https://amzn.to/4s487gc' },
     { id: 'woodscrew-8', label: 'Buy #8', url: 'https://amzn.to/4pTWDuq' },
   ],
   // fastens a bolt-on handle to its faceplate — the one REQUIRED buy on an
@@ -197,6 +216,9 @@ const BUY = {
     { id: 'rubber-feet', label: 'Buy rubber feet', url: 'https://amzn.to/4cEanSB' },
   ],
 };
+// Under-table rails bill ONLY the #6 × 3/4" listing: it is the specific
+// recommendation (SCREW_UT), not a gauge choice. Wall rows keep both gauges.
+BUY.railScrews = [BUY.woodScrews[0]];
 
 // Per-length product pages (2026-07-11 refresh — every collection has its own
 // cases/decor pages now, and covers + foot rails got dedicated pages instead
@@ -412,15 +434,16 @@ export function generateManifest(build) {
   // rows (2026-07-19, evaluated meshes in the rails render blend — hole-bore
   // face clustering; Joey caught the 59 back screws floating ~18 mm off):
   // FRONT row is 12 mm from the rail front on every length (screw pos = axis
-  // − 3.43, the radial offset the pitched WoodScrew GLB carries → 15.43).
+  // − SCREW_UT.r, the radial offset the pitched screw GLB carries → 15.574;
+  // it was 15.43 with the 31.8 mm WoodScrew, whose GLB was 0.14 mm slimmer).
   // BACK row inset from the rail back varies per collection (railScrewBack in
   // COLL, default 36 = the 185 calibration; 270 measured 36 too, 165 measured
   // 34 — 2 mm off the old derived value, 115 = 42.4, 240 = 20, 59 = 16.89).
   // Every measured back row carries holes exactly at the end + seam screw Xs.
   const railFrontZ = depth / 2, railBackZ = depth / 2 - (coll.railDepth || 201); // fallback only pads the error path (UT without rails errors above)
   const railZ = (railFrontZ + railBackZ) / 2;         // −8 (185) / −7 (165)
-  const utScrewFrontZ = railFrontZ - 15.43;           // 77.07 (185) / 67.07 (165)
-  const utScrewBackZ = railBackZ + (coll.railScrewBack || 36) - 3.43; // −75.93 (185) / −65.93 (165)
+  const utScrewFrontZ = railFrontZ - (12 + SCREW_UT.r);                     // 76.93 (185) / 66.93 (165)
+  const utScrewBackZ = railBackZ + (coll.railScrewBack || 36) - SCREW_UT.r; // −76.07 (185) / −66.07 (165)
   // Classic drawer closed Z — DERIVED 2026-07-11 from measured part geometry
   // (no assembled ground truth): the classic's back wall (same 2.6 mm wall +
   // magnet clip slot as the decor) aligns with the calibrated decor back,
@@ -639,11 +662,14 @@ export function generateManifest(build) {
      ⚠ `required` survives as a DERIVED legacy boolean for readers not yet
      moved, computed by the contract as scope !== 'enhancement' - never set by
      hand here any more, so it cannot disagree with the requirement. */
-  const add = (node, label, type, links, n = 1, purchased = false, required = false, req = null) => {
+  // `note`: an optional per-row line the label can't carry (a condition, a
+  // warning) — rendered under the label (main.js .cl-note), carried by Copy
+  // list + the CSV's Note column, exactly like the static kits' manifest notes.
+  const add = (node, label, type, links, n = 1, purchased = false, required = false, req = null, note = null) => {
     if (!bom.has(node)) {
       const img = imgFor(node, type);
       const row = { node, label, type, qty: 0, ...(links ? { links } : {}), ...(img ? { img } : {}),
-        ...(purchased ? { purchased } : {}) };
+        ...(purchased ? { purchased } : {}), ...(note ? { note } : {}) };
       if (req && req.requirement) {
         row.requirement = req.requirement;
         // COPY the basis: per-unit rows accumulate selectedCount across calls
@@ -718,15 +744,17 @@ export function generateManifest(build) {
       add(`UnderTableRail_${L}-${w}W`, `Under-Table Rail ${L}-${w}W`, 'Rail', links.rail, 1, false, false, mountCore('mount.install'));
       // screws: one x-position at each rail end (inset 5) + every internal 88 mm
       // seam, × 2 depth rows (front/back) → 2(W+1) per tile = planner railScrews(w).
-      // Pitched 90° about X so they stand tip-up into the surface.
+      // Pitched 90° about X so they stand tip-up into the surface. The model
+      // is the #6 × 3/4" SCREW_UT (not the wall's 31.8 mm WoodScrew — that one
+      // went straight through a 25 mm top).
       const xs = [-(44 * w - UT.screwInset)];
       for (let i = 1; i < w; i++) xs.push(-44 * w + 88 * i);
       xs.push(44 * w - UT.screwInset);
       for (const lx of xs) for (const z of [utScrewBackZ, utScrewFrontZ]) {
         const sid = `uts${utScrewIds.length}`;
         utScrewIds.push(sid);
-        inst.push({ id: sid, node: 'WoodScrew', pos: [railX(t) + lx, flatTopY + UT.screwY, z], rot: [90, 0, 0] });
-        add('WoodScrew', 'Wood Screw', 'Screw', { ...links.rail, buy: BUY.woodScrews }, 1, true, true, mountCore('mount.install')); // purchased + core: the rail can't mount without them
+        inst.push({ id: sid, node: SCREW_UT.node, pos: [railX(t) + lx, flatTopY + UT.screwY, z], rot: [90, 0, 0] });
+        add(SCREW_UT.node, SCREW_UT.label, 'Screw', { ...links.rail, buy: BUY.railScrews }, 1, true, true, mountCore('mount.install'), SCREW_UT.note); // purchased + core: the rail can't mount without them
       }
       c += w;
     }
@@ -748,7 +776,12 @@ export function generateManifest(build) {
       const id = `sc${screwIds.length}`;
       screwIds.push(id);
       inst.push({ id, node: 'WoodScrew', pos: [colCenter(c) + dx, pegY, WALL.screwZ + dz] });
-      add('WoodScrew', 'Wood Screw', 'Screw', { ...links.wall, buy: BUY.woodScrews }, 1, true, true, mountCore('mount.install')); // purchased + core: nothing hangs without them
+      // The wall keeps the 31.8 mm model as an ILLUSTRATION, never a length
+      // spec: wall guidance is deliberately separate from the under-table
+      // default (Joey, 2026-08-23) because the right screw or anchor depends
+      // on the wall material - the note says so on the row.
+      add('WoodScrew', 'Wood Screw', 'Screw', { ...links.wall, buy: BUY.woodScrews }, 1, true, true, mountCore('mount.install'),
+        'Hardware store item · length and anchors depend on the wall material; the 1-1/4" screw shown is an illustration.'); // purchased + core: nothing hangs without them
     }
   } else if (caseFeet) {
     // feet slide into the bottom case's own underside slots: 4 per 1W, running
@@ -1469,7 +1502,7 @@ export function generateManifest(build) {
   if (isUT) {
     preSteps.push({
       title: utIds.length > 1 ? 'Screw the rails to the surface' : 'Screw the rail to the surface',
-      note: 'Hold each rail flat against the underside · channels facing down, the long overhang toward the back · and drive the wood screws up through the plate: one at each end and at every seam line, in the front and back rows. The rail is the stationary part; every case slides into it.',
+      note: 'Hold each rail flat against the underside · channels facing down, the long overhang toward the back · and drive the #6 × 3/4" wood screws up through the plate: one at each end and at every seam line, in the front and back rows. A 3/4" screw reaches about 16 mm into the top, so check the surface is thick enough first. The rail is the stationary part; every case slides into it.',
       camera: { ...camUp(0, flatTopY, totalW, gridBottom), fit: FIT },
       phases: [
         { enter: utIds.map(id => ({ id, from: [0, -70, 0] })) },      // lift the rail up against the surface
@@ -1702,6 +1735,9 @@ function imgFor(node, type) {
   // handle fastener (2026-07-24) — rendered at full thread detail, unlike the
   // deliberately decimated GLB
   if (node === 'ButtonHeadScrew_M3-6') return 'img/parts/ButtonHeadScrew_M3-6.png';
+  // the under-table rail screw (2026-08-23) — same recipe: full-detail render
+  // of the #6 × 3/4" model, from the Screws exporter blend's TrueIsoCam rig
+  if (node === SCREW_UT.node) return `img/parts/${SCREW_UT.node}.png`;
   if (node.startsWith('Faceplate_Essential')) return 'img/parts/Faceplate-Essential.jpg';
   // EdgeLabel plates have per-size renders (2026-07-08 batch) — shared
   // hardware, so one 18-file set serves every collection

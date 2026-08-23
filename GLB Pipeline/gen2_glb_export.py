@@ -52,6 +52,10 @@ CONFIG = {
     "export_materials": "NONE",                # NONE (law #2 default) | PLACEHOLDER | EXPORT
                                                #   EXPORT keeps multi-slot zones as tiny named
                                                #   stubs (e.g. 2-zone faceplate BODY/GRIP)
+    "decimate_ratio": 0.0,                     # >0 = collapse-decimate the DUPLICATE to this
+                                               #   fraction of its triangles before export
+                                               #   (screws: 0.02 -- a thread helix is ~60-75k
+                                               #   tris the viewer only needs as a hint)
 }
 
 # depth-mode note:
@@ -83,6 +87,8 @@ def get_config():
                     type=int, default=CONFIG["drop_islands_max_verts"])
     ap.add_argument("--drop-islands-max-thick", dest="drop_islands_max_thick",
                     type=float, default=CONFIG["drop_islands_max_thick"])
+    ap.add_argument("--decimate-ratio", dest="decimate_ratio",
+                    type=float, default=CONFIG["decimate_ratio"])
     ap.add_argument("--report", default=CONFIG["report"])
     return vars(ap.parse_args(user))
 
@@ -180,6 +186,30 @@ def drop_support_islands(mesh, max_verts, max_thick):
     return dropped
 
 
+def decimate_duplicate(dup, ratio):
+    """Collapse-decimate the DUPLICATE to `ratio` of its triangles and return its
+    new mesh datablock. Goes through the evaluated depsgraph (no operator, no
+    context dependency), so it runs identically headless and inside an open
+    Blender; the source object is never touched. Added 2026-08-23 for the
+    #6 x 3/4in wood screw -- the original WoodScrew had to be hand-decimated
+    because this option did not exist, which made that job unrepeatable."""
+    mod = dup.modifiers.new("gen2_decimate", 'DECIMATE')
+    mod.decimate_type = 'COLLAPSE'
+    mod.ratio = ratio
+    mod.use_collapse_triangulate = True
+    bpy.context.view_layer.update()
+    dg = bpy.context.evaluated_depsgraph_get()
+    new_mesh = bpy.data.meshes.new_from_object(dup.evaluated_get(dg))
+    old = dup.data
+    name = old.name
+    dup.modifiers.remove(mod)
+    dup.data = new_mesh
+    bpy.data.meshes.remove(old, do_unlink=True)
+    new_mesh.name = name
+    new_mesh.update()
+    return new_mesh
+
+
 def run():
     cfg = get_config()
     out_dir = cfg["out"]
@@ -226,6 +256,12 @@ def run():
         mesh.update()
         bpy.context.view_layer.update()
 
+        tris_before = sum(len(p.vertices) - 2 for p in mesh.polygons)
+        if cfg["decimate_ratio"] > 0:
+            mesh = decimate_duplicate(dup, cfg["decimate_ratio"])
+            bpy.context.view_layer.update()
+        tris_after = sum(len(p.vertices) - 2 for p in mesh.polygons)
+
         dropped = 0
         if cfg["drop_islands_max_verts"] > 0:
             dropped = drop_support_islands(mesh, cfg["drop_islands_max_verts"],
@@ -246,6 +282,9 @@ def run():
             "source_object": src.name,
             "node": node,
             "islands_dropped": dropped,
+            "decimate_ratio": cfg["decimate_ratio"],
+            "tris_before": tris_before,
+            "tris_after": tris_after,
             "file": os.path.basename(path),
             "offset_applied": [round(v, 4) for v in off],
             "blender_bounds_after": {
@@ -271,6 +310,7 @@ def run():
         "name_template": cfg["name_template"],
         "depth_mode": cfg["depth_mode"],
         "export_materials": cfg["export_materials"],
+        "decimate_ratio": cfg["decimate_ratio"],
         "exported": len(report),
         "parts": report,
     }

@@ -64,6 +64,7 @@ def run_export(blender_exe, job):
         "--export-materials", job.get("export_materials", "NONE"),
         "--drop-islands-max-verts", str(job.get("drop_islands_max_verts", 0)),
         "--drop-islands-max-thick", str(job.get("drop_islands_max_thick", 2.0)),
+        "--decimate-ratio", str(job.get("decimate_ratio", 0.0)),
     ]
     print(f"  [blender] {os.path.basename(job['blend'])} -> {raw_dir}")
     subprocess.run(cmd, check=True)

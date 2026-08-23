@@ -396,6 +396,18 @@
       "name_template": "UnderTableRail_{code}",
       "depth_mode": "center",
       "report": "_export_report_59.json"
+    },
+    {
+      "name": "Wood screw #6 x 3/4in (under-table hardware)",
+      "_note": "Joey's 2026-08-23 default for under-table rails (19.05 mm; the original 31.8 mm WoodScrew stays the WALL model - wall fasteners depend on the wall). Source object 'Woodscrew #6 3-4in' is modelled tip +X; it is POSED +90 deg about Z in the blend (object rotation, mesh untouched) so the worker bakes tip = Blender +Y = glTF -Z, head = glTF +Z, the WoodScrew convention the generator's rot:[90,0,0] and WALL.screwZ depend on. REQUIRES the blend saved with that pose. decimate_ratio 0.02 takes the 74.6k-tri helix to ~1.5k like the other screws; the worker gained --decimate-ratio for this job.",
+      "blend": "D:\\Render Projects\\Hardware\\GEN2 GLB Exporter - GEN2 Hardware - Screws.blend",
+      "out": "D:\\Code Projects\\GEN2 Visual Animator\\GLB Library\\Hardware",
+      "select": "prefix:Woodscrew #6",
+      "code_regex": "",
+      "name_template": "WoodScrew_No6-19mm",
+      "depth_mode": "center",
+      "decimate_ratio": 0.02,
+      "report": "_export_report_woodscrew6.json"
     }
   ]
 }
