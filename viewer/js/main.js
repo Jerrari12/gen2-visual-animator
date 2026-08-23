@@ -752,7 +752,13 @@ function aoResize() {
 // aspect change) moves the picture while a rounded position stays put; the
 // overlay then sits offset from the geometry it is meant to shade, which reads
 // as a ghosted second copy of the build.
-const _aoCam = new Float32Array(32);
+// ⚠ Float64, NOT Float32 (2026-08-22): Matrix4.elements are doubles, and a
+// Float32 copy rounds them, so `_aoCam[i] !== m[i]` was TRUE for any camera
+// that was not at a round number - aoCamMoved() reported a moved camera on
+// every frame and compositeAO() never drew. Measured: 9 of 32 elements
+// mismatched under Float32, 0 under Float64. The high tier's AO had been
+// silently invisible in production since the guard landed (d6a5ab5).
+const _aoCam = new Float64Array(32);
 function aoCamMoved() {
   const m = camera.matrixWorld.elements, p = camera.projectionMatrix.elements;
   for (let i = 0; i < 16; i++) if (_aoCam[i] !== m[i] || _aoCam[16 + i] !== p[i]) return true;
