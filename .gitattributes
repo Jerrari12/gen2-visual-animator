@@ -21,3 +21,8 @@ test/golden/** text eol=lf
 # clone - a false "someone edited it" that the obvious fix (bump the hash)
 # would launder into a real split.
 requirement-scope.js text eol=lf
+
+# The tabletop-completion module is hash-pinned the same way (planner source,
+# vendored copy here) - same trap, same fix: fixed LF so the pin survives a
+# fresh Windows clone (caught by the fresh-clone deploy gate 2026-08-23).
+tabletop-completion.js text eol=lf
