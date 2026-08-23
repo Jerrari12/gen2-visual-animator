@@ -547,7 +547,11 @@ const GROUPS = [
   { id: 'printer',label: '3D PRINTERS',      pre: ['printer'] },
   // `feet` is the planner's own event for the printed/adhesive pick; the studio
   // reports the same choice as opt:feet:*, already covered by the `opt` head.
-  { id: 'build',  label: 'BUILD HARDWARE',   pre: ['closure','closure-soon','opt','feet'] },
+  // convert:<to> (one drawer, the toolbar seg) and convert-all:<to>:<surface>
+  // (every drawer - palette bridge or Customize master) are the planner's
+  // Classic <-> Decor drawer conversions (2026-08-23): a build decision like
+  // feet, and the surface segment answers which control earns its place.
+  { id: 'build',  label: 'BUILD HARDWARE',   pre: ['closure','closure-soon','opt','feet','convert','convert-all'] },
   // kits:hero|footer are the planner's two links INTO the kits gallery — a
   // cross-tool jump like 3d-instructions (planner→studio) and customize
   // (studio→planner), so they belong with the other intent signals. Split by
