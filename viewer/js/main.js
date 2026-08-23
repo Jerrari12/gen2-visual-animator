@@ -267,8 +267,17 @@ scene.add(surface);
 const STAGE_THEMES = {
   light: { bg: 0xeef0f3, bgWall: 0xd7d4ce, table: 0xdadce0, wall: 0xe6e3dd,
            surface: 0xd9cfc0, grid: null, dim: 0x656a73 },
-  dark:  { bg: 0x0d0e21, bgWall: 0x150f30, table: 0x14163a, wall: 0x1c1442,
-           surface: 0x171a40, grid: 0x2b7f9e, dim: 0x8f9ad8 },
+  // ⚠ wall + surface on the dark stage are MEASURED values (2026-08-23, a
+  // relayed review said the wall was "slightly too low contrast"; it was
+  // worse - the rendered wall (13,4,49) sat DARKER than the room (21,15,48),
+  // luminance ratio 0.55, and the under-table slab 0.88). Desaturated navy-
+  // greys from a rendered sweep: the wall renders (40,43,75), L* 18.7, +12
+  // L* over the room; the slab (seen from below, lit less, and at its full
+  // desk size the far reaches are dimmer still) (34,40,70), L* 17, +12.4
+  // over its room. A plane you see at once, still far below the parts.
+  // Keep them low-chroma: bluer materials rendered as saturated blue here.
+  dark:  { bg: 0x0d0e21, bgWall: 0x150f30, table: 0x14163a, wall: 0x50526e,
+           surface: 0x6e7090, grid: 0x2b7f9e, dim: 0x8f9ad8 },
 };
 // DARK IS THE DEFAULT (Joey 2026-08-08). Both choices are stored explicitly,
 // so "no key" can't mean light and a blocked localStorage fails safe to the
@@ -640,7 +649,13 @@ function updateReflection(force = false) {
 // quad simply REPLACED the frame). Black-with-alpha has no such ambiguity.
 const AO_N = 24, AO_RADIUS = 18, AO_STRENGTH = 1.15;
 const ao = { rtN: null, rtAO: null, normalMat: null, aoMat: null, compMat: null,
-             quad: null, qScene: null, qCam: null, key: '', busy: false };
+             quad: null, qScene: null, qCam: null, key: '', busy: false,
+             // the wall / under-table slab ride the AO pass, so the cases cast
+             // a contact shadow onto what they are mounted to (2026-08-23).
+             // The TABLE never does - a floor disc occludes itself into a grey
+             // wash at grazing angles. The site's frame capture turns this off
+             // for its plain pass (the core's shading must match across mounts).
+             backdrops: true };
 // ⚠ `!tweens.size` is load-bearing, not an optimisation. The AO buffer is
 // regenerated off a key built from the CAMERA — but a step animation moves the
 // PARTS while the camera sits still, so the key never changes, the stale buffer
@@ -781,11 +796,12 @@ function updateAO(force = false) {
   ao.key = key;
   aoCamStore();
   ao.busy = true;
-  // depth + view-space normals of the PARTS only — the table would occlude itself
-  // into a grey wash and it isn't what anyone is inspecting
+  // depth + view-space normals of the PARTS (+ the mounting backdrop when
+  // ao.backdrops, for the contact shadow) — never the table: a floor disc
+  // occludes itself into a grey wash and it isn't what anyone is inspecting
   const hidden = [];
   scene.traverse(o => {
-    if ((o === table || o === grid || o === wall || o === surface ||
+    if ((o === table || o === grid || (!ao.backdrops && (o === wall || o === surface)) ||
          o.isLine || o.isLineSegments || o.isSprite || o === refl.mesh) && o.visible) {
       o.visible = false; hidden.push(o);
     }
@@ -1576,10 +1592,20 @@ function fitWall() {
   }
   if (box.isEmpty()) return;
   const size = box.getSize(new THREE.Vector3()), ctr = box.getCenter(new THREE.Vector3());
-  const margin = 90;
+  // Sized from the build's bounding SPHERE, not its box + 90 mm (2026-08-23):
+  // at the tour's fit framing a box-plus-margin plane showed all four edges
+  // and read as a dark board hung behind the model. MEASURED at the tour's
+  // final 3/4 preset on a 1440x791 canvas: 6R wide still showed the left
+  // edge (the camera sits to the right), 8R cleared it by 18 px, 10R by 165;
+  // 7R tall centred ONE RADIUS BELOW the build clears top and bottom - a wall
+  // runs down to the floor, not up into the air. Zoom out and the edges
+  // return, which is fine for a "mounting surface". The behind-the-wall hide
+  // rule (render loop) is what keeps orbiting free, not the plane's size.
+  const R = size.length() / 2, margin = 90;
+  const w = Math.max(size.x + margin * 2, R * 10), h = Math.max(size.y + margin * 2, R * 7);
   wall.geometry.dispose();
-  wall.geometry = new THREE.PlaneGeometry(size.x + margin * 2, size.y + margin * 2);
-  wall.position.set(ctr.x, ctr.y, box.min.z - 2); // just behind the case backs / bracket
+  wall.geometry = new THREE.PlaneGeometry(w, h);
+  wall.position.set(ctr.x, ctr.y - R, box.min.z - 2); // just behind the case backs / bracket
 }
 
 // size the surface slab to the assembled build + margin, its underside resting
@@ -1602,7 +1628,10 @@ function fitSurface() {
   }
   if (box.isEmpty()) return;
   const size = box.getSize(new THREE.Vector3()), ctr = box.getCenter(new THREE.Vector3());
-  const margin = 90;
+  // back + side margins from the bounding sphere (see fitWall): the desk runs
+  // off the frame instead of ending 90 mm past the cases. The FRONT edge is
+  // still flush with the rail fronts - that edge is the product's own claim.
+  const R = size.length() / 2, margin = Math.max(90, R * 4);
   surfaceUnderY = box.max.y;
   const front = rails.isEmpty() ? box.max.z : rails.max.z; // rail front = the desk edge
   const depth = (front - box.min.z) + margin;              // margin on the back only
