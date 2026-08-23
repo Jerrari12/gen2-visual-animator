@@ -36,6 +36,26 @@ const REQ = (() => {
    rather than reaching for the global on its own. One resolution, one object. */
 export { REQ as REQUIREMENT };
 
+/* THE TABLETOP-COMPLETION CONTRACT (2026-08-23) - which empty cells a tabletop
+   run still needs before its top is level. Same vendoring shape as the
+   requirement-scope contract above: a classic script in the browser, the
+   vendored file evaluated here under node, the bytes pinned by
+   test/tabletop-completion-vendor.test.mjs. The planner draws the same cells
+   on its board, so what this viewer ghosts and what the board hatches can
+   never disagree. */
+const TABLETOP = (() => {
+  if (typeof globalThis.GEN2_TABLETOP === 'object' && globalThis.GEN2_TABLETOP) return globalThis.GEN2_TABLETOP;
+  if (typeof process !== 'undefined' && process.versions && process.versions.node) {
+    const { readFileSync } = process.getBuiltinModule('node:fs');
+    const { fileURLToPath } = process.getBuiltinModule('node:url');
+    const { join, dirname } = process.getBuiltinModule('node:path');
+    const here = dirname(fileURLToPath(import.meta.url));
+    (0, eval)(readFileSync(join(here, 'vendor', 'tabletop-completion.js'), 'utf8'));
+    if (globalThis.GEN2_TABLETOP) return globalThis.GEN2_TABLETOP;
+  }
+  throw new Error('tabletop-completion contract is not loaded: viewer/js/vendor/tabletop-completion.js must precede generate.js (see index.html)');
+})();
+
 const PITCH_X = 88, PITCH_HALF_Y = 28;        // 1W column / half-row pitch
 const ROW0_BOTTOM = 17.65;                    // bottom-row case bottom (7.65 + 10.00)
 const FRL_Y = 7.65, FRU_Y = 12.75;
@@ -631,13 +651,24 @@ export function generateManifest(build) {
         break;
       }
   }
-  // the top must be flat — every occupied column must reach the same height
-  // (planner columnTops() rule; covers need it, and so do the bracket/rail courses)
+  // The top. On a HANGING mount it must be flat against the surface (the rail
+  // or bracket course is one line) - and an uneven one is a unit with nothing
+  // to hang from, which the support check just reported; the error stays for
+  // the message. On a TABLETOP build an unfinished run is NOT an error any
+  // more (2026-08-23, Joey): every kit passes through "one column shorter than
+  // the tallest" while it is being built, so the manifest carries the deficit
+  // and the viewer previews the layout as in progress - ghost boxes over the
+  // missing volume, covers translucent until their run is level, no
+  // instructions. The deficit comes from the SHARED contract (per contiguous
+  // run: separate stacks of different heights are each complete), so the
+  // planner's board hatches exactly the cells ghosted here.
   const colTop = new Map();
   for (const u of units) for (let c = u.col; c < u.col + u.w; c++)
     colTop.set(c, Math.max(colTop.get(c) || 0, u.topIdx));
-  if (new Set(colTop.values()).size > 1)
+  if (hangs && new Set(colTop.values()).size > 1)
     errors.push(`${isUT ? 'The rails need a flat top row against the surface' : 'The covers need a flat top'} · every column must stack to the same height. Fix the build in the planner first.`);
+  const completion = hangs ? null : TABLETOP.completion(build.placed);
+  const incomplete = !!completion && !completion.complete;
   // sanity cap: each unit becomes ~9 parts and its own step — beyond this the
   // instructions stop being instructions
   if (units.length > 80)
@@ -1214,14 +1245,23 @@ export function generateManifest(build) {
   // before the case hangs); under-table builds have NO covers (the rail course
   // is the top) — so this whole section is tabletop-only.
   const topOf = c => Math.max(0, ...units.filter(v => c >= v.col && c < v.col + v.w).map(v => v.topIdx));
+  // A run is a contiguous span of occupied columns; its covers sit at the
+  // run's TARGET top (its tallest column). On a level run that is every
+  // column's top, exactly as before; on an in-progress run it is the intended
+  // flat top, and every tile whose footprint touches a short column is
+  // `planned` - the viewer renders it translucent, because it cannot attach
+  // until that column is built up (a tile wholly over level columns stays
+  // normal; it is installable today).
+  const shortCols = new Set(incomplete ? completion.columns.map(c => c.x - minCol) : []);
   const coverRuns = [];
   for (let c = 0, run = null; !hangs && c < totalW; c++) {
     const t = bottomCols.size ? topOf(c) : 0;
     const occupied = units.some(v => c >= v.col && c < v.col + v.w);
-    if (occupied && run && run.top === t && run.c1 === c - 1) run.c1 = c;
+    if (occupied && run && run.c1 === c - 1) { run.c1 = c; run.top = Math.max(run.top, t); }
     else if (occupied) coverRuns.push(run = { c0: c, c1: c, top: t });
     else run = null;
   }
+  const plannedTile = t => [...Array(t.w).keys()].some(k => shortCols.has(t.col + k));
   coverRuns.forEach(r => {
     const n = r.c1 - r.c0 + 1;
     const clY = row0 + r.top * PITCH_HALF_Y;
@@ -1229,13 +1269,13 @@ export function generateManifest(build) {
     // (and the cases under them) together — planner brickTiling() rule.
     for (const t of tileOut(r, tilesLower(n))) {
       const i = clIds.length;
-      inst.push({ id: `cl${i}`, node: `CL-${L}-${t.w}W`, pos: [railX(t), clY, 0] });
+      inst.push({ id: `cl${i}`, node: `CL-${L}-${t.w}W`, pos: [railX(t), clY, 0], ...(plannedTile(t) ? { planned: true } : {}) });
       clIds.push(`cl${i}`);
       add(`CL-${L}-${t.w}W`, `Cover Lower ${L}-${t.w}W`, 'CoverL', links.covers, 1, false, false, coverReq('lower'));
     }
     for (const t of tileOut(r, tilesUpper(n))) {
       const i = cuIds.length;
-      inst.push({ id: `cu${i}`, node: `CU-${L}-${t.w}W`, pos: [railX(t), clY + 4.3, 0] });
+      inst.push({ id: `cu${i}`, node: `CU-${L}-${t.w}W`, pos: [railX(t), clY + 4.3, 0], ...(plannedTile(t) ? { planned: true } : {}) });
       cuIds.push(`cu${i}`);
       add(`CU-${L}-${t.w}W`, `Cover Upper ${L}-${t.w}W`, 'CoverU', links.covers, 1, false, false, coverReq('upper'));
     }
@@ -1693,6 +1733,44 @@ export function generateManifest(build) {
     stages,
     steps: [...preSteps, ...caseStepOrder, ...postSteps],
   };
+  if (incomplete) {
+    /* IN-PROGRESS PREVIEW (2026-08-23). The layout is valid but one or more
+       runs are not level yet. The manifest carries:
+       - `incomplete`: the deficit in the planner's own terms - `areas` is the
+         count a person sees (4-connected regions of missing cells, from the
+         shared contract), never the number of boxes it takes to draw them;
+       - `ghosts`: one translucent box per short COLUMN, in viewer millimetres,
+         with `halfRows` so the viewer can draw the 0.5H grid inside it (the
+         volume reads as space to fill, never as a particular drawer - a 1H, two
+         0.5H or any other fit all complete it). Not parts: never in `parts`,
+         `instances`, the bounds or a raycast;
+       - ONE step that simply places everything (no motion, no assembly). The
+         viewer hides every instruction surface in this mode, so this is a
+         state carrier, not a page anyone reads as "step 1 of 1". Staged
+         subassemblies are un-staged so each part's `pos` is final. */
+    const ghosts = completion.columns.map(c => {
+      const col = c.x - minCol, n = c.y1 - c.y0;
+      return {
+        pos: [colCenter(col), row0 + (gridBottom - c.y1) * PITCH_HALF_Y, 0],
+        size: [PITCH_X, n * PITCH_HALF_Y, depth],
+        halfRows: n,
+      };
+    });
+    for (const i of inst) delete i.stage;
+    // the parts list still bills the intended covers (they are the kit's), but a
+    // row with a planned tile says so - the same `note` line the feet rows use
+    for (const p of manifest.parts)
+      if (inst.some(i => i.node === p.node && i.planned)) p.note = 'Planned · attaches once every column in its run reaches the top';
+    manifest.incomplete = { areas: completion.areas.length, cells: completion.cells.length, columns: completion.columns.length };
+    manifest.ghosts = ghosts;
+    manifest.steps = [{
+      title: 'Finish the top',
+      note: `This layout is still in progress · fill the outlined space in the planner (${completion.areas.length === 1 ? 'one area' : completion.areas.length + ' areas'}) so every column supports the top cover - any drawer combination that fits. The translucent covers attach once their run is level.`,
+      camera: { ...cam(0, H_MM * 0.45, totalW, gridBottom, FIT) },
+      preview: true,
+      phases: [{ enter: inst.map(i => ({ id: i.id, from: [0, 0, 0] })), sync: true }],
+    }];
+  }
   return { errors, warnings, manifest };
 }
 

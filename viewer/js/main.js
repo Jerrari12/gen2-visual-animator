@@ -255,6 +255,69 @@ const surface = new THREE.Mesh(
 surface.visible = false;
 scene.add(surface);
 
+/* IN-PROGRESS TABLETOP PREVIEW (2026-08-23). While a tabletop run is still
+   being built up, the generator ships the layout with `manifest.incomplete`
+   and `manifest.ghosts`: one box per short column, the volume that is still
+   missing before the run's top is level. They are VOLUME, never parts: neutral,
+   translucent, with the 0.5H grid drawn inside so a 1H box never reads as
+   "a 1H drawer goes here" (a 1H, two 0.5H, or any other fit completes it).
+   They live in their own group, outside `instances`, so the BOM, the
+   dimension callouts, measuring, identify, exports, shadows, AO and the
+   reflection never see them; the passes that walk the scene skip
+   `userData.ghost`. Shown only on the preview state (goTo). */
+const ghostGroup = new THREE.Group();
+ghostGroup.visible = false;
+scene.add(ghostGroup);
+const GHOST_FILL = new THREE.MeshBasicMaterial({ color: 0x9aa3b8, transparent: true, opacity: 0.16, depthWrite: false });
+const GHOST_EDGE = new THREE.LineBasicMaterial({ color: 0xc9d0e4, transparent: true, opacity: 0.9 });
+const GHOST_GRID = new THREE.LineBasicMaterial({ color: 0xc9d0e4, transparent: true, opacity: 0.35 });
+function buildGhosts() {
+  for (const o of [...ghostGroup.children]) { ghostGroup.remove(o); o.traverse(c => { if (c.geometry) c.geometry.dispose(); }); }
+  for (const g of (manifest.ghosts || [])) {
+    const [w, h, d] = g.size;
+    const box = new THREE.Mesh(new THREE.BoxGeometry(w - 2, h - 1, d - 2), GHOST_FILL);
+    box.position.set(g.pos[0], g.pos[1] + h / 2, g.pos[2]);
+    box.userData.ghost = true;
+    box.renderOrder = 2; // after the parts, so the translucent fill composites over them correctly
+    const edges = new THREE.LineSegments(new THREE.EdgesGeometry(box.geometry), GHOST_EDGE);
+    edges.userData.ghost = true;
+    box.add(edges);
+    // the half-row grid inside the volume: every 0.5H a rectangle, so the box
+    // reads as "this much space", not as a drawer of this size
+    const pts = [];
+    for (let r = 1; r < g.halfRows; r++) {
+      const y = -h / 2 + r * (h / g.halfRows);
+      const x0 = -(w - 2) / 2, x1 = (w - 2) / 2, z0 = -(d - 2) / 2, z1 = (d - 2) / 2;
+      pts.push(x0, y, z1, x1, y, z1,  x1, y, z1, x1, y, z0,  x1, y, z0, x0, y, z0,  x0, y, z0, x0, y, z1);
+    }
+    if (pts.length) {
+      const gridGeo = new THREE.BufferGeometry();
+      gridGeo.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
+      const lines = new THREE.LineSegments(gridGeo, GHOST_GRID);
+      lines.userData.ghost = true;
+      box.add(lines);
+    }
+    ghostGroup.add(box);
+  }
+}
+/* The status pill + the chrome. body.incomplete hides every instruction
+   surface (controls, dots, note, the embed's Begin button) - this is a
+   preview of a layout in progress, not step 1 of 1 of anything. */
+function setIncomplete(on) {
+  const inc = on ? manifest.incomplete : null;
+  document.body.classList.toggle('incomplete', !!inc);
+  const pill = document.getElementById('incomplete-status');
+  if (pill) {
+    pill.classList.toggle('hidden', !inc);
+    if (inc) {
+      const n = inc.areas;
+      pill.querySelector('b').textContent = `Previewing an in-progress tabletop kit · ${n === 1 ? 'one area' : n + ' areas'} remaining`;
+      pill.querySelector('span').textContent = 'Fill the outlined space in the planner · any drawer combination that fits · the translucent covers attach once the top is level';
+    }
+  }
+  if (inc) trackOnce('incomplete:preview');
+}
+
 // ---- stage themes: light / dark mode (retrowave look, 2026-08-08) ----------
 // light = the color-accurate default the filament picks are judged against;
 // dark = the retrowave showcase stage (navy room, cyan grid). ONLY the room
@@ -624,7 +687,7 @@ function updateReflection(force = false) {
   const hidden = [];
   const hide = o => { if (o.visible) { o.visible = false; hidden.push(o); } };
   hide(refl.mesh); hide(grid);
-  scene.traverse(o => { if ((o.isLine || o.isLineSegments || o.isSprite) && o.visible) hide(o); });
+  scene.traverse(o => { if ((o.isLine || o.isLineSegments || o.isSprite || o.userData.ghost) && o.visible) hide(o); });
   const prevBg = scene.background;
   scene.background = null;
   renderer.setRenderTarget(refl.rt);
@@ -801,7 +864,7 @@ function updateAO(force = false) {
   // occludes itself into a grey wash and it isn't what anyone is inspecting
   const hidden = [];
   scene.traverse(o => {
-    if ((o === table || o === grid || (!ao.backdrops && (o === wall || o === surface)) ||
+    if ((o === table || o === grid || (!ao.backdrops && (o === wall || o === surface)) || o.userData.ghost ||
          o.isLine || o.isLineSegments || o.isSprite || o === refl.mesh) && o.visible) {
       o.visible = false; hidden.push(o);
     }
@@ -2674,7 +2737,12 @@ function goTo(i, { animate = true } = {}) {
   fpEnv.target = 1;  // a step-scripted `room: 0` (faceplate cinematic) must not outlive its page
   closeFilamentMenu(false); // parts move on a page change; selection is handled below
   stopCinema();
+  // an in-progress layout has exactly one page - its preview - whatever was
+  // asked for (the cover, a keyboard Next, a restored index): no cover, no
+  // intro, no outro for a kit that is not finished
+  if (manifest.incomplete) i = manifest.steps.length;
   cur = Math.max(0, Math.min(PAGES.length - 1, i));
+  ghostGroup.visible = !!manifest.incomplete && cur === manifest.steps.length;
   const page = PAGES[cur];
   const isCover = !!page.cover, isOutro = !!page.outro;
   $('cover-overlay').classList.toggle('hidden', !isCover);
@@ -2925,11 +2993,41 @@ const ray = new THREE.Raycaster();
 const DEBUG_ON = !!new URLSearchParams(location.search).get('debug'); // ?debug=1 — same flag as the __GEN2_VIEWER__ hook
 let downXY = null, selectedId = null;
 const highlightMats = {}, altHighlightMats = {}; // (type | type:zone) -> emissive clone (base / lightened tile)
+/* PLANNED parts (2026-08-23): a cover tile the generator marked `planned`
+   sits over a column that is not built up yet, so it cannot attach today. It
+   renders as a translucent clone of the material it would otherwise wear -
+   colour copied from the registry entry on every applyPalette, so a filament
+   pick repaints it like any other cover - with its RESTING opacity stamped,
+   which is what keeps every fade in this engine honest about it. A separate
+   registry, so the shared opaque material is never mutated. */
+const PLANNED_OPACITY = 0.35;
+const plannedMats = {}, plannedHighlightMats = {}; // cacheKey -> { mat, src }
+function plannedMatFor(src, cacheKey) {
+  if (!plannedMats[cacheKey]) {
+    const m = src.clone();
+    if (src.onBeforeCompile) { m.onBeforeCompile = src.onBeforeCompile; m.customProgramCacheKey = src.customProgramCacheKey; }
+    m.transparent = true; m.opacity = PLANNED_OPACITY; m.userData.rest = PLANNED_OPACITY;
+    plannedMats[cacheKey] = { mat: m, src };
+  }
+  return plannedMats[cacheKey].mat;
+}
 function materialFor(inst, highlighted, zone = '') {
   const type = typeByNode[inst.cfg.node];
   const key = zoneKey(type, zone);
-  const base = (inst.alt && !zone) ? altMatFor(type) : baseMatFor(type, zone); // zoned types aren't tiled — alt is a body-only concept
+  const solid = (inst.alt && !zone) ? altMatFor(type) : baseMatFor(type, zone); // zoned types aren't tiled — alt is a body-only concept
+  const planned = !!inst.cfg.planned;
+  const pKey = key + (inst.alt && !zone ? '|alt' : '');
+  const base = planned ? plannedMatFor(solid, pKey) : solid;
   if (!highlighted) return base;
+  if (planned) {
+    if (!plannedHighlightMats[pKey]) {
+      const m = base.clone();
+      if (base.onBeforeCompile) { m.onBeforeCompile = base.onBeforeCompile; m.customProgramCacheKey = base.customProgramCacheKey; }
+      m.emissive = new THREE.Color(0xff8a40); m.emissiveIntensity = 0.4;
+      plannedHighlightMats[pKey] = { mat: m, src: solid };
+    }
+    return plannedHighlightMats[pKey].mat;
+  }
   const cache = (inst.alt && !zone) ? altHighlightMats : highlightMats;
   if (!cache[key]) {
     const m = base.clone();
@@ -3825,6 +3923,9 @@ function applyPalette() {
   // preset's covers/footrails render uniform without any material reassignment
   for (const [type, mat] of Object.entries(altMaterials)) mat.color.set(activeHex(type)).lerp(new THREE.Color('#ffffff'), altLerp(type));
   for (const [type, mat] of Object.entries(altHighlightMats)) mat.color.set(activeHex(type)).lerp(new THREE.Color('#ffffff'), altLerp(type));
+  // planned (translucent) clones take their source's colour, after it moved
+  for (const e of Object.values(plannedMats)) e.mat.color.copy(e.src.color);
+  for (const e of Object.values(plannedHighlightMats)) e.mat.color.copy(e.src.color);
   renderChecklist();
   updateColorToggle();
   renderPresets(); // keep the active preset / My-palette chip highlight in step
@@ -5441,6 +5542,8 @@ async function mountManifest(m) {
   await loadTemplates();
   if (plateActive()) ensurePlateUVs();   // plate GLBs ship position+normal only
   buildInstances();
+  buildGhosts();
+  setIncomplete(!!m.incomplete);
   computeBounds();
   // (re)apply the tier now that the build exists — the shadow camera and the
   // reflector plane are both sized off assembledBox, and regenerate() replaces
@@ -5784,6 +5887,7 @@ const SHOT_LEN_COLORS = { 59: '#f2f2f2', 115: '#9ea3a8', 165: '#3aa0e8', 185: '#
 function captureShot() {
   applyState(manifest.steps.length - 1);          // assembled, deterministic
   table.visible = grid.visible = false;
+  ghostGroup.visible = false;
   if (isWallBuild) wall.visible = false;
   if (isUnderTableBuild) surface.visible = false;
   // TRANSPARENT, not a baked panel colour (2026-08-08). The art used to carry

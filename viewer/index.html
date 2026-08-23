@@ -190,6 +190,10 @@
       <!-- Embed (docked split view) only: the live-preview landing's chrome.
            Shown/hidden purely by body.embed-preview / .embed-hint-on classes. -->
       <button id="embed-begin" title="Step-by-step assembly for this exact build">&#9654; Begin the instructions</button>
+      <!-- In-progress tabletop layout (a column still short of the top): a
+           non-modal status over the live preview. Filled by main.js setIncomplete();
+           body.incomplete hides the instruction chrome around it. -->
+      <div id="incomplete-status" class="hidden" role="status"><b></b><span></span></div>
       <div id="embed-hint"><span>🖱 Drag to orbit &middot; scroll to zoom &middot; tap parts to color them</span></div>
 
       <!-- ?part=&mode=preview only: restore the framed view + idle spin after the user orbits -->
@@ -235,6 +239,12 @@
        scripts run before deferred modules, so GEN2_REQ exists by the time
        generate.js evaluates. -->
   <script src="js/vendor/requirement-scope.js"></script>
+  <!-- The shared tabletop-completion contract (2026-08-23): which cells an
+       in-progress tabletop run still needs before its top is level. Vendored
+       byte-for-byte from the planner (gen2-planner-main/js/tabletop-completion.js),
+       pinned by test/tabletop-completion-vendor.test.mjs. Classic script, above
+       main.js, for the same reason as the one above. -->
+  <script src="js/vendor/tabletop-completion.js"></script>
   <script type="module" src="js/main.js"></script>
 <!-- GoatCounter analytics: cookieless, no consent banner. Counts a pageview on
      load; main.js's track() sends custom events (open/step/out/error…).

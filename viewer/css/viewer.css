@@ -783,6 +783,24 @@ body.embed-preview #embed-begin:hover { filter: brightness(1.07); }
 @media (min-width: 561px) {
   body.embed-preview #identify-card { bottom: 72px; }
 }
+/* In-progress tabletop preview (2026-08-23): the layout is valid but a run
+   is still being built up. One non-modal status pill, bottom-centre, and NO
+   instruction chrome - there is nothing to step through yet. Orange heading,
+   a progress glyph, role=status: guidance, never an alert. */
+#incomplete-status {
+  position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%);
+  z-index: 30; max-width: min(560px, calc(100% - 32px));
+  background: var(--panel); border: 1px solid var(--accent); border-radius: 10px;
+  padding: 10px 16px; text-align: center; box-shadow: 0 6px 20px rgba(0,0,0,.22);
+  pointer-events: none;
+}
+#incomplete-status.hidden { display: none; }
+#incomplete-status b { display: block; color: var(--accent); font-size: 14px; }
+#incomplete-status b::before { content: "\25D4  "; }
+#incomplete-status span { display: block; font-size: 12px; color: var(--ink-soft); margin-top: 2px; }
+body.incomplete #controls, body.incomplete #note-panel, body.incomplete #embed-begin,
+body.incomplete #embed-hint, body.incomplete #step-counter { display: none !important; }
+@media (min-width: 561px) { body.incomplete #identify-card { bottom: 88px; } }
 #embed-hint { display: none; }
 body.embed-preview.embed-hint-on #embed-hint {
   display: block;

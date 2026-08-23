@@ -36,7 +36,8 @@ async function plannerBom(build) {
   const dom = new JSDOM(read('index.html'), { runScripts: 'outside-only' });
   const { window } = dom;
   window.__GEN2_PLANNER_TEST__ = true;
-  window.eval(read('js/requirement-scope.js') + '\n' + read('js/data.js') + '\n' + read('js/app.js'));
+  // tabletop-completion.js next: app.js calls it on every tabletop refresh (2026-08-23)
+  window.eval(read('js/requirement-scope.js') + '\n' + read('js/tabletop-completion.js') + '\n' + read('js/data.js') + '\n' + read('js/app.js'));
   const app = window.__GEN2_PLANNER_TEST__;
   assert.ok(app.applyBuild(JSON.parse(JSON.stringify(build))), 'planner rejected the fixture build');
   const rows = JSON.parse(JSON.stringify(app.computeBom())).flatMap((s) => s.items);
