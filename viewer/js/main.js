@@ -712,6 +712,16 @@ function updateReflection(force = false) {
 // NoBlending produced byte-identical frames (the blend mode was ignored and the
 // quad simply REPLACED the frame). Black-with-alpha has no such ambiguity.
 const AO_N = 24, AO_ACCUM = 16, AO_RADIUS = 18, AO_STRENGTH = 1.15, AO_DEPTH_TOL = 12;
+// AO engages only after this much CONTINUOUS quiet (2026-08-24, Joey's
+// flicker report): playStep's phase boundaries leave 1-2 tween-free frames
+// (the next phase's tweens are scheduled in a microtask after the frame that
+// finished the last one), and a single quiet frame used to render AND
+// composite pass 1 - a one-frame dark blink between animations (measured on
+// the step-7 playback: three flash-frame pairs per step, p99 darkening 37
+// luma levels). 300ms also outlasts the ~160ms settle that restores
+// pixelRatio, so the burst no longer starts once only to be thrown away by
+// the resize.
+const AO_ENGAGE_MS = 300;
 const ao = { rtN: null, rtAO: null, normalMat: null, aoMat: null, compMat: null,
              quad: null, qScene: null, qCam: null, key: '', busy: false,
              // settle accumulation (2026-08-23): passes = how many jittered
@@ -722,7 +732,10 @@ const ao = { rtN: null, rtAO: null, normalMat: null, aoMat: null, compMat: null,
              // old `instances.size + cur` key survived a regenerate that
              // replaced every part, and a stale buffer accumulated 16 passes
              // of confidence in geometry that no longer exists.
-             passes: 0, accumMax: 1, groups: null, rev: 0, rtBlur: null, blurMat: null,
+             // quietAt = when the current quiet spell began (-1 = not quiet;
+             // -Infinity = seeded by a force pass so scripted captures never
+             // wait out AO_ENGAGE_MS)
+             passes: 0, accumMax: 1, groups: null, rev: 0, rtBlur: null, blurMat: null, quietAt: -1,
              // the wall / under-table slab ride the AO pass, so the cases cast
              // a contact shadow onto what they are mounted to (2026-08-23).
              // The TABLE never does - a floor disc occludes itself into a grey
@@ -1044,7 +1057,18 @@ function updateAO(force = false) {
   // Coming back from a blocked spell (an animation, the outro) the camera may be
   // exactly where it was, so nothing would look changed and we'd composite the
   // buffer from BEFORE the parts moved. Force one regeneration on resume.
-  if (!aoWanted()) { ao.blocked = true; return; }
+  if (!aoWanted()) { ao.blocked = true; ao.quietAt = -1; return; }
+  // the engage delay (see AO_ENGAGE_MS). ⚠ ao.passes is zeroed while waiting:
+  // the buffer still holds the PRE-motion image, and if the step's camera
+  // returns to the exact stored pose, compositeAO's only other guards
+  // (aoCamMoved + passes) would happily lay that stale shading over the
+  // moved parts for the whole waiting window.
+  if (force) ao.quietAt = -Infinity;
+  else {
+    const nowQ = performance.now();
+    if (ao.quietAt === -1) ao.quietAt = nowQ;
+    if (nowQ - ao.quietAt < AO_ENGAGE_MS) { ao.blocked = true; ao.passes = 0; return; }
+  }
   if (ao.blocked) { ao.blocked = false; force = true; }
   ensureAO(); aoResize();
   camera.updateMatrixWorld();
