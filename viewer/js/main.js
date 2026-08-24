@@ -702,8 +702,9 @@ function updateReflection(force = false) {
 // Hand-rolled half-res SSAO. No EffectComposer: the beauty pass never goes through
 // a render target — AO is rendered into its own buffer and laid over the finished
 // frame as a fullscreen quad, so the normal render path is untouched.
-// Measured cost: +0.18 ms/frame steady, +0.66 ms one-off when the view settles —
-// cheaper than the shadow map and ~3x cheaper than the environment.
+// Measured cost: ~0.19 ms/frame steady (one bilinear quad); after a settle, a
+// ~16-frame accumulation burst at ~1 ms/frame (jittered depth+normals + SSAO
+// + half-res bilateral), then EXACTLY zero work until something moves.
 //
 // ⚠ The scene is REAL MILLIMETRES. AO_RADIUS is in mm (~18mm reads the case seams
 // and drawer gaps); a tutorial's 0.5 "units" is a sub-pixel no-op here.
@@ -740,14 +741,20 @@ const ao = { rtN: null, rtAO: null, normalMat: null, aoMat: null, compMat: null,
 // part's silhouette, over the embedding page's panel (2026-08-19 design
 // review). And the idle turntable would invalidate it every frame anyway.
 function aoWanted() { return QUALITY[quality].ao && !cinema.on && !fxDead.ao && !tweens.size && !IS_PART; }
-/* ONE golden-angle spiral over n*groups hemisphere points, dealt into `groups`
-   stratified hands (stride deal): every accumulation pass gets its own n
-   directions AND its own radii/elevations, so 16 passes sample 384 DISTINCT
-   points. ⚠ Do NOT "jitter" one fixed kernel by golden-ratio rotations
-   instead: the kernel's own angular step is 0.381966 turns and the golden
-   ratio conjugate is its negative mod 1, so sample i on pass p lands at
-   (i-p)*step - 16 passes collapse to ~39 distinct azimuths, not 384
-   (adversarial review catch, 2026-08-23). */
+/* Every accumulation pass gets its OWN full 24-point golden-angle spiral -
+   the shipped kernel's angular quality (max azimuth gap ~20 deg) - rotated by
+   an equally-spaced g/groups turn and radius-interleaved by (g+0.5)/groups,
+   so the 16-hand union is 384 DISTINCT azimuths and radii. Two designs were
+   REJECTED by review before this one (2026-08-23):
+   - jittering ONE kernel by golden-RATIO rotations: the kernel's own step is
+     0.381966 turns and the golden-ratio conjugate is its negative mod 1, so
+     16 passes collapse to ~39 distinct azimuths;
+   - stride-dealing one 384-point spiral into 16 hands: 16*goldenAngle is
+     ~1/9 turn, so each HAND was nine tight clusters (azimuth gaps 1.1-39
+     deg) - and pass 0 is what every MOTION frame and the byte fallback use,
+     so single-pass quality had silently regressed below the shipped kernel.
+   The g/groups offsets are RATIONAL, the kernel step irrational - no
+   resonance, no collisions. */
 /* Sub-texel jitter per accumulation pass (in half-res texel units): the
    passes render the SCENE grid shifted by fractions of a texel, so the
    accumulated buffer is grid-SUPERSAMPLED - occlusion terminators (the
@@ -762,13 +769,17 @@ const AO_JITTER = (() => {
 const _aoProj = new THREE.Matrix4(), _aoProjInv = new THREE.Matrix4();
 
 function aoKernelGroups(n, groups) {
-  const total = n * groups, all = [];
-  for (let i = 0; i < total; i++) {
-    const a = i * 2.399963, r = Math.sqrt((i + 0.5) / total), z = Math.sqrt(1 - r * r);
-    all.push(new THREE.Vector3(Math.cos(a) * r, Math.sin(a) * r, z)
-      .multiplyScalar(0.3 + 0.7 * ((i / total) ** 2)));   // cluster near the origin
-  }
-  return Array.from({ length: groups }, (_, g) => all.filter((_, i) => i % groups === g));
+  return Array.from({ length: groups }, (_, g) => {
+    const k = [];
+    for (let i = 0; i < n; i++) {
+      const t = (i + (g + 0.5) / groups) / n;             // radius interleave across hands
+      const a = (i * 0.381966 + g / groups) * 6.2831853;  // full spiral + equal-spaced hand rotation
+      const r = Math.sqrt(t), z = Math.sqrt(Math.max(0, 1 - r * r));
+      k.push(new THREE.Vector3(Math.cos(a) * r, Math.sin(a) * r, z)
+        .multiplyScalar(0.3 + 0.7 * (t ** 2)));           // cluster near the origin
+    }
+    return k;
+  });
 }
 /* A complete RGBA16F framebuffer proves renderability, not that the
    constant-alpha running-mean blend behaves. Verify the arithmetic once, on
@@ -778,9 +789,10 @@ function aoKernelGroups(n, groups) {
    fallback, never a silently-shimmering half-working mean. */
 function aoBlendProbe() {
   let rt = null, mat = null, quad = null;
+  const prevAuto = renderer.autoClear;
   try {
     const gl = renderer.getContext();
-    rt = new THREE.WebGLRenderTarget(2, 2, { type: THREE.HalfFloatType });
+    rt = new THREE.WebGLRenderTarget(2, 2, { type: THREE.HalfFloatType, depthBuffer: false });
     mat = new THREE.ShaderMaterial({
       uniforms: { uV: { value: 0.8 } },
       vertexShader: `void main(){ gl_Position = vec4( position.xy, 0.0, 1.0 ); }`,
@@ -791,7 +803,6 @@ function aoBlendProbe() {
     quad.frustumCulled = false;
     const sc = new THREE.Scene(); sc.add(quad);
     const cam = new THREE.Camera();
-    const prevAuto = renderer.autoClear;
     renderer.setRenderTarget(rt);
     mat.blending = THREE.NoBlending;
     renderer.render(sc, cam);
@@ -803,7 +814,6 @@ function aoBlendProbe() {
     mat.blendAlpha = 0.25;
     renderer.autoClear = false;
     renderer.render(sc, cam);
-    renderer.autoClear = prevAuto;
     // read one pixel back in whatever float format the device offers
     const fmt = gl.getParameter(gl.IMPLEMENTATION_COLOR_READ_FORMAT);
     const type = gl.getParameter(gl.IMPLEMENTATION_COLOR_READ_TYPE);
@@ -820,11 +830,16 @@ function aoBlendProbe() {
     if (!pass) { console.warn('[gen2] AO accumulation probe failed (read ' + r + ') — single-pass AO only'); track('error:fx-ao-accum'); }
     return pass;
   } catch (e) {
-    renderer.setRenderTarget(null);
     console.warn('[gen2] AO accumulation probe threw — single-pass AO only', e);
     track('error:fx-ao-accum');
     return false;
   } finally {
+    // ⚠ unconditional: a throw between autoClear=false and its inline restore
+    // used to leave the MAIN renderer never clearing again (frame trails),
+    // with the exception swallowed here so guardFx never saw it (post-work
+    // review blocker). State first, disposals after.
+    renderer.autoClear = prevAuto;
+    renderer.setRenderTarget(null);
     if (rt) rt.dispose();
     if (mat) mat.dispose();
     if (quad) quad.geometry.dispose();
@@ -845,7 +860,7 @@ function ensureAO() {
   // that silently renders nothing and composites a full-screen black overlay.
   ao.accumMax = 1;
   if (renderer.extensions.has('EXT_color_buffer_float')) {
-    ao.rtAO = new THREE.WebGLRenderTarget(w, h, { type: THREE.HalfFloatType });
+    ao.rtAO = new THREE.WebGLRenderTarget(w, h, { type: THREE.HalfFloatType, depthBuffer: false });
     const gl = renderer.getContext();
     renderer.setRenderTarget(ao.rtAO);
     const ok = gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE;
@@ -853,8 +868,10 @@ function ensureAO() {
     if (ok && aoBlendProbe()) ao.accumMax = AO_ACCUM;
     else { ao.rtAO.dispose(); ao.rtAO = null; }
   }
-  if (!ao.rtAO) ao.rtAO = new THREE.WebGLRenderTarget(w, h);
-  ao.rtBlur = new THREE.WebGLRenderTarget(w, h);   // denoised copy (8 bits is plenty for display)
+  // fullscreen-quad targets never use depth - the default depthBuffer:true
+  // silently costs ~3.5 MB each at dpr 2 (post-work review)
+  if (!ao.rtAO) ao.rtAO = new THREE.WebGLRenderTarget(w, h, { depthBuffer: false });
+  ao.rtBlur = new THREE.WebGLRenderTarget(w, h, { depthBuffer: false });   // denoised copy (8 bits is plenty for display)
   ao.groups = aoKernelGroups(AO_N, AO_ACCUM);
   ao.normalMat = new THREE.MeshNormalMaterial();     // view-space normals in RGB
   ao.aoMat = new THREE.ShaderMaterial({
@@ -1106,13 +1123,38 @@ function updateAO(force = false) {
     renderer.autoClear = false;
     renderer.render(ao.qScene, ao.qCam);
     // denoise the running mean into rtBlur (full overwrite, half-res, cheap) -
-    // the composite reads only this, so its per-frame cost stays a 4-tap quad
+    // the composite reads only this, so its per-frame cost stays one quad
     ao.quad.material = ao.blurMat;
     renderer.setRenderTarget(ao.rtBlur);
     renderer.render(ao.qScene, ao.qCam);
     // commit identity only after the passes actually rendered
     ao.passes++;
     if (changed) { ao.key = key; aoCamStore(); }
+    // The RESTING image must not depend on which jitter happened to come
+    // last: the bilateral classifies the accumulated mean against rtN, which
+    // holds the LAST pass's +-0.375-texel-shifted depth. On the final pass,
+    // re-render depth+normals CENTRED and re-blur - deterministic
+    // classification for the frame that then sits on screen for seconds
+    // (post-work review: order-dependence at depth edges).
+    if (ao.passes === ao.accumMax && ao.accumMax > 1) {
+      scene.traverse(o => {
+        if ((o === table || o === grid || (!ao.backdrops && (o === wall || o === surface)) || o.userData.ghost ||
+             o.isLine || o.isLineSegments || o.isSprite || o === refl.mesh) && o.visible) {
+          o.visible = false; hidden.push(o);
+        }
+      });
+      scene.background = null; scene.overrideMaterial = ao.normalMat;
+      renderer.setRenderTarget(ao.rtN);
+      renderer.autoClear = prevAuto;
+      renderer.clear();
+      renderer.render(scene, camera);
+      scene.overrideMaterial = prevOv; scene.background = prevBg;
+      while (hidden.length) hidden.pop().visible = true;
+      ao.quad.material = ao.blurMat;
+      renderer.setRenderTarget(ao.rtBlur);
+      renderer.autoClear = false;
+      renderer.render(ao.qScene, ao.qCam);
+    }
   } finally {
     // a throw mid-normals-pass must not strand hidden parts, a null background
     // or an override material - guardFx only resets the render target
