@@ -12,6 +12,16 @@
       "autoPort": false
     },
     {
+      "name": "viewer-alt",
+      "runtimeExecutable": "python",
+      "runtimeArgs": [
+        "serve-viewer.py",
+        "8126"
+      ],
+      "port": 8126,
+      "autoPort": false
+    },
+    {
       "name": "planner",
       "runtimeExecutable": "python",
       "runtimeArgs": [
