@@ -867,6 +867,31 @@ export function generateManifest(build) {
   // wall steps play top-down (reversed), so the first top case SHOWN is the last
   // one generated — that's the one that gets the ghost+zoom peg demo.
   const ghostTopIdx = units.reduce((acc, v, idx) => v.topIdx === maxTop ? idx : acc, -1);
+
+  // ---- QuickLock dip-and-pop (ground truth: the 2026-08-24 spring video) ----
+  // A seated QuickLock's tab is pressed DOWN while a unit's channel slides
+  // over it and springs UP into the keyhole at full seat. `dipFrom(travel)` =
+  // the fraction of the slide at which the slider's leading edge first covers
+  // a tab: the leading edge always ENDS at depth/2 and the tab sits at qlZ,
+  // so the geometry is identical in every mount and for the covers.
+  const qlZ = 65.02 - dz;
+  const dipFrom = travel => Math.min(0.92, Math.max(0.1, 1 - (depth / 2 - qlZ - 10) / travel));
+  const dipItems = (ids, travel) => ids.map(id => ({ id, from: dipFrom(travel) }));
+  const popItems = ids => ids.map(id => ({ id }));
+  // The QuickLocks DIRECTLY UNDER `u` whose tabs lie inside u's span - the
+  // ones u's bottom channel actually presses during its slide. Per-TAB filter:
+  // a partially-overlapped supporter can have one tab under u and one outside.
+  const qlsUnder = u => {
+    const uL = spanCenter(u) - u.w * PITCH_X / 2 - 1, uR = spanCenter(u) + u.w * PITCH_X / 2 + 1;
+    const out = [];
+    units.forEach((v, j) => {
+      if (v.topIdx !== u.rowIdx) return;
+      const vL = spanCenter(v) - v.w * PITCH_X / 2, vR = spanCenter(v) + v.w * PITCH_X / 2;
+      if (vL + 3.88 >= uL && vL + 3.88 <= uR) out.push(`ql${j}L`);
+      if (vR - 3.45 >= uL && vR - 3.45 <= uR) out.push(`ql${j}R`);
+    });
+    return out;
+  };
   const clIds = [], cuIds = [];         // cover ids (wall: filled per top case; tabletop: in the cover section)
   const caseSteps = [];
   // staggered wall: the top row is assembled and hung as ONE unit — collect the
@@ -1035,7 +1060,8 @@ export function generateManifest(build) {
         { enter: [{ id: `ql${i}L`, from: [0, 45, 0] }, { id: `ql${i}R`, from: [0, 45, 0] }] },
       ];
       if (mcId) bench.push({ enter: [{ id: mcId, from: [0, 35, 0] }, { id: mgId, from: [0, 0, -30] }] });
-      bench.push({ enter: clLocal.map(id => ({ id, from: [0, 0, -WALL.coverSlide] })) });
+      bench.push({ enter: clLocal.map(id => ({ id, from: [0, 0, -WALL.coverSlide] })), dip: dipItems([`ql${i}L`, `ql${i}R`], WALL.coverSlide) });
+      bench.push({ pop: popItems([`ql${i}L`, `ql${i}R`]) });
       if (stopIds.length) bench.push({ enter: stopIds.map(id => ({ id, from: [0, 35, 0] })) });
       bench.push({ enter: cuLocal.map(id => ({ id, from: [0, 0, -WALL.coverSlide] })) });
 
@@ -1093,13 +1119,17 @@ export function generateManifest(build) {
           { enter: [{ id: `ql${i}L`, at: [0, 0, UT.fwd], from: [0, 45, 0] }, { id: `ql${i}R`, at: [0, 0, UT.fwd], from: [0, 45, 0] }] },
           ...(mcId ? [{ enter: [{ id: mcId, at: [0, 0, UT.fwd], from: [0, 30, 0] }, { id: mgId, at: [0, 0, UT.fwd], from: [0, 0, -30] }] }] : []),
           { camera: camUp(cx, bottom + caseH / 2, totalW, gridBottom) }, // back below before the slide
-          { move: members.map(id => ({ id, by: [0, 0, -UT.fwd] })) },
+          { move: members.map(id => ({ id, by: [0, 0, -UT.fwd] })), dip: dipItems([`ql${i}L`, `ql${i}R`], UT.fwd) },
+          { pop: popItems([`ql${i}L`, `ql${i}R`]) },
         ];
         step.note = 'Fit the QuickLocks first (L left, R right)' + (mcId ? ', snap in the magnet clip,' : ',')
           + ' then slide the case straight back under the surface · its top rails ride into the rail channels until it stops.';
       } else {
         // pre-assembled one-piece slide-in, same read as wall lower rows
-        step.phases = [{ sync: true, enter: members.map(id => ({ id, from: [0, 0, UT.fwd] })) }];
+        step.phases = [
+          { sync: true, enter: members.map(id => ({ id, from: [0, 0, UT.fwd] })), dip: dipItems([`ql${i}L`, `ql${i}R`], UT.fwd) },
+          { pop: popItems([`ql${i}L`, `ql${i}R`]) },
+        ];
         step.note = isTop
           ? 'QuickLocks in, then slide the case straight back · its top rails ride into the rail channels until it stops.'
           : 'Slide the case straight back under the row above · its top rails engage the case above and the QuickLocks click home.';
@@ -1112,7 +1142,10 @@ export function generateManifest(build) {
       step.title = `Hang case · ${u.w}W-${H}H`;
       // sync: the case + its QuickLocks (+ clip) slide in together as one piece,
       // not staggered (they're pre-assembled, not arriving separately).
-      step.phases = [{ sync: true, enter: members.map(id => ({ id, from: [0, 0, wallFwd] })) }];
+      step.phases = [
+        { sync: true, enter: members.map(id => ({ id, from: [0, 0, wallFwd] })), dip: dipItems([`ql${i}L`, `ql${i}R`], wallFwd) },
+        { pop: popItems([`ql${i}L`, `ql${i}R`]) },
+      ];
       step.note = 'Slide the case straight back toward the wall from just in front · its top rails engage the case above and the QuickLocks click home.';
       if (mcId && firstClipDemo === null) { firstClipDemo = i; step.note += ' ' + clipText; }
     } else {
@@ -1137,7 +1170,15 @@ export function generateManifest(build) {
       }
     }
     if (hangs) steps.push(step);
-    else if (!isBase) { step.phases.push({ settle: st }); steps.push(step); }
+    else if (!isBase) {
+      // the settle is the back-to-front slide over the row below: that row's
+      // QuickLock tabs dip under this case's channel and click up at full seat
+      const dips = qlsUnder(u);
+      if (dips.length) {
+        step.phases.push({ settle: st, dip: dipItems(dips, Math.abs(slideBack)) }, { pop: popItems(dips) });
+      } else step.phases.push({ settle: st });
+      steps.push(step);
+    }
     else baseCaseSteps.push(step); // slots into the bench flow before the feet
     caseSteps.push(step);
   });
@@ -1177,11 +1218,16 @@ export function generateManifest(build) {
       note: 'Slide the staggered Cover Lower across the whole top row'
         + (stopIds.length ? ', drop the drawer stoppers into it,' : ',') + ' then cap it with the staggered Cover Upper · the offset seams tie all the top cases together before it goes on the wall.',
       camera: benchCam,
-      phases: [
-        { enter: clLocal.map(id => ({ id, from: [0, 0, -WALL.coverSlide] })) },
-        ...(stopIds.length ? [{ enter: stopIds.map(id => ({ id, from: [0, 35, 0] })) }] : []),
-        { enter: cuLocal.map(id => ({ id, from: [0, 0, -WALL.coverSlide] })) },
-      ],
+      phases: (() => {
+        const topQls = [];
+        units.forEach((v, j) => { if (v.topIdx === maxTop) topQls.push(`ql${j}L`, `ql${j}R`); });
+        return [
+          { enter: clLocal.map(id => ({ id, from: [0, 0, -WALL.coverSlide] })), dip: dipItems(topQls, WALL.coverSlide) },
+          { pop: popItems(topQls) },
+          ...(stopIds.length ? [{ enter: stopIds.map(id => ({ id, from: [0, 35, 0] })) }] : []),
+          { enter: cuLocal.map(id => ({ id, from: [0, 0, -WALL.coverSlide] })) },
+        ];
+      })(),
     };
     const base = cam(0, flatTopY - 30, totalW, gridBottom, FIT);
     const pegCam = { t: 24, p: 40, r: base.r * 0.62, target: [0, flatTopY - 18, -30] };
@@ -1631,10 +1677,15 @@ export function generateManifest(build) {
       note: 'The lower covers slide over the top from the back · the top cases’ QuickLocks lock them.' +
         (coverStoppers.length ? ' Then drop the remaining stoppers into the covers’ slots to protect the top-row drawers.' : ''),
       camera: cam(0, H_MM, totalW, gridBottom, FIT),
-      phases: [
-        { enter: clIds.map(id => ({ id, from: [0, 0, slideBack] })) },
-        ...(coverStoppers.length ? [{ enter: coverStoppers.flatMap(e => e.enter) }] : []),
-      ],
+      phases: (() => {
+        const topQls = [];
+        units.forEach((v, j) => { if (v.topIdx === maxTop) topQls.push(`ql${j}L`, `ql${j}R`); });
+        return [
+          { enter: clIds.map(id => ({ id, from: [0, 0, slideBack] })), dip: dipItems(topQls, Math.abs(slideBack)) },
+          { pop: popItems(topQls) },
+          ...(coverStoppers.length ? [{ enter: coverStoppers.flatMap(e => e.enter) }] : []),
+        ];
+      })(),
     });
     postSteps.push({
       title: cuIds.length > 1 ? 'Upper covers' : 'Upper cover',

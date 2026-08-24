@@ -2180,6 +2180,7 @@ function renderCoverBadges() {
 
 // ---------- step animation ----------
 const DUR = { enter: 750, settle: 850, move: 600, fade: 650, stagger: 130, camera: 750, via: 300 };
+const QL_DIP = 3;   // mm a pressed QuickLock tab travels (ground truth: the 2026-08-24 spring video)
 let animToken = 0;
 
 async function playStep(i) {
@@ -2318,6 +2319,49 @@ async function playStep(i) {
           const prev = s === 0 ? 0 : legs[s - 1];
           const t = legs[s] === prev ? 1 : (d - prev) / (legs[s] - prev);
           inst.group.position.lerpVectors(pts[s], pts[s + 1], t);
+        }
+      }));
+    });
+    // dip: spring-loaded QuickLock tabs pressed DOWN while a unit slides over
+    // them in THIS phase (enter, settle or move), then HELD until the `pop`
+    // phase that must follow in the same step releases them - the mechanism
+    // Joey filmed 2026-08-24 (integrated serpentine spring; the tab dips ~3 mm
+    // under the slider's channel, then clicks up into the keyhole at full
+    // seat). `from` = the fraction of the slide at which the slider's leading
+    // edge first covers the tab - the generator computes it from geometry.
+    // Rides each instance's INNER CHILD exactly like `spin`, so applyState's
+    // child-zeroing self-heals any interruption, and dip+pop always net to
+    // zero within the step - after-state math never sees the offset.
+    if (ph.dip && ph.dip.length) {
+      const nEnter = (ph.enter || []).length;
+      const maxVia = Math.max(0, ...(ph.enter || []).map(e => e.via?.length || 0));
+      const span = nEnter
+        ? (DUR.enter + DUR.via * maxVia) * pace + (ph.sync ? 0 : (nEnter - 1) * DUR.stagger * pace)
+        : ph.settle ? DUR.settle : DUR.move;
+      ph.dip.forEach(dp => {
+        const inst = instances.get(dp.id);
+        const child = inst && inst.group.children[0];
+        if (!child) return;
+        const f0 = dp.from ?? 0.7, lead = Math.min(0.12, f0);
+        jobs.push(tween({
+          duration: span,
+          onUpdate: k => {
+            const e = k <= f0 - lead ? 0 : k >= f0 ? 1 : (k - (f0 - lead)) / lead;
+            child.position.y = -QL_DIP * e * e * (3 - 2 * e);   // smoothstep press
+          }
+        }));
+      });
+    }
+    // pop: the spring release - rise from the held dip with a small damped
+    // overshoot, landing EXACTLY at 0 (k>=1 clamps, deterministic rest).
+    (ph.pop || []).forEach((p, n2) => {
+      const inst = instances.get(p.id);
+      const child = inst && inst.group.children[0];
+      if (!child) return;
+      jobs.push(tween({
+        duration: 320, delay: n2 * 45,
+        onUpdate: k => {
+          child.position.y = k >= 1 ? 0 : -QL_DIP * (1 - k) * (1 - k) * Math.cos(5.2 * k);
         }
       }));
     });
