@@ -710,9 +710,18 @@ function updateReflection(force = false) {
 // ⚠ Do NOT composite with MultiplyBlending. Measured: MultiplyBlending and
 // NoBlending produced byte-identical frames (the blend mode was ignored and the
 // quad simply REPLACED the frame). Black-with-alpha has no such ambiguity.
-const AO_N = 24, AO_RADIUS = 18, AO_STRENGTH = 1.15;
+const AO_N = 24, AO_ACCUM = 16, AO_RADIUS = 18, AO_STRENGTH = 1.15, AO_DEPTH_TOL = 12;
 const ao = { rtN: null, rtAO: null, normalMat: null, aoMat: null, compMat: null,
              quad: null, qScene: null, qCam: null, key: '', busy: false,
+             // settle accumulation (2026-08-23): passes = how many jittered
+             // SSAO passes the buffer currently averages for THIS camera;
+             // accumMax = 16 with a float-renderable target, 1 without (the
+             // running mean needs more than 8 bits or late passes quantize
+             // away); rev = scene revision, bumped by mountManifest - the
+             // old `instances.size + cur` key survived a regenerate that
+             // replaced every part, and a stale buffer accumulated 16 passes
+             // of confidence in geometry that no longer exists.
+             passes: 0, accumMax: 1, groups: null, rev: 0, rtBlur: null, blurMat: null,
              // the wall / under-table slab ride the AO pass, so the cases cast
              // a contact shadow onto what they are mounted to (2026-08-23).
              // The TABLE never does - a floor disc occludes itself into a grey
@@ -731,37 +740,138 @@ const ao = { rtN: null, rtAO: null, normalMat: null, aoMat: null, compMat: null,
 // part's silhouette, over the embedding page's panel (2026-08-19 design
 // review). And the idle turntable would invalidate it every frame anyway.
 function aoWanted() { return QUALITY[quality].ao && !cinema.on && !fxDead.ao && !tweens.size && !IS_PART; }
-function aoKernel(n) {              // deterministic hemisphere kernel (golden angle)
-  const k = [];
-  for (let i = 0; i < n; i++) {
-    const a = i * 2.399963, r = Math.sqrt((i + 0.5) / n), z = Math.sqrt(1 - r * r);
-    k.push(new THREE.Vector3(Math.cos(a) * r, Math.sin(a) * r, z)
-      .multiplyScalar(0.3 + 0.7 * ((i / n) ** 2)));   // cluster near the origin
+/* ONE golden-angle spiral over n*groups hemisphere points, dealt into `groups`
+   stratified hands (stride deal): every accumulation pass gets its own n
+   directions AND its own radii/elevations, so 16 passes sample 384 DISTINCT
+   points. ⚠ Do NOT "jitter" one fixed kernel by golden-ratio rotations
+   instead: the kernel's own angular step is 0.381966 turns and the golden
+   ratio conjugate is its negative mod 1, so sample i on pass p lands at
+   (i-p)*step - 16 passes collapse to ~39 distinct azimuths, not 384
+   (adversarial review catch, 2026-08-23). */
+/* Sub-texel jitter per accumulation pass (in half-res texel units): the
+   passes render the SCENE grid shifted by fractions of a texel, so the
+   accumulated buffer is grid-SUPERSAMPLED - occlusion terminators (the
+   shadow boundary under a drawer lip) come out anti-aliased instead of
+   quantized to half-res stairs. Pass 0 is unjittered, so a single-pass
+   frame (motion, the byte fallback) is exactly the old picture. */
+const AO_JITTER = (() => {
+  const j = [new THREE.Vector2(0, 0)];
+  for (let i = 1; i < 16; i++) j.push(new THREE.Vector2(((i % 4) - 1.5) / 4, ((i >> 2) - 1.5) / 4));
+  return j;
+})();
+const _aoProj = new THREE.Matrix4(), _aoProjInv = new THREE.Matrix4();
+
+function aoKernelGroups(n, groups) {
+  const total = n * groups, all = [];
+  for (let i = 0; i < total; i++) {
+    const a = i * 2.399963, r = Math.sqrt((i + 0.5) / total), z = Math.sqrt(1 - r * r);
+    all.push(new THREE.Vector3(Math.cos(a) * r, Math.sin(a) * r, z)
+      .multiplyScalar(0.3 + 0.7 * ((i / total) ** 2)));   // cluster near the origin
   }
-  return k;
+  return Array.from({ length: groups }, (_, g) => all.filter((_, i) => i % groups === g));
 }
+/* A complete RGBA16F framebuffer proves renderability, not that the
+   constant-alpha running-mean blend behaves. Verify the arithmetic once, on
+   the device: write 0.8, blend 0.0 at blendAlpha 0.25, expect 0.6. On any
+   failure (bad blend, unreadable float framebuffer) accumulation is turned
+   OFF - single-pass AO with the new noise and bilateral chain is the shipped
+   fallback, never a silently-shimmering half-working mean. */
+function aoBlendProbe() {
+  let rt = null, mat = null, quad = null;
+  try {
+    const gl = renderer.getContext();
+    rt = new THREE.WebGLRenderTarget(2, 2, { type: THREE.HalfFloatType });
+    mat = new THREE.ShaderMaterial({
+      uniforms: { uV: { value: 0.8 } },
+      vertexShader: `void main(){ gl_Position = vec4( position.xy, 0.0, 1.0 ); }`,
+      fragmentShader: `uniform float uV; void main(){ gl_FragColor = vec4( vec3( uV ), 1.0 ); }`,
+      depthTest: false, depthWrite: false,
+    });
+    quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), mat);
+    quad.frustumCulled = false;
+    const sc = new THREE.Scene(); sc.add(quad);
+    const cam = new THREE.Camera();
+    const prevAuto = renderer.autoClear;
+    renderer.setRenderTarget(rt);
+    mat.blending = THREE.NoBlending;
+    renderer.render(sc, cam);
+    mat.uniforms.uV.value = 0.0;
+    mat.blending = THREE.CustomBlending;
+    mat.blendEquation = THREE.AddEquation;
+    mat.blendSrc = THREE.ConstantAlphaFactor;
+    mat.blendDst = THREE.OneMinusConstantAlphaFactor;
+    mat.blendAlpha = 0.25;
+    renderer.autoClear = false;
+    renderer.render(sc, cam);
+    renderer.autoClear = prevAuto;
+    // read one pixel back in whatever float format the device offers
+    const fmt = gl.getParameter(gl.IMPLEMENTATION_COLOR_READ_FORMAT);
+    const type = gl.getParameter(gl.IMPLEMENTATION_COLOR_READ_TYPE);
+    let r = NaN;
+    if (fmt === gl.RGBA && type === gl.FLOAT) {
+      const b = new Float32Array(4); gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.FLOAT, b); r = b[0];
+    } else if (fmt === gl.RGBA && type === gl.HALF_FLOAT) {
+      const b = new Uint16Array(4); gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.HALF_FLOAT, b);
+      const h = b[0], sgn = h >> 15 ? -1 : 1, e = (h >> 10) & 0x1f, f = h & 0x3ff;
+      r = e === 0 ? sgn * f * 2 ** -24 : sgn * (1 + f / 1024) * 2 ** (e - 15);
+    }
+    renderer.setRenderTarget(null);
+    const pass = Math.abs(r - 0.6) < 0.02;
+    if (!pass) { console.warn('[gen2] AO accumulation probe failed (read ' + r + ') — single-pass AO only'); track('error:fx-ao-accum'); }
+    return pass;
+  } catch (e) {
+    renderer.setRenderTarget(null);
+    console.warn('[gen2] AO accumulation probe threw — single-pass AO only', e);
+    track('error:fx-ao-accum');
+    return false;
+  } finally {
+    if (rt) rt.dispose();
+    if (mat) mat.dispose();
+    if (quad) quad.geometry.dispose();
+  }
+}
+
 function ensureAO() {
   if (ao.rtN) return;
   const w = Math.max(2, Math.floor(canvas.width * 0.5)), h = Math.max(2, Math.floor(canvas.height * 0.5));
   ao.rtN = new THREE.WebGLRenderTarget(w, h);
   ao.rtN.depthTexture = new THREE.DepthTexture(w, h);
   ao.rtN.depthTexture.type = THREE.UnsignedIntType;
-  ao.rtAO = new THREE.WebGLRenderTarget(w, h);
+  // The accumulation target must be float-renderable: a running mean in 8 bits
+  // quantizes late passes to nothing. EXT_color_buffer_float guarantees
+  // RGBA16F renderability (and 16F blending); the completeness probe below
+  // catches a driver that advertises the extension and lies - the failure
+  // mode is not a throw guardFx could see, it is an incomplete framebuffer
+  // that silently renders nothing and composites a full-screen black overlay.
+  ao.accumMax = 1;
+  if (renderer.extensions.has('EXT_color_buffer_float')) {
+    ao.rtAO = new THREE.WebGLRenderTarget(w, h, { type: THREE.HalfFloatType });
+    const gl = renderer.getContext();
+    renderer.setRenderTarget(ao.rtAO);
+    const ok = gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE;
+    renderer.setRenderTarget(null);
+    if (ok && aoBlendProbe()) ao.accumMax = AO_ACCUM;
+    else { ao.rtAO.dispose(); ao.rtAO = null; }
+  }
+  if (!ao.rtAO) ao.rtAO = new THREE.WebGLRenderTarget(w, h);
+  ao.rtBlur = new THREE.WebGLRenderTarget(w, h);   // denoised copy (8 bits is plenty for display)
+  ao.groups = aoKernelGroups(AO_N, AO_ACCUM);
   ao.normalMat = new THREE.MeshNormalMaterial();     // view-space normals in RGB
   ao.aoMat = new THREE.ShaderMaterial({
     defines: { N: AO_N },
     uniforms: {
       tNormal: { value: ao.rtN.texture }, tDepth: { value: ao.rtN.depthTexture },
       uProj: { value: new THREE.Matrix4() }, uProjInv: { value: new THREE.Matrix4() },
-      uKernel: { value: aoKernel(AO_N) },
+      uKernel: { value: ao.groups[0] },
       uRadius: { value: AO_RADIUS }, uBias: { value: 0.6 },
       uRes: { value: new THREE.Vector2(w, h) },
+      uNoiseOff: { value: new THREE.Vector2(0, 0) }, uJitter: { value: 0 },
     },
     vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4( position.xy, 0.0, 1.0 ); }`,
     fragmentShader: `
       uniform sampler2D tNormal; uniform sampler2D tDepth;
       uniform mat4 uProj, uProjInv; uniform vec3 uKernel[N];
-      uniform float uRadius, uBias; uniform vec2 uRes;
+      uniform float uRadius, uBias, uJitter; uniform vec2 uRes, uNoiseOff;
       varying vec2 vUv;
       vec3 viewPos( vec2 uv ){
         float d = texture2D( tDepth, uv ).x;
@@ -773,9 +883,24 @@ function ensureAO() {
         if ( d >= 1.0 ) { gl_FragColor = vec4( 1.0 ); return; }   // background: no AO
         vec3 p = viewPos( vUv );
         vec3 n = normalize( texture2D( tNormal, vUv ).xyz * 2.0 - 1.0 );
-        float ang = fract( sin( dot( vUv * uRes, vec2( 12.9898, 78.233 ) ) ) * 43758.5453 ) * 6.2831853;
-        vec3 rv = vec3( cos( ang ), sin( ang ), 0.0 );
-        vec3 t = normalize( rv - n * dot( rv, n ) );
+        // Interleaved gradient noise (Jimenez) over PIXEL coords - even error
+        // distribution where the old white-noise hash clumped into speckle.
+        // uNoiseOff scrolls the domain per accumulation pass; uJitter adds an
+        // unrelated phase (plastic number, NOT the golden ratio - see
+        // aoKernelGroups for the resonance this avoids).
+        vec2 px = gl_FragCoord.xy + uNoiseOff;
+        float ign = fract( 52.9829189 * fract( dot( px, vec2( 0.06711056, 0.00583715 ) ) ) );
+        float ang = ( ign + uJitter ) * 6.2831853;
+        // branchless orthonormal basis (Duff et al.) - the old tangent
+        // projection normalized a near-zero vector when the rotation vector
+        // grazed the normal, and ONE NaN pixel in ONE pass poisons the
+        // accumulated mean permanently
+        float sn = n.z >= 0.0 ? 1.0 : -1.0;
+        float ka = -1.0 / ( sn + n.z );
+        float kb = n.x * n.y * ka;
+        vec3 b1 = vec3( 1.0 + sn * n.x * n.x * ka, sn * kb, -sn * n.x );
+        vec3 b2 = vec3( kb, sn + n.y * n.y * ka, -n.y );
+        vec3 t = cos( ang ) * b1 + sin( ang ) * b2;
         mat3 tbn = mat3( t, cross( n, t ), n );
         float occ = 0.0;
         for ( int i = 0; i < N; i++ ){
@@ -790,18 +915,68 @@ function ensureAO() {
       }`,
     depthTest: false, depthWrite: false,
   });
-  ao.compMat = new THREE.ShaderMaterial({
-    uniforms: { tAO: { value: ao.rtAO.texture }, uTexel: { value: new THREE.Vector2(1 / w, 1 / h) },
-                uStrength: { value: AO_STRENGTH } },
+  /* Bilateral denoise, HALF-RES, run inside updateAO only when a pass just
+     rendered: 3x3 taps, spatial gaussian x linear falloff of |view-Z
+     difference|. At half-res every output pixel IS a texel centre, so the
+     spatial weights are compile-time constants (1 / .4111 / .169) - the
+     full-res version of this ran at ~37% of a whole beauty pass (~1.6 ms,
+     measured by timer query) and the design review named this exact split as
+     the fallback. View-Z is the scalar near/far reconstruction, never a
+     matrix multiply. */
+  ao.blurMat = new THREE.ShaderMaterial({
+    uniforms: { tAO: { value: ao.rtAO.texture }, tCDepth: { value: ao.rtN.depthTexture },
+                uRes: { value: new THREE.Vector2(w, h) },
+                uDepthTol: { value: AO_DEPTH_TOL }, uNear: { value: 1 }, uFar: { value: 8000 } },
     vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4( position.xy, 0.0, 1.0 ); }`,
     fragmentShader: `
-      uniform sampler2D tAO; uniform vec2 uTexel; uniform float uStrength; varying vec2 vUv;
+      uniform sampler2D tAO; uniform sampler2D tCDepth;
+      uniform vec2 uRes; uniform float uDepthTol, uNear, uFar;
+      varying vec2 vUv;
+      float viewDist( float d ){ return ( uNear * uFar ) / ( uFar - d * ( uFar - uNear ) ); }
       void main(){
-        float a = texture2D( tAO, vUv ).r * 0.4;
-        a += texture2D( tAO, vUv + vec2(  uTexel.x,  uTexel.y ) ).r * 0.15;
-        a += texture2D( tAO, vUv + vec2( -uTexel.x,  uTexel.y ) ).r * 0.15;
-        a += texture2D( tAO, vUv + vec2(  uTexel.x, -uTexel.y ) ).r * 0.15;
-        a += texture2D( tAO, vUv + vec2( -uTexel.x, -uTexel.y ) ).r * 0.15;
+        float dc = texture2D( tCDepth, vUv ).x;
+        if ( dc >= 1.0 ) { gl_FragColor = vec4( 1.0 ); return; }
+        float zc = viewDist( dc );
+        float a = 0.0, wsum = 0.0;
+        for ( int j = -1; j <= 1; j++ )
+        for ( int i = -1; i <= 1; i++ ){
+          vec2 uv = vUv + vec2( float( i ), float( j ) ) / uRes;
+          float ws = ( i == 0 && j == 0 ) ? 1.0 : ( ( i == 0 || j == 0 ) ? 0.4111 : 0.169 );
+          float dz = abs( viewDist( texture2D( tCDepth, uv ).x ) - zc );
+          // the 0.12 floor: with HARD rejection every texel is purely one
+          // surface and a diagonal silhouette ramps in exactly one texel,
+          // which zooms into visible half-res stairs. A few percent of
+          // cross-edge weight widens the boundary blend to ~2 texels, which
+          // the composite's bilinear then smooths continuously - the last
+          // trace of the old bleed, kept deliberately and this small.
+          float w = ws * ( 0.12 + 0.88 * max( 0.0, 1.0 - dz / uDepthTol ) );
+          a += texture2D( tAO, uv ).r * w;
+          wsum += w;
+        }
+        gl_FragColor = vec4( vec3( wsum > 0.0 ? a / wsum : 1.0 ), 1.0 );
+      }`,
+    depthTest: false, depthWrite: false,
+  });
+  /* The composite is ONE bilinear fetch. All edge-awareness lives at half-res
+     (the SSAO pass and the bilateral denoise both reject across depth), so
+     every rtBlur texel belongs purely to its own surface and plain bilinear
+     interpolation ramps between surfaces over exactly one texel - continuous,
+     so no stair-steps. Two shapes were tried and REJECTED here first: a
+     full-res 3x3 bilateral (correct but ~1.6 ms at dpr 2 - 9x the budget) and
+     a 4-tap depth-referenced upsample (cheap but its per-pixel nearest-depth
+     reference FLIPS at half-res texel boundaries, drawing stair-steps along
+     occlusion silhouettes that the MSAA beauty edge makes obvious). Background
+     texels hold AO=1 so alpha fades to 0 within a texel of the silhouette -
+     no outward halo beyond a sub-pixel feather.
+     ⚠ Output is BLACK with alpha, never MultiplyBlending - measured earlier:
+     Multiply was ignored on this quad and REPLACED the frame. */
+  ao.compMat = new THREE.ShaderMaterial({
+    uniforms: { tAO: { value: ao.rtBlur.texture }, uStrength: { value: AO_STRENGTH } },
+    vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4( position.xy, 0.0, 1.0 ); }`,
+    fragmentShader: `
+      uniform sampler2D tAO; uniform float uStrength; varying vec2 vUv;
+      void main(){
+        float a = texture2D( tAO, vUv ).r;
         gl_FragColor = vec4( 0.0, 0.0, 0.0, clamp( ( 1.0 - a ) * uStrength, 0.0, 1.0 ) );
       }`,
     transparent: true, depthTest: false, depthWrite: false,
@@ -817,9 +992,11 @@ function aoResize() {
   ao.rtN.setSize(w, h);
   ao.rtN.depthTexture.image.width = w; ao.rtN.depthTexture.image.height = h;
   ao.rtAO.setSize(w, h);
+  ao.rtBlur.setSize(w, h);
   ao.aoMat.uniforms.uRes.value.set(w, h);
-  ao.compMat.uniforms.uTexel.value.set(1 / w, 1 / h);
+  ao.blurMat.uniforms.uRes.value.set(w, h);
   ao.key = '';                       // force a regen at the new resolution
+  ao.passes = 0;                     // and a fresh accumulation
 }
 // Regenerated only when the view or the build moved — the whole point of a
 // mostly-static viewer.
@@ -854,36 +1031,98 @@ function updateAO(force = false) {
   if (ao.blocked) { ao.blocked = false; force = true; }
   ensureAO(); aoResize();
   camera.updateMatrixWorld();
-  const key = instances.size + '|' + cur;   // scene identity; the camera is matrix-compared
-  if (!force && key === ao.key && !aoCamMoved()) return;
-  ao.key = key;
-  aoCamStore();
+  const key = instances.size + '|' + cur + '|' + ao.rev;   // scene identity; the camera is matrix-compared
+  const changed = force || key !== ao.key || aoCamMoved();
+  // converged and nothing moved: free. Not yet converged: one more jittered
+  // pass per frame, averaged into the buffer - the burst after a settle costs
+  // one SSAO quad per frame for ~AO_ACCUM frames, exactly when the camera is
+  // idle. Motion keeps today's behaviour (a fresh single pass every frame).
+  if (!changed && ao.passes >= ao.accumMax) return;
   ao.busy = true;
-  // depth + view-space normals of the PARTS (+ the mounting backdrop when
-  // ao.backdrops, for the contact shadow) — never the table: a floor disc
-  // occludes itself into a grey wash and it isn't what anyone is inspecting
-  const hidden = [];
-  scene.traverse(o => {
-    if ((o === table || o === grid || (!ao.backdrops && (o === wall || o === surface)) || o.userData.ghost ||
-         o.isLine || o.isLineSegments || o.isSprite || o === refl.mesh) && o.visible) {
-      o.visible = false; hidden.push(o);
+  const hidden = [], prevBg = scene.background, prevOv = scene.overrideMaterial;
+  const prevAuto = renderer.autoClear;
+  try {
+    if (changed) ao.passes = 0;
+    // Every pass renders its OWN depth+normals, at that pass's sub-texel
+    // jitter - the projection is shifted by a fraction of a half-res texel
+    // (TAA-style, elements 8/9), and the SSAO pass reconstructs with the SAME
+    // shifted pair, so each pass is self-consistent and the accumulated mean
+    // is a supersampled image on the base grid. The camera's own matrices are
+    // restored immediately: aoCamMoved() compares the REAL projection.
+    const off = AO_JITTER[ao.passes % AO_ACCUM];
+    _aoProj.copy(camera.projectionMatrix);
+    _aoProj.elements[8] += off.x * 2 / ao.rtN.width;
+    _aoProj.elements[9] += off.y * 2 / ao.rtN.height;
+    _aoProjInv.copy(_aoProj).invert();
+    {
+      // depth + view-space normals of the PARTS (+ the mounting backdrop when
+      // ao.backdrops, for the contact shadow) — never the table: a floor disc
+      // occludes itself into a grey wash and it isn't what anyone is inspecting
+      scene.traverse(o => {
+        if ((o === table || o === grid || (!ao.backdrops && (o === wall || o === surface)) || o.userData.ghost ||
+             o.isLine || o.isLineSegments || o.isSprite || o === refl.mesh) && o.visible) {
+          o.visible = false; hidden.push(o);
+        }
+      });
+      scene.background = null; scene.overrideMaterial = ao.normalMat;
+      const savedProj = camera.projectionMatrix, savedInv = camera.projectionMatrixInverse;
+      camera.projectionMatrix = _aoProj; camera.projectionMatrixInverse = _aoProjInv;
+      try {
+        renderer.setRenderTarget(ao.rtN);
+        renderer.clear();
+        renderer.render(scene, camera);
+      } finally {
+        camera.projectionMatrix = savedProj; camera.projectionMatrixInverse = savedInv;
+      }
+      scene.overrideMaterial = prevOv; scene.background = prevBg;
+      while (hidden.length) hidden.pop().visible = true;
+      ao.blurMat.uniforms.uNear.value = camera.near;
+      ao.blurMat.uniforms.uFar.value = camera.far;
     }
-  });
-  const prevBg = scene.background, prevOv = scene.overrideMaterial;
-  scene.background = null; scene.overrideMaterial = ao.normalMat;
-  renderer.setRenderTarget(ao.rtN);
-  renderer.clear();
-  renderer.render(scene, camera);
-  scene.overrideMaterial = prevOv; scene.background = prevBg;
-  for (const o of hidden) o.visible = true;
-
-  ao.aoMat.uniforms.uProj.value.copy(camera.projectionMatrix);
-  ao.aoMat.uniforms.uProjInv.value.copy(camera.projectionMatrixInverse);
-  ao.quad.material = ao.aoMat;
-  renderer.setRenderTarget(ao.rtAO);
-  renderer.render(ao.qScene, ao.qCam);
-  renderer.setRenderTarget(null);
-  ao.busy = false;
+    // one SSAO pass: pass 0 overwrites, later passes blend into the running
+    // mean via the blend constant (out = src/(n+1) + dst*n/(n+1)).
+    // ⚠ autoClear must be off for the blended passes - renderer.render()
+    // clears the BOUND target first, which silently resets the mean every
+    // frame and leaves accumulation looking exactly like a single pass
+    // (design review). Each pass gets its own stratified kernel group, a
+    // scrolled noise domain and an unrelated phase.
+    const u = ao.aoMat.uniforms;
+    u.uKernel.value = ao.groups[ao.passes % AO_ACCUM];
+    u.uNoiseOff.value.set(5.588238 * ao.passes, 5.588238 * ao.passes);
+    u.uJitter.value = (ao.passes * 0.754877666) % 1;
+    u.uProj.value.copy(_aoProj);
+    u.uProjInv.value.copy(_aoProjInv);
+    if (ao.passes === 0) {
+      ao.aoMat.blending = THREE.NoBlending;
+    } else {
+      ao.aoMat.blending = THREE.CustomBlending;
+      ao.aoMat.blendEquation = THREE.AddEquation;
+      ao.aoMat.blendSrc = THREE.ConstantAlphaFactor;
+      ao.aoMat.blendDst = THREE.OneMinusConstantAlphaFactor;
+      ao.aoMat.blendAlpha = 1 / (ao.passes + 1);
+    }
+    ao.quad.material = ao.aoMat;
+    renderer.setRenderTarget(ao.rtAO);
+    renderer.autoClear = false;
+    renderer.render(ao.qScene, ao.qCam);
+    // denoise the running mean into rtBlur (full overwrite, half-res, cheap) -
+    // the composite reads only this, so its per-frame cost stays a 4-tap quad
+    ao.quad.material = ao.blurMat;
+    renderer.setRenderTarget(ao.rtBlur);
+    renderer.render(ao.qScene, ao.qCam);
+    // commit identity only after the passes actually rendered
+    ao.passes++;
+    if (changed) { ao.key = key; aoCamStore(); }
+  } finally {
+    // a throw mid-normals-pass must not strand hidden parts, a null background
+    // or an override material - guardFx only resets the render target
+    renderer.autoClear = prevAuto;
+    renderer.setRenderTarget(null);
+    scene.overrideMaterial = prevOv;
+    scene.background = prevBg;
+    while (hidden.length) hidden.pop().visible = true;
+    ao.busy = false;
+  }
 }
 // Per-feature kill switch: an optional render effect must never be able to take
 // the render loop with it. First throw disables that effect for the session and
@@ -903,7 +1142,7 @@ function guardFx(name, fn) {
   }
 }
 function compositeAO() {
-  if (!aoWanted() || !ao.rtAO || ao.busy || fxDead.ao) return;
+  if (!aoWanted() || !ao.rtAO || ao.busy || fxDead.ao || !ao.passes) return;
   // safety net: never lay the overlay over a frame drawn from a different camera
   // than the buffer was rendered from. Losing AO for one frame is invisible; a
   // mismatched overlay is a ghost of the build sitting beside the build.
@@ -4277,6 +4516,7 @@ function faceplateHeightOf(node) {
 }
 let activeHandleStyle = null; // the specific HANDLE_STYLES entry in use (BlockBar_D etc.), re-applied after a regenerate so a variant survives
 async function applyHandleStyle(style) {
+  ao.rev++;   // static kits swap meshes/visibility in place - no mountManifest to bump it
   const prevActive = activeHandleStyle, prevPlanner = build && build.handleStyle;
   activeHandleStyle = style;
   if (build) build.handleStyle = style.planner; // keep the build in sync (regenerate/BOM/reset read this)
@@ -4439,6 +4679,7 @@ function pageVisibility(inst) {
 }
 let activeFaceplateStyle = null; // kit-swap memory (generated builds carry the family in build.faceStyle instead)
 async function applyFaceplateStyle(style) {
+  ao.rev++;   // static kits swap plates/dressing in place - no mountManifest to bump it
   const prevActive = activeFaceplateStyle;
   activeFaceplateStyle = style;
   if (build) {
@@ -5522,6 +5763,8 @@ addEventListener('message', async (e) => {
 // live outside this.
 async function mountManifest(m) {
   manifest = m;
+  ao.rev++;   // the parts are about to be rebuilt - never accumulate over stale normals
+
   if (OFFICIAL) {
     // official kits carry their real name — replace the generator's random fun
     // name on the header/tab and brand the intro step. Done here (not at boot)
@@ -5933,6 +6176,9 @@ function captureShot() {
   camera.position.copy(pos);
   camera.lookAt(target);
   updateAO(true);
+  // converge the accumulation synchronously - a capture is one frame, so it
+  // takes the full settled quality, not the first pass of the burst
+  for (let i = 0; ao.passes < ao.accumMax && i < AO_ACCUM * 2; i++) updateAO();
   renderer.render(scene, camera);
   compositeAO();
   return renderer.domElement.toDataURL('image/png');   // PNG: JPEG has no alpha
