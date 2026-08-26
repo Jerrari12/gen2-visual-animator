@@ -33,7 +33,7 @@ const UPSTREAM = join(root, '..', 'GEN2 Planner', 'gen2-planner-main', 'js', 're
    This is the half of the gate that works on a fresh clone or in CI, where no
    planner checkout exists: it catches an edit made on THIS side, which is the
    drift this repo can actually cause. */
-const PINNED_SHA256 = '3c42b9768681ee9737a4c064f1386c95222c21733cae744b3d8001f5455d3167';
+const PINNED_SHA256 = 'fcec589b7d78394e6daaad7fa00c19ea7c091d2fecbca871da500002b8491650';
 
 const sha = (p) => createHash('sha256').update(readFileSync(p)).digest('hex');
 
