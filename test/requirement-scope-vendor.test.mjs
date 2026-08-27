@@ -33,9 +33,17 @@ const UPSTREAM = join(root, '..', 'GEN2 Planner', 'gen2-planner-main', 'js', 're
    This is the half of the gate that works on a fresh clone or in CI, where no
    planner checkout exists: it catches an edit made on THIS side, which is the
    drift this repo can actually cause. */
-const PINNED_SHA256 = 'fcec589b7d78394e6daaad7fa00c19ea7c091d2fecbca871da500002b8491650';
+const PINNED_SHA256 = '9d50b076a030fd7b6930c8cb7e0e2d4d8d96e754a11db3a41727de259481a2ef';
 
-const sha = (p) => createHash('sha256').update(readFileSync(p)).digest('hex');
+/* ⚠⚠ HASH THE CANONICAL CONTENT, NEVER THE WORKING-COPY BYTES.
+   This repo and the planner both STORE LF; a Windows working copy holds
+   CRLF. Hashing raw bytes therefore asked "was this file checked out on
+   the same OS as whoever computed the pin", which is not the question -
+   and it answered NO in every fresh clone and in CI while passing locally.
+   That blocked a viewer deploy on a copy that was actually correct.
+   Normalising does not weaken the gate: a real edit changes content. */
+const canonical = (p) => Buffer.from(readFileSync(p, 'utf8').replace(/\r\n/g, '\n'), 'utf8');
+const sha = (p) => createHash('sha256').update(canonical(p)).digest('hex');
 
 test('the vendored copy exists and is loadable', () => {
   assert.ok(existsSync(VENDORED), 'viewer/js/vendor/requirement-scope.js is missing');
@@ -53,12 +61,12 @@ test('⚠ DRIFT GATE 1/2: the vendored copy matches its pinned hash', () => {
     '  update PINNED_SHA256 - in that order.');
 });
 
-test('⚠ DRIFT GATE 2/2: the vendored copy is byte-identical to the planner', (t) => {
+test('⚠ DRIFT GATE 2/2: the vendored copy is identical to the planner', (t) => {
   if (!existsSync(UPSTREAM)) {
     t.skip('planner checkout not present - the pinned hash below still guards this side');
     return;
   }
-  const a = readFileSync(UPSTREAM), b = readFileSync(VENDORED);
+  const a = canonical(UPSTREAM), b = canonical(VENDORED);
   assert.equal(sha(UPSTREAM), sha(VENDORED),
     `vendored copy has DRIFTED from the planner.\n` +
     `  planner : ${a.length} bytes  ${sha(UPSTREAM).slice(0, 16)}\n` +
