@@ -2885,6 +2885,17 @@ const OPTION_LABELS = {
   'cover.layout:staggered': 'staggered-cover',
   'tabletop.feet:tpu': 'printed-feet',
   'tabletop.feet:adhesive': 'adhesive-feet',
+  'fill:classic': 'classic-drawer',
+  'fill:decor': 'decor-drawer',
+  'fill:shelf': 'shelf',
+  'fill:cabinet': 'cabinet',
+  'faceplate.family:essential': 'Essential faceplate',
+  'faceplate.family:classic': 'Classic faceplate',
+  'faceplate.family:edgelabel': 'EdgeLabel faceplate',
+  'faceplate.family:classicpro': 'Classic Pro faceplate',
+  'faceplate.family:chevron': 'Chevron faceplate',
+  'drawer.closure:magnet': 'magnetic-closure',
+  'drawer.stoppers:on': 'drawer-stopper',
 };
 // NB the viewBox is the artwork's ROTATED bounds, not 0 0 24 24: the wrench is
 // drawn upright then turned −45°, so inside a square box it only spans ~13.6 of
