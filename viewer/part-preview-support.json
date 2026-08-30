@@ -67,20 +67,20 @@
       "platePreview": false
     },
     "59-case-extender-1w-1h": {
-      "preview": false,
-      "reason": "Case extenders aren't in the 3D part library yet."
+      "preview": true,
+      "platePreview": false
     },
     "59-case-extender-2w-1h": {
-      "preview": false,
-      "reason": "Case extenders aren't in the 3D part library yet."
+      "preview": true,
+      "platePreview": false
     },
     "59-case-extender-3w-1h": {
       "preview": false,
-      "reason": "Case extenders aren't in the 3D part library yet."
+      "reason": "3W cases don't exist in the 59 collection (1W and 2W only)."
     },
     "59-case-extender-4w-1h": {
       "preview": false,
-      "reason": "Case extenders aren't in the 3D part library yet."
+      "reason": "4W cases don't exist in the 59 collection (1W and 2W only)."
     },
     "59-under-table-rail-1w": {
       "preview": true,
@@ -347,20 +347,20 @@
       "platePreview": false
     },
     "115-case-extender-1w-1h": {
-      "preview": false,
-      "reason": "Case extenders aren't in the 3D part library yet."
+      "preview": true,
+      "platePreview": false
     },
     "115-case-extender-2w-1h": {
-      "preview": false,
-      "reason": "Case extenders aren't in the 3D part library yet."
+      "preview": true,
+      "platePreview": false
     },
     "115-case-extender-3w-1h": {
-      "preview": false,
-      "reason": "Case extenders aren't in the 3D part library yet."
+      "preview": true,
+      "platePreview": false
     },
     "115-case-extender-4w-1h": {
-      "preview": false,
-      "reason": "Case extenders aren't in the 3D part library yet."
+      "preview": true,
+      "platePreview": false
     },
     "115-under-table-rail-1w": {
       "preview": true,
@@ -627,20 +627,20 @@
       "platePreview": false
     },
     "165-case-extender-1w-1h": {
-      "preview": false,
-      "reason": "Case extenders aren't in the 3D part library yet."
+      "preview": true,
+      "platePreview": false
     },
     "165-case-extender-2w-1h": {
-      "preview": false,
-      "reason": "Case extenders aren't in the 3D part library yet."
+      "preview": true,
+      "platePreview": false
     },
     "165-case-extender-3w-1h": {
-      "preview": false,
-      "reason": "Case extenders aren't in the 3D part library yet."
+      "preview": true,
+      "platePreview": false
     },
     "165-case-extender-4w-1h": {
-      "preview": false,
-      "reason": "Case extenders aren't in the 3D part library yet."
+      "preview": true,
+      "platePreview": false
     },
     "165-under-table-rail-1w": {
       "preview": true,
@@ -907,20 +907,20 @@
       "platePreview": false
     },
     "185-case-extender-1w-1h": {
-      "preview": false,
-      "reason": "Case extenders aren't in the 3D part library yet."
+      "preview": true,
+      "platePreview": false
     },
     "185-case-extender-2w-1h": {
-      "preview": false,
-      "reason": "Case extenders aren't in the 3D part library yet."
+      "preview": true,
+      "platePreview": false
     },
     "185-case-extender-3w-1h": {
-      "preview": false,
-      "reason": "Case extenders aren't in the 3D part library yet."
+      "preview": true,
+      "platePreview": false
     },
     "185-case-extender-4w-1h": {
-      "preview": false,
-      "reason": "Case extenders aren't in the 3D part library yet."
+      "preview": true,
+      "platePreview": false
     },
     "185-under-table-rail-1w": {
       "preview": true,
@@ -1187,20 +1187,20 @@
       "platePreview": false
     },
     "240-case-extender-1w-1h": {
-      "preview": false,
-      "reason": "Case extenders aren't in the 3D part library yet."
+      "preview": true,
+      "platePreview": false
     },
     "240-case-extender-2w-1h": {
-      "preview": false,
-      "reason": "Case extenders aren't in the 3D part library yet."
+      "preview": true,
+      "platePreview": false
     },
     "240-case-extender-3w-1h": {
-      "preview": false,
-      "reason": "Case extenders aren't in the 3D part library yet."
+      "preview": true,
+      "platePreview": false
     },
     "240-case-extender-4w-1h": {
-      "preview": false,
-      "reason": "Case extenders aren't in the 3D part library yet."
+      "preview": true,
+      "platePreview": false
     },
     "240-under-table-rail-1w": {
       "preview": true,
@@ -1467,20 +1467,20 @@
       "platePreview": false
     },
     "270-case-extender-1w-1h": {
-      "preview": false,
-      "reason": "Case extenders aren't in the 3D part library yet."
+      "preview": true,
+      "platePreview": false
     },
     "270-case-extender-2w-1h": {
-      "preview": false,
-      "reason": "Case extenders aren't in the 3D part library yet."
+      "preview": true,
+      "platePreview": false
     },
     "270-case-extender-3w-1h": {
-      "preview": false,
-      "reason": "Case extenders aren't in the 3D part library yet."
+      "preview": true,
+      "platePreview": false
     },
     "270-case-extender-4w-1h": {
-      "preview": false,
-      "reason": "Case extenders aren't in the 3D part library yet."
+      "preview": true,
+      "platePreview": false
     },
     "270-under-table-rail-1w": {
       "preview": true,

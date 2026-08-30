@@ -36,6 +36,13 @@ const REQ = (() => {
    rather than reaching for the global on its own. One resolution, one object. */
 export { REQ as REQUIREMENT };
 
+/* Which shelf-lip modes a collection can actually build. ONE source for the
+   fact: main.js drives its controls off this, so the mid-lip stop only appears
+   where the deck carries a second slot pair. `null` is "no lip" - the field's
+   absence - and the order IS the cycle order the ◀▶ walks. */
+export const shelfLipModes = (L) => (LIP.mid[L] ? [null, 'front', 'both'] : [null, 'front']);
+export const SHELF_LIP_LABEL = { null: 'No lip', front: 'Front lip', both: 'Front + mid lip' };
+
 /* THE TABLETOP-COMPLETION CONTRACT (2026-08-23) - which empty cells a tabletop
    run still needs before its top is level. Same vendoring shape as the
    requirement-scope contract above: a classic script in the browser, the
@@ -199,6 +206,96 @@ const LINKS = {
 // centre-relative height offset into the bottom-anchored `pos.y`.
 const SCREW_M3 = { node: 'ButtonHeadScrew_M3-6', label: 'M3×6mm Button Head Screw', h: 5.08 };
 
+/* ---- Shelf inserts + shelf lips (2026-08-28) ------------------------------
+   MEASURED, not derived from a scaling rule: computed off Joey's own
+   case-and-insert render scene (`D:\Render Projects\GEN2 Thumbnail Renderer -
+   Shelf Inserts.blend`) by taking world bounding boxes and then pairing every
+   insert DOWN-facing horizontal face against every case UP-facing one that
+   overlaps it in plan.
+
+     · seat      the insert's underside rib plane (insert-local y 7.4) lands on
+                 the case's full-width internal ledge (case-local y 5.0) —
+                 6,678 mm² of contact at a 0.06 mm gap, with the next-nearest
+                 candidate 1.76 mm away. 5.0 − 7.4 = −2.4, so the insert bottom
+                 sits 2.4 mm BELOW the case bottom. That overhang is not slop:
+                 the insert's INTEGRATED DRAWER STOPPERS poke down through the
+                 case floor, which is both how it snaps in and why a drawer in
+                 the bay below needs no stopper pair of its own (Joey
+                 2026-08-28). See `shelfAbove()`.
+     · depth     the insert is (L − 8.8) deep and sits FLUSH AT THE FRONT, so
+                 its z-centre is L/2 − (L−8.8)/2 = +4.4 on EVERY collection.
+                 No ±dz term — unlike the shared hardware that references a
+                 case face, this part's own depth already tracks the length.
+     · lip       clips onto the insert's front edge, centred and front-flush,
+                 standing exactly 5.0 mm above the shelf surface (it is 7.55
+                 tall and 16 deep, and its resting face is 2.55 up from its own
+                 base): 9.0 − 2.55 = +6.45 above the case bottom.
+
+   ⚠ DERIVED FROM ONE ARRANGEMENT (185-1W) and NOT from a printed build — the
+   same standing as the 165/240/270 hardware. Verify on a print before trusting
+   it to the millimetre.
+   ⚠ THE 4W INSERTS ARE ~0.38 mm SHALLOWER than (L − 8.8) — measured across all
+   six lengths, e.g. 185-4W is 175.82 not 176.20. Held at z 4.4 like every other
+   width, a 4W front therefore sits ~0.19 mm inside the case face instead of
+   flush. Left alone deliberately: 0.19 mm is invisible at this scale, and a
+   per-width correction would encode a number nothing confirms is intentional
+   rather than a CAD clearance on the widest part. Do not "fix" it without a
+   seated 4W to measure. */
+const SHELF = { drop: -2.4, z: 4.4, h: 11.4 };
+/* `mid`: how far BEHIND the front lip the second one sits, per collection.
+   MEASURED 2026-08-28 by rasterising the deck of every shipped insert and
+   locating the openings the lip's two tabs drop through (they pass THROUGH the
+   deck - the lip does not clip over the front edge). Every length and width
+   puts the front pair at 2.00-12.78 mm from the front edge, centre 7.39. Only
+   240 and 270 carry a second pair, and the offset is a round number on both:
+
+       240   86.00-96.78, centre  91.39   ->  84 mm behind the front lip
+       270  146.00-156.78, centre 151.39  -> 144 mm behind the front lip
+
+   ⚠ It is an absolute offset, NOT a fraction of the depth - the second lip
+   lands 39.5% back on a 240 and 58% back on a 270. Joey's name for it is the
+   "mid lip" even so; do not "correct" it to a proportional rule. */
+const LIP = { y: 6.45, depth: 16, mid: { 240: 84, 270: 144 } };
+
+/* HOW THE LIP GOES ON. It is a DOVETAIL, not a press-fit: its two tabs drop
+   through the WIDE back end of the deck slots and slide FORWARD to lock under
+   the narrow front end (Joey 2026-08-28 — and rasterising the deck shows the
+   openings widening toward the back, which is the drop-in mouth).
+
+   MEASURED off the shipped parts, and the three numbers close exactly, which is
+   what makes them trustworthy rather than merely plausible:
+
+       deck slot        2.00 .. 12.78  from the deck's front edge   (10.78 long)
+       tab, SEATED      2.15 ..  7.85                               ( 5.70 long)
+       tab, DROPPED IN  7.08 .. 12.78
+       0.15 front clearance + 5.70 tab + 4.93 free slot = 10.78  ✓
+
+   So the travel is 4.93 mm FORWARD (+Z — the insert is front-flush, so the
+   deck's front edge is the case front), and the tab foot is only 1.42 deep.
+   ⚠ That is why `lift` is small. The eased k maps to DISTANCE along the
+   polyline, so a tall drop would eat the duration and leave the 4.93 slide —
+   the part that actually teaches the dovetail — as a couple of frames. At
+   lift 14 the slide is a quarter of the path and reads as a direction change.
+
+   The path shape is the faceplate back cover's (`at` + `from` + `via` = one
+   arc-length-continuous eased polyline, no dead stop at the bend), with the
+   segments in the order Joey described: DOWN into the holes, then FORWARD. */
+const LIP_FIT = { slide: 4.93, lift: 14, hold: 500 };
+/* TWO PHASES, not one glide. `via` exists to remove the dead stop at a bend —
+   here the stop IS the point: the lip drops into the slots, sits for a beat,
+   and only then slides forward and snaps (Joey 2026-08-28). So the drop is an
+   `enter` landing at the drop-in point and the slide is its own `move`, which
+   carries the hold and the detent curve.
+   `base` is any offset the step already needs (the under-table demo case builds
+   out front). enter.at + move.by = base, so the step's after-state is untouched
+   and the net-cancels rule holds by construction. */
+const lipEnter = (id, base = [0, 0, 0]) => ({
+  id,
+  at: [base[0], base[1], base[2] - LIP_FIT.slide],
+  from: [0, LIP_FIT.lift, 0],
+});
+const lipSlide = (id) => ({ id, by: [0, 0, LIP_FIT.slide], hold: LIP_FIT.hold, ease: 'detent' });
+
 // Amazon affiliate buy links for purchased hardware (Joey's, 2026-07-12) —
 // rendered as extra chips after Printables/Thangs in the BOM checklist +
 // identify card (links.buy, main.js). Standard magnets suit most builds; the
@@ -244,6 +341,24 @@ BUY.railScrews = [BUY.woodScrews[0]];
 // cases/decor pages now, and covers + foot rails got dedicated pages instead
 // of funneling to the Table Top Kit bundle).
 const LINKS_BY_LEN = {
+  /* Shelf inserts AND shelf lips both resolve here: the lips ship INSIDE each
+     length's shelf-insert download, so one page per length serves both rows —
+     the same shape as covers, where every CL/CU width row linkAs-es a single
+     `GEN2 <L> Covers` page (planner data.js). Empty pending Joey's uploads;
+     while it is, `links.shelfInsert` is null, `add()` writes no `links` key and
+     the rows read exactly as they do today.
+     ⚠ NO 185 FALLBACK, unlike `cases`/`decor`/`extender` below. Those fall back
+     because all six lengths exist; here a missing entry means "not published
+     for this length", and inheriting 185's page would hand a 240 buyer the
+     wrong download. Absent must stay absent. */
+  shelfInsert: {
+    59:  { p: 'https://www.printables.com/model/1828405-gen2-59-shelf-inserts' },
+    115: { p: 'https://www.printables.com/model/1828408-gen2-115-shelf-inserts' },
+    165: { p: 'https://www.printables.com/model/1828409-gen2-165-shelf-inserts' },
+    185: { p: 'https://www.printables.com/model/1828395-gen2-185-shelf-inserts' },
+    240: { p: 'https://www.printables.com/model/1828410-gen2-240-shelf-inserts' },
+    270: { p: 'https://www.printables.com/model/1828411-gen2-270-shelf-inserts' },
+  },
   cases: {
     59:  { p: 'https://www.printables.com/model/1658749-gen2-59-cases-all', t: 'https://than.gs/m/1535454', m: 'https://makerworld.com/en/models/3092550-gen2-59-cases-all' },
     115: { p: 'https://www.printables.com/model/1658744-gen2-115-cases-all', t: 'https://than.gs/m/1535435', m: 'https://makerworld.com/en/models/3092499-gen2-115-cases-all' },
@@ -251,6 +366,21 @@ const LINKS_BY_LEN = {
     185: { p: 'https://www.printables.com/model/1658700-gen2-185-cases-all', t: 'https://than.gs/m/1535455', m: 'https://makerworld.com/en/models/3092219-gen2-185-cases-all' },
     240: { p: 'https://www.printables.com/model/1658608-gen2-240-cases-all', t: 'https://than.gs/m/1535459', m: 'https://makerworld.com/en/models/3091292-gen2-240-cases-all' },
     270: { p: 'https://www.printables.com/model/1658688-gen2-270-cases-all', t: 'https://than.gs/m/1535458', m: 'https://makerworld.com/en/models/3092111-gen2-270-cases-all' },
+  },
+  /* Case extenders — the 1H rings a shelf (and, when the doors land, a cabinet)
+     stacks above its case to reach height. PUBLISHED products, unlike the shelf
+     insert and lip: these carry real links and no "coming soon" note.
+     ⚠ PRINTABLES ONLY, deliberately — the planner's LINK_OVERRIDES has no `t`
+     for any of the six, so inventing one here would mint a dead Thangs URL. The
+     store split-button omits stores that don't carry a part, so a row honestly
+     offers Printables alone until Joey uploads them elsewhere. */
+  extender: {
+    59:  { p: 'https://www.printables.com/model/1563420-gen2-59-case-extenders' },
+    115: { p: 'https://www.printables.com/model/1563509-gen2-115-case-extenders' },
+    165: { p: 'https://www.printables.com/model/1710717-gen2-165-case-extenders' },
+    185: { p: 'https://www.printables.com/model/1706520-gen2-185-case-extenders' },
+    240: { p: 'https://www.printables.com/model/1702093-gen2-240-case-extenders' },
+    270: { p: 'https://www.printables.com/model/1706499-gen2-270-case-extenders' },
   },
   decor: {
     59:  { p: 'https://www.printables.com/model/1070454-gen2-59-decor-drawers-all', t: 'https://than.gs/m/1481534', m: 'https://makerworld.com/en/models/2364145-gen2-59-decor-drawers-all' },
@@ -348,6 +478,27 @@ const COLORS = {
   Screw: '#d5dae1',       // light steel — wood screw
   Rail: '#2f7fd6',        // blue — under-table rail (footrails never coexist with it)
 };
+/* Shelf colours ride in CONDITIONALLY (see the manifest's `colors`), exactly
+   like FootAdhesive: a build with no shelf must emit the palette it always did,
+   or all ten official-kit goldens move for a part they do not contain.
+   Both get their own key rather than borrowing Drawer's — a mixed board lists
+   shelves and drawers side by side, and two rows sharing a chip is precisely
+   the confusion the identification palette exists to prevent. */
+const SHELF_COLORS = {
+  ShelfInsert: '#7ad1c0',  // pale teal — the shelf plate
+  ShelfLip: '#f26d5b',     // coral — the optional front lip
+};
+/* The case extender rides in conditionally too, for the same golden-stability
+   reason. It gets its OWN type and hue rather than sharing the case's, which
+   was the first instinct and is wrong three ways in this codebase: `imgFor`'s
+   plate-pose table keys the confirmed CASE print pose off `type === 'Case'`
+   (an extender would silently inherit a pose nobody has verified), the part
+   preview picks its row by type and FAILS CLOSED on anything but one match (a
+   tall shelf would offer two 'Case' rows), and the cover badge sums 'Case'
+   quantities, so a 6H shelf would advertise itself as "6 CASES".
+   Slate blue-grey: reads as structure next to the dark case without colliding
+   with FootrailL/U blue-cyan, QuickLock teal or the insert's pale teal. */
+const EXTENDER_COLOR = { CaseExtender: '#7d8496' };
 
 // ---- official-kit build migrations -----------------------------------------
 // Official kits (builds/<id>.json) commit a planner build to the repo forever —
@@ -478,6 +629,8 @@ export function generateManifest(build) {
     ...LINKS,
     kit:     LINKS_BY_LEN.kit[L] || LINKS.kit,
     cases:   LINKS_BY_LEN.cases[L] || LINKS_BY_LEN.cases[185],
+    extender: LINKS_BY_LEN.extender[L] || LINKS_BY_LEN.extender[185],
+    shelfInsert: LINKS_BY_LEN.shelfInsert[L] || null,   // no fallback — see the table
     decor:   LINKS_BY_LEN.decor[L] || LINKS_BY_LEN.decor[185],
     classic: LINKS_BY_LEN.classic[L] || LINKS_BY_LEN.classic[185],
     covers:  LINKS_BY_LEN.covers[L] || LINKS_BY_LEN.covers[185],
@@ -623,24 +776,68 @@ export function generateManifest(build) {
     warnings.push(`"${build.handleStyle}" handles aren't modeled yet · showing ${handleStyle.label.replace(' Handle', '')} (swap styles by tapping a handle).`);
 
   // ---- per-unit validation -------------------------------------------------
+  /* ⚠ THE LEGAL HEIGHTS ARE PER FILL, and the two domains barely overlap.
+     A DRAWER is one printed box, so it can only be a size the drawer catalog
+     ships: H_LABEL's own keys (05/1/15/2/3H). A SHELF or CABINET is ASSEMBLED
+     from 1H rings — one case plus case extenders — so it reaches WHOLE unit
+     heights the drawer catalog never had, up to the planner's maxCaseHeight of
+     6H (hh 12). Mirrors the planner's `heightsForFill`: drawerHeights vs
+     caseHeights.
+     ⚠ Judging both against H_LABEL was the bug this replaces: it stops at hh 6,
+     so a perfectly legal 4H-6H shelf the planner offers would have died here as
+     "unknown height". Judging stacked fills by "hh is even" ALONE is not enough
+     either — it would wave an hh 14 through toward parts that stop at 6H. */
+  const isStacked = (fill) => fill === 'shelf' || fill === 'cabinet';
+  const MAX_RINGS = 6;                       // planner GEN2.maxCaseHeight
+  const ringsOf = (u) => u.hh / 2;           // 1H rings in a stacked unit
   for (const u of units) {
-    const H = H_LABEL[u.hh];
-    if (!H) { errors.push(`A unit has an unknown height (hh=${u.hh}).`); continue; }
-    if (u.w >= 3 && u.hh === 6) errors.push(`${u.w}W-3H doesn't exist (too large to print) · planner shouldn't allow this.`);
+    // stacked fills are ALWAYS built on a 1H case, so their case node never
+    // uses the unit's own height label — H here is for the messages only
+    const stacked = isStacked(u.fill);
+    const H = stacked ? String(ringsOf(u)) : H_LABEL[u.hh];
+    if (stacked ? (u.hh % 2 || u.hh < 2 || ringsOf(u) > MAX_RINGS) : !H) {
+      errors.push(stacked
+        ? `A ${u.fill} unit has an unsupported height (hh=${u.hh}) · shelves and cabinets stack whole 1H rings, 1H to ${MAX_RINGS}H.`
+        : `A unit has an unknown height (hh=${u.hh}).`);
+      continue;
+    }
+    // 3W-3H / 4W-3H are DRAWER-only exclusions (no single case that big prints
+    // reliably). A shelf of the same footprint is legal in both tools because it
+    // is stacked from 1H rings, never one tall case — planner `unavailableSizes`
+    // is likewise consulted only for classic/decor.
+    if (!stacked && u.w >= 3 && u.hh === 6) errors.push(`${u.w}W-3H doesn't exist (too large to print) · planner shouldn't allow this.`);
     if (coll.maxW && u.w > coll.maxW) errors.push(`${u.w}W cases don't exist in the ${L} collection (1W and 2W only).`);
-    if (coll.maxHH && u.hh > coll.maxHH) errors.push(`${H}H cases don't exist in the ${L} collection (05H and 1H only).`);
+    // ⚠ DRAWER-ONLY, mirroring the planner's `maxDrawerH` — which it applies
+    // only to classic/decor for exactly this reason. The 59 ships no case above
+    // 1H, but a taller 59 SHELF needs none: it stacks 59 extenders, which exist
+    // at every width. Applying this to every fill made the viewer refuse a
+    // 59-2W-2H shelf the planner happily offers.
+    if (!stacked && coll.maxHH && u.hh > coll.maxHH) errors.push(`${H}H cases don't exist in the ${L} collection (05H and 1H only).`);
     // No length sets classicMaxHH since 2026-08-02 (all six ship 3H classics),
     // but the guard stays armed for the next partial catalog — so the ceiling
     // is read from the cap rather than hardcoded, or it would misreport it.
     if (u.fill === 'classic' && coll.classicMaxHH && u.hh > coll.classicMaxHH)
       errors.push(`Classic Drawers only go up to ${H_LABEL[coll.classicMaxHH]}H in the ${L} collection (no ${H}H model) · switch this drawer to Decor, or pick a smaller size.`);
-    if (u.fill === 'cabinet') errors.push('Cabinet units need case-extender models that are not in the 3D library yet.');
-    if (u.fill === 'shelf' && u.hh !== 2) errors.push('Shelves taller than 1H use case extenders that are not in the 3D library yet.');
+    /* Cabinets stay refused, but NO LONGER for the extenders — those shipped
+       2026-08-29. What is still missing is the door itself and its hardware
+       (door / hinge / latch are all in the planner's `unreleased`, and none has
+       a GLB). ⚠ The cabinet BOM is also NOT the shelf rule: the planner bills a
+       simple cabinet as (1 + shelves) CASES plus the remaining extenders, and an
+       advanced one per mixed-width compartment. Do not reach for `ringsOf` here
+       when the doors land — read the planner's cabinet branch. */
+    if (u.fill === 'cabinet') errors.push('Cabinet units need the door, hinge and latch models, which are not in the 3D library yet · the case extenders they stack are.');
   }
   // support check: tabletop stacks bottom-up (each column rests on a unit top);
   // hanging mounts go top-down (each column hangs off a unit above). Mount flips it.
   const topAt = (col, level) => units.some(v => v.topIdx === level && col >= v.col && col < v.col + v.w);
   const bottomAt = (col, level) => units.some(v => v.rowIdx === level && col >= v.col && col < v.col + v.w);
+  /* A drawer's stoppers seat in the CEILING of its bay — which is the FLOOR of
+     whatever sits on top. When that is a SHELF unit, the shelf insert's own
+     INTEGRATED stoppers already occupy those slots: they are what snaps it in,
+     and they poke through into the bay below (Joey 2026-08-28). So the drawer
+     underneath must not also bill a pair — they would fight for one slot. */
+  const shelfAbove = (col, level) => units.some(v =>
+    v.fill === 'shelf' && v.rowIdx === level && col >= v.col && col < v.col + v.w);
   for (const u of units) {
     if (hangs ? u.topIdx === maxTop : u.rowIdx === 0) continue; // top row hangs on brackets/rails / bottom row sits on the surface
     for (let c = u.col; c < u.col + u.w; c++)
@@ -862,7 +1059,34 @@ export function generateManifest(build) {
   }
 
   // cases + per-case hardware
-  let firstClipDemo = null, firstDrawerDemo = null;
+  let firstClipDemo = null, firstDrawerDemo = null, firstShelfDemo = null;
+  /* The shelf install is a straight DROP: the insert's integrated stoppers pass
+     down through slots in the case floor, and a tab cannot enter a floor slot
+     sideways — so it is lowered in, never slid in from the front. It therefore
+     has to happen while the case's top is still open, i.e. BEFORE the unit
+     above exists. Every mount already stages its case somewhere that is true:
+     tabletop cases are dressed at the bench then settle from behind, wall top
+     cases are assembled at a forward bench, and the under-table demo case is
+     built out front. Wall lower rows and the remaining under-table cases arrive
+     PRE-ASSEMBLED as one synchronised slide — the same treatment their
+     QuickLocks and magnet clips already get — so the insert simply rides in
+     with them (it is in `members`). Only the first shelf spells the mechanism
+     out; the rest just say the shelf is already in. */
+  const shelfWhy = 'Its built-in drawer stoppers drop through the slots in the case floor and snap it home.';
+  const shelfText = 'Lower the shelf insert straight down into the open case · ' + shelfWhy.charAt(0).toLowerCase() + shelfWhy.slice(1);
+  /* The lip's tabs drop through slots in the deck, so "onto the front edge" is
+     wrong however natural it sounds - MEASURED, see the LIP block. */
+  /* The lips are DOVETAILED in, so the note has to name both halves of the
+     motion — dropping one straight down onto its final spot does not seat it. */
+  const lipText = (n) => !n ? ''
+    : n > 1 ? ' Then fit the two shelf lips · drop each one into the wide back of its slots and slide it forward until it locks. One sits at the front edge, one part-way back to stop a spool rolling forward.'
+    : ' Then fit the shelf lip: drop it into the wide back of the slots at the front edge and slide it forward until it locks.';
+  /* Said on the rows that arrive pre-assembled, so the reader is told the shelf
+     is already fitted rather than being shown a drop that never happens — the
+     case's top is covered by the row above by the time it slides in. */
+  const preFittedShelf = (nLips) => 'Fit the shelf insert'
+    + (nLips > 1 ? ' and both lips' : nLips ? ' and its lip' : '')
+    + ' before this case goes up · once the row above is in place the top is covered.';
   const baseCaseSteps = []; // bench cases (feet-on-case rows) slot into the bench flow before the feet
   // wall steps play top-down (reversed), so the first top case SHOWN is the last
   // one generated — that's the one that gets the ghost+zoom peg demo.
@@ -925,7 +1149,8 @@ export function generateManifest(build) {
     const runWidths = isStaggered ? [totalW] : contiguousRuns.map(r => r.w);
     const anyDrawerStoppers = units.some(u =>
       (u.fill === 'decor' || u.fill === 'classic') &&
-      Array.from({ length: u.w }, (_, k) => u.col + k).some(c => !stopperOff(u, c)));
+      Array.from({ length: u.w }, (_, k) => u.col + k)
+        .some(c => !stopperOff(u, c) && !shelfAbove(c, u.topIdx)));
     coverFacts = {
       staggerRequired: runWidths.some(w => w > 2),
       hasStoppers: anyDrawerStoppers,
@@ -933,7 +1158,20 @@ export function generateManifest(build) {
   }
 
   units.forEach((u, i) => {
-    const H = H_LABEL[u.hh];
+    /* A SHELF is ASSEMBLED from 1H rings, never printed as one tall case: a
+       case at the bottom (its floor carries the slots the insert's integrated
+       stoppers snap through) plus one CASE EXTENDER per further 1H of height.
+       So a shelf's case node is ALWAYS 1H whatever the unit's own height —
+       exactly the planner's billing, `sizeToken(p.w, 1)` + (h − 1) extenders.
+       Every other fill is one printed case at its own size.
+       ⚠ Keyed on 'shelf' EXPLICITLY, not on a shared "stacked fill" flag. A
+       CABINET is billed differently — the planner gives a simple one
+       (1 + shelves) CASES plus the remaining extenders, and an advanced one a
+       case/extender/insert stack per mixed-width compartment — so this must not
+       silently become the cabinet rule the day the door models land. */
+    const isShelfUnit = u.fill === 'shelf';
+    const rings = isShelfUnit ? u.hh / 2 : 1;     // 1H rings; extenders = rings − 1
+    const H = isShelfUnit ? '1' : H_LABEL[u.hh];
     const caseNode = `${L}-${u.w}W-${H}H_Case`;
     const bottom = row0 + u.rowIdx * PITCH_HALF_Y;
     const caseH = u.hh * PITCH_HALF_Y + 3;
@@ -951,18 +1189,99 @@ export function generateManifest(build) {
     if (st && !isBase) stages[st] = isWall ? [0, WALL.drop, WALL.benchFwd] : [0, 0, slideBack];
     const stg = st ? { stage: st } : {};
     inst.push({ id: `case${i}`, node: caseNode, pos: [cx, bottom, 0], ...stg });
-    add(caseNode, `Case ${L}-${u.w}W-${H}H`, 'Case', links.cases);
-    // QuickLocks: one handed pair per case, outer walls, near the top.
-    // y = caseBottom + caseH − 23.32 (DERIVED from 1H ground truth 35.68).
-    const qy = bottom + caseH - 23.32;
-    inst.push({ id: `ql${i}L`, node: 'QuickLock-L', pos: [left + 3.88, qy, 65.02 - dz], ...stg });
-    inst.push({ id: `ql${i}R`, node: 'QuickLock-R', pos: [right - 3.45, qy, 65.02 - dz], ...stg });
-    add('QuickLock-L', 'QuickLock L', 'QuickLock', links.hw);
-    add('QuickLock-R', 'QuickLock R', 'QuickLock', links.hw);
+    /* The case IS the unit's enclosure, exactly as the extender above it is -
+       the planner has tagged it `core("unit.enclosure")` all along, and this
+       row carried NO requirement, so the cross-tool parity test could not
+       compare it at all (it dropped every row without one). Migrated
+       2026-08-29 with the QuickLock pair below. */
+    add(caseNode, `Case ${L}-${u.w}W-${H}H`, 'Case', links.cases, 1, false, false,
+      { requirement: REQ.core('unit.enclosure') });
+    /* ---- case extenders (shelf units above 1H) ----------------------------
+       Each ring sits exactly ONE ROW of pitch above the last — the same rule
+       that stacks cases, and the reason a stack is dimensionally identical to
+       the tall case it replaces: a 1H case occupies 56 mm of pitch and stands
+       59 mm (the 3 mm dovetail seats into whatever is above), so case + one
+       extender tops out at 115 mm — exactly `caseH` for hh 4. MEASURED: every
+       extender GLB is 88·w × 59 × L, bottom-anchored, X/Z centred.
+       `owner` names the planner unit the way the insert's and the magnet clip's
+       instances do. */
+    const extNode = `CaseExtender_${L}-${u.w}W-1H`;
+    const extIds = [];
+    for (let k = 1; k < rings; k++) {
+      const id = `ext${i}_${k}`;
+      extIds.push(id);
+      inst.push({ id, node: extNode, pos: [cx, bottom + k * PITCH_HALF_Y * 2, 0], owner: u.id, ...stg });
+    }
+    if (extIds.length)
+      /* CORE on `unit.enclosure`, no basis — byte-for-byte the planner's own
+         classification. An extender is not an addition to a finished unit; it
+         is the interchangeable way a shelf reaches its height, so it is
+         enclosure exactly as the case is. */
+      add(extNode, `Case Extender ${L}-${u.w}W`, 'CaseExtender', links.extender,
+        extIds.length, false, false, { requirement: REQ.core('unit.enclosure') });
+    /* QuickLocks: one handed pair per UNIT, outer walls, hosted by the TOPMOST
+       ring, y = unitBottom + caseH − 23.32 (DERIVED from 1H ground truth 35.68;
+       the QuickLock GLB is 23.30 tall, so its sprung tab finishes flush with
+       that ring's top and engages whatever seats above).
+       ⚠ This line needs NO shelf special-case, and that is a real check on the
+       stacking rule rather than a coincidence: for hh 4 it resolves to
+       bottom + 91.68, and the extender's own bottom is bottom + 56 — putting
+       the pair 35.68 above the ring that hosts it, the calibrated offset
+       exactly. MEASURED on the GLBs: the extender reproduces 96.9% of the
+       case's vertices in that wall window (100% over the top 6 mm), so it
+       carries the same QuickLock channel.
+       ⚠⚠ OPEN, ASKED OF JOEY 2026-08-29: whether the case↔extender SEAM also
+       takes a pair, i.e. one pair per RING rather than per unit. Today's count
+       mirrors the planner's (`totalCases`, which excludes extenders), so the
+       two tools agree either way; if the answer is per-seam, it is this loop
+       and the planner's `totalCases` that change, together. */
+    /* ⚠⚠ ONE PAIR PER RING, NOT PER UNIT (Joey 2026-08-29). EVERY seam locks:
+       the base case takes a pair AND so does each extender stacked on it, so a
+       3H shelf carries three pairs. Asked because both independent reviewers
+       flagged that the geometry could not settle it — the extender has the
+       channel, but having one does not prove it must be populated. It must.
+       A one-printed-piece case is still ONE ring whatever its height (a 2H case
+       has a single channel near its top), so `rings` is 1 for every other fill
+       and this loop reproduces the old single pair exactly.
+       ⚠ THE TOP RING KEEPS THE BARE `ql<i>L/R` IDS. Every dip/pop site names
+       them — `qlsUnder`, the wall and under-table slides, the cover benches —
+       and the pair those mean is the one a unit or cover slides OVER, which is
+       always the topmost. Lower rings get `_<k>` ids and take no dip: an
+       extender DROPS straight on, so its tab passes through the keyhole's round
+       end rather than being covered by channel the way a slide covers it. */
+    const qlId = (k, hand) => `ql${i}${hand}` + (k === rings - 1 ? '' : `_${k}`);
+    const qlIds = [];
+    for (let k = 0; k < rings; k++) {
+      /* Ring k's own bottom + the calibrated 35.68. The two branches AGREE on a
+         shelf (caseH = rings·56 + 3, so caseH − 23.32 = (rings−1)·56 + 35.68);
+         the top-ring form is kept verbatim because it is also the ONLY ring on
+         every other fill, where caseH may be a tall one-piece case and the old
+         calibration must be reproduced byte-for-byte. */
+      const qy = k === rings - 1
+        ? bottom + caseH - 23.32
+        : bottom + k * PITCH_HALF_Y * 2 + 35.68;
+      const idL = qlId(k, 'L'), idR = qlId(k, 'R');
+      qlIds.push(idL, idR);
+      inst.push({ id: idL, node: 'QuickLock-L', pos: [left + 3.88, qy, 65.02 - dz], ...stg });
+      inst.push({ id: idR, node: 'QuickLock-R', pos: [right - 3.45, qy, 65.02 - dz], ...stg });
+    }
+    /* `unit.join` is CORE with no neighbour: a lone case's tabs are still
+       engaged by whatever receives it - the Lower cover on tabletop, the bench
+       cover on wall, the rails under-table (the dip-and-pop timeline shows
+       exactly that). The obligation is "lock this ring to whatever receives
+       it", never "lock it to the next case". Matches the planner's own
+       reasoning verbatim; no basis on either side. */
+    add('QuickLock-L', 'QuickLock L', 'QuickLock', links.hw, rings, false, false,
+      { requirement: REQ.core('unit.join') });
+    add('QuickLock-R', 'QuickLock R', 'QuickLock', links.hw, rings, false, false,
+      { requirement: REQ.core('unit.join') });
 
     const isDrawer = u.fill === 'decor' || u.fill === 'classic';
     const hasMagnet = isDrawer && u.closure === 'magnet'; // planner "Drawer close = Magnets"
-    const members = [`case${i}`, `ql${i}L`, `ql${i}R`]; // move together during a wall hang
+    // move together during a wall hang / under-table slide. Extenders are part
+    // of the enclosure, so they ride with it wherever the whole unit travels —
+    // and so does EVERY ring's QuickLock pair, not just the topmost.
+    const members = [`case${i}`, ...extIds, ...qlIds];
     const clipText = 'Magnet closure: snap the clip into the back-wall slot (magnet pressed in back-to-front, clip lowered) · unreachable after assembly, so now is the time.';
     let mcId, mgId;
     if (hasMagnet) {
@@ -987,6 +1306,135 @@ export function generateManifest(build) {
       add('Magnet_10x2mm', 'Magnet 10×2 mm', 'Magnet', { buy: BUY.magnets }, 2, true, false, magReq);
       members.push(mcId, mgId);
     }
+    /* ---- shelf insert (+ its optional lip) --------------------------------
+       CORE on `unit.fill`, exactly as the planner bills it: there is no "empty"
+       fill, so the insert IS how a shelf unit is filled, not an addition to a
+       bare case. The lip is a real OPTION — it has a genuine off state, and a
+       shelf without one is still a shelf (Joey 2026-08-28).
+       ⚠ NEITHER PART IS PUBLISHED YET, so both rows deliberately carry NO
+       store links (main.js renders no link block when `links` is absent) and
+       say so in their note — the viewer's honest equivalent of the planner's
+       "coming soon" gate. Wire LINKS/LINKS_BY_LEN the day the pages go live. */
+    const isShelf = u.fill === 'shelf';
+    /* 'front' | 'both'; the field's ABSENCE is "no lip". A rear-only shelf is
+       deliberately not expressible - Joey's rule is front first, always
+       (2026-08-28), so the control is a 3-state cycle and a shelf can never
+       end up with an open front edge. ⚠ 'both' CLAMPS to the front lip on a
+       collection whose deck has no mid slot, rather than erroring: the choice
+       survives if the same build is later switched to a 240/270. */
+    const lipMode = isShelf && (u.lip === 'front' || u.lip === 'both') ? u.lip : null;
+    const midGap = LIP.mid[L];
+    let shId = null, lipIds = [], lipMidZ = SHELF.z;
+    if (isShelf) {
+      const shNode = `ShelfInsert_${L}-${u.w}W`;
+      shId = `sh${i}`;
+      // `owner` names the planner unit, the same way a magnet clip names its
+      // drawer — it is what lets the identify card find which shelf to retoggle.
+      inst.push({ id: shId, node: shNode, pos: [cx, bottom + SHELF.drop, SHELF.z], owner: u.id, ...stg });
+      add(shNode, `Shelf Insert ${L}-${u.w}W`, 'ShelfInsert', links.shelfInsert, 1, false, false,
+        { requirement: REQ.core('unit.fill'), basis: REQ.basis('fill', 'shelf', 'unit', 1) },
+        links.shelfInsert ? null : 'Not published yet · the model is coming soon.');
+      members.push(shId);
+      if (lipMode) {
+        const lipNode = `ShelfLip_${u.w}W`;
+        // front-flush like the insert, but the lip's depth is FIXED at 16, so
+        // unlike SHELF.z this centre does depend on the collection length.
+        const frontZ = depth / 2 - LIP.depth / 2;
+        // ONE part, at one or two positions - the same ShelfLip_<w>W either way,
+        // so the BOM row simply carries qty 2.
+        const spots = lipMode === 'both' && midGap ? [frontZ, frontZ - midGap] : [frontZ];
+        spots.forEach((z, k) => {
+          const id = `lip${i}${k ? 'm' : ''}`;
+          inst.push({ id, node: lipNode, pos: [cx, bottom + LIP.y, z], owner: u.id, ...stg });
+          lipIds.push(id);
+        });
+        /* The lip links to the length's SHELF INSERT page, because that is
+           where its STLs live - so the note says so, or the download button
+           reads as pointing at the wrong product. Both flip automatically the
+           moment LINKS_BY_LEN.shelfInsert is filled in. */
+        add(lipNode, `Shelf Lip ${u.w}W`, 'ShelfLip', links.shelfInsert, spots.length, false, false,
+          { requirement: REQ.option('shelf.retention', 'shelf.lip'),
+            basis: REQ.basis('shelf.lip', 'on', 'unit', 1) },
+          links.shelfInsert ? `Included in the ${L} shelf insert download.`
+                            : 'Not published yet · the model is coming soon.');
+        members.push(...lipIds);
+        // centre of the band the lips occupy - the front one, or midway between
+        // the pair - so a two-lip shelf frames both rather than one and a gap
+        lipMidZ = spots.reduce((a, z) => a + z, 0) / spots.length;
+      }
+    }
+    /* Close on the SHELF while it goes in. Framed by the DECK, not the case:
+       the whole install is a 14 mm drop and a 4.93 mm slide, which measured
+       6.2 px at the step's own whole-case framing - honest, and nearly
+       invisible (Joey 2026-08-28: "it feels really zoomed out"). Sizing off the
+       deck's own diagonal puts the slide at roughly 2% of frame width instead.
+       ⚠ `p` is SMALLER than the standard 58 because smaller means HIGHER here
+       (camUp uses 116 for below) - the camera has to look down INTO the open
+       case to see the deck at all.
+       ⚠⚠ IT MUST AIM AT THE STAGED POSITION, NOT THE FINAL ONE. The install
+       happens while the case is still on its bench, and every mount stages that
+       bench somewhere else: tabletop's base sits 110 mm UP (`stages.base`), a
+       non-base tabletop case sits `slideBack` BEHIND, a wall top case sits at
+       `WALL.benchFwd` in front. Aiming at the resting position pointed the
+       camera at empty stage a metre below the action - caught by measuring
+       where the deck actually projected, not by reading the code.
+       `zBase` covers the one mount with NO stage: the under-table demo case,
+       which is moved out front by its own enter offsets instead. */
+    const stgOff = (st && stages[st]) || [0, 0, 0];
+    const shelfCam = (zBase = 0) => ({
+      t: 30, p: 44,
+      r: Math.max(300, Math.hypot(u.w * PITCH_X, depth) / 2 * 2.3),
+      target: [
+        cx + stgOff[0],
+        bottom + SHELF.h + stgOff[1],
+        stgOff[2] + zBase + (lipIds.length ? lipMidZ : SHELF.z),
+      ],
+    });
+    /* Everything a SHELF unit adds to whatever bench assembles it, in PHYSICAL
+       order: the insert is lowered into the still-open case, its lip dovetails
+       in, and only then do the extender rings stack on top.
+       ⚠ ONE helper for ALL FOUR assembly paths — tabletop bench, wall
+       per-column bench, staggered wall top row, and the under-table demo case.
+       That matters, because the staggered row assembled its case and QuickLocks
+       and then RETURNED: since the inserts shipped (2026-08-28) a staggered
+       wall shelf has been placing its insert and lip as instances no phase ever
+       entered. Sharing the sequence is what stops a fifth path repeating it.
+       ⚠ QuickLocks are deliberately NOT included. They seat in the TOPMOST
+       ring, so every caller enters them AFTER these phases — which is why the
+       shelf paths below break the usual case→QuickLocks adjacency. */
+    const shelfFit = ({ drop = 45, at = null, restore = null, zBase = 0 } = {}) => {
+      const out = [], off = at ? { at } : {};
+      if (shId) {
+        out.push({ camera: shelfCam(zBase) });
+        out.push({ enter: [{ id: shId, ...off, from: [0, 50, 0] }] });
+        if (lipIds.length) {
+          out.push({ enter: lipIds.map(id => lipEnter(id, at || [0, 0, 0])) });
+          out.push({ move: lipIds.map(id => lipSlide(id)) });
+        }
+        if (restore) out.push({ camera: restore });
+      }
+      /* Then the rings, each DROPPED straight on and immediately given its own
+         QuickLock pair — every seam locks (Joey 2026-08-29), so the pair that
+         belongs to ring k is fitted while ring k is still the open top. Doing
+         all the rings first and all the pairs after would show a pair being
+         dropped into a channel already capped by the ring above it. */
+      extIds.forEach((id, n) => {
+        out.push({ enter: [{ id, ...off, from: [0, drop, 0] }] });
+        out.push({ enter: [
+          { id: qlId(n + 1, 'L'), ...off, from: [0, drop, 0] },
+          { id: qlId(n + 1, 'R'), ...off, from: [0, drop, 0] },
+        ] });
+      });
+      return out;
+    };
+    // the note that explains the rings, said once per shelf that has them
+    /* ⚠ Says "its own QuickLocks" because EVERY ring locks (Joey 2026-08-29):
+       a 3H shelf takes three pairs, one per ring, not one for the unit. */
+    const extText = extIds.length
+      ? ` Then stack ${extIds.length === 1 ? 'the case extender'
+          : extIds.length === 2 ? 'both case extenders'
+          : `all ${extIds.length} case extenders`} on top to bring the shelf up to ${rings}H — each ring gets its own QuickLock pair before the next one goes on.`
+      : '';
     const step = {
       title: isBase ? `Bench: bottom case · ${u.w}W-${H}H` : `Case ${i + 1} · ${u.w}W-${H}H`,
       note: null,
@@ -1008,14 +1456,19 @@ export function generateManifest(build) {
       topPlacements.push({
         title: `Top case ${n} · ${u.w}W-${H}H`,
         note: 'On the bench, line this top case up with the rest of the top row: QuickLocks into the outer wall slots (L left, R right)'
-          + (mcId ? ', magnet clip into the back slot' : '') + '. The cover slides on across the whole row next.',
+          + (mcId ? ', magnet clip into the back slot' : '') + '. The cover slides on across the whole row next.'
+          + (shId ? ' ' + (firstShelfDemo === null ? shelfText : 'Fit this case\'s shelf insert the same way.') + lipText(lipIds.length) : '')
+          + extText,
         camera: benchCam,
         phases: [
           { enter: [{ id: `case${i}`, from: [0, 45, 0] }] },
-          { enter: [{ id: `ql${i}L`, from: [0, 45, 0] }, { id: `ql${i}R`, from: [0, 45, 0] }] },
+          { enter: [{ id: qlId(0, 'L'), from: [0, 45, 0] }, { id: qlId(0, 'R'), from: [0, 45, 0] }] },
           ...(mcId ? [{ enter: [{ id: mcId, from: [0, 35, 0] }, { id: mgId, from: [0, 0, -30] }] }] : []),
+          // ⚠ the shelf fit had been MISSING here entirely — see shelfFit
+          ...shelfFit({ restore: benchCam }),
         ],
       });
+      if (shId && firstShelfDemo === null) firstShelfDemo = i;
       topMembers.push(...members);
       caseSteps.push(stagHang); // floor stoppers (row below) drop in after the whole row hangs
       if (mcId && firstClipDemo === null) firstClipDemo = i;
@@ -1054,12 +1507,23 @@ export function generateManifest(build) {
       }
       members.push(...coverIds, ...stopIds); // all ride the hang together
 
+      // ⚠ HOISTED above the bench array (2026-08-28): the shelf close-up has to
+      // restore this shot before the Cover Lower goes on, and `const` in its
+      // temporal dead zone threw on every wall shelf build.
+      const benchCam = { t: 30, p: 58, r: caseR(u.w, caseH), target: [cx, bottom + caseH / 2 + WALL.drop, WALL.benchFwd] };
       // bench assembly, in physical order (CL → stoppers → CU)
+      // the BASE ring's pair, right after the case as always; shelfFit adds each
+      // further ring's own pair as that ring goes on
       const bench = [
         { enter: [{ id: `case${i}`, from: [0, 45, 0] }] },
-        { enter: [{ id: `ql${i}L`, from: [0, 45, 0] }, { id: `ql${i}R`, from: [0, 45, 0] }] },
+        { enter: [{ id: qlId(0, 'L'), from: [0, 45, 0] }, { id: qlId(0, 'R'), from: [0, 45, 0] }] },
       ];
       if (mcId) bench.push({ enter: [{ id: mcId, from: [0, 35, 0] }, { id: mgId, from: [0, 0, -30] }] });
+      // the shelf drops in BEFORE the Cover Lower — the CL caps the case top,
+      // so this is the last moment the insert can be lowered in
+      // back out before the cover — the CL caps the case top, so this is the
+      // last moment the insert can be lowered in
+      if (shId) bench.push(...shelfFit({ restore: benchCam }));
       bench.push({ enter: clLocal.map(id => ({ id, from: [0, 0, -WALL.coverSlide] })), dip: dipItems([`ql${i}L`, `ql${i}R`], WALL.coverSlide) });
       bench.push({ pop: popItems([`ql${i}L`, `ql${i}R`]) });
       if (stopIds.length) bench.push({ enter: stopIds.map(id => ({ id, from: [0, 35, 0] })) });
@@ -1071,10 +1535,12 @@ export function generateManifest(build) {
       const base = cam(cx, bottom + caseH / 2, totalW, gridBottom, FIT); // frames the hung (final) build
       // the bench assembly sits WALL.benchFwd toward the camera — frame THAT
       // case up close (caseR), not the whole build
-      const benchCam = { t: 30, p: 58, r: caseR(u.w, caseH), target: [cx, bottom + caseH / 2 + WALL.drop, WALL.benchFwd] };
-      const benchNote = 'On the bench, before it goes near the wall: QuickLocks in, slide the Cover Lower on'
+      const benchNote = 'On the bench, before it goes near the wall: QuickLocks in, '
+        + (shId ? 'shelf insert' + (lipIds.length ? (lipIds.length > 1 ? ' and both lips' : ' and lip') : '') + ' down into the case, ' : '')
+        + 'slide the Cover Lower on'
         + (isDrawer ? ', drop the drawer stoppers into it,' : ',') + ' then cap it with the Cover Upper · the cover can only slide on now, not once the case is on the wall.'
-        + (mcId && firstClipDemo === null ? ' ' + clipText : '');
+        + (mcId && firstClipDemo === null ? ' ' + clipText : '')
+        + (shId && firstShelfDemo === null ? ' ' + shelfWhy : '');
 
       if (i === ghostTopIdx) {
         // the first top case shown is split into two steps (there's a lot going
@@ -1092,6 +1558,7 @@ export function generateManifest(build) {
         steps.push(hangStep, assembleStep);
         caseSteps.push(hangStep); // one caseSteps entry per unit; floor stoppers (row below) merge into the hang
         if (mcId && firstClipDemo === null) firstClipDemo = i;
+        if (shId && firstShelfDemo === null) firstShelfDemo = i;
         return;
       }
       step.title = `Hang the covered top case · ${u.w}W-${H}H`;
@@ -1099,6 +1566,7 @@ export function generateManifest(build) {
       step.phases = [...bench, { camera: base, move: back.move }, drop, land]; // …pan to the wall as it hangs
       step.note = benchNote + ' Then hang it: push it straight back onto the pegs and drop 16 mm to lock.';
       if (mcId && firstClipDemo === null) firstClipDemo = i;
+      if (shId && firstShelfDemo === null) firstShelfDemo = i;
     } else if (isUT) {
       // under-table: EVERY case slides straight back from out front, one piece —
       // the top row's case tops ride into the rail channels; lower rows hang
@@ -1116,14 +1584,23 @@ export function generateManifest(build) {
         step.phases = [
           { enter: [{ id: `case${i}`, at: [0, 0, UT.fwd], from: [0, 0, 60] }] },
           { camera: above },                                   // rise above the bench
-          { enter: [{ id: `ql${i}L`, at: [0, 0, UT.fwd], from: [0, 45, 0] }, { id: `ql${i}R`, at: [0, 0, UT.fwd], from: [0, 45, 0] }] },
+          { enter: [{ id: qlId(0, 'L'), at: [0, 0, UT.fwd], from: [0, 45, 0] }, { id: qlId(0, 'R'), at: [0, 0, UT.fwd], from: [0, 45, 0] }] },
           ...(mcId ? [{ enter: [{ id: mcId, at: [0, 0, UT.fwd], from: [0, 30, 0] }, { id: mgId, at: [0, 0, UT.fwd], from: [0, 0, -30] }] }] : []),
+          // the shelf drops in while the camera is still overhead and the case
+          // is out front — the `at` is cancelled by the shared move below, so
+          // the step's net offset still comes back to zero. Extenders take the
+          // same `at`, and ride the same cancelling move via `members`.
+          ...shelfFit({ at: [0, 0, UT.fwd], zBase: UT.fwd }),
           { camera: camUp(cx, bottom + caseH / 2, totalW, gridBottom) }, // back below before the slide
           { move: members.map(id => ({ id, by: [0, 0, -UT.fwd] })), dip: dipItems([`ql${i}L`, `ql${i}R`], UT.fwd) },
           { pop: popItems([`ql${i}L`, `ql${i}R`]) },
         ];
         step.note = 'Fit the QuickLocks first (L left, R right)' + (mcId ? ', snap in the magnet clip,' : ',')
           + ' then slide the case straight back under the surface · its top rails ride into the rail channels until it stops.';
+        if (shId) {
+          step.note += ' ' + shelfText + lipText(lipIds.length);
+          if (firstShelfDemo === null) firstShelfDemo = i;
+        }
       } else {
         // pre-assembled one-piece slide-in, same read as wall lower rows
         step.phases = [
@@ -1136,6 +1613,7 @@ export function generateManifest(build) {
       }
       if (isTop && isDrawer) step.note += ' (No drawer stoppers needed up here · the rail has them built in.)';
       if (mcId && firstClipDemo === null) { firstClipDemo = i; if (i !== ghostTopIdx) step.note += ' ' + clipText; }
+      if (shId && firstShelfDemo !== i) step.note += ' ' + preFittedShelf(lipIds.length);
     } else if (isWall) {
       // lower rows: the assembled case (with quicklocks + clip) slides straight
       // back from ~40 mm in front — no drop, so it can't clip the case above.
@@ -1148,11 +1626,13 @@ export function generateManifest(build) {
       ];
       step.note = 'Slide the case straight back toward the wall from just in front · its top rails engage the case above and the QuickLocks click home.';
       if (mcId && firstClipDemo === null) { firstClipDemo = i; step.note += ' ' + clipText; }
+      if (shId) step.note += ' ' + preFittedShelf(lipIds.length);
     } else {
       // tabletop: case + quicklocks drop in on the bench, then settle from behind
+      // the BASE ring's pair; shelfFit gives each further ring its own
       step.phases = [
         { enter: [{ id: `case${i}`, from: [0, 60, 0] }] },
-        { enter: [{ id: `ql${i}L`, from: [0, 55, 0] }, { id: `ql${i}R`, from: [0, 55, 0] }] },
+        { enter: [{ id: qlId(0, 'L'), from: [0, 55, 0] }, { id: qlId(0, 'R'), from: [0, 55, 0] }] },
       ];
       if (isBase) step.note = 'A single bottom case needs no footrails · it takes the feet directly. Start at the bench: QuickLocks into the outer wall slots, L left, R right.';
       if (mcId && firstClipDemo === null) {
@@ -1167,6 +1647,16 @@ export function generateManifest(build) {
           : `QuickLocks go in the outer wall slots: L left, R right. ${clipText} Then slide the case on from the back until it clicks.`;
       } else if (mcId) {
         step.phases.push({ fade: [{ id: mcId }, { id: mgId }] });
+      }
+      if (shId) {
+        // its own phase, not folded into the enter: the UT peg demo sets the
+        // precedent - move the camera, THEN act, so the action is not half
+        // missed while the shot is still travelling
+        step.phases.push(...shelfFit({ drop: 55, restore: step.camera }));
+        step.note = (step.note ? step.note + ' ' : '')
+          + (firstShelfDemo === null ? shelfText : 'Drop this case\'s shelf insert in the same way.')
+          + lipText(lipIds.length) + extText;
+        if (firstShelfDemo === null) firstShelfDemo = i;
       }
     }
     if (hangs) steps.push(step);
@@ -1256,6 +1746,7 @@ export function generateManifest(build) {
     const sy = row0 + u.topIdx * PITCH_HALF_Y - 2;
     for (let c = u.col; c < u.col + u.w; c++) {
       if (stopperOff(u, c)) continue; // user removed this 1W's stopper pair
+      if (shelfAbove(c, u.topIdx)) continue; // the shelf insert above brings its own
       const lx = colCenter(c);
       const idL = `st${stopN}L`, idR = `st${stopN}R`, sk = `${u.id}:${c - u.col}`;
       stopN++;
@@ -1778,7 +2269,17 @@ export function generateManifest(build) {
     // the light stage while staying legible on the dark one. Faking it via
     // DARK_STAGE_PALETTE was rejected - that would contradict the "shown in its
     // real finish" promise the colour-locked tooltip makes about a bought item.
-    colors: adhesiveFeet ? { ...COLORS, FootAdhesive: '#4a4d56' } : COLORS,
+    // Shelf colours follow the same rule for the same reason — a build with no
+    // shelf emits exactly the palette it always did, so the kit goldens hold.
+    colors: {
+      ...COLORS,
+      ...(adhesiveFeet ? { FootAdhesive: '#4a4d56' } : {}),
+      ...(units.some(u => u.fill === 'shelf') ? { ShelfInsert: SHELF_COLORS.ShelfInsert } : {}),
+      ...(units.some(u => u.fill === 'shelf' && (u.lip === 'front' || u.lip === 'both')) ? { ShelfLip: SHELF_COLORS.ShelfLip } : {}),
+      // only a shelf ABOVE 1H stacks extenders, so a board of 1H shelves still
+      // emits no extender colour
+      ...(units.some(u => u.fill === 'shelf' && u.hh > 2) ? EXTENDER_COLOR : {}),
+    },
     parts: [...bom.values()],
     instances: inst,
     stages,
@@ -1831,6 +2332,16 @@ function imgFor(node, type) {
   // Case / decor renders are per-collection — ALL six lengths copied from the
   // planner's per-length batches (2026-07-10). The identify card's <img>
   // onerror (main.js) hides any stray gap rather than showing a wrong photo.
+  /* Case extenders: the render is WIDTH-ONLY (every extender is 1H), matching
+     the planner's own `Case Extender <L>-<w>W.png` batch, 18 of which are
+     copied in flat. ⚠ 165 HAS NO RENDERS — they were never made (there is no
+     "165 Case Extenders" folder in D:\Render Projects, unlike the other five),
+     so the path is emitted anyway and main.js's <img> onerror hides it. Drop
+     the four files in and they light up with no code change.
+     ⚠ Anchored, and it must stay that way: a loose `Case` match would swallow
+     these — the same trap the planner documents for its own link rules
+     ("Extender before Case so 'Case Extender - ' never matches 'Case - '"). */
+  if ((m = node.match(/^CaseExtender_(\d+)-(\d)W-1H$/))) return `img/parts/Case Extender ${m[1]}-${m[2]}W.png`;
   if ((m = node.match(/^(\d+)-(\d)W-(\w+)H_Case$/))) return `img/parts/Case ${m[1]}-${m[2]}W-${m[3]}H.png`;
   if ((m = node.match(/^DecorDrawer_(\d+)-(\d)W-(\w+)H$/))) return `img/parts/Decor Drawer ${m[1]}-${m[2]}W-${m[3]}H.png`;
   // classic drawers: per-length renders for all six lengths (2026-07-11 batch)
@@ -1846,6 +2357,10 @@ function imgFor(node, type) {
   // decor handles: per-variant renders named by node (2026-07-20 batch —
   // Deco, BlockBar A–F, Crystal A/B) — lights up the handle BOM rows
   if (node.startsWith('Handle_')) return `img/parts/${node}.png`;
+  // shelf inserts (per length + width) and shelf lips (per width, universal):
+  // the 2026-08-28 batch was copied in NAMED BY NODE, so both map straight
+  // through. Inserts wear their collection's brand colour, lips are Case Black.
+  if (/^ShelfInsert_\d+-\dW$/.test(node) || /^ShelfLip_\dW$/.test(node)) return `img/parts/${node}.png`;
   // mirror parts: the R render is the L one flipped horizontally (2026-07-10)
   if (node === 'QuickLock-R') return 'img/parts/QuickLock-R.png';
   if (node.startsWith('QuickLock')) return 'img/parts/QuickLock.png';
@@ -1932,8 +2447,10 @@ function previewColors(L) {
   const lc = PREVIEW_LEN_COLORS[parseInt(L, 10)] || '#ff8a40';
   return {
     ...COLORS,
-    // collection-scoped families wear the collection color, like their posters
-    Case: lc, Drawer: lc, CoverL: lc, CoverU: lc, FootrailL: lc, FootrailU: lc, Rail: lc,
+    // collection-scoped families wear the collection color, like their posters.
+    // CaseExtender is one of them (`CaseExtender_<L>-<w>W-1H`) — it is sold per
+    // collection and its poster is tinted like the case's.
+    Case: lc, CaseExtender: lc, Drawer: lc, CoverL: lc, CoverU: lc, FootrailL: lc, FootrailU: lc, Rail: lc,
     // universal parts wear their poster-render hues (faceplates: dark
     // navy-charcoal body + the render palette's orange grip/face + silver rod)
     Faceplate: '#31333f',
@@ -2013,8 +2530,6 @@ function previewProbe(slug) {
   let m;
   const H = '(0-5|1|1-5|2|3)';
   // recognized-but-unsupported families first (the site falls back to its poster)
-  if (/^\d+-case-extender-\d+w-1h$/.test(s))
-    return un("Case extenders aren't in the 3D part library yet.");
   if (/^(quicklock-b-bi-directional-optional|magnet-insert-6x2mm)$/.test(s))
     return un("This hardware part doesn't have a 3D model in the part library yet.");
   // hardware (sets + singles) — the probe mounts are chosen so the REAL
@@ -2031,6 +2546,17 @@ function previewProbe(slug) {
         : one(185, 1, 2);
     return { build, hw };
   }
+  /* Case extenders (GLBs landed 2026-08-29). ⚠ The probe is a 2H SHELF, not a
+     case: the extender only exists as the ring a shelf stacks, so a 2H shelf
+     bills exactly one 1H case plus exactly one extender. Picking by the
+     'CaseExtender' type — its own, not 'Case' — is what keeps that single match
+     unambiguous; sharing 'Case' would give this probe TWO rows and fail closed.
+     ⚠ 59-3W/4W are in the site's catalog and their GLBs exist in the library,
+     but the 59's cases stop at 2W in BOTH tools, so the probe errors and the
+     slug reports unsupported. That is correct, not a gap: there is no 59-3W
+     case for the ring to stack on. It must go on being tested. */
+  if ((m = s.match(/^(\d+)-case-extender-([1-4])w-1h$/)))
+    return { build: one(+m[1], +m[2], 4, 'shelf'), pick: { type: 'CaseExtender' } };
   if ((m = s.match(new RegExp(`^(\\d+)-case-([1-4])w-${H}h$`))))
     return { build: one(+m[1], +m[2], H_FROM_SLUG[m[3]]), pick: { type: 'Case' } };
   if ((m = s.match(new RegExp(`^(\\d+)-(classic|decor)-drawer-([1-4])w-${H}h$`))))

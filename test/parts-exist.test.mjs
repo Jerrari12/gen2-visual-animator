@@ -58,7 +58,9 @@ const assertResolves = (name, b) => {
 test('every legal drawer size resolves to real GLBs (or errors gracefully) in all six collections', () => {
   let generated = 0, guarded = 0;
   for (const L of LENGTHS)
-    for (const fill of ['decor', 'classic'])
+    // 'shelf' joined 2026-08-28: only hh=2 is legal, and every other height
+    // errors gracefully — which assertResolves already counts as guarded.
+    for (const fill of ['decor', 'classic', 'shelf'])
       for (const w of [1, 2, 3, 4])
         for (const hh of HH) {
           if (w >= 3 && hh === 6) continue; // 3W/4W-3H are illegal everywhere
@@ -91,7 +93,54 @@ test('all mounts, faceplate families, handle styles and the back cover resolve e
       assertResolves(`${L}/face=${fs}`, mk(L, { faceStyle: fs, backCover: true, placed: [unit(1, 2, 'decor')] }));
     for (const hs of ['deco', 'blockbar', 'crystal'])
       assertResolves(`${L}/handle=${hs}`, mk(L, { handleStyle: hs, placed: [unit(1, 2, 'decor')] }));
+    /* Shelves on every mount, with and without the optional lip. The lip is a
+       UNIVERSAL part copied into each per-length pool (like Adhesive-Foot), so
+       this is what catches a pool that shipped the inserts but not the lips. */
+    for (const mount of ['tabletop', 'wall', 'under-table']) {
+      if (L === 59 && mount === 'tabletop') continue;
+      // 'both' asks for the mid lip, which only 240/270 decks have a slot for -
+      // everywhere else it must CLAMP to the front lip, not reach for a part
+      for (const lip of [null, 'front', 'both'])
+        for (const w of [1, 2]) // every collection has at least 1W/2W cases
+          assertResolves(`${L}/${mount}/shelf ${w}W lip=${lip}`,
+            mk(L, { mount, placed: [{ ...unit(w, 2, 'shelf'), ...(lip ? { lip } : {}) }] }));
+    }
   }
+});
+
+/* ⚠ THE SWEEP ABOVE COUNTS A GRACEFUL ERROR AS A PASS, which is right for a
+   catalog gap but useless as proof that anything BUILDS. This one DEMANDS a
+   manifest for every shelf the planner will actually offer, so the day a cap is
+   lifted onto a missing model the failure is here rather than in production.
+   The matrix is the planner's own: `caseHeights` 1H-6H (its `unavailableSizes`
+   and `maxDrawerH` are drawer-only, so 3W-3H and a tall 59 are legal SHELVES),
+   capped per collection by `maxW`, which does apply to every fill. */
+test('every legal SHELF the planner offers generates real GLBs - 1H to 6H', () => {
+  let built = 0;
+  for (const L of LENGTHS) {
+    const maxW = L === 59 ? 2 : 4;   // COLL[59].maxW - the one cap that is not drawer-only
+    for (const mount of ['tabletop', 'wall', 'under-table']) {
+      if (L === 59 && mount === 'tabletop') continue;
+      for (let rings = 1; rings <= 6; rings++)
+        for (let w = 1; w <= maxW; w++) {
+          const name = `${L}/${mount}/shelf ${w}W ${rings}H`;
+          // `unit` places at y = 20 - hh, which sits on the floor exactly
+          // because gridBottom is the default gridH 10 doubled - don't override it
+          const b = mk(L, { mount, placed: [{ ...unit(w, rings * 2, 'shelf'), lip: 'front' }] });
+          const g = generateManifest(b);
+          // NOT "manifest or error" - a legal shelf MUST build
+          assert.deepEqual(g.errors || [], [], `${name}: must generate, not error`);
+          const missing = [...new Set(g.manifest.instances.map((i) => i.node))].filter((n) => !glbExists(L, n));
+          assert.deepEqual(missing, [], `${name}: references GLBs that don't exist: ${missing.join(', ')}`);
+          // and the rings are really there
+          const ext = g.manifest.instances.filter((i) => /^CaseExtender_/.test(i.node));
+          assert.equal(ext.length, rings - 1, `${name}: expected ${rings - 1} extenders`);
+          built++;
+        }
+    }
+  }
+  // 5 lengths x 3 mounts x 6 heights x 4 widths + the 59's 2 mounts x 6 x 2
+  assert.equal(built, 5 * 3 * 6 * 4 + 2 * 6 * 2, `sweep looks broken - built ${built}`);
 });
 
 // ---- static kits: the folder must back everything the UI can reach ---------

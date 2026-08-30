@@ -74,7 +74,12 @@
     "t": "https://than.gs/m/1535457",
     "m": "https://makerworld.com/en/models/3092414-gen2-165-cases-all"
    },
-   "img": "img/parts/Case 165-1W-1H.png"
+   "img": "img/parts/Case 165-1W-1H.png",
+   "requirement": {
+    "scope": "core",
+    "obligationId": "unit.enclosure"
+   },
+   "required": true
   },
   {
    "node": "QuickLock-L",
@@ -85,7 +90,12 @@
     "p": "https://www.printables.com/model/1012796-gen2-hardware",
     "t": "https://thangs.com/designer/Jerrari/3d-model/GEN2%20Hardware-1141439"
    },
-   "img": "img/parts/QuickLock.png"
+   "img": "img/parts/QuickLock.png",
+   "requirement": {
+    "scope": "core",
+    "obligationId": "unit.join"
+   },
+   "required": true
   },
   {
    "node": "QuickLock-R",
@@ -96,7 +106,12 @@
     "p": "https://www.printables.com/model/1012796-gen2-hardware",
     "t": "https://thangs.com/designer/Jerrari/3d-model/GEN2%20Hardware-1141439"
    },
-   "img": "img/parts/QuickLock-R.png"
+   "img": "img/parts/QuickLock-R.png",
+   "requirement": {
+    "scope": "core",
+    "obligationId": "unit.join"
+   },
+   "required": true
   },
   {
    "node": "MagnetClip_10x2mm",
@@ -175,7 +190,12 @@
     "t": "https://than.gs/m/1535457",
     "m": "https://makerworld.com/en/models/3092414-gen2-165-cases-all"
    },
-   "img": "img/parts/Case 165-2W-1H.png"
+   "img": "img/parts/Case 165-2W-1H.png",
+   "requirement": {
+    "scope": "core",
+    "obligationId": "unit.enclosure"
+   },
+   "required": true
   },
   {
    "node": "Drawer_Stoppers_L",

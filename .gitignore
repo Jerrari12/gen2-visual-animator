@@ -21,6 +21,15 @@ GLB Library/Hardware/*
 GLB Library/Hardware/raw/*
 !GLB Library/Hardware/raw/Tabletop-Kit-Foot.glb
 
+# gen2_batch.py rewrites this on EVERY run: diagnostic exhaust, not provenance.
+# MEASURED on the shelf-insert run - 167 kB, machine-specific absolute paths,
+# and 363 canonical_ok rows for a 7-job run because each job rescans everything
+# already sitting in its output directory. It also freezes whatever the job
+# notes said at run time (that copy still reads "clips up", corrected the same
+# day). A real provenance record would need source hashes + tool versions +
+# the producing commit, and would be written deliberately, not blessed from this.
+GLB Pipeline/run_report.json
+
 # Python bytecode (GLB Pipeline)
 __pycache__/
 *.pyc

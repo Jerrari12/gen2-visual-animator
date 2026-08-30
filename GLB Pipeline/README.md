@@ -33,10 +33,15 @@ a closed, outward-wound, non-degenerate 2-manifold with a +Y cap and −Y bottom
 AND all six shipped pool copies, so a stale artifact fails (exit 1, naming the
 file) rather than passing on a mere existence test.
 
-⚠ Like every blend, `GLB Library/` is gitignored, so the printed master this
-reads lives only on Joey's machine — the script cannot run from a fresh clone.
-The SHIPPED copies under `viewer/parts/<L>/` are committed, which is why
-`test/adhesive-foot.test.mjs` measures those and never the master.
+⚠ CORRECTED 2026-08-28 — this paragraph had gone FALSE and said the opposite
+of the truth. `GLB Library/` is gitignored as a whole, but since 2026-08-22 the
+ignore file carries a deliberate exception ladder un-ignoring exactly the two
+files this script needs (`Hardware/Adhesive-Foot.lib.glb` and
+`Hardware/raw/Tabletop-Kit-Foot.glb`, 7.4 kB together) precisely SO THAT
+`--check` can run in CI. It therefore DOES run from a fresh clone, and the Pages
+workflow runs it. `test/adhesive-foot.test.mjs` still measures the shipped
+copies under `viewer/parts/<L>/` — but because those are what a visitor
+downloads, not because the master is unavailable.
 
 ⚠ **Two things about it break the usual conventions, both deliberately:**
 - It ships **UNCOMPRESSED** despite the `.lib.glb` suffix. At 16 triangles the

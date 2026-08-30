@@ -408,6 +408,137 @@
       "depth_mode": "center",
       "decimate_ratio": 0.02,
       "report": "_export_report_woodscrew6.json"
+    },
+    {
+      "name": "59 Shelf Inserts",
+      "_note": "Objects '59-XW Shelf Insert' in collection ShelfInserts_59. Posed in INSTALLED orientation - plate face UP, clips hanging DOWN - and baked to identity in the blend, so this reproduces headlessly. (MEASURED 2026-08-28: in the shipped mesh the full-footprint plate surface is the TOPMOST plane and every rib/clip sits below it. This note used to say 'clips up', which is the PRINT orientation the build script flips out of - the GLBs were always right.) Insert depth = 59 - 8.8mm; front edge sits flush with the case front, back is short - depth_mode center like the case library, viewer aligns fronts at runtime.",
+      "blend": "D:\\Code Projects\\GEN2 Visual Animator\\Blender Files\\Shelf Inserts\\GEN2 GLB Exporter - GEN2 Shelf Inserts.blend",
+      "out": "D:\\Code Projects\\GEN2 Visual Animator\\GLB Library\\59",
+      "select": "collection:ShelfInserts_59",
+      "code_regex": "59-\\d+W",
+      "name_template": "ShelfInsert_{code}",
+      "depth_mode": "center"
+    },
+    {
+      "name": "115 Shelf Inserts",
+      "_note": "Objects '115-XW Shelf Insert' in collection ShelfInserts_115. Posed in INSTALLED orientation - plate face UP, clips hanging DOWN - and baked to identity in the blend, so this reproduces headlessly. (MEASURED 2026-08-28: in the shipped mesh the full-footprint plate surface is the TOPMOST plane and every rib/clip sits below it. This note used to say 'clips up', which is the PRINT orientation the build script flips out of - the GLBs were always right.) Insert depth = 115 - 8.8mm; front edge sits flush with the case front, back is short - depth_mode center like the case library, viewer aligns fronts at runtime.",
+      "blend": "D:\\Code Projects\\GEN2 Visual Animator\\Blender Files\\Shelf Inserts\\GEN2 GLB Exporter - GEN2 Shelf Inserts.blend",
+      "out": "D:\\Code Projects\\GEN2 Visual Animator\\GLB Library\\115",
+      "select": "collection:ShelfInserts_115",
+      "code_regex": "115-\\d+W",
+      "name_template": "ShelfInsert_{code}",
+      "depth_mode": "center"
+    },
+    {
+      "name": "165 Shelf Inserts",
+      "_note": "Objects '165-XW Shelf Insert' in collection ShelfInserts_165. Posed in INSTALLED orientation - plate face UP, clips hanging DOWN - and baked to identity in the blend, so this reproduces headlessly. (MEASURED 2026-08-28: in the shipped mesh the full-footprint plate surface is the TOPMOST plane and every rib/clip sits below it. This note used to say 'clips up', which is the PRINT orientation the build script flips out of - the GLBs were always right.) Insert depth = 165 - 8.8mm; front edge sits flush with the case front, back is short - depth_mode center like the case library, viewer aligns fronts at runtime.",
+      "blend": "D:\\Code Projects\\GEN2 Visual Animator\\Blender Files\\Shelf Inserts\\GEN2 GLB Exporter - GEN2 Shelf Inserts.blend",
+      "out": "D:\\Code Projects\\GEN2 Visual Animator\\GLB Library\\165",
+      "select": "collection:ShelfInserts_165",
+      "code_regex": "165-\\d+W",
+      "name_template": "ShelfInsert_{code}",
+      "depth_mode": "center"
+    },
+    {
+      "name": "185 Shelf Inserts",
+      "_note": "Objects '185-XW Shelf Insert' in collection ShelfInserts_185. Posed in INSTALLED orientation - plate face UP, clips hanging DOWN - and baked to identity in the blend, so this reproduces headlessly. (MEASURED 2026-08-28: in the shipped mesh the full-footprint plate surface is the TOPMOST plane and every rib/clip sits below it. This note used to say 'clips up', which is the PRINT orientation the build script flips out of - the GLBs were always right.) Insert depth = 185 - 8.8mm; front edge sits flush with the case front, back is short - depth_mode center like the case library, viewer aligns fronts at runtime.",
+      "blend": "D:\\Code Projects\\GEN2 Visual Animator\\Blender Files\\Shelf Inserts\\GEN2 GLB Exporter - GEN2 Shelf Inserts.blend",
+      "out": "D:\\Code Projects\\GEN2 Visual Animator\\GLB Library\\185",
+      "select": "collection:ShelfInserts_185",
+      "code_regex": "185-\\d+W",
+      "name_template": "ShelfInsert_{code}",
+      "depth_mode": "center"
+    },
+    {
+      "name": "240 Shelf Inserts",
+      "_note": "Objects '240-XW Shelf Insert' in collection ShelfInserts_240. Posed in INSTALLED orientation - plate face UP, clips hanging DOWN - and baked to identity in the blend, so this reproduces headlessly. (MEASURED 2026-08-28: in the shipped mesh the full-footprint plate surface is the TOPMOST plane and every rib/clip sits below it. This note used to say 'clips up', which is the PRINT orientation the build script flips out of - the GLBs were always right.) Insert depth = 240 - 8.8mm; front edge sits flush with the case front, back is short - depth_mode center like the case library, viewer aligns fronts at runtime.",
+      "blend": "D:\\Code Projects\\GEN2 Visual Animator\\Blender Files\\Shelf Inserts\\GEN2 GLB Exporter - GEN2 Shelf Inserts.blend",
+      "out": "D:\\Code Projects\\GEN2 Visual Animator\\GLB Library\\240",
+      "select": "collection:ShelfInserts_240",
+      "code_regex": "240-\\d+W",
+      "name_template": "ShelfInsert_{code}",
+      "depth_mode": "center"
+    },
+    {
+      "name": "270 Shelf Inserts",
+      "_note": "Objects '270-XW Shelf Insert' in collection ShelfInserts_270. Posed in INSTALLED orientation - plate face UP, clips hanging DOWN - and baked to identity in the blend, so this reproduces headlessly. (MEASURED 2026-08-28: in the shipped mesh the full-footprint plate surface is the TOPMOST plane and every rib/clip sits below it. This note used to say 'clips up', which is the PRINT orientation the build script flips out of - the GLBs were always right.) Insert depth = 270 - 8.8mm; front edge sits flush with the case front, back is short - depth_mode center like the case library, viewer aligns fronts at runtime.",
+      "blend": "D:\\Code Projects\\GEN2 Visual Animator\\Blender Files\\Shelf Inserts\\GEN2 GLB Exporter - GEN2 Shelf Inserts.blend",
+      "out": "D:\\Code Projects\\GEN2 Visual Animator\\GLB Library\\270",
+      "select": "collection:ShelfInserts_270",
+      "code_regex": "270-\\d+W",
+      "name_template": "ShelfInsert_{code}",
+      "depth_mode": "center"
+    },
+    {
+      "name": "Shelf Lips (universal hardware)",
+      "_note": "Width-sized shelf lips (1W-4W), fit every collection length - same universal treatment as QuickLocks/Drawer Stoppers. Stops items rolling off a shelf insert and stiffens wide spans. Clips face DOWN as installed: the lip's resting face sits 2.55 mm up from its own base, so its end hooks drop over the insert's front edge and it stands exactly 5.0 mm proud of the shelf surface (MEASURED 2026-08-28).",
+      "blend": "D:\\Code Projects\\GEN2 Visual Animator\\Blender Files\\Shelf Inserts\\GEN2 GLB Exporter - GEN2 Shelf Inserts.blend",
+      "out": "D:\\Code Projects\\GEN2 Visual Animator\\GLB Library\\Hardware",
+      "select": "collection:ShelfLips",
+      "code_regex": "\\d+W",
+      "name_template": "ShelfLip_{code}",
+      "depth_mode": "center"
+    },
+    {
+      "name": "59 Case Extenders",
+      "_note": "Objects '59-XW-1H Case Extender' in collection CaseExtenders_59. Built from the 'No Helper Disks' STLs - the viewer must not show print helper disks (they are snapped off before assembly), though the BOM/listing renders legitimately keep them. Modeled already in installed orientation (open box, opening UP, bottom at Z=0), no rotation applied. Extenders are 1H only; they stack on any case of the same length+width to build taller units.",
+      "blend": "D:\\Code Projects\\GEN2 Visual Animator\\Blender Files\\Case Extenders\\GEN2 GLB Exporter - GEN2 Case Extenders.blend",
+      "out": "D:\\Code Projects\\GEN2 Visual Animator\\GLB Library\\59",
+      "select": "collection:CaseExtenders_59",
+      "code_regex": "59-\\d+W-1H",
+      "name_template": "CaseExtender_{code}",
+      "depth_mode": "center"
+    },
+    {
+      "name": "115 Case Extenders",
+      "_note": "Objects '115-XW-1H Case Extender' in collection CaseExtenders_115. Built from the 'No Helper Disks' STLs - the viewer must not show print helper disks (they are snapped off before assembly), though the BOM/listing renders legitimately keep them. Modeled already in installed orientation (open box, opening UP, bottom at Z=0), no rotation applied. Extenders are 1H only; they stack on any case of the same length+width to build taller units.",
+      "blend": "D:\\Code Projects\\GEN2 Visual Animator\\Blender Files\\Case Extenders\\GEN2 GLB Exporter - GEN2 Case Extenders.blend",
+      "out": "D:\\Code Projects\\GEN2 Visual Animator\\GLB Library\\115",
+      "select": "collection:CaseExtenders_115",
+      "code_regex": "115-\\d+W-1H",
+      "name_template": "CaseExtender_{code}",
+      "depth_mode": "center"
+    },
+    {
+      "name": "165 Case Extenders",
+      "_note": "Objects '165-XW-1H Case Extender' in collection CaseExtenders_165. Built from the 'No Helper Disks' STLs - the viewer must not show print helper disks (they are snapped off before assembly), though the BOM/listing renders legitimately keep them. Modeled already in installed orientation (open box, opening UP, bottom at Z=0), no rotation applied. Extenders are 1H only; they stack on any case of the same length+width to build taller units.",
+      "blend": "D:\\Code Projects\\GEN2 Visual Animator\\Blender Files\\Case Extenders\\GEN2 GLB Exporter - GEN2 Case Extenders.blend",
+      "out": "D:\\Code Projects\\GEN2 Visual Animator\\GLB Library\\165",
+      "select": "collection:CaseExtenders_165",
+      "code_regex": "165-\\d+W-1H",
+      "name_template": "CaseExtender_{code}",
+      "depth_mode": "center"
+    },
+    {
+      "name": "185 Case Extenders",
+      "_note": "Objects '185-XW-1H Case Extender' in collection CaseExtenders_185. Built from the 'No Helper Disks' STLs - the viewer must not show print helper disks (they are snapped off before assembly), though the BOM/listing renders legitimately keep them. Modeled already in installed orientation (open box, opening UP, bottom at Z=0), no rotation applied. Extenders are 1H only; they stack on any case of the same length+width to build taller units.",
+      "blend": "D:\\Code Projects\\GEN2 Visual Animator\\Blender Files\\Case Extenders\\GEN2 GLB Exporter - GEN2 Case Extenders.blend",
+      "out": "D:\\Code Projects\\GEN2 Visual Animator\\GLB Library\\185",
+      "select": "collection:CaseExtenders_185",
+      "code_regex": "185-\\d+W-1H",
+      "name_template": "CaseExtender_{code}",
+      "depth_mode": "center"
+    },
+    {
+      "name": "240 Case Extenders",
+      "_note": "Objects '240-XW-1H Case Extender' in collection CaseExtenders_240. Built from the 'No Helper Disks' STLs - the viewer must not show print helper disks (they are snapped off before assembly), though the BOM/listing renders legitimately keep them. Modeled already in installed orientation (open box, opening UP, bottom at Z=0), no rotation applied. Extenders are 1H only; they stack on any case of the same length+width to build taller units. The 240 STLs ship ~6x denser than every other length (30.9k-96.9k tris vs 5-12k), so this job alone decimates to bring them in line; dims verified unchanged after.",
+      "blend": "D:\\Code Projects\\GEN2 Visual Animator\\Blender Files\\Case Extenders\\GEN2 GLB Exporter - GEN2 Case Extenders.blend",
+      "out": "D:\\Code Projects\\GEN2 Visual Animator\\GLB Library\\240",
+      "select": "collection:CaseExtenders_240",
+      "code_regex": "240-\\d+W-1H",
+      "name_template": "CaseExtender_{code}",
+      "depth_mode": "center",
+      "decimate_ratio": 0.13
+    },
+    {
+      "name": "270 Case Extenders",
+      "_note": "Objects '270-XW-1H Case Extender' in collection CaseExtenders_270. Built from the 'No Helper Disks' STLs - the viewer must not show print helper disks (they are snapped off before assembly), though the BOM/listing renders legitimately keep them. Modeled already in installed orientation (open box, opening UP, bottom at Z=0), no rotation applied. Extenders are 1H only; they stack on any case of the same length+width to build taller units.",
+      "blend": "D:\\Code Projects\\GEN2 Visual Animator\\Blender Files\\Case Extenders\\GEN2 GLB Exporter - GEN2 Case Extenders.blend",
+      "out": "D:\\Code Projects\\GEN2 Visual Animator\\GLB Library\\270",
+      "select": "collection:CaseExtenders_270",
+      "code_regex": "270-\\d+W-1H",
+      "name_template": "CaseExtender_{code}",
+      "depth_mode": "center"
     }
   ]
 }

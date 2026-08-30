@@ -15,8 +15,10 @@
    are the thing that must not move without a re-derivation), and the derived
    foot is measured properly: topology, winding, normals, spans, and the
    semantic tie between the two. It reads the SHIPPED artifacts under
-   viewer/parts/, never the untracked GLB Library master, because the shipped
-   pool copies are what a visitor actually downloads.
+   viewer/parts/ because those are what a visitor actually downloads. (The
+   GLB Library master is NOT untracked, as this said until 2026-08-28: the
+   ignore file un-ignores it and its raw source deliberately, so that
+   derive_adhesive_foot.py --check can run in CI.)
 
    Intentional changes refresh via UPDATE_GOLDEN=1 npm test - but read the
    failure message first: refreshing the golden WITHOUT re-running the

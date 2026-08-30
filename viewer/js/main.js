@@ -5,7 +5,8 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
-import { generateManifest, migrateOfficialBuild, resolvePartPreview, REQUIREMENT as REQ } from './generate.js';
+import { generateManifest, migrateOfficialBuild, resolvePartPreview, REQUIREMENT as REQ,
+  shelfLipModes, SHELF_LIP_LABEL } from './generate.js';
 import { resolveEntry } from './entry.js';
 
 /* Every entry-routing boolean below is derived by resolveEntry() in entry.js -
@@ -146,10 +147,17 @@ const tweens = new Set();
 // camera tween so an installation can be watched closely. The outro cinema
 // drives its own clock and is never slowed.
 let slowmo = false;
-function tween({ duration = 700, delay = 0, onUpdate, onDone }) {
+/* `raw: true` hands onUpdate the UNEASED 0..1 progress. Every tween is
+   easeInOutCubic'd by default, which starts AND ends at zero velocity - fine
+   for travel, impossible for a mechanism that has to arrive abruptly. A curve
+   that owns its own ending (the shelf lip's dovetail snap) cannot be built by
+   composing on top of that, because no shaping of a value whose derivative is
+   already 0 at k=1 can produce a snap. dip/pop shape the eased value and are
+   deliberately left alone - they are mid-travel effects, not arrivals. */
+function tween({ duration = 700, delay = 0, onUpdate, onDone, raw = false }) {
   const f = slowmo && !cinema.on ? 2.5 : 1;
   return new Promise(resolve => {
-    tweens.add({ t0: performance.now() + delay * f, duration: duration * f, onUpdate, done: () => { onDone?.(); resolve(); } });
+    tweens.add({ t0: performance.now() + delay * f, duration: duration * f, onUpdate, raw, done: () => { onDone?.(); resolve(); } });
   });
 }
 // pause (⏸ in the controls bar) freezes the tween clock: while paused every
@@ -169,7 +177,7 @@ function stepTweens(now) {
     if (now < tw.t0) continue;
     const k = Math.min(1, (now - tw.t0) / tw.duration);
     const e = k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2; // easeInOutCubic
-    tw.onUpdate(e);
+    tw.onUpdate(tw.raw ? k : e);
     if (k >= 1) { tweens.delete(tw); tw.done(); }
   }
 }
@@ -2203,7 +2211,17 @@ function renderCoverBadges() {
 }
 
 // ---------- step animation ----------
-const DUR = { enter: 750, settle: 850, move: 600, fade: 650, stagger: 130, camera: 750, via: 300 };
+const DUR = { enter: 750, settle: 850, move: 600, fade: 650, stagger: 130, camera: 750, via: 300, detent: 900 };
+/* Named curves a `move` phase can ask for by name, over RAW progress.
+   detent: p(k) = k + (A/2pi)*sin(2pi*k), so p'(k) = 1 + A*cos(2pi*k) —
+   fast off the mark (1+A), nearly stalled at mid-travel (1-A), fast again into
+   the seat (1+A). ⚠ A must stay BELOW 1 or p' goes negative and the part
+   visibly reverses mid-slide; 0.85 is the deepest hesitation that stays
+   monotone. Endpoints are exact: sin(0) = sin(2pi) = 0, so p(0)=0 and p(1)=1
+   and the part rests precisely on its seat. */
+const MOVE_EASE = {
+  detent: k => k + (0.85 / (2 * Math.PI)) * Math.sin(2 * Math.PI * k),
+};
 const QL_DIP = 3;   // mm a pressed QuickLock tab travels (ground truth: the 2026-08-24 spring video)
 let animToken = 0;
 
@@ -2395,9 +2413,17 @@ async function playStep(i) {
       const inst = instances.get(m.id);
       const fromV = inst.group.position.clone();
       const to = fromV.clone().add(new THREE.Vector3(...m.by));
+      /* `hold`: wait before starting. Phases run back to back, so without it a
+         two-leg install reads as one continuous motion - the beat is what says
+         "it is IN the slot now, and THAT was a separate action".
+         `ease: 'detent'`: moves off, all but stops at mid-travel, then snaps
+         home - a dovetail that catches and clicks (Joey 2026-08-28). */
+      const ease = MOVE_EASE[m.ease];
       jobs.push(tween({
-        duration: DUR.move,
-        onUpdate: k => inst.group.position.lerpVectors(fromV, to, k)
+        duration: m.ease ? DUR.detent : DUR.move,
+        delay: m.hold || 0,
+        raw: !!ease,
+        onUpdate: k => inst.group.position.lerpVectors(fromV, to, ease ? ease(k) : k)
       }));
     });
     // fade: materialize instances at their final position ("…and repeat for
@@ -2855,6 +2881,30 @@ function renderOptions() {
   if (build.mount === 'tabletop') {
     box.appendChild(optSeg('Feet', [{ label: 'Print TPU', val: 'tpu' }, { label: 'Buy adhesive', val: 'adhesive' }], build.feet === 'adhesive' ? 'adhesive' : 'tpu',
       async v => { track('opt:feet:' + v); build.feet = v; await regenerate(); }));
+  }
+  // shelf lip — an All/None master over every shelf, the same shape as the
+  // planner's per-unit toggle and the Drawer stoppers control here. The lip is
+  // a real option: a shelf without one is still a shelf, so "None" is a
+  // legitimate finished build, not an unmet obligation.
+  const shelves = build.placed.filter(u => u.fill === 'shelf');
+  if (shelves.length) {
+    /* The stops come from the COLLECTION: only a 240/270 deck carries the
+       second slot pair, so 'Front + mid' simply is not offered elsewhere.
+       ⚠ 'none' is a STRING sentinel here, not null — optSeg already uses null
+       for "the shelves disagree", which is a different state. */
+    const SEG = { null: 'None', front: 'Front', both: 'Front + mid' };
+    const modes = shelfLipModes(parseInt(manifest.collection, 10) || 185);
+    const vals = shelves.map(u => u.lip ?? 'none');
+    const active = vals.every(v => v === vals[0]) ? vals[0] : null;
+    box.appendChild(optSeg('Shelf lip',
+      modes.map(mv => ({ label: SEG[mv], val: mv || 'none' })), active,
+      async v => {
+        track('opt:shelflip:' + v);
+        // absence IS "no lip" — never write `lip: false`, or the build stops
+        // round-tripping through a planner share link that never carried it
+        for (const u of shelves) { if (v === 'none') delete u.lip; else u.lip = v; }
+        await regenerate();
+      }));
   }
   if (isWallBuild) {
     box.appendChild(optSeg('Top cover', [{ label: 'Per-column', val: false }, { label: 'Staggered', val: true }], !!build.wallStagger,
@@ -3520,6 +3570,13 @@ function renderZoneChips(inst) {
 }
 
 let selAnchor = new THREE.Vector3(); // selected part's bbox-center offset from its origin
+/* The shelf whose lip the identify card is editing (null when the selection is
+   anything else). Assigned in setSelected, read by cycleLip further down.
+   ⚠ DECLARED HERE, ABOVE its assignment, on purpose: setSelected runs during
+   boot (regenerate calls it with null), and a `let` still in its temporal dead
+   zone throws a ReferenceError that takes the entire boot down — the same trap
+   the #btn-theme wiring hit. */
+let lipUnit = null;
 function setSelected(id) {
   if (selectedId === id) return;
   // "did they discover tap-to-identify at all" — once per session, because the
@@ -3611,6 +3668,13 @@ function setSelected(id) {
   const rmBtn = $('identify-remove');
   rmBtn.classList.toggle('hidden', !removable);
   if (removable) rmBtn.textContent = rmType === 'Stopper' ? '✕ Remove this stopper' : '✕ Remove magnet closure';
+  /* Shelf lip ◀▶ — offered on the insert AND on a lip itself, because the lip
+     is the thing you tap when you want rid of it. Generated builds only: a
+     static kit has no `build` to mutate. */
+  lipUnit = (build && (rmType === 'ShelfInsert' || rmType === 'ShelfLip') && inst.cfg.owner != null)
+    ? build.placed.find(p => p.id === inst.cfg.owner && p.fill === 'shelf') : null;
+  $('identify-lip').classList.toggle('hidden', !lipUnit);
+  if (lipUnit) $('lip-name').textContent = SHELF_LIP_LABEL[lipUnit.lip ?? null];
   card.classList.remove('hidden');
   // drawer-open interaction (assembled scenes only — the drawer must be resting
   // in its FINAL seat, not staged or mid-step). Selecting the drawer BODY pulls
@@ -4924,6 +4988,32 @@ const cycleStyle = dir => {
 };
 $('style-prev').onclick = () => cycleStyle(-1);
 $('style-next').onclick = () => cycleStyle(1);
+
+/* ⚠ The field's ABSENCE is "no lip" — never write `lip: false`/`null`, or a
+   build stops round-tripping through a planner share link that never carried
+   the key. Joey's rule is front first, always, so the cycle is
+   None → Front → Front + mid and a rear-only shelf is unreachable by design. */
+const cycleLip = async (dir) => {
+  if (!lipUnit || regenBusy) return;
+  const modes = shelfLipModes(parseInt(manifest.collection, 10) || 185);
+  const cur = modes.indexOf(lipUnit.lip ?? null);
+  const next = modes[((cur < 0 ? 0 : cur) + dir + modes.length) % modes.length];
+  if (next) lipUnit.lip = next; else delete lipUnit.lip;
+  track('opt:shelflip:' + (next || 'none'));
+  const keepUnit = lipUnit, keep = selectedId;   // setSelected reassigns lipUnit
+  await regenerate();
+  /* Re-open the card on the same part — instance ids are deterministic, so
+     without this the card closes on every click and the ◀▶ is unusable.
+     ⚠ If the LIP you were looking at is the one that just went away, fall back
+     to the shelf INSERT of the same unit: otherwise the control deletes its own
+     anchor the first time you cycle to "No lip" and there is no way back. */
+  let re = instances.has(keep) ? keep : null;
+  if (!re) for (const [id, inst] of instances)
+    if (inst.cfg.owner === keepUnit.id && typeByNode[inst.cfg.node] === 'ShelfInsert') { re = id; break; }
+  if (re) setSelected(re);
+};
+$('lip-prev').onclick = () => cycleLip(-1);
+$('lip-next').onclick = () => cycleLip(1);
 // remove the selected optional part (magnet closure for its drawer, or a 1W
 // stopper pair), then regenerate + update the BOM
 $('identify-remove').onclick = async () => {
@@ -5716,11 +5806,19 @@ function updatePointerLine() {
 // both ways. Applying a received change must NOT re-post (loop guard). Static
 // kits (no build) never sync.
 let applyingRemote = false;
+// the only shelf-lip values that may cross the relay - anything else is dropped
+const LIP_MODES = new Set(['none', 'front', 'both']);
 function currentOpts() {
   if (!build) return null;
   const closures = {};
   for (const u of build.placed) if (u.fill === 'decor' || u.fill === 'classic') closures[u.id] = u.closure === 'magnet' ? 'magnet' : 'none';
-  return { closures, removedStoppers: build.removedStoppers || [], wallStagger: !!build.wallStagger, handleStyle: build.handleStyle, faceStyle: build.faceStyle, backCover: !!build.backCover, feet: build.feet === 'adhesive' ? 'adhesive' : 'tpu' };
+  // shelf lips ride the same per-unit-map shape as closures, keyed by unit id.
+  // Every SHELF gets an entry (true or false) so the receiver can tell "lip
+  // turned off" from "this unit is not a shelf" - the map's own absence of a
+  // key is what means the latter.
+  const lips = {};
+  for (const u of build.placed) if (u.fill === 'shelf') lips[u.id] = u.lip ?? 'none';
+  return { closures, lips, removedStoppers: build.removedStoppers || [], wallStagger: !!build.wallStagger, handleStyle: build.handleStyle, faceStyle: build.faceStyle, backCover: !!build.backCover, feet: build.feet === 'adhesive' ? 'adhesive' : 'tpu' };
 }
 // The planner window, wherever we live: a popped-out tab talks to its opener,
 // the docked split-view iframe talks to its parent.
@@ -5804,8 +5902,15 @@ let syncBuildToPlanner = () => {
 let booted = false, layoutRetryTimer = 0;
 const showBlocked = r => { $('blocked-reason').textContent = r; $('blocked-overlay').classList.remove('hidden'); };
 const hideBlocked = () => $('blocked-overlay').classList.add('hidden');
+/* The no-op/echo guard for an incoming layout. WARNING: every per-unit field
+   the generator READS must appear here, or a layout that changes only that
+   field is misread as an echo and DROPPED. It must also stay in step with the
+   planner's own `layoutSig` - that one decides whether a layout is POSTED, this
+   one whether it is APPLIED, and a field in one but not the other is a silent
+   half-broken channel (exactly how `lip` shipped: the planner posted the
+   change, this key ignored it, the toggle did nothing). */
 const layoutKey = b => JSON.stringify([b.mount, +b.length, (b.placed || []).map(u =>
-  [u.id, u.x, u.y, u.w, u.hh, u.fill, u.shelves || 0, u.label || '', u.closure || '', JSON.stringify(u.interior ?? null)])]);
+  [u.id, u.x, u.y, u.w, u.hh, u.fill, u.shelves || 0, u.label || '', u.closure || '', u.lip || '', JSON.stringify(u.interior ?? null)])]);
 async function applyRemoteLayout(nb) {
   if (!booted || !nb || !Array.isArray(nb.placed) || !nb.placed.length) return;
   if (regenBusy) { // mid-regenerate from an earlier message — retry, never drop the newest state
@@ -5863,6 +5968,8 @@ addEventListener('message', async (e) => {
   if (o.faceStyle && o.faceStyle !== build.faceStyle) changed = true;
   if (typeof o.backCover === 'boolean' && o.backCover !== !!build.backCover) changed = true;
   if ((o.feet === 'tpu' || o.feet === 'adhesive') && o.feet !== (build.feet === 'adhesive' ? 'adhesive' : 'tpu')) changed = true;
+  if (o.lips) for (const u of build.placed)
+    if (u.fill === 'shelf' && LIP_MODES.has(o.lips[u.id]) && o.lips[u.id] !== (u.lip ?? 'none')) changed = true;
   if (!changed) return;
   applyingRemote = true;
   try {
@@ -5873,6 +5980,11 @@ addEventListener('message', async (e) => {
     if (o.faceStyle) build.faceStyle = o.faceStyle;
     if (typeof o.backCover === 'boolean') build.backCover = o.backCover;
     if (o.feet === 'tpu' || o.feet === 'adhesive') build.feet = o.feet;
+    if (o.lips) for (const u of build.placed) {
+      if (u.fill !== 'shelf' || !LIP_MODES.has(o.lips[u.id])) continue;
+      const v = o.lips[u.id];
+      if (v === 'none') delete u.lip; else u.lip = v;      // absence IS "no lip"
+    }
     await regenerate();
   } finally { applyingRemote = false; }
 });

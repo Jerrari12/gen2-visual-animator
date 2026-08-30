@@ -37,12 +37,16 @@ const SLUGS = JSON.parse(readFileSync(join(root, 'test', 'site-slugs.json'), 'ut
 const GOLDEN_PATH = join(root, 'test', 'golden', 'part-previews.json');
 const glbExists = (L, node) => existsSync(join(root, 'viewer', 'parts', String(L), node + '.lib.glb'));
 
-// families with no 3D model ON PURPOSE (the site keeps its static poster):
-// case extenders have no GLBs, and neither do QuickLock B or the 6x2 magnet
-// insert. The other four hardware pages preview since 2026-08-20 (Joey's
-// composition call: a handed pair is ONE product — see HARDWARE_PREVIEW).
+/* Families with no 3D model ON PURPOSE (the site keeps its static poster):
+   QuickLock B and the 6x2 magnet insert.
+   ⚠ CASE EXTENDERS LEFT THIS LIST 2026-08-29 — all 24 GLBs landed and 22 now
+   preview. The two that stay unsupported are 59-3W and 59-4W, and NOT for want
+   of a model: their GLBs exist in the library, but the 59's cases stop at 2W in
+   both tools, so there is no 59-3W case for the ring to stack on and the probe
+   errors honestly. They are deliberately not copied into `viewer/parts/59/`,
+   exactly like the 59-3W/4W shelf inserts. */
 const expectUnsupported = s =>
-  /-case-extender-/.test(s) ||
+  /^59-case-extender-[34]w-1h$/.test(s) ||
   /^(magnet-insert-6x2mm|quicklock-b-bi-directional-optional)$/.test(s);
 
 // resolve the whole catalog once — every test reads from this
@@ -64,8 +68,9 @@ test('every production slug is accounted for — resolved or intentionally unsup
   }
   assert.deepEqual(unknown, [], 'production slugs the resolver does not recognize (grammar drift)');
   assert.deepEqual(wrongBucket, [], 'slugs in the wrong support bucket');
-  assert.equal(supported, 465, 'supported preview count');
-  assert.equal(unsupported, 26, 'intentionally-unsupported count (24 extenders + 2 no-GLB hardware)');
+  // 2026-08-29: +22 case extenders (465 → 487); 26 → 4 unsupported
+  assert.equal(supported, 487, 'supported preview count');
+  assert.equal(unsupported, 4, 'intentionally-unsupported (59-3W/4W extenders + 2 no-GLB hardware)');
 });
 
 test('every resolved preview references GLBs that exist in its collection pool', () => {
