@@ -806,6 +806,17 @@ export function generateManifest(build) {
     // is stacked from 1H rings, never one tall case — planner `unavailableSizes`
     // is likewise consulted only for classic/decor.
     if (!stacked && u.w >= 3 && u.hh === 6) errors.push(`${u.w}W-3H doesn't exist (too large to print) · planner shouldn't allow this.`);
+    /* ⚠ WIDTH HAS A FLOOR, not just a ceiling. Without this a hand-made or
+       corrupted `#build=` hash with w = 0, -1 or 1.5 generated a manifest with
+       ZERO errors and zero warnings, referencing GLBs that cannot exist
+       (`185-0W-1H_Case`, `ShelfInsert_185--1W`, ...). The planner drops such a
+       unit in sanitize, so this was never reachable from the planner - only
+       from the hash - and loadTemplates' missing-node error caught it at the
+       far end. But "the generator must never emit a node that has no GLB" is
+       the whole point of parts-exist.test.mjs, and that test sweeps only LEGAL
+       builds, so it could not see this. Found by fuzzing 2026-08-30; it
+       affected EVERY fill, not just shelves. */
+    if (!Number.isInteger(u.w) || u.w < 1) errors.push(`A unit has an impossible width (w=${u.w}).`);
     if (coll.maxW && u.w > coll.maxW) errors.push(`${u.w}W cases don't exist in the ${L} collection (1W and 2W only).`);
     // ⚠ DRAWER-ONLY, mirroring the planner's `maxDrawerH` — which it applies
     // only to classic/decor for exactly this reason. The 59 ships no case above

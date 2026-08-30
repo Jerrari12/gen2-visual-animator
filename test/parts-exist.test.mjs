@@ -171,3 +171,31 @@ for (const kit of readdirSync(kitsDir)) {
     }
   });
 }
+
+/* An ILLEGAL width must be REFUSED, not turned into a node name.
+   This suite sweeps LEGAL builds, so it structurally cannot catch a build the
+   generator should have rejected - and before 2026-08-30 it did not: w = 0, -1
+   or 1.5 produced a manifest with zero errors AND zero warnings, referencing
+   `185-0W-1H_Case`, `ShelfInsert_185--1W` and friends. The planner drops such a
+   unit in sanitize, so it was reachable only from a hand-made or corrupted
+   `#build=` hash, and loadTemplates' missing-node error caught it at the far
+   end - but emitting a node with no GLB is exactly what this file exists to
+   prevent. ⚠ It affected EVERY fill, not just shelves. Found by fuzzing. */
+test('an impossible width is refused, never emitted as a node name', () => {
+  const mk = (w, fill) => ({
+    mount: 'tabletop', length: 185, faceStyle: 'essential', handleStyle: 'deco',
+    wallStagger: false, backCover: false, feet: 'tpu', removedStoppers: [],
+    gridW: 6, gridH: 1,
+    placed: [{ id: 1, x: 0, y: 0, w, hh: 2, fill, shelves: 0 }], nextId: 2,
+  });
+  for (const fill of ['shelf', 'decor', 'classic']) {
+    for (const w of [0, -1, 1.5, NaN]) {
+      const r = generateManifest(mk(w, fill));
+      assert.equal(r.manifest, null, `${fill} w=${w}: generated a manifest instead of refusing`);
+      assert.ok(r.errors && r.errors.length, `${fill} w=${w}: refused with no error to show the user`);
+    }
+    // the legal ones still work, so the guard is a floor and not a wall
+    for (const w of [1, 2, 3, 4])
+      assert.ok(generateManifest(mk(w, fill)).manifest, `${fill} w=${w}: legal width was refused`);
+  }
+});
