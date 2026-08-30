@@ -352,12 +352,12 @@ const LINKS_BY_LEN = {
      for this length", and inheriting 185's page would hand a 240 buyer the
      wrong download. Absent must stay absent. */
   shelfInsert: {
-    59:  { p: 'https://www.printables.com/model/1828405-gen2-59-shelf-inserts' },
-    115: { p: 'https://www.printables.com/model/1828408-gen2-115-shelf-inserts' },
-    165: { p: 'https://www.printables.com/model/1828409-gen2-165-shelf-inserts' },
-    185: { p: 'https://www.printables.com/model/1828395-gen2-185-shelf-inserts' },
-    240: { p: 'https://www.printables.com/model/1828410-gen2-240-shelf-inserts' },
-    270: { p: 'https://www.printables.com/model/1828411-gen2-270-shelf-inserts' },
+    59:  { p: 'https://www.printables.com/model/1828405-gen2-59-shelf-inserts', t: 'https://than.gs/m/1595944' },
+    115: { p: 'https://www.printables.com/model/1828408-gen2-115-shelf-inserts', t: 'https://than.gs/m/1595952' },
+    165: { p: 'https://www.printables.com/model/1828409-gen2-165-shelf-inserts', t: 'https://than.gs/m/1595957' },
+    185: { p: 'https://www.printables.com/model/1828395-gen2-185-shelf-inserts', t: 'https://than.gs/m/1595956' },
+    240: { p: 'https://www.printables.com/model/1828410-gen2-240-shelf-inserts', t: 'https://than.gs/m/1595955' },
+    270: { p: 'https://www.printables.com/model/1828411-gen2-270-shelf-inserts', t: 'https://than.gs/m/1595953' },
   },
   cases: {
     59:  { p: 'https://www.printables.com/model/1658749-gen2-59-cases-all', t: 'https://than.gs/m/1535454', m: 'https://makerworld.com/en/models/3092550-gen2-59-cases-all' },
