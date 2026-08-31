@@ -6132,7 +6132,7 @@ function fitPartCamera() {
 // grid with stronger 50 mm majors, usable-area outline). No turntable — a
 // print layout is studied, not admired. A "Top" pill swaps between the high
 // 3/4 and a straight-down view.
-const plateStage = { group: null, top: false, yawed: false, overhang: null };
+const plateStage = { group: null, top: false, yawed: false, overhang: null, ringMat: null };
 function seatOnPlate() {
   // a plate manifest is the bare PRINT JOB by construction — one body, or a
   // handed pair whose two bodies ship in one STL (the resolver's goldens pin
@@ -6205,6 +6205,35 @@ function markOverhang() {
   strip.textContent = `✕ Too big for this plate · needs ${plateStage.overhang.w}×${plateStage.overhang.d} mm`;
   document.body.appendChild(strip);
   document.body.classList.add('plate-overhang-on'); // drops the corner pills below the strip
+  buildWarnRing();
+}
+/* the in-scene half of the warning (Joey, 2026-08-31): a red frame on the
+   plate PERIMETER, slow-pulsing, so the violation reads while looking at the
+   part itself - straight-down top view included, where the banner sits
+   outside the eye line. Four butt-jointed strips, never overlapped: the
+   material is transparent and stacked corners would double-blend darker.
+   MeshBasicMaterial on purpose - a warning is UI, not a lit surface. */
+function buildWarnRing() {
+  const { w, d } = PART_PLATE;
+  const RING = 4;                              // strip width, mm - straddles the edge
+  const mat = new THREE.MeshBasicMaterial({ color: 0xd8434e, transparent: true, opacity: 0.7, depthWrite: false });
+  const strip = (sx, sz, x, z) => {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(sx, 0.6, sz), mat);
+    m.position.set(x, 0.35, z);                // proud of the grid lines (0.15-0.25)
+    plateStage.group.add(m);
+  };
+  strip(w + RING, RING, 0, -d / 2);            // far rail, spans the corners
+  strip(w + RING, RING, 0, d / 2);             // near rail
+  strip(RING, d - RING, -w / 2, 0);            // left rail, butts between them
+  strip(RING, d - RING, w / 2, 0);             // right rail
+  // a steady ring for anyone who asked the OS to hold still; the pulse tick
+  // reads ringMat, so leaving it null freezes the ring at its base opacity
+  if (!matchMedia('(prefers-reduced-motion: reduce)').matches) plateStage.ringMat = mat;
+}
+function updateOverhangPulse(now) {
+  if (!plateStage.ringMat) return;
+  // ~1.8s sine breath between 0.3 and 0.75 - a slow flash, not an alarm strobe
+  plateStage.ringMat.opacity = 0.3 + 0.45 * (0.5 + 0.5 * Math.sin((now * Math.PI * 2) / 1800));
 }
 function buildPlateStage() {
   const { w, d } = PART_PLATE;
@@ -6508,6 +6537,7 @@ renderer.setAnimationLoop(now => {
   updateDims();
   updateDrawerDims();
   updateFpEnv();
+  updateOverhangPulse(now);
   // ⚠ AO and the reflection are the only things here touching driver-dependent
   // features (render targets, depth textures, an override material). A throw
   // INSIDE setAnimationLoop kills the whole loop — the screen would freeze
