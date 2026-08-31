@@ -4225,6 +4225,19 @@ const PRESETS = [
     Bracket: _db('Elegoo PLA Black'), FootrailL: _db('Elegoo PLA Black'),
     FootrailU: _db('Elegoo PLA Black'), Foot: _db('Elegoo PLA Black'),
     Rail: _db('Elegoo PLA Black'),
+    /* SHELF + EXTENDER COLOUR RULE (Joey 2026-08-30), applied to all four:
+       - a case extender IS a case without the bottom, so it takes the CASE's
+         filament - a stacked shelf must not read as two different products;
+       - the LIP takes the case colour too, so it reads as part of the shell;
+       - the DECK "matches the theme yet is higher contrast where the palette
+         allows" - it is the surface you have to see things on. MEASURED as a
+         luminance contrast ratio against that preset's own case colour, and
+         chosen from colours the preset ALREADY uses, so it never leaves the
+         theme: Jerrari 14.9:1, Stealth 12.5:1, Signal 8.7:1, Sandstone 5.5:1.
+         Stealth previously sat at 1.64:1 (Dark Grey on black) - a deck you
+         could not see. test/presets.test.mjs pins a 4.5:1 floor. */
+    CaseExtender: _db('Elegoo PLA Black'),
+    ShelfInsert: _db('Panchroma Cold White'), ShelfLip: _db('Elegoo PLA Black'),
     ...CLASSIC_FACE, // black body / orange face + grip / silk-silver rod
     Accent: _db('ERYONE Burnt Titanium'), Label: _db('Panchroma Cold White'),
     BackCover: _db('Elegoo PLA Black'),
@@ -4238,7 +4251,10 @@ const PRESETS = [
     CoverL: _db('Panchroma Black'), CoverU: _db('Panchroma Black'),
     Bracket: _db('Panchroma Black'), FootrailL: _db('Panchroma Black'),
     FootrailU: _db('Panchroma Black'), Foot: _db('Panchroma Black'),
-    Rail: _db('Panchroma Black'),
+    Rail: _db('Panchroma Black'), CaseExtender: _db('Panchroma Black'),
+    // Silk Silver, not Cold White: Joey wants Stealth to stay stealthy
+    // (9.29:1 against its black case - Steel Grey would drop to 2.89:1)
+    ShelfInsert: _db('Panchroma Silk Silver'), ShelfLip: _db('Panchroma Black'),
     // FACE is the Classic plate's front layer — every preset defines all four
     // zones so nothing silently inherits the body (see renderZoneChips)
     Faceplate: _db('Panchroma Steel Grey'), 'Faceplate:FACE': _db('Panchroma Dark Grey'),
@@ -4255,7 +4271,8 @@ const PRESETS = [
     CoverL: _db('Panchroma Green'), CoverU: _db('Panchroma Green'),
     FootrailL: _db('Panchroma Blue'), FootrailU: _db('Panchroma Blue'),
     Foot: _db('Panchroma Purple'), Rail: _db('Panchroma Blue'),
-    Bracket: _db('Panchroma Steel Grey'),
+    Bracket: _db('Panchroma Steel Grey'), CaseExtender: _db('Panchroma Black'),
+    ShelfInsert: _db('Panchroma Yellow'), ShelfLip: _db('Panchroma Black'),
     Faceplate: _db('Panchroma Orange'), 'Faceplate:FACE': _db('Panchroma Yellow'),
     'Faceplate:GRIP': _db('Panchroma Yellow'), 'Faceplate:GRIP ACCENT': _db('Panchroma Polymaker Teal'),
     Accent: _db('Panchroma Aqua Blue'), Label: _db('Panchroma Cold White'),
@@ -4270,7 +4287,8 @@ const PRESETS = [
     CoverL: _db('Panchroma Cream'), CoverU: _db('Panchroma Cream'),
     Bracket: _db('Panchroma Brown'), FootrailL: _db('Panchroma Brown'),
     FootrailU: _db('Panchroma Brown'), Foot: _db('Panchroma Brown'),
-    Rail: _db('Panchroma Brown'),
+    Rail: _db('Panchroma Brown'), CaseExtender: _db('Panchroma Brown'),
+    ShelfInsert: _db('Panchroma Cream'), ShelfLip: _db('Panchroma Brown'),
     Faceplate: _db('Panchroma Orange'), 'Faceplate:FACE': _db('Panchroma Brown'),
     'Faceplate:GRIP': _db('Panchroma Brown'), 'Faceplate:GRIP ACCENT': _db('Panchroma Steel Grey'),
     Accent: _db('Panchroma Tan'), Label: _db('Panchroma Cream'),
