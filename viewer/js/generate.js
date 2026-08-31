@@ -2670,6 +2670,14 @@ const PLATE_POSE = {
   shelfInsert: [180, 0, 0],
   shelfLip: [180, 0, 0],
   backCover: [-90, 0, 0],
+  /* Joey, 2026-08-31, the LAST family: "the side that faces back that makes
+     contact with the wall, that back side prints face down on the bed for
+     all wall mount brackets" - installed the back is vertical against the
+     wall, so the same back-down swing as the back covers lays it flat.
+     With this, every preview-capable part has a confirmed pose; a FUTURE
+     family still boots fail-closed until its own words arrive, because
+     platePoseFor answers null for any type not named here. */
+  bracket: [-90, 0, 0],
 };
 function platePoseFor(probe) {
   if (probe.hw) return probe.hw.plateRot; // hardware poses live on the entry ([] = as authored)
@@ -2685,6 +2693,7 @@ function platePoseFor(probe) {
     : probe.pick.type === 'ShelfInsert' ? 'shelfInsert'
     : probe.pick.type === 'ShelfLip' ? 'shelfLip'
     : probe.pick.type === 'BackCover' ? 'backCover'
+    : probe.pick.type === 'Bracket' ? 'bracket'
     : null;
   return k != null && k in PLATE_POSE ? PLATE_POSE[k] : null;
 }

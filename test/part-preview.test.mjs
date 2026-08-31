@@ -224,6 +224,10 @@ test('plate view: confirmed print poses only, bare primary, fail-closed elsewher
   assert.deepEqual(rot('185-shelf-insert-2w'), [180, 0, 0], 'shelf insert prints top down');
   assert.deepEqual(rot('shelf-lip-2w'), [180, 0, 0], 'shelf lip prints top down');
   assert.deepEqual(rot('faceplate-back-cover-2w-1h'), [-90, 0, 0], 'back cover prints rear-face down');
+  // Joey's 2026-08-31 final confirmation: "the side that faces back that
+  // makes contact with the wall, that back side prints face down on the bed
+  // for all wall mount brackets" - the back-cover swing, wall face to sheet.
+  assert.deepEqual(rot('wall-mount-bracket-2w'), [-90, 0, 0], 'wall bracket prints wall-face down');
   // the plate shows the BARE print body — dressed extras have no confirmed
   // individual print pose or plate arrangement yet
   const p = resolvePartPreview('edgelabel-faceplate-2w-1h', { plate: true });
@@ -243,14 +247,18 @@ test('plate view: confirmed print poses only, bare primary, fail-closed elsewher
   assert.deepEqual(Object.fromEntries(qlPlate.manifest.instances.map(i => [i.node, i.rot])),
     { 'QuickLock-L': [0, 0, 90], 'QuickLock-R': [0, 0, -90] }, 'chiral hands wear MIRRORED print poses');
   // fail closed on anything without a confirmed pose
-  for (const s of ['wall-mount-bracket-1w', 'wall-mount-bracket-2w', 'wall-mount-bracket-3w'])
-    assert.equal(resolvePartPreview(s, { plate: true }).fail.reason, 'unsupported', s + ' must fail closed');
-  // plate-capable census: 94 cases + 94 classic + 94 decor + 90 faceplates
-  // + 4 hardware (2026-08-20) + 24 covers + 20 foot rails + 24 under-table
-  // rails + 22 case extenders + 22 shelf inserts + 4 shelf lips + 18 back
-  // covers (2026-08-31). Wall brackets are the LAST family without words.
-  const n = [...resolved.values()].filter(r => !r.fail && r.part.platePreview).length;
-  assert.equal(n, 510, 'plate-capable slug count');
+  // 2026-08-31: the bracket confirmation COMPLETED the register - every
+  // preview-capable slug now carries a confirmed pose, so the fail-closed
+  // sweep has no honest subject left. The mechanism is not dead code:
+  // platePoseFor answers null for any probe type it does not name, so the
+  // NEXT family ships plate-less until its own confirmation lands here.
+  const caps = [...resolved.values()].filter(r => !r.fail);
+  assert.equal(caps.filter(r => !r.part.platePreview).length, 0, 'no preview-capable slug left fail-closed');
+  // full census: 94 cases + 94 classic + 94 decor + 90 faceplates + 4
+  // hardware + 24 covers + 20 foot rails + 24 under-table rails + 22 case
+  // extenders + 22 shelf inserts + 4 shelf lips + 18 back covers + 3 wall
+  // brackets
+  assert.equal(caps.filter(r => r.part.platePreview).length, 513, 'plate-capable slug count');
 
   // sweep EVERY plate-capable slug's plate boot (not just samples): the bare
   // print JOB (one body, or every member of a handed set), rotations matching
@@ -264,7 +272,7 @@ test('plate view: confirmed print poses only, bare primary, fail-closed elsewher
       : /-cover-upper-/.test(s) ? [180, 0, 0]
       : /-under-table-rail-/.test(s) ? [180, 0, 0]
       : /-shelf-insert-|^shelf-lip-/.test(s) ? [180, 0, 0]
-      : /^faceplate-back-cover-/.test(s) ? [-90, 0, 0]
+      : /^faceplate-back-cover-|^wall-mount-bracket-/.test(s) ? [-90, 0, 0]
       : undefined;
   for (const [s, r] of resolved) {
     if (r.fail || !r.part.platePreview) continue;

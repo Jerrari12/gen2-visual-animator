@@ -2060,15 +2060,15 @@
     },
     "wall-mount-bracket-1w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "wall-mount-bracket-2w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "wall-mount-bracket-3w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     }
   }
 }

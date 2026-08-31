@@ -4698,20 +4698,20 @@
     "collection": "185",
     "type": "Bracket",
     "label": "Wall Mount Lite 1W",
-    "platePreview": false
+    "platePreview": true
   },
   "wall-mount-bracket-2w": {
     "node": "WallMount_Lite_2W",
     "collection": "185",
     "type": "Bracket",
     "label": "Wall Mount Lite 2W",
-    "platePreview": false
+    "platePreview": true
   },
   "wall-mount-bracket-3w": {
     "node": "WallMount_Lite_3W",
     "collection": "185",
     "type": "Bracket",
     "label": "Wall Mount Lite 3W",
-    "platePreview": false
+    "platePreview": true
   }
 }
