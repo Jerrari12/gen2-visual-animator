@@ -88,14 +88,14 @@
     "collection": "59",
     "type": "ShelfInsert",
     "label": "Shelf Insert 59-1W",
-    "platePreview": false
+    "platePreview": true
   },
   "59-shelf-insert-2w": {
     "node": "ShelfInsert_59-2W",
     "collection": "59",
     "type": "ShelfInsert",
     "label": "Shelf Insert 59-2W",
-    "platePreview": false
+    "platePreview": true
   },
   "59-cover-upper-1w": {
     "node": "CU-59-1W",
@@ -556,28 +556,28 @@
     "collection": "115",
     "type": "ShelfInsert",
     "label": "Shelf Insert 115-1W",
-    "platePreview": false
+    "platePreview": true
   },
   "115-shelf-insert-2w": {
     "node": "ShelfInsert_115-2W",
     "collection": "115",
     "type": "ShelfInsert",
     "label": "Shelf Insert 115-2W",
-    "platePreview": false
+    "platePreview": true
   },
   "115-shelf-insert-3w": {
     "node": "ShelfInsert_115-3W",
     "collection": "115",
     "type": "ShelfInsert",
     "label": "Shelf Insert 115-3W",
-    "platePreview": false
+    "platePreview": true
   },
   "115-shelf-insert-4w": {
     "node": "ShelfInsert_115-4W",
     "collection": "115",
     "type": "ShelfInsert",
     "label": "Shelf Insert 115-4W",
-    "platePreview": false
+    "platePreview": true
   },
   "115-cover-upper-1w": {
     "node": "CU-115-1W",
@@ -1074,28 +1074,28 @@
     "collection": "165",
     "type": "ShelfInsert",
     "label": "Shelf Insert 165-1W",
-    "platePreview": false
+    "platePreview": true
   },
   "165-shelf-insert-2w": {
     "node": "ShelfInsert_165-2W",
     "collection": "165",
     "type": "ShelfInsert",
     "label": "Shelf Insert 165-2W",
-    "platePreview": false
+    "platePreview": true
   },
   "165-shelf-insert-3w": {
     "node": "ShelfInsert_165-3W",
     "collection": "165",
     "type": "ShelfInsert",
     "label": "Shelf Insert 165-3W",
-    "platePreview": false
+    "platePreview": true
   },
   "165-shelf-insert-4w": {
     "node": "ShelfInsert_165-4W",
     "collection": "165",
     "type": "ShelfInsert",
     "label": "Shelf Insert 165-4W",
-    "platePreview": false
+    "platePreview": true
   },
   "165-cover-upper-1w": {
     "node": "CU-165-1W",
@@ -1592,28 +1592,28 @@
     "collection": "185",
     "type": "ShelfInsert",
     "label": "Shelf Insert 185-1W",
-    "platePreview": false
+    "platePreview": true
   },
   "185-shelf-insert-2w": {
     "node": "ShelfInsert_185-2W",
     "collection": "185",
     "type": "ShelfInsert",
     "label": "Shelf Insert 185-2W",
-    "platePreview": false
+    "platePreview": true
   },
   "185-shelf-insert-3w": {
     "node": "ShelfInsert_185-3W",
     "collection": "185",
     "type": "ShelfInsert",
     "label": "Shelf Insert 185-3W",
-    "platePreview": false
+    "platePreview": true
   },
   "185-shelf-insert-4w": {
     "node": "ShelfInsert_185-4W",
     "collection": "185",
     "type": "ShelfInsert",
     "label": "Shelf Insert 185-4W",
-    "platePreview": false
+    "platePreview": true
   },
   "185-cover-upper-1w": {
     "node": "CU-185-1W",
@@ -2110,28 +2110,28 @@
     "collection": "240",
     "type": "ShelfInsert",
     "label": "Shelf Insert 240-1W",
-    "platePreview": false
+    "platePreview": true
   },
   "240-shelf-insert-2w": {
     "node": "ShelfInsert_240-2W",
     "collection": "240",
     "type": "ShelfInsert",
     "label": "Shelf Insert 240-2W",
-    "platePreview": false
+    "platePreview": true
   },
   "240-shelf-insert-3w": {
     "node": "ShelfInsert_240-3W",
     "collection": "240",
     "type": "ShelfInsert",
     "label": "Shelf Insert 240-3W",
-    "platePreview": false
+    "platePreview": true
   },
   "240-shelf-insert-4w": {
     "node": "ShelfInsert_240-4W",
     "collection": "240",
     "type": "ShelfInsert",
     "label": "Shelf Insert 240-4W",
-    "platePreview": false
+    "platePreview": true
   },
   "240-cover-upper-1w": {
     "node": "CU-240-1W",
@@ -2628,28 +2628,28 @@
     "collection": "270",
     "type": "ShelfInsert",
     "label": "Shelf Insert 270-1W",
-    "platePreview": false
+    "platePreview": true
   },
   "270-shelf-insert-2w": {
     "node": "ShelfInsert_270-2W",
     "collection": "270",
     "type": "ShelfInsert",
     "label": "Shelf Insert 270-2W",
-    "platePreview": false
+    "platePreview": true
   },
   "270-shelf-insert-3w": {
     "node": "ShelfInsert_270-3W",
     "collection": "270",
     "type": "ShelfInsert",
     "label": "Shelf Insert 270-3W",
-    "platePreview": false
+    "platePreview": true
   },
   "270-shelf-insert-4w": {
     "node": "ShelfInsert_270-4W",
     "collection": "270",
     "type": "ShelfInsert",
     "label": "Shelf Insert 270-4W",
-    "platePreview": false
+    "platePreview": true
   },
   "270-cover-upper-1w": {
     "node": "CU-270-1W",
@@ -4510,154 +4510,154 @@
     "collection": "185",
     "type": "BackCover",
     "label": "Faceplate Back Cover 1W-05H",
-    "platePreview": false
+    "platePreview": true
   },
   "faceplate-back-cover-2w-0-5h": {
     "node": "BackCover_EdgeLabel_2W-05H",
     "collection": "185",
     "type": "BackCover",
     "label": "Faceplate Back Cover 2W-05H",
-    "platePreview": false
+    "platePreview": true
   },
   "faceplate-back-cover-3w-0-5h": {
     "node": "BackCover_EdgeLabel_3W-05H",
     "collection": "185",
     "type": "BackCover",
     "label": "Faceplate Back Cover 3W-05H",
-    "platePreview": false
+    "platePreview": true
   },
   "faceplate-back-cover-4w-0-5h": {
     "node": "BackCover_EdgeLabel_4W-05H",
     "collection": "185",
     "type": "BackCover",
     "label": "Faceplate Back Cover 4W-05H",
-    "platePreview": false
+    "platePreview": true
   },
   "faceplate-back-cover-1w-1h": {
     "node": "BackCover_EdgeLabel_1W-1H",
     "collection": "185",
     "type": "BackCover",
     "label": "Faceplate Back Cover 1W-1H",
-    "platePreview": false
+    "platePreview": true
   },
   "faceplate-back-cover-2w-1h": {
     "node": "BackCover_EdgeLabel_2W-1H",
     "collection": "185",
     "type": "BackCover",
     "label": "Faceplate Back Cover 2W-1H",
-    "platePreview": false
+    "platePreview": true
   },
   "faceplate-back-cover-3w-1h": {
     "node": "BackCover_EdgeLabel_3W-1H",
     "collection": "185",
     "type": "BackCover",
     "label": "Faceplate Back Cover 3W-1H",
-    "platePreview": false
+    "platePreview": true
   },
   "faceplate-back-cover-4w-1h": {
     "node": "BackCover_EdgeLabel_4W-1H",
     "collection": "185",
     "type": "BackCover",
     "label": "Faceplate Back Cover 4W-1H",
-    "platePreview": false
+    "platePreview": true
   },
   "faceplate-back-cover-1w-1-5h": {
     "node": "BackCover_EdgeLabel_1W-15H",
     "collection": "185",
     "type": "BackCover",
     "label": "Faceplate Back Cover 1W-15H",
-    "platePreview": false
+    "platePreview": true
   },
   "faceplate-back-cover-2w-1-5h": {
     "node": "BackCover_EdgeLabel_2W-15H",
     "collection": "185",
     "type": "BackCover",
     "label": "Faceplate Back Cover 2W-15H",
-    "platePreview": false
+    "platePreview": true
   },
   "faceplate-back-cover-3w-1-5h": {
     "node": "BackCover_EdgeLabel_3W-15H",
     "collection": "185",
     "type": "BackCover",
     "label": "Faceplate Back Cover 3W-15H",
-    "platePreview": false
+    "platePreview": true
   },
   "faceplate-back-cover-4w-1-5h": {
     "node": "BackCover_EdgeLabel_4W-15H",
     "collection": "185",
     "type": "BackCover",
     "label": "Faceplate Back Cover 4W-15H",
-    "platePreview": false
+    "platePreview": true
   },
   "faceplate-back-cover-1w-2h": {
     "node": "BackCover_EdgeLabel_1W-2H",
     "collection": "185",
     "type": "BackCover",
     "label": "Faceplate Back Cover 1W-2H",
-    "platePreview": false
+    "platePreview": true
   },
   "faceplate-back-cover-2w-2h": {
     "node": "BackCover_EdgeLabel_2W-2H",
     "collection": "185",
     "type": "BackCover",
     "label": "Faceplate Back Cover 2W-2H",
-    "platePreview": false
+    "platePreview": true
   },
   "faceplate-back-cover-3w-2h": {
     "node": "BackCover_EdgeLabel_3W-2H",
     "collection": "185",
     "type": "BackCover",
     "label": "Faceplate Back Cover 3W-2H",
-    "platePreview": false
+    "platePreview": true
   },
   "faceplate-back-cover-4w-2h": {
     "node": "BackCover_EdgeLabel_4W-2H",
     "collection": "185",
     "type": "BackCover",
     "label": "Faceplate Back Cover 4W-2H",
-    "platePreview": false
+    "platePreview": true
   },
   "faceplate-back-cover-1w-3h": {
     "node": "BackCover_EdgeLabel_1W-3H",
     "collection": "185",
     "type": "BackCover",
     "label": "Faceplate Back Cover 1W-3H",
-    "platePreview": false
+    "platePreview": true
   },
   "faceplate-back-cover-2w-3h": {
     "node": "BackCover_EdgeLabel_2W-3H",
     "collection": "185",
     "type": "BackCover",
     "label": "Faceplate Back Cover 2W-3H",
-    "platePreview": false
+    "platePreview": true
   },
   "shelf-lip-1w": {
     "node": "ShelfLip_1W",
     "collection": "185",
     "type": "ShelfLip",
     "label": "Shelf Lip 1W",
-    "platePreview": false
+    "platePreview": true
   },
   "shelf-lip-2w": {
     "node": "ShelfLip_2W",
     "collection": "185",
     "type": "ShelfLip",
     "label": "Shelf Lip 2W",
-    "platePreview": false
+    "platePreview": true
   },
   "shelf-lip-3w": {
     "node": "ShelfLip_3W",
     "collection": "185",
     "type": "ShelfLip",
     "label": "Shelf Lip 3W",
-    "platePreview": false
+    "platePreview": true
   },
   "shelf-lip-4w": {
     "node": "ShelfLip_4W",
     "collection": "185",
     "type": "ShelfLip",
     "label": "Shelf Lip 4W",
-    "platePreview": false
+    "platePreview": true
   },
   "quicklock-a-v1-11": {
     "node": "QuickLock-L",

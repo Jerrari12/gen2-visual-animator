@@ -217,6 +217,13 @@ test('plate view: confirmed print poses only, bare primary, fail-closed elsewher
   // print "same as a case": as authored.
   assert.deepEqual(rot('115-under-table-rail-2w'), [180, 0, 0], 'under-table rail prints table-contact-face down');
   assert.equal(rot('185-case-extender-1w-1h'), undefined, 'case extender prints as a case does');
+  // Joey's 2026-08-31 third group: "shelves in the final build, print top
+  // down onto the build plate, same with the shelf lips"; back covers put
+  // "the side facing towards the back of the build" on the plate - the
+  // faceplate back-down swing, so the clip tabs face up.
+  assert.deepEqual(rot('185-shelf-insert-2w'), [180, 0, 0], 'shelf insert prints top down');
+  assert.deepEqual(rot('shelf-lip-2w'), [180, 0, 0], 'shelf lip prints top down');
+  assert.deepEqual(rot('faceplate-back-cover-2w-1h'), [-90, 0, 0], 'back cover prints rear-face down');
   // the plate shows the BARE print body — dressed extras have no confirmed
   // individual print pose or plate arrangement yet
   const p = resolvePartPreview('edgelabel-faceplate-2w-1h', { plate: true });
@@ -236,13 +243,14 @@ test('plate view: confirmed print poses only, bare primary, fail-closed elsewher
   assert.deepEqual(Object.fromEntries(qlPlate.manifest.instances.map(i => [i.node, i.rot])),
     { 'QuickLock-L': [0, 0, 90], 'QuickLock-R': [0, 0, -90] }, 'chiral hands wear MIRRORED print poses');
   // fail closed on anything without a confirmed pose
-  for (const s of ['185-shelf-insert-2w', 'faceplate-back-cover-2w-1h'])
+  for (const s of ['wall-mount-bracket-1w', 'wall-mount-bracket-2w', 'wall-mount-bracket-3w'])
     assert.equal(resolvePartPreview(s, { plate: true }).fail.reason, 'unsupported', s + ' must fail closed');
   // plate-capable census: 94 cases + 94 classic + 94 decor + 90 faceplates
   // + 4 hardware (2026-08-20) + 24 covers + 20 foot rails + 24 under-table
-  // rails + 22 case extenders (2026-08-31)
+  // rails + 22 case extenders + 22 shelf inserts + 4 shelf lips + 18 back
+  // covers (2026-08-31). Wall brackets are the LAST family without words.
   const n = [...resolved.values()].filter(r => !r.fail && r.part.platePreview).length;
-  assert.equal(n, 466, 'plate-capable slug count');
+  assert.equal(n, 510, 'plate-capable slug count');
 
   // sweep EVERY plate-capable slug's plate boot (not just samples): the bare
   // print JOB (one body, or every member of a handed set), rotations matching
@@ -255,6 +263,8 @@ test('plate view: confirmed print poses only, bare primary, fail-closed elsewher
       : s === 'magnet-insert-10x2mm' ? [90, 0, 0]
       : /-cover-upper-/.test(s) ? [180, 0, 0]
       : /-under-table-rail-/.test(s) ? [180, 0, 0]
+      : /-shelf-insert-|^shelf-lip-/.test(s) ? [180, 0, 0]
+      : /^faceplate-back-cover-/.test(s) ? [-90, 0, 0]
       : undefined;
   for (const [s, r] of resolved) {
     if (r.fail || !r.part.platePreview) continue;

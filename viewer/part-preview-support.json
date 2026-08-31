@@ -52,11 +52,11 @@
     },
     "59-shelf-insert-1w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "59-shelf-insert-2w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "59-cover-upper-1w": {
       "preview": true,
@@ -324,19 +324,19 @@
     },
     "115-shelf-insert-1w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "115-shelf-insert-2w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "115-shelf-insert-3w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "115-shelf-insert-4w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "115-cover-upper-1w": {
       "preview": true,
@@ -620,19 +620,19 @@
     },
     "165-shelf-insert-1w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "165-shelf-insert-2w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "165-shelf-insert-3w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "165-shelf-insert-4w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "165-cover-upper-1w": {
       "preview": true,
@@ -916,19 +916,19 @@
     },
     "185-shelf-insert-1w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "185-shelf-insert-2w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "185-shelf-insert-3w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "185-shelf-insert-4w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "185-cover-upper-1w": {
       "preview": true,
@@ -1212,19 +1212,19 @@
     },
     "240-shelf-insert-1w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "240-shelf-insert-2w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "240-shelf-insert-3w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "240-shelf-insert-4w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "240-cover-upper-1w": {
       "preview": true,
@@ -1508,19 +1508,19 @@
     },
     "270-shelf-insert-1w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "270-shelf-insert-2w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "270-shelf-insert-3w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "270-shelf-insert-4w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "270-cover-upper-1w": {
       "preview": true,
@@ -1948,91 +1948,91 @@
     },
     "faceplate-back-cover-1w-0-5h": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "faceplate-back-cover-2w-0-5h": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "faceplate-back-cover-3w-0-5h": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "faceplate-back-cover-4w-0-5h": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "faceplate-back-cover-1w-1h": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "faceplate-back-cover-2w-1h": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "faceplate-back-cover-3w-1h": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "faceplate-back-cover-4w-1h": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "faceplate-back-cover-1w-1-5h": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "faceplate-back-cover-2w-1-5h": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "faceplate-back-cover-3w-1-5h": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "faceplate-back-cover-4w-1-5h": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "faceplate-back-cover-1w-2h": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "faceplate-back-cover-2w-2h": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "faceplate-back-cover-3w-2h": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "faceplate-back-cover-4w-2h": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "faceplate-back-cover-1w-3h": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "faceplate-back-cover-2w-3h": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "shelf-lip-1w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "shelf-lip-2w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "shelf-lip-3w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "shelf-lip-4w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "quicklock-a-v1-11": {
       "preview": true,

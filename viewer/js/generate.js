@@ -2662,6 +2662,14 @@ const PLATE_POSE = {
      so they flip. Case extenders print "same as a case" - as authored. */
   rail: [180, 0, 0],
   caseExtender: [],
+  /* Joey, 2026-08-31, third group: "shelves in the final build, print top
+     down onto the build plate, same with the shelf lips" - both flip. Back
+     covers: "the side facing towards the back of the build, that surface
+     needs to print face down" - the same swing that lays a faceplate's
+     back on the plate lays the back cover's rear-facing surface down. */
+  shelfInsert: [180, 0, 0],
+  shelfLip: [180, 0, 0],
+  backCover: [-90, 0, 0],
 };
 function platePoseFor(probe) {
   if (probe.hw) return probe.hw.plateRot; // hardware poses live on the entry ([] = as authored)
@@ -2674,6 +2682,9 @@ function platePoseFor(probe) {
     : probe.pick.type === 'FootrailL' ? 'footrailLower'
     : probe.pick.type === 'Rail' ? 'rail'
     : probe.pick.type === 'CaseExtender' ? 'caseExtender'
+    : probe.pick.type === 'ShelfInsert' ? 'shelfInsert'
+    : probe.pick.type === 'ShelfLip' ? 'shelfLip'
+    : probe.pick.type === 'BackCover' ? 'backCover'
     : null;
   return k != null && k in PLATE_POSE ? PLATE_POSE[k] : null;
 }
