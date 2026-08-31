@@ -69,7 +69,9 @@ test('every production slug is accounted for — resolved or intentionally unsup
   assert.deepEqual(unknown, [], 'production slugs the resolver does not recognize (grammar drift)');
   assert.deepEqual(wrongBucket, [], 'slugs in the wrong support bucket');
   // 2026-08-29: +22 case extenders (465 → 487); 26 → 4 unsupported
-  assert.equal(supported, 487, 'supported preview count');
+  // 2026-08-30: +22 shelf inserts +4 shelf lips (487 → 513) - the site catalog
+  // gained the released shelves, and every one previews (GLBs landed 08-29)
+  assert.equal(supported, 513, 'supported preview count');
   assert.equal(unsupported, 4, 'intentionally-unsupported (59-3W/4W extenders + 2 no-GLB hardware)');
 });
 

@@ -2462,6 +2462,9 @@ function previewColors(L) {
     // CaseExtender is one of them (`CaseExtender_<L>-<w>W-1H`) — it is sold per
     // collection and its poster is tinted like the case's.
     Case: lc, CaseExtender: lc, Drawer: lc, CoverL: lc, CoverU: lc, FootrailL: lc, FootrailU: lc, Rail: lc,
+    // ShelfInsert is collection-scoped like the extender (`ShelfInsert_<L>-<w>W`);
+    // the universal lip wears its poster render's navy-slate body hue
+    ShelfInsert: lc, ShelfLip: '#313d4f',
     // universal parts wear their poster-render hues (faceplates: dark
     // navy-charcoal body + the render palette's orange grip/face + silver rod)
     Faceplate: '#31333f',
@@ -2568,6 +2571,14 @@ function previewProbe(slug) {
      case for the ring to stack on. It must go on being tested. */
   if ((m = s.match(/^(\d+)-case-extender-([1-4])w-1h$/)))
     return { build: one(+m[1], +m[2], 4, 'shelf'), pick: { type: 'CaseExtender' } };
+  /* Shelf inserts (released 2026-08-29; site slugs landed 2026-08-30). The
+     probe is a 1H shelf unit: it bills exactly one case and exactly one
+     ShelfInsert row, so the type pick is unambiguous - and 1H exists in every
+     collection, 59 included. Width caps flow from the generator itself: the
+     site only mints slugs for widths whose case exists, so no 59-3W arm is
+     needed the way the extenders' comment explains. */
+  if ((m = s.match(/^(\d+)-shelf-insert-([1-4])w$/)))
+    return { build: one(+m[1], +m[2], 2, 'shelf'), pick: { type: 'ShelfInsert' } };
   if ((m = s.match(new RegExp(`^(\\d+)-case-([1-4])w-${H}h$`))))
     return { build: one(+m[1], +m[2], H_FROM_SLUG[m[3]]), pick: { type: 'Case' } };
   if ((m = s.match(new RegExp(`^(\\d+)-(classic|decor)-drawer-([1-4])w-${H}h$`))))
@@ -2599,6 +2610,12 @@ function previewProbe(slug) {
     return { build: one(185, +m[2], H_FROM_SLUG[m[3]], 'decor', { faceStyle: m[1] }), pick: { type: 'Faceplate' } };
   if ((m = s.match(new RegExp(`^faceplate-back-cover-([1-4])w-${H}h$`))))
     return { build: one(185, +m[1], H_FROM_SLUG[m[2]], 'decor', { backCover: true }), pick: { type: 'BackCover' } };
+  // shelf lips are universal like the faceplates (no length in the name), so
+  // they probe on the calibrated 185: a 1H shelf with lip:'front' bills the
+  // ShelfLip_<w>W node exactly once (the mid slot stays empty - 'both' would
+  // double the qty on 240/270, never the node)
+  if ((m = s.match(/^shelf-lip-([1-4])w$/)))
+    return { build: { mount: 'wall', length: 185, gridH: 1, placed: [{ ...unit(+m[1], 2, 'shelf'), lip: 'front' }] }, pick: { type: 'ShelfLip' } };
   // wall-mount bracket sections (2026-08-20, the site's hardware restructure):
   // a single w-wide wall case tiles exactly one <w>W bracket course, so the
   // pick is unambiguous. Turntable only - no confirmed print pose yet, so the

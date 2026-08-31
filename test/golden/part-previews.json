@@ -83,6 +83,20 @@
     "label": "Decor Drawer 59-2W-1H",
     "platePreview": true
   },
+  "59-shelf-insert-1w": {
+    "node": "ShelfInsert_59-1W",
+    "collection": "59",
+    "type": "ShelfInsert",
+    "label": "Shelf Insert 59-1W",
+    "platePreview": false
+  },
+  "59-shelf-insert-2w": {
+    "node": "ShelfInsert_59-2W",
+    "collection": "59",
+    "type": "ShelfInsert",
+    "label": "Shelf Insert 59-2W",
+    "platePreview": false
+  },
   "59-cover-upper-1w": {
     "node": "CU-59-1W",
     "collection": "59",
@@ -536,6 +550,34 @@
     "type": "Drawer",
     "label": "Decor Drawer 115-2W-3H",
     "platePreview": true
+  },
+  "115-shelf-insert-1w": {
+    "node": "ShelfInsert_115-1W",
+    "collection": "115",
+    "type": "ShelfInsert",
+    "label": "Shelf Insert 115-1W",
+    "platePreview": false
+  },
+  "115-shelf-insert-2w": {
+    "node": "ShelfInsert_115-2W",
+    "collection": "115",
+    "type": "ShelfInsert",
+    "label": "Shelf Insert 115-2W",
+    "platePreview": false
+  },
+  "115-shelf-insert-3w": {
+    "node": "ShelfInsert_115-3W",
+    "collection": "115",
+    "type": "ShelfInsert",
+    "label": "Shelf Insert 115-3W",
+    "platePreview": false
+  },
+  "115-shelf-insert-4w": {
+    "node": "ShelfInsert_115-4W",
+    "collection": "115",
+    "type": "ShelfInsert",
+    "label": "Shelf Insert 115-4W",
+    "platePreview": false
   },
   "115-cover-upper-1w": {
     "node": "CU-115-1W",
@@ -1027,6 +1069,34 @@
     "label": "Decor Drawer 165-2W-3H",
     "platePreview": true
   },
+  "165-shelf-insert-1w": {
+    "node": "ShelfInsert_165-1W",
+    "collection": "165",
+    "type": "ShelfInsert",
+    "label": "Shelf Insert 165-1W",
+    "platePreview": false
+  },
+  "165-shelf-insert-2w": {
+    "node": "ShelfInsert_165-2W",
+    "collection": "165",
+    "type": "ShelfInsert",
+    "label": "Shelf Insert 165-2W",
+    "platePreview": false
+  },
+  "165-shelf-insert-3w": {
+    "node": "ShelfInsert_165-3W",
+    "collection": "165",
+    "type": "ShelfInsert",
+    "label": "Shelf Insert 165-3W",
+    "platePreview": false
+  },
+  "165-shelf-insert-4w": {
+    "node": "ShelfInsert_165-4W",
+    "collection": "165",
+    "type": "ShelfInsert",
+    "label": "Shelf Insert 165-4W",
+    "platePreview": false
+  },
   "165-cover-upper-1w": {
     "node": "CU-165-1W",
     "collection": "165",
@@ -1516,6 +1586,34 @@
     "type": "Drawer",
     "label": "Decor Drawer 185-2W-3H",
     "platePreview": true
+  },
+  "185-shelf-insert-1w": {
+    "node": "ShelfInsert_185-1W",
+    "collection": "185",
+    "type": "ShelfInsert",
+    "label": "Shelf Insert 185-1W",
+    "platePreview": false
+  },
+  "185-shelf-insert-2w": {
+    "node": "ShelfInsert_185-2W",
+    "collection": "185",
+    "type": "ShelfInsert",
+    "label": "Shelf Insert 185-2W",
+    "platePreview": false
+  },
+  "185-shelf-insert-3w": {
+    "node": "ShelfInsert_185-3W",
+    "collection": "185",
+    "type": "ShelfInsert",
+    "label": "Shelf Insert 185-3W",
+    "platePreview": false
+  },
+  "185-shelf-insert-4w": {
+    "node": "ShelfInsert_185-4W",
+    "collection": "185",
+    "type": "ShelfInsert",
+    "label": "Shelf Insert 185-4W",
+    "platePreview": false
   },
   "185-cover-upper-1w": {
     "node": "CU-185-1W",
@@ -2007,6 +2105,34 @@
     "label": "Decor Drawer 240-2W-3H",
     "platePreview": true
   },
+  "240-shelf-insert-1w": {
+    "node": "ShelfInsert_240-1W",
+    "collection": "240",
+    "type": "ShelfInsert",
+    "label": "Shelf Insert 240-1W",
+    "platePreview": false
+  },
+  "240-shelf-insert-2w": {
+    "node": "ShelfInsert_240-2W",
+    "collection": "240",
+    "type": "ShelfInsert",
+    "label": "Shelf Insert 240-2W",
+    "platePreview": false
+  },
+  "240-shelf-insert-3w": {
+    "node": "ShelfInsert_240-3W",
+    "collection": "240",
+    "type": "ShelfInsert",
+    "label": "Shelf Insert 240-3W",
+    "platePreview": false
+  },
+  "240-shelf-insert-4w": {
+    "node": "ShelfInsert_240-4W",
+    "collection": "240",
+    "type": "ShelfInsert",
+    "label": "Shelf Insert 240-4W",
+    "platePreview": false
+  },
   "240-cover-upper-1w": {
     "node": "CU-240-1W",
     "collection": "240",
@@ -2496,6 +2622,34 @@
     "type": "Drawer",
     "label": "Decor Drawer 270-2W-3H",
     "platePreview": true
+  },
+  "270-shelf-insert-1w": {
+    "node": "ShelfInsert_270-1W",
+    "collection": "270",
+    "type": "ShelfInsert",
+    "label": "Shelf Insert 270-1W",
+    "platePreview": false
+  },
+  "270-shelf-insert-2w": {
+    "node": "ShelfInsert_270-2W",
+    "collection": "270",
+    "type": "ShelfInsert",
+    "label": "Shelf Insert 270-2W",
+    "platePreview": false
+  },
+  "270-shelf-insert-3w": {
+    "node": "ShelfInsert_270-3W",
+    "collection": "270",
+    "type": "ShelfInsert",
+    "label": "Shelf Insert 270-3W",
+    "platePreview": false
+  },
+  "270-shelf-insert-4w": {
+    "node": "ShelfInsert_270-4W",
+    "collection": "270",
+    "type": "ShelfInsert",
+    "label": "Shelf Insert 270-4W",
+    "platePreview": false
   },
   "270-cover-upper-1w": {
     "node": "CU-270-1W",
@@ -4475,6 +4629,34 @@
     "collection": "185",
     "type": "BackCover",
     "label": "Faceplate Back Cover 2W-3H",
+    "platePreview": false
+  },
+  "shelf-lip-1w": {
+    "node": "ShelfLip_1W",
+    "collection": "185",
+    "type": "ShelfLip",
+    "label": "Shelf Lip 1W",
+    "platePreview": false
+  },
+  "shelf-lip-2w": {
+    "node": "ShelfLip_2W",
+    "collection": "185",
+    "type": "ShelfLip",
+    "label": "Shelf Lip 2W",
+    "platePreview": false
+  },
+  "shelf-lip-3w": {
+    "node": "ShelfLip_3W",
+    "collection": "185",
+    "type": "ShelfLip",
+    "label": "Shelf Lip 3W",
+    "platePreview": false
+  },
+  "shelf-lip-4w": {
+    "node": "ShelfLip_4W",
+    "collection": "185",
+    "type": "ShelfLip",
+    "label": "Shelf Lip 4W",
     "platePreview": false
   },
   "quicklock-a-v1-11": {

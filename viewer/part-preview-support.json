@@ -50,6 +50,14 @@
       "preview": true,
       "platePreview": true
     },
+    "59-shelf-insert-1w": {
+      "preview": true,
+      "platePreview": false
+    },
+    "59-shelf-insert-2w": {
+      "preview": true,
+      "platePreview": false
+    },
     "59-cover-upper-1w": {
       "preview": true,
       "platePreview": false
@@ -313,6 +321,22 @@
     "115-decor-drawer-2w-3h": {
       "preview": true,
       "platePreview": true
+    },
+    "115-shelf-insert-1w": {
+      "preview": true,
+      "platePreview": false
+    },
+    "115-shelf-insert-2w": {
+      "preview": true,
+      "platePreview": false
+    },
+    "115-shelf-insert-3w": {
+      "preview": true,
+      "platePreview": false
+    },
+    "115-shelf-insert-4w": {
+      "preview": true,
+      "platePreview": false
     },
     "115-cover-upper-1w": {
       "preview": true,
@@ -594,6 +618,22 @@
       "preview": true,
       "platePreview": true
     },
+    "165-shelf-insert-1w": {
+      "preview": true,
+      "platePreview": false
+    },
+    "165-shelf-insert-2w": {
+      "preview": true,
+      "platePreview": false
+    },
+    "165-shelf-insert-3w": {
+      "preview": true,
+      "platePreview": false
+    },
+    "165-shelf-insert-4w": {
+      "preview": true,
+      "platePreview": false
+    },
     "165-cover-upper-1w": {
       "preview": true,
       "platePreview": false
@@ -873,6 +913,22 @@
     "185-decor-drawer-2w-3h": {
       "preview": true,
       "platePreview": true
+    },
+    "185-shelf-insert-1w": {
+      "preview": true,
+      "platePreview": false
+    },
+    "185-shelf-insert-2w": {
+      "preview": true,
+      "platePreview": false
+    },
+    "185-shelf-insert-3w": {
+      "preview": true,
+      "platePreview": false
+    },
+    "185-shelf-insert-4w": {
+      "preview": true,
+      "platePreview": false
     },
     "185-cover-upper-1w": {
       "preview": true,
@@ -1154,6 +1210,22 @@
       "preview": true,
       "platePreview": true
     },
+    "240-shelf-insert-1w": {
+      "preview": true,
+      "platePreview": false
+    },
+    "240-shelf-insert-2w": {
+      "preview": true,
+      "platePreview": false
+    },
+    "240-shelf-insert-3w": {
+      "preview": true,
+      "platePreview": false
+    },
+    "240-shelf-insert-4w": {
+      "preview": true,
+      "platePreview": false
+    },
     "240-cover-upper-1w": {
       "preview": true,
       "platePreview": false
@@ -1433,6 +1505,22 @@
     "270-decor-drawer-2w-3h": {
       "preview": true,
       "platePreview": true
+    },
+    "270-shelf-insert-1w": {
+      "preview": true,
+      "platePreview": false
+    },
+    "270-shelf-insert-2w": {
+      "preview": true,
+      "platePreview": false
+    },
+    "270-shelf-insert-3w": {
+      "preview": true,
+      "platePreview": false
+    },
+    "270-shelf-insert-4w": {
+      "preview": true,
+      "platePreview": false
     },
     "270-cover-upper-1w": {
       "preview": true,
@@ -1927,6 +2015,22 @@
       "platePreview": false
     },
     "faceplate-back-cover-2w-3h": {
+      "preview": true,
+      "platePreview": false
+    },
+    "shelf-lip-1w": {
+      "preview": true,
+      "platePreview": false
+    },
+    "shelf-lip-2w": {
+      "preview": true,
+      "platePreview": false
+    },
+    "shelf-lip-3w": {
+      "preview": true,
+      "platePreview": false
+    },
+    "shelf-lip-4w": {
       "preview": true,
       "platePreview": false
     },
