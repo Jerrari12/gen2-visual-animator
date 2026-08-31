@@ -130,14 +130,14 @@
     "collection": "59",
     "type": "CaseExtender",
     "label": "Case Extender 59-1W",
-    "platePreview": false
+    "platePreview": true
   },
   "59-case-extender-2w-1h": {
     "node": "CaseExtender_59-2W-1H",
     "collection": "59",
     "type": "CaseExtender",
     "label": "Case Extender 59-2W",
-    "platePreview": false
+    "platePreview": true
   },
   "59-case-extender-3w-1h": {
     "unsupported": "unsupported"
@@ -150,28 +150,28 @@
     "collection": "59",
     "type": "Rail",
     "label": "Under-Table Rail 59-1W",
-    "platePreview": false
+    "platePreview": true
   },
   "59-under-table-rail-2w": {
     "node": "UnderTableRail_59-2W",
     "collection": "59",
     "type": "Rail",
     "label": "Under-Table Rail 59-2W",
-    "platePreview": false
+    "platePreview": true
   },
   "59-under-table-rail-3w": {
     "node": "UnderTableRail_59-3W",
     "collection": "59",
     "type": "Rail",
     "label": "Under-Table Rail 59-3W",
-    "platePreview": false
+    "platePreview": true
   },
   "59-under-table-rail-4w": {
     "node": "UnderTableRail_59-4W",
     "collection": "59",
     "type": "Rail",
     "label": "Under-Table Rail 59-4W",
-    "platePreview": false
+    "platePreview": true
   },
   "115-case-1w-0-5h": {
     "node": "115-1W-05H_Case",
@@ -640,56 +640,56 @@
     "collection": "115",
     "type": "CaseExtender",
     "label": "Case Extender 115-1W",
-    "platePreview": false
+    "platePreview": true
   },
   "115-case-extender-2w-1h": {
     "node": "CaseExtender_115-2W-1H",
     "collection": "115",
     "type": "CaseExtender",
     "label": "Case Extender 115-2W",
-    "platePreview": false
+    "platePreview": true
   },
   "115-case-extender-3w-1h": {
     "node": "CaseExtender_115-3W-1H",
     "collection": "115",
     "type": "CaseExtender",
     "label": "Case Extender 115-3W",
-    "platePreview": false
+    "platePreview": true
   },
   "115-case-extender-4w-1h": {
     "node": "CaseExtender_115-4W-1H",
     "collection": "115",
     "type": "CaseExtender",
     "label": "Case Extender 115-4W",
-    "platePreview": false
+    "platePreview": true
   },
   "115-under-table-rail-1w": {
     "node": "UnderTableRail_115-1W",
     "collection": "115",
     "type": "Rail",
     "label": "Under-Table Rail 115-1W",
-    "platePreview": false
+    "platePreview": true
   },
   "115-under-table-rail-2w": {
     "node": "UnderTableRail_115-2W",
     "collection": "115",
     "type": "Rail",
     "label": "Under-Table Rail 115-2W",
-    "platePreview": false
+    "platePreview": true
   },
   "115-under-table-rail-3w": {
     "node": "UnderTableRail_115-3W",
     "collection": "115",
     "type": "Rail",
     "label": "Under-Table Rail 115-3W",
-    "platePreview": false
+    "platePreview": true
   },
   "115-under-table-rail-4w": {
     "node": "UnderTableRail_115-4W",
     "collection": "115",
     "type": "Rail",
     "label": "Under-Table Rail 115-4W",
-    "platePreview": false
+    "platePreview": true
   },
   "165-case-1w-0-5h": {
     "node": "165-1W-05H_Case",
@@ -1158,56 +1158,56 @@
     "collection": "165",
     "type": "CaseExtender",
     "label": "Case Extender 165-1W",
-    "platePreview": false
+    "platePreview": true
   },
   "165-case-extender-2w-1h": {
     "node": "CaseExtender_165-2W-1H",
     "collection": "165",
     "type": "CaseExtender",
     "label": "Case Extender 165-2W",
-    "platePreview": false
+    "platePreview": true
   },
   "165-case-extender-3w-1h": {
     "node": "CaseExtender_165-3W-1H",
     "collection": "165",
     "type": "CaseExtender",
     "label": "Case Extender 165-3W",
-    "platePreview": false
+    "platePreview": true
   },
   "165-case-extender-4w-1h": {
     "node": "CaseExtender_165-4W-1H",
     "collection": "165",
     "type": "CaseExtender",
     "label": "Case Extender 165-4W",
-    "platePreview": false
+    "platePreview": true
   },
   "165-under-table-rail-1w": {
     "node": "UnderTableRail_165-1W",
     "collection": "165",
     "type": "Rail",
     "label": "Under-Table Rail 165-1W",
-    "platePreview": false
+    "platePreview": true
   },
   "165-under-table-rail-2w": {
     "node": "UnderTableRail_165-2W",
     "collection": "165",
     "type": "Rail",
     "label": "Under-Table Rail 165-2W",
-    "platePreview": false
+    "platePreview": true
   },
   "165-under-table-rail-3w": {
     "node": "UnderTableRail_165-3W",
     "collection": "165",
     "type": "Rail",
     "label": "Under-Table Rail 165-3W",
-    "platePreview": false
+    "platePreview": true
   },
   "165-under-table-rail-4w": {
     "node": "UnderTableRail_165-4W",
     "collection": "165",
     "type": "Rail",
     "label": "Under-Table Rail 165-4W",
-    "platePreview": false
+    "platePreview": true
   },
   "185-case-1w-0-5h": {
     "node": "185-1W-05H_Case",
@@ -1676,56 +1676,56 @@
     "collection": "185",
     "type": "CaseExtender",
     "label": "Case Extender 185-1W",
-    "platePreview": false
+    "platePreview": true
   },
   "185-case-extender-2w-1h": {
     "node": "CaseExtender_185-2W-1H",
     "collection": "185",
     "type": "CaseExtender",
     "label": "Case Extender 185-2W",
-    "platePreview": false
+    "platePreview": true
   },
   "185-case-extender-3w-1h": {
     "node": "CaseExtender_185-3W-1H",
     "collection": "185",
     "type": "CaseExtender",
     "label": "Case Extender 185-3W",
-    "platePreview": false
+    "platePreview": true
   },
   "185-case-extender-4w-1h": {
     "node": "CaseExtender_185-4W-1H",
     "collection": "185",
     "type": "CaseExtender",
     "label": "Case Extender 185-4W",
-    "platePreview": false
+    "platePreview": true
   },
   "185-under-table-rail-1w": {
     "node": "UnderTableRail_185-1W",
     "collection": "185",
     "type": "Rail",
     "label": "Under-Table Rail 185-1W",
-    "platePreview": false
+    "platePreview": true
   },
   "185-under-table-rail-2w": {
     "node": "UnderTableRail_185-2W",
     "collection": "185",
     "type": "Rail",
     "label": "Under-Table Rail 185-2W",
-    "platePreview": false
+    "platePreview": true
   },
   "185-under-table-rail-3w": {
     "node": "UnderTableRail_185-3W",
     "collection": "185",
     "type": "Rail",
     "label": "Under-Table Rail 185-3W",
-    "platePreview": false
+    "platePreview": true
   },
   "185-under-table-rail-4w": {
     "node": "UnderTableRail_185-4W",
     "collection": "185",
     "type": "Rail",
     "label": "Under-Table Rail 185-4W",
-    "platePreview": false
+    "platePreview": true
   },
   "240-case-1w-0-5h": {
     "node": "240-1W-05H_Case",
@@ -2194,56 +2194,56 @@
     "collection": "240",
     "type": "CaseExtender",
     "label": "Case Extender 240-1W",
-    "platePreview": false
+    "platePreview": true
   },
   "240-case-extender-2w-1h": {
     "node": "CaseExtender_240-2W-1H",
     "collection": "240",
     "type": "CaseExtender",
     "label": "Case Extender 240-2W",
-    "platePreview": false
+    "platePreview": true
   },
   "240-case-extender-3w-1h": {
     "node": "CaseExtender_240-3W-1H",
     "collection": "240",
     "type": "CaseExtender",
     "label": "Case Extender 240-3W",
-    "platePreview": false
+    "platePreview": true
   },
   "240-case-extender-4w-1h": {
     "node": "CaseExtender_240-4W-1H",
     "collection": "240",
     "type": "CaseExtender",
     "label": "Case Extender 240-4W",
-    "platePreview": false
+    "platePreview": true
   },
   "240-under-table-rail-1w": {
     "node": "UnderTableRail_240-1W",
     "collection": "240",
     "type": "Rail",
     "label": "Under-Table Rail 240-1W",
-    "platePreview": false
+    "platePreview": true
   },
   "240-under-table-rail-2w": {
     "node": "UnderTableRail_240-2W",
     "collection": "240",
     "type": "Rail",
     "label": "Under-Table Rail 240-2W",
-    "platePreview": false
+    "platePreview": true
   },
   "240-under-table-rail-3w": {
     "node": "UnderTableRail_240-3W",
     "collection": "240",
     "type": "Rail",
     "label": "Under-Table Rail 240-3W",
-    "platePreview": false
+    "platePreview": true
   },
   "240-under-table-rail-4w": {
     "node": "UnderTableRail_240-4W",
     "collection": "240",
     "type": "Rail",
     "label": "Under-Table Rail 240-4W",
-    "platePreview": false
+    "platePreview": true
   },
   "270-case-1w-0-5h": {
     "node": "270-1W-05H_Case",
@@ -2712,56 +2712,56 @@
     "collection": "270",
     "type": "CaseExtender",
     "label": "Case Extender 270-1W",
-    "platePreview": false
+    "platePreview": true
   },
   "270-case-extender-2w-1h": {
     "node": "CaseExtender_270-2W-1H",
     "collection": "270",
     "type": "CaseExtender",
     "label": "Case Extender 270-2W",
-    "platePreview": false
+    "platePreview": true
   },
   "270-case-extender-3w-1h": {
     "node": "CaseExtender_270-3W-1H",
     "collection": "270",
     "type": "CaseExtender",
     "label": "Case Extender 270-3W",
-    "platePreview": false
+    "platePreview": true
   },
   "270-case-extender-4w-1h": {
     "node": "CaseExtender_270-4W-1H",
     "collection": "270",
     "type": "CaseExtender",
     "label": "Case Extender 270-4W",
-    "platePreview": false
+    "platePreview": true
   },
   "270-under-table-rail-1w": {
     "node": "UnderTableRail_270-1W",
     "collection": "270",
     "type": "Rail",
     "label": "Under-Table Rail 270-1W",
-    "platePreview": false
+    "platePreview": true
   },
   "270-under-table-rail-2w": {
     "node": "UnderTableRail_270-2W",
     "collection": "270",
     "type": "Rail",
     "label": "Under-Table Rail 270-2W",
-    "platePreview": false
+    "platePreview": true
   },
   "270-under-table-rail-3w": {
     "node": "UnderTableRail_270-3W",
     "collection": "270",
     "type": "Rail",
     "label": "Under-Table Rail 270-3W",
-    "platePreview": false
+    "platePreview": true
   },
   "270-under-table-rail-4w": {
     "node": "UnderTableRail_270-4W",
     "collection": "270",
     "type": "Rail",
     "label": "Under-Table Rail 270-4W",
-    "platePreview": false
+    "platePreview": true
   },
   "essential-faceplate-1w-0-5h": {
     "node": "Faceplate_Essential_1W-05H",

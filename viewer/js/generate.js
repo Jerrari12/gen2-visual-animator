@@ -2656,6 +2656,12 @@ const PLATE_POSE = {
   coverLower: [],
   footrailUpper: [],
   footrailLower: [],
+  /* Joey, 2026-08-31, second group: under-table rails "print top down of a
+     build plate, the top being the side that makes contact with the
+     underside of the table" - installed they hang table-contact-face UP,
+     so they flip. Case extenders print "same as a case" - as authored. */
+  rail: [180, 0, 0],
+  caseExtender: [],
 };
 function platePoseFor(probe) {
   if (probe.hw) return probe.hw.plateRot; // hardware poses live on the entry ([] = as authored)
@@ -2666,6 +2672,8 @@ function platePoseFor(probe) {
     : probe.pick.type === 'CoverL' ? 'coverLower'
     : probe.pick.type === 'FootrailU' ? 'footrailUpper'
     : probe.pick.type === 'FootrailL' ? 'footrailLower'
+    : probe.pick.type === 'Rail' ? 'rail'
+    : probe.pick.type === 'CaseExtender' ? 'caseExtender'
     : null;
   return k != null && k in PLATE_POSE ? PLATE_POSE[k] : null;
 }

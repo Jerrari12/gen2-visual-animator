@@ -76,11 +76,11 @@
     },
     "59-case-extender-1w-1h": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "59-case-extender-2w-1h": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "59-case-extender-3w-1h": {
       "preview": false,
@@ -92,19 +92,19 @@
     },
     "59-under-table-rail-1w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "59-under-table-rail-2w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "59-under-table-rail-3w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "59-under-table-rail-4w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "115-case-1w-0-5h": {
       "preview": true,
@@ -372,35 +372,35 @@
     },
     "115-case-extender-1w-1h": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "115-case-extender-2w-1h": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "115-case-extender-3w-1h": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "115-case-extender-4w-1h": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "115-under-table-rail-1w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "115-under-table-rail-2w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "115-under-table-rail-3w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "115-under-table-rail-4w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "165-case-1w-0-5h": {
       "preview": true,
@@ -668,35 +668,35 @@
     },
     "165-case-extender-1w-1h": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "165-case-extender-2w-1h": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "165-case-extender-3w-1h": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "165-case-extender-4w-1h": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "165-under-table-rail-1w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "165-under-table-rail-2w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "165-under-table-rail-3w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "165-under-table-rail-4w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "185-case-1w-0-5h": {
       "preview": true,
@@ -964,35 +964,35 @@
     },
     "185-case-extender-1w-1h": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "185-case-extender-2w-1h": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "185-case-extender-3w-1h": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "185-case-extender-4w-1h": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "185-under-table-rail-1w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "185-under-table-rail-2w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "185-under-table-rail-3w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "185-under-table-rail-4w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "240-case-1w-0-5h": {
       "preview": true,
@@ -1260,35 +1260,35 @@
     },
     "240-case-extender-1w-1h": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "240-case-extender-2w-1h": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "240-case-extender-3w-1h": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "240-case-extender-4w-1h": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "240-under-table-rail-1w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "240-under-table-rail-2w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "240-under-table-rail-3w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "240-under-table-rail-4w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "270-case-1w-0-5h": {
       "preview": true,
@@ -1556,35 +1556,35 @@
     },
     "270-case-extender-1w-1h": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "270-case-extender-2w-1h": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "270-case-extender-3w-1h": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "270-case-extender-4w-1h": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "270-under-table-rail-1w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "270-under-table-rail-2w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "270-under-table-rail-3w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "270-under-table-rail-4w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "essential-faceplate-1w-0-5h": {
       "preview": true,

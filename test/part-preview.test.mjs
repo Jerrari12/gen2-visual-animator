@@ -211,6 +211,12 @@ test('plate view: confirmed print poses only, bare primary, fail-closed elsewher
   assert.equal(rot('185-cover-lower-2w'), undefined, 'cover lower prints as authored');
   assert.equal(rot('270-foot-rail-upper-1w'), undefined, 'foot rail upper prints as authored');
   assert.equal(rot('115-foot-rail-lower-2w'), undefined, 'foot rail lower prints as authored');
+  // Joey's 2026-08-31 second group: rails "print top down of a build plate,
+  // the top being the side that makes contact with the underside of the
+  // table" - installed they hang that face UP, so they flip. Extenders
+  // print "same as a case": as authored.
+  assert.deepEqual(rot('115-under-table-rail-2w'), [180, 0, 0], 'under-table rail prints table-contact-face down');
+  assert.equal(rot('185-case-extender-1w-1h'), undefined, 'case extender prints as a case does');
   // the plate shows the BARE print body — dressed extras have no confirmed
   // individual print pose or plate arrangement yet
   const p = resolvePartPreview('edgelabel-faceplate-2w-1h', { plate: true });
@@ -230,12 +236,13 @@ test('plate view: confirmed print poses only, bare primary, fail-closed elsewher
   assert.deepEqual(Object.fromEntries(qlPlate.manifest.instances.map(i => [i.node, i.rot])),
     { 'QuickLock-L': [0, 0, 90], 'QuickLock-R': [0, 0, -90] }, 'chiral hands wear MIRRORED print poses');
   // fail closed on anything without a confirmed pose
-  for (const s of ['185-case-extender-1w-1h', '185-shelf-insert-2w', '115-under-table-rail-2w', 'faceplate-back-cover-2w-1h'])
+  for (const s of ['185-shelf-insert-2w', 'faceplate-back-cover-2w-1h'])
     assert.equal(resolvePartPreview(s, { plate: true }).fail.reason, 'unsupported', s + ' must fail closed');
   // plate-capable census: 94 cases + 94 classic + 94 decor + 90 faceplates
-  // + 4 hardware (2026-08-20) + 24 covers + 20 foot rails (2026-08-31)
+  // + 4 hardware (2026-08-20) + 24 covers + 20 foot rails + 24 under-table
+  // rails + 22 case extenders (2026-08-31)
   const n = [...resolved.values()].filter(r => !r.fail && r.part.platePreview).length;
-  assert.equal(n, 420, 'plate-capable slug count');
+  assert.equal(n, 466, 'plate-capable slug count');
 
   // sweep EVERY plate-capable slug's plate boot (not just samples): the bare
   // print JOB (one body, or every member of a handed set), rotations matching
@@ -247,6 +254,7 @@ test('plate view: confirmed print poses only, bare primary, fail-closed elsewher
       : s === 'drawer-stoppers' ? [180, 0, 0]
       : s === 'magnet-insert-10x2mm' ? [90, 0, 0]
       : /-cover-upper-/.test(s) ? [180, 0, 0]
+      : /-under-table-rail-/.test(s) ? [180, 0, 0]
       : undefined;
   for (const [s, r] of resolved) {
     if (r.fail || !r.part.platePreview) continue;
