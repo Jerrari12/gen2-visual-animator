@@ -2498,6 +2498,10 @@ const HARDWARE_PREVIEW = {
     // Joey's live check caught R resting on its snap tab (2026-08-20). For a
     // mirror image, the corrective rotation mirrors too: Rz(+90) ↔ Rz(−90).
     plateRot: { 'QuickLock-L': [0, 0, 90], 'QuickLock-R': [0, 0, -90] },
+    // ⚠ QuickLock B (Bi-Directional) prints in EXACTLY this orientation too
+    // (Joey, 2026-08-31). It has no GLB in the part library yet, so there is
+    // nothing to pose - carry the same ±90 chirality onto its entry the day
+    // its model lands, and its plate view lights with zero new confirmation.
     // the GLBs are BOTTOM-ANCHORED, so a ±90° swing displaces each body's
     // center by half its 23.3mm width to opposite sides of its anchor —
     // without this compensation the mirrored poses silently widened the pair
@@ -2640,12 +2644,28 @@ const PLATE_POSE = {
   'faceplate:classicpro': [-90, 0, 0],
   'faceplate:essential': [90, 0, 0],
   'faceplate:chevron': [90, 0, 0],
+  /* Joey's confirmations, 2026-08-31, in his installed-orientation language:
+     "in the final build of a table top kit, the Cover Lowers, Footrail
+     Uppers and Footrail Lowers are all facing the correct print
+     orientation" - installed pose IS the print pose, so they ride as
+     authored. The Cover Upper is the exception he called out separately:
+     its INSTALLED TOP prints against the plate (the visible face takes the
+     build-sheet finish - the same rationale as Essential/Chevron printing
+     face-down), so it flips. */
+  coverUpper: [180, 0, 0],
+  coverLower: [],
+  footrailUpper: [],
+  footrailLower: [],
 };
 function platePoseFor(probe) {
   if (probe.hw) return probe.hw.plateRot; // hardware poses live on the entry ([] = as authored)
   const k = probe.pick.type === 'Case' ? 'case'
     : probe.pick.type === 'Drawer' ? 'drawer'
     : probe.pick.type === 'Faceplate' ? 'faceplate:' + probe.build.faceStyle
+    : probe.pick.type === 'CoverU' ? 'coverUpper'
+    : probe.pick.type === 'CoverL' ? 'coverLower'
+    : probe.pick.type === 'FootrailU' ? 'footrailUpper'
+    : probe.pick.type === 'FootrailL' ? 'footrailLower'
     : null;
   return k != null && k in PLATE_POSE ? PLATE_POSE[k] : null;
 }

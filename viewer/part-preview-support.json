@@ -60,19 +60,19 @@
     },
     "59-cover-upper-1w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "59-cover-lower-1w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "59-cover-upper-2w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "59-cover-lower-2w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "59-case-extender-1w-1h": {
       "preview": true,
@@ -340,35 +340,35 @@
     },
     "115-cover-upper-1w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "115-cover-lower-1w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "115-cover-upper-2w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "115-cover-lower-2w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "115-foot-rail-upper-1w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "115-foot-rail-lower-1w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "115-foot-rail-upper-2w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "115-foot-rail-lower-2w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "115-case-extender-1w-1h": {
       "preview": true,
@@ -636,35 +636,35 @@
     },
     "165-cover-upper-1w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "165-cover-lower-1w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "165-cover-upper-2w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "165-cover-lower-2w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "165-foot-rail-upper-1w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "165-foot-rail-lower-1w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "165-foot-rail-upper-2w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "165-foot-rail-lower-2w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "165-case-extender-1w-1h": {
       "preview": true,
@@ -932,35 +932,35 @@
     },
     "185-cover-upper-1w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "185-cover-lower-1w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "185-cover-upper-2w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "185-cover-lower-2w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "185-foot-rail-upper-1w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "185-foot-rail-lower-1w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "185-foot-rail-upper-2w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "185-foot-rail-lower-2w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "185-case-extender-1w-1h": {
       "preview": true,
@@ -1228,35 +1228,35 @@
     },
     "240-cover-upper-1w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "240-cover-lower-1w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "240-cover-upper-2w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "240-cover-lower-2w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "240-foot-rail-upper-1w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "240-foot-rail-lower-1w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "240-foot-rail-upper-2w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "240-foot-rail-lower-2w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "240-case-extender-1w-1h": {
       "preview": true,
@@ -1524,35 +1524,35 @@
     },
     "270-cover-upper-1w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "270-cover-lower-1w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "270-cover-upper-2w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "270-cover-lower-2w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "270-foot-rail-upper-1w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "270-foot-rail-lower-1w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "270-foot-rail-upper-2w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "270-foot-rail-lower-2w": {
       "preview": true,
-      "platePreview": false
+      "platePreview": true
     },
     "270-case-extender-1w-1h": {
       "preview": true,

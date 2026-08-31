@@ -102,28 +102,28 @@
     "collection": "59",
     "type": "CoverU",
     "label": "Cover Upper 59-1W",
-    "platePreview": false
+    "platePreview": true
   },
   "59-cover-lower-1w": {
     "node": "CL-59-1W",
     "collection": "59",
     "type": "CoverL",
     "label": "Cover Lower 59-1W",
-    "platePreview": false
+    "platePreview": true
   },
   "59-cover-upper-2w": {
     "node": "CU-59-2W",
     "collection": "59",
     "type": "CoverU",
     "label": "Cover Upper 59-2W",
-    "platePreview": false
+    "platePreview": true
   },
   "59-cover-lower-2w": {
     "node": "CL-59-2W",
     "collection": "59",
     "type": "CoverL",
     "label": "Cover Lower 59-2W",
-    "platePreview": false
+    "platePreview": true
   },
   "59-case-extender-1w-1h": {
     "node": "CaseExtender_59-1W-1H",
@@ -584,56 +584,56 @@
     "collection": "115",
     "type": "CoverU",
     "label": "Cover Upper 115-1W",
-    "platePreview": false
+    "platePreview": true
   },
   "115-cover-lower-1w": {
     "node": "CL-115-1W",
     "collection": "115",
     "type": "CoverL",
     "label": "Cover Lower 115-1W",
-    "platePreview": false
+    "platePreview": true
   },
   "115-cover-upper-2w": {
     "node": "CU-115-2W",
     "collection": "115",
     "type": "CoverU",
     "label": "Cover Upper 115-2W",
-    "platePreview": false
+    "platePreview": true
   },
   "115-cover-lower-2w": {
     "node": "CL-115-2W",
     "collection": "115",
     "type": "CoverL",
     "label": "Cover Lower 115-2W",
-    "platePreview": false
+    "platePreview": true
   },
   "115-foot-rail-upper-1w": {
     "node": "FR-U_115-1W",
     "collection": "115",
     "type": "FootrailU",
     "label": "Footrail Upper 115-1W",
-    "platePreview": false
+    "platePreview": true
   },
   "115-foot-rail-lower-1w": {
     "node": "FR-L_115-1W",
     "collection": "115",
     "type": "FootrailL",
     "label": "Footrail Lower 115-1W",
-    "platePreview": false
+    "platePreview": true
   },
   "115-foot-rail-upper-2w": {
     "node": "FR-U_115-2W",
     "collection": "115",
     "type": "FootrailU",
     "label": "Footrail Upper 115-2W",
-    "platePreview": false
+    "platePreview": true
   },
   "115-foot-rail-lower-2w": {
     "node": "FR-L_115-2W",
     "collection": "115",
     "type": "FootrailL",
     "label": "Footrail Lower 115-2W",
-    "platePreview": false
+    "platePreview": true
   },
   "115-case-extender-1w-1h": {
     "node": "CaseExtender_115-1W-1H",
@@ -1102,56 +1102,56 @@
     "collection": "165",
     "type": "CoverU",
     "label": "Cover Upper 165-1W",
-    "platePreview": false
+    "platePreview": true
   },
   "165-cover-lower-1w": {
     "node": "CL-165-1W",
     "collection": "165",
     "type": "CoverL",
     "label": "Cover Lower 165-1W",
-    "platePreview": false
+    "platePreview": true
   },
   "165-cover-upper-2w": {
     "node": "CU-165-2W",
     "collection": "165",
     "type": "CoverU",
     "label": "Cover Upper 165-2W",
-    "platePreview": false
+    "platePreview": true
   },
   "165-cover-lower-2w": {
     "node": "CL-165-2W",
     "collection": "165",
     "type": "CoverL",
     "label": "Cover Lower 165-2W",
-    "platePreview": false
+    "platePreview": true
   },
   "165-foot-rail-upper-1w": {
     "node": "FR-U_165-1W",
     "collection": "165",
     "type": "FootrailU",
     "label": "Footrail Upper 165-1W",
-    "platePreview": false
+    "platePreview": true
   },
   "165-foot-rail-lower-1w": {
     "node": "FR-L_165-1W",
     "collection": "165",
     "type": "FootrailL",
     "label": "Footrail Lower 165-1W",
-    "platePreview": false
+    "platePreview": true
   },
   "165-foot-rail-upper-2w": {
     "node": "FR-U_165-2W",
     "collection": "165",
     "type": "FootrailU",
     "label": "Footrail Upper 165-2W",
-    "platePreview": false
+    "platePreview": true
   },
   "165-foot-rail-lower-2w": {
     "node": "FR-L_165-2W",
     "collection": "165",
     "type": "FootrailL",
     "label": "Footrail Lower 165-2W",
-    "platePreview": false
+    "platePreview": true
   },
   "165-case-extender-1w-1h": {
     "node": "CaseExtender_165-1W-1H",
@@ -1620,56 +1620,56 @@
     "collection": "185",
     "type": "CoverU",
     "label": "Cover Upper 185-1W",
-    "platePreview": false
+    "platePreview": true
   },
   "185-cover-lower-1w": {
     "node": "CL-185-1W",
     "collection": "185",
     "type": "CoverL",
     "label": "Cover Lower 185-1W",
-    "platePreview": false
+    "platePreview": true
   },
   "185-cover-upper-2w": {
     "node": "CU-185-2W",
     "collection": "185",
     "type": "CoverU",
     "label": "Cover Upper 185-2W",
-    "platePreview": false
+    "platePreview": true
   },
   "185-cover-lower-2w": {
     "node": "CL-185-2W",
     "collection": "185",
     "type": "CoverL",
     "label": "Cover Lower 185-2W",
-    "platePreview": false
+    "platePreview": true
   },
   "185-foot-rail-upper-1w": {
     "node": "FR-U_185-1W",
     "collection": "185",
     "type": "FootrailU",
     "label": "Footrail Upper 185-1W",
-    "platePreview": false
+    "platePreview": true
   },
   "185-foot-rail-lower-1w": {
     "node": "FR-L_185-1W",
     "collection": "185",
     "type": "FootrailL",
     "label": "Footrail Lower 185-1W",
-    "platePreview": false
+    "platePreview": true
   },
   "185-foot-rail-upper-2w": {
     "node": "FR-U_185-2W",
     "collection": "185",
     "type": "FootrailU",
     "label": "Footrail Upper 185-2W",
-    "platePreview": false
+    "platePreview": true
   },
   "185-foot-rail-lower-2w": {
     "node": "FR-L_185-2W",
     "collection": "185",
     "type": "FootrailL",
     "label": "Footrail Lower 185-2W",
-    "platePreview": false
+    "platePreview": true
   },
   "185-case-extender-1w-1h": {
     "node": "CaseExtender_185-1W-1H",
@@ -2138,56 +2138,56 @@
     "collection": "240",
     "type": "CoverU",
     "label": "Cover Upper 240-1W",
-    "platePreview": false
+    "platePreview": true
   },
   "240-cover-lower-1w": {
     "node": "CL-240-1W",
     "collection": "240",
     "type": "CoverL",
     "label": "Cover Lower 240-1W",
-    "platePreview": false
+    "platePreview": true
   },
   "240-cover-upper-2w": {
     "node": "CU-240-2W",
     "collection": "240",
     "type": "CoverU",
     "label": "Cover Upper 240-2W",
-    "platePreview": false
+    "platePreview": true
   },
   "240-cover-lower-2w": {
     "node": "CL-240-2W",
     "collection": "240",
     "type": "CoverL",
     "label": "Cover Lower 240-2W",
-    "platePreview": false
+    "platePreview": true
   },
   "240-foot-rail-upper-1w": {
     "node": "FR-U_240-1W",
     "collection": "240",
     "type": "FootrailU",
     "label": "Footrail Upper 240-1W",
-    "platePreview": false
+    "platePreview": true
   },
   "240-foot-rail-lower-1w": {
     "node": "FR-L_240-1W",
     "collection": "240",
     "type": "FootrailL",
     "label": "Footrail Lower 240-1W",
-    "platePreview": false
+    "platePreview": true
   },
   "240-foot-rail-upper-2w": {
     "node": "FR-U_240-2W",
     "collection": "240",
     "type": "FootrailU",
     "label": "Footrail Upper 240-2W",
-    "platePreview": false
+    "platePreview": true
   },
   "240-foot-rail-lower-2w": {
     "node": "FR-L_240-2W",
     "collection": "240",
     "type": "FootrailL",
     "label": "Footrail Lower 240-2W",
-    "platePreview": false
+    "platePreview": true
   },
   "240-case-extender-1w-1h": {
     "node": "CaseExtender_240-1W-1H",
@@ -2656,56 +2656,56 @@
     "collection": "270",
     "type": "CoverU",
     "label": "Cover Upper 270-1W",
-    "platePreview": false
+    "platePreview": true
   },
   "270-cover-lower-1w": {
     "node": "CL-270-1W",
     "collection": "270",
     "type": "CoverL",
     "label": "Cover Lower 270-1W",
-    "platePreview": false
+    "platePreview": true
   },
   "270-cover-upper-2w": {
     "node": "CU-270-2W",
     "collection": "270",
     "type": "CoverU",
     "label": "Cover Upper 270-2W",
-    "platePreview": false
+    "platePreview": true
   },
   "270-cover-lower-2w": {
     "node": "CL-270-2W",
     "collection": "270",
     "type": "CoverL",
     "label": "Cover Lower 270-2W",
-    "platePreview": false
+    "platePreview": true
   },
   "270-foot-rail-upper-1w": {
     "node": "FR-U_270-1W",
     "collection": "270",
     "type": "FootrailU",
     "label": "Footrail Upper 270-1W",
-    "platePreview": false
+    "platePreview": true
   },
   "270-foot-rail-lower-1w": {
     "node": "FR-L_270-1W",
     "collection": "270",
     "type": "FootrailL",
     "label": "Footrail Lower 270-1W",
-    "platePreview": false
+    "platePreview": true
   },
   "270-foot-rail-upper-2w": {
     "node": "FR-U_270-2W",
     "collection": "270",
     "type": "FootrailU",
     "label": "Footrail Upper 270-2W",
-    "platePreview": false
+    "platePreview": true
   },
   "270-foot-rail-lower-2w": {
     "node": "FR-L_270-2W",
     "collection": "270",
     "type": "FootrailL",
     "label": "Footrail Lower 270-2W",
-    "platePreview": false
+    "platePreview": true
   },
   "270-case-extender-1w-1h": {
     "node": "CaseExtender_270-1W-1H",
