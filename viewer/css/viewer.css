@@ -1094,3 +1094,19 @@ body.part-preview #loading-overlay { background: transparent; }
 #part-measure.on { color: #fff; background: var(--accent); border-color: var(--accent); }
 /* plate boots show Top view in the left corner - measure stacks under it */
 body.part-plate #part-measure { top: 46px; }
+/* doesn't-fit banner: a full-width strip along the top edge, so it reads at
+   every stage width (a centered pill collided with the corner pills in the
+   site's 300px media column). The corner pills drop below it while it's up. */
+#plate-overhang {
+  position: absolute; left: 0; right: 0; top: 0; z-index: 2;
+  padding: 8px 12px; text-align: center;
+  background: rgba(197, 58, 69, 0.94); color: #fff;
+  font-size: 12px; font-weight: 700; line-height: 1.2;
+  pointer-events: none;
+}
+body.plate-overhang-on #part-top { top: 42px; }
+body.plate-overhang-on #part-reset { top: 42px; }
+body.plate-overhang-on.part-plate #part-measure { top: 78px; }
+/* the site's narrowest media column is 300px - keep the strip to one line
+   there so the dropped pills never collide with a wrapped second line */
+@media (max-width: 360px) { #plate-overhang { font-size: 11px; } }

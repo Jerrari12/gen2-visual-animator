@@ -6132,7 +6132,7 @@ function fitPartCamera() {
 // grid with stronger 50 mm majors, usable-area outline). No turntable — a
 // print layout is studied, not admired. A "Top" pill swaps between the high
 // 3/4 and a straight-down view.
-const plateStage = { group: null, top: false, yawed: false };
+const plateStage = { group: null, top: false, yawed: false, overhang: null };
 function seatOnPlate() {
   // a plate manifest is the bare PRINT JOB by construction — one body, or a
   // handed pair whose two bodies ship in one STL (the resolver's goldens pin
@@ -6173,6 +6173,12 @@ function seatOnPlate() {
     }
     plateStage.yawed = true;
     applyState(0); // reposition from the rotated cfg before the seating measurement
+  } else if (!fitsAs) {
+    // neither orientation fits: the honest overhang still renders, but LOUDLY
+    // (Joey, 2026-08-31, after a 270 rail hung off a 256 bed in silence) —
+    // markOverhang() paints the job slicer-red and raises the banner. Ceil to
+    // whole mm: the banner quotes a print requirement, not float noise.
+    plateStage.overhang = { w: Math.ceil(s.x), d: Math.ceil(s.z) };
   }
   // the print pose rotated each body about its product-pose bottom-center —
   // measure the posed (and possibly yawed) JOB bounds once and BAKE one shared
@@ -6184,6 +6190,21 @@ function seatOnPlate() {
     i.cfg.pos = [i.cfg.pos[0] - c.x, i.cfg.pos[1] - box.min.y, i.cfg.pos[2] - c.z];
   applyState(0);
   computeBounds();
+}
+// doesn't-fit treatment, the slicer convention (PrusaSlicer paints the part
+// red when it exits the bed): flat red job + a banner naming the footprint the
+// print actually needs. The site's fitline already says "Won't fit" before the
+// visitor ever opens Plate - this makes the picture agree with the words.
+const OVERHANG_MAT = new THREE.MeshStandardMaterial({ color: 0xd8434e, roughness: 0.55 });
+function markOverhang() {
+  if (!plateStage.overhang) return;
+  for (const i of instances.values())
+    i.group.traverse(o => { if (o.isMesh) o.material = OVERHANG_MAT; });
+  const strip = document.createElement('div');
+  strip.id = 'plate-overhang';
+  strip.textContent = `✕ Too big for this plate · needs ${plateStage.overhang.w}×${plateStage.overhang.d} mm`;
+  document.body.appendChild(strip);
+  document.body.classList.add('plate-overhang-on'); // drops the corner pills below the strip
 }
 function buildPlateStage() {
   const { w, d } = PART_PLATE;
@@ -6354,6 +6375,7 @@ if (IS_PART) {
   if (PART_PLATE) {
     seatOnPlate();
     buildPlateStage();
+    markOverhang();
     fitPlateCamera(false);
   } else {
     fitPartCamera();
