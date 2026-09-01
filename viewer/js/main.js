@@ -761,7 +761,14 @@ const ao = { rtN: null, rtAO: null, normalMat: null, aoMat: null, compMat: null,
 // TRANSPARENT background its half-res bleed draws a dark halo just outside the
 // part's silhouette, over the embedding page's panel (2026-08-19 design
 // review). And the idle turntable would invalidate it every frame anyway.
-function aoWanted() { return QUALITY[quality].ao && !cinema.on && !fxDead.ao && !tweens.size && !IS_PART; }
+/* ⚠ !tweens.size is a LIVE-PERFORMANCE choice (AO skipped while anything
+   animates) - and therefore the exact mechanism of the filmed-clip flicker:
+   engine-tweened footage ships AO-less frames, then AO pops in at rest. The
+   film rig needs AO HELD ON through tweens for consistent frames, so the
+   window flag below exists for capture harnesses only. It costs production
+   nothing (undefined stays falsy) and replaces the old git-archive-and-patch
+   ritual (NEXT-SESSION 2026-08-30) now that this repo owns its own filming. */
+function aoWanted() { return QUALITY[quality].ao && !cinema.on && !fxDead.ao && (!tweens.size || window.__FILM_AO_DURING_TWEENS) && !IS_PART; }
 /* Every accumulation pass gets its OWN full 24-point golden-angle spiral -
    the shipped kernel's angular quality (max azimuth gap ~20 deg) - rotated by
    an equally-spaced g/groups turn and radius-interleaved by (g+0.5)/groups,
