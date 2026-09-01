@@ -1,0 +1,16 @@
+{
+  "sourceRegistryRevision": "gen2-viewer@065cee2",
+  "plateCapableInRegistry": 513,
+  "exported": 511,
+  "skippedEntirely": [
+    {
+      "slug": "quicklock-a-v1-11",
+      "reason": "chiral set: one physical print, two per-node rotations - the contract carries one rotation per entry (handoff invites an extension rather than flattening)"
+    },
+    {
+      "slug": "drawer-stoppers",
+      "reason": "multi-body set: one physical print across several GLB files - the contract carries a singular asset identity per entry"
+    }
+  ],
+  "bedOffsetOmitted": []
+}
