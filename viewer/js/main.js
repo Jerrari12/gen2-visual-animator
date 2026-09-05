@@ -9,6 +9,7 @@ import { generateManifest, migrateOfficialBuild, resolvePartPreview, REQUIREMENT
   shelfLipModes, SHELF_LIP_LABEL } from './generate.js';
 import { resolveEntry } from './entry.js';
 import { FILAMENT_DB } from './filament-db.js';
+import { partMaterialSpec } from './part-material.js';
 
 /* Every entry-routing boolean below is derived by resolveEntry() in entry.js -
    a pure function of (search, hash) with no DOM or network - so the boot
@@ -1799,34 +1800,30 @@ function attachHolo(m, diffracts) {
   return m;
 }
 const holoUniforms = [];   // live intensity across every holo material
+/* ⚠ THE FINISH NUMBERS MOVED TO `part-material.js` ON 2026-09-05, unchanged.
+   They are vendored into the Filament Material Lab, whose staging page has to
+   render what THIS viewer renders in order to argue that something else would
+   be better - and a hand-copied 0.55 / 0.05 there would be a second author of
+   this surface. Edit them THERE only; both suites gate on byte equality.
+
+   What stays here is everything the spec deliberately does not carry: the
+   colour (palette state, and the whole point of the picker), the THREE
+   construction, and the holographic shader patch. */
 function newPartMaterial(key) {
-  if (plateActive() && key.split(':')[0] === 'Faceplate') {
-    const face = plateContactKey(key);
-    return attachHolo(new THREE.MeshPhysicalMaterial({
-      color: new THREE.Color(activeHex(key)),
-      metalness: 0, roughness: face ? 0.14 : 0.2,
-      clearcoat: face ? 1.0 : 0.8, clearcoatRoughness: face ? 0.11 : 0.14,
-      envMapIntensity: 1.15,
-    }), face);
-  }
-  /* Bought adhesive rubber feet (2026-08-22). A REAL part in the scene, not an
-     annotation - Joey confirmed the bought foot is the printed one minus its
-     dovetail rail, so `Adhesive-Foot` is derived from the printed master and
-     the shape IS the product. What it must not wear is the identification
-     palette: rubber reads as rubber only if it is matte beside the plastics.
-     Colour comes from activeHex like every other type - and because its BOM row
-     is `purchased`, colorLocked pins it to the manifest colour, so no preset or
-     filament pick can repaint a bought item. */
-  if (key === 'FootAdhesive') {
-    // 0.72, not the 0.95 a "matte rubber" instinct reaches for: a real bumper
-    // foot carries a soft sheen, and at 0.95 there is no specular at all - the
-    // pad's edges disappeared into the dark stage (checked on screen, not
-    // reasoned about).
-    return new THREE.MeshStandardMaterial({
-      color: new THREE.Color(activeHex(key)), roughness: 0.72, metalness: 0,
+  const plateContact = plateContactKey(key);
+  const spec = partMaterialSpec(key, { holographicPlate: plateActive(), plateContact });
+  const color = new THREE.Color(activeHex(key));
+
+  if (spec.kind === 'physical') {
+    const m = new THREE.MeshPhysicalMaterial({
+      color,
+      metalness: spec.metalness, roughness: spec.roughness,
+      clearcoat: spec.clearcoat, clearcoatRoughness: spec.clearcoatRoughness,
+      envMapIntensity: spec.envMapIntensity,
     });
+    return spec.holographic ? attachHolo(m, plateContact) : m;
   }
-  return new THREE.MeshStandardMaterial({ color: new THREE.Color(activeHex(key)), roughness: 0.55, metalness: 0.05 });
+  return new THREE.MeshStandardMaterial({ color, roughness: spec.roughness, metalness: spec.metalness });
 }
 /* A material's RESTING opacity. Every fade in this engine used to drive
    opacity from/to a hardcoded 1, which is only true while every part is
