@@ -19,36 +19,43 @@
  * identification colour AND give all four presets an entry, or fail here.
  *
  * main.js cannot be imported under node (it builds a WebGL renderer at module
- * scope), so the filament section is lifted out and EXECUTED - the same
- * technique test/relay-contract.test.mjs uses. Every extraction is guarded: if
- * a regex stops matching, the test fails loudly rather than passing vacuously.
+ * scope), so PRESETS is lifted out and EXECUTED - the same technique
+ * test/relay-contract.test.mjs uses. Every extraction is guarded: if a regex
+ * stops matching, the test fails loudly rather than passing vacuously.
+ *
+ * ⚠ FILAMENT_DB IS IMPORTED NOW, NOT LIFTED (2026-09-05). It moved to its own
+ * module, which node CAN import - so the catalog under test is the object the
+ * viewer actually ships, rather than a re-execution of a text slice, and one
+ * whole class of "the regex quietly stopped matching" is gone with it. PRESETS
+ * still lives in main.js and is still lifted, with the catalog injected.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { FILAMENT_DB } from '../viewer/js/filament-db.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const main = readFileSync(join(root, 'viewer', 'js', 'main.js'), 'utf8');
 const gen = readFileSync(join(root, 'viewer', 'js', 'generate.js'), 'utf8');
 const L = main.split(/\r?\n/);
 
-/* The whole filament section, verbatim: FILAMENT_DB leans on PM / POLY_LINK /
-   POLYMAKER_URL, so cherry-picking declarations just chases dependencies. */
-const from = L.findIndex((l) => /^const POLY_LINK\s*=/.test(l));
+/* `_db` through the end of PRESETS. The catalog is IMPORTED above and injected
+   into this scope, so the only thing executed here is the preset table. */
+const from = L.findIndex((l) => /^function _db\s*\(/.test(l));
 const pStart = L.findIndex((l) => /^const PRESETS\s*=/.test(l));
-assert.ok(from >= 0 && pStart > from, 'could not locate the filament section in main.js');
+assert.ok(from >= 0 && pStart > from, 'could not locate _db / PRESETS in main.js');
 let to = pStart;
 while (to < L.length && !/^\];/.test(L[to])) to++;
 assert.ok(to < L.length, 'PRESETS array is unterminated at column 0');
 
 const warnings = [];
-const { FILAMENT_DB, PRESETS } = new Function('__warn', [
+const { PRESETS } = new Function('__warn', 'FILAMENT_DB', [
   'const console = { warn: (m) => __warn.push(m) };',
   L.slice(from, to + 1).join('\n'),
-  'return { FILAMENT_DB, PRESETS };',
-].join('\n'))(warnings);
+  'return { PRESETS };',
+].join('\n'))(warnings, FILAMENT_DB);
 
 /* the identification palette's type list, from the generator */
 function objAt(needle) {
