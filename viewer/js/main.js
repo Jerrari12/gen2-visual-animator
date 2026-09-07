@@ -1892,7 +1892,24 @@ function dropFaceplateMaterials() {
  * a cache key of `holo1|ld` and both shader blocks present; the other order gives `holo1` and the
  * layer block simply absent. test/layer-detail-seam.test.mjs is the gate.
  */
+/**
+ * ⚠ THE KILL SWITCH. Set false and redeploy to take printed-layer relief off every part in the
+ * viewer, without reverting anything and without touching the vendored module.
+ *
+ * It exists because layer detail is the first thing this repo has shipped that changes how EVERY
+ * printed surface is drawn, on hardware nobody here has benchmarked — it costs +2.171 ms a frame on
+ * an A5000 at DPR 2, and fill rate is what decides mobile. If it is wrong on a real device the
+ * answer has to be one line and one deploy, not a revert of a landed port. The flag is read at
+ * material construction, so flipping it takes effect on the next build of the scene.
+ *
+ * ⚠ IT IS A LEVER, NOT A SETTING. There is no UI for it and there should not be: a user-facing
+ * toggle would need a persisted preference, a place in the quality tiers and a story about what the
+ * comparison in the Lab is then comparing. This is the thing you reach for at 2am.
+ */
+const LAYER_DETAIL_ENABLED = true;
+
 function withLayerDetail(m, key) {
+  if (!LAYER_DETAIL_ENABLED) return m;
   const up = buildAxisForKey(key);
   if (!up) return m;
   layerHandles.set(key, applyLayerDetail(m, {
@@ -1906,7 +1923,9 @@ function withLayerDetail(m, key) {
 
 function newPartMaterial(key) {
   const plateContact = plateContactKey(key);
-  const spec = partMaterialSpec(key, { holographicPlate: plateActive(), plateContact });
+  const spec = partMaterialSpec(key, {
+    holographicPlate: plateActive(), plateContact, label: activeLabel(key),
+  });
   const color = new THREE.Color(activeHex(key));
 
   if (spec.kind === 'physical') {
@@ -4341,17 +4360,70 @@ const activeHex = key => {
   return base !== key ? activeHex(base) : '#b9bcc2';
 };
 
+/**
+ * WHICH FILAMENT THIS KEY IS WEARING, or null when it is not wearing one.
+ *
+ * ⚠ IT MIRRORS activeHex BRANCH FOR BRANCH, AND IT HAS TO. A profile keys by filament LABEL, and
+ * the only branch of activeHex that HAS a label is the first — a custom palette pick, whose entry
+ * carries {name, hex, url}. The dark-stage palette and the manifest colours are identification
+ * colours: they are a hex and nothing more, and a part painted by one is not wearing a filament.
+ * Falling through to a filament there would paint a profile onto a colour the user never chose.
+ *
+ * ⚠ THE THREE SHARED RULES ARE WHY THIS IS NOT A ONE-LINER. It must honour `colorLocked`, or a
+ * purchased part — the adhesive foot — picks up a profile for a filament it was never printed in.
+ * It must honour `useCustom`, or turning the palette off leaves the finish behind while the colour
+ * reverts. And it must take the `Type:zone -> Type` fallback, or a zone with no pick of its own gets
+ * the base type's COLOUR and the base finish, which is the split that makes a grip read as a
+ * different material from the face it is moulded into.
+ *
+ * ⚠ SO IN INSTRUCTION-COLOURS MODE THIS RETURNS NULL FOR EVERYTHING, and so it does in the ?part=
+ * embed, which never loads a palette. Those views get the base finish plus layer detail. That is
+ * the decision of 2026-09-07, and it is enforced here rather than anywhere else.
+ */
+const activeLabel = key => {
+  if (useCustom && customColors[key] && !colorLocked(key)) return customColors[key].name || null;
+  if (stageTheme !== 'light' && DARK_STAGE_PALETTE[key]) return null;
+  if (manifest.colors[key]) return null;
+  const base = key.split(':')[0];
+  return base !== key ? activeLabel(base) : null;
+};
+
+/**
+ * The finish a key should be wearing right now, as a live read rather than a construction-time one.
+ *
+ * ⚠ THIS IS THE HALF applyPalette WAS MISSING. It has always walked the six material maps setting
+ * `.color` AND NOTHING ELSE, which was complete while a finish was a constant. It is not one any
+ * more: a filament with a profile carries its own roughness and metalness, so a palette change that
+ * moves the colour and leaves the finish renders the new filament at the old material until
+ * something happens to rebuild the scene. The part would look right in the picker and wrong on the
+ * model, which is the failure this whole transport exists to produce correctly.
+ */
+const finishFor = key => partMaterialSpec(key, {
+  holographicPlate: plateActive(), plateContact: plateContactKey(key), label: activeLabel(key),
+});
+
 function applyPalette() {
-  for (const [type, mat] of Object.entries(materials)) mat.color.set(activeHex(type));
-  for (const [type, mat] of Object.entries(highlightMats)) mat.color.set(activeHex(type));
+  /* ⚠ COLOUR AND FINISH, SINCE 2026-09-07. See finishFor. Only roughness and metalness move:
+     they are the whole of what a profile carries, and they are plain uniforms, so no material needs
+     recompiling. Anything structural — the clearcoat the holographic plate transfers, the material
+     CLASS — still comes from a rebuild, exactly as it did before, because nothing here can change
+     it without one. */
+  const repaint = (type, mat) => {
+    mat.color.set(activeHex(type));
+    const spec = finishFor(type);
+    mat.roughness = spec.roughness;
+    mat.metalness = spec.metalness;
+  };
+  for (const [type, mat] of Object.entries(materials)) repaint(type, mat);
+  for (const [type, mat] of Object.entries(highlightMats)) repaint(type, mat);
   // lightened alternate-tile variants track the active palette too — and fall
   // to lerp 0 (identical to base) for types with a custom filament pick, so a
   // preset's covers/footrails render uniform without any material reassignment
-  for (const [type, mat] of Object.entries(altMaterials)) mat.color.set(activeHex(type)).lerp(new THREE.Color('#ffffff'), altLerp(type));
-  for (const [type, mat] of Object.entries(altHighlightMats)) mat.color.set(activeHex(type)).lerp(new THREE.Color('#ffffff'), altLerp(type));
-  // planned (translucent) clones take their source's colour, after it moved
-  for (const e of Object.values(plannedMats)) e.mat.color.copy(e.src.color);
-  for (const e of Object.values(plannedHighlightMats)) e.mat.color.copy(e.src.color);
+  for (const [type, mat] of Object.entries(altMaterials)) { repaint(type, mat); mat.color.lerp(new THREE.Color('#ffffff'), altLerp(type)); }
+  for (const [type, mat] of Object.entries(altHighlightMats)) { repaint(type, mat); mat.color.lerp(new THREE.Color('#ffffff'), altLerp(type)); }
+  // planned (translucent) clones take their source's colour AND finish, after both moved
+  for (const e of Object.values(plannedMats)) { e.mat.color.copy(e.src.color); e.mat.roughness = e.src.roughness; e.mat.metalness = e.src.metalness; }
+  for (const e of Object.values(plannedHighlightMats)) { e.mat.color.copy(e.src.color); e.mat.roughness = e.src.roughness; e.mat.metalness = e.src.metalness; }
   renderChecklist();
   updateColorToggle();
   renderPresets(); // keep the active preset / My-palette chip highlight in step
@@ -6577,5 +6649,12 @@ if (new URLSearchParams(location.search).get('debug')) {
     // part-preview internals (2026-08-19) — the mode flag, the view state and
     // the resolver, so an embed question is answerable by reading state
     IS_PART, partView, resolvePartPreview, fitPartCamera, PART_PLATE, plateStage,
+    // the palette, for the profile transport's end-to-end test (2026-09-07). A profile keys by
+    // filament LABEL, so nothing outside can assign one without reaching the picker's own state;
+    // these are the two handles it touches. `customColors` is a getter because the binding is
+    // REASSIGNED (presets, uploads, relays) - returning the object once would hand out a stale one.
+    // Debug-only, like everything else here.
+    applyPalette, activeLabel, get customColors() { return customColors; },
+    COLOR_STORE_KEY,
     trackLog, track };
 }

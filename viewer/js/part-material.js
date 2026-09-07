@@ -32,7 +32,16 @@
    testable in plain node on both sides.
    ========================================================================= */
 
-export const PART_MATERIAL_CONTRACT_VERSION = 1;
+import { FILAMENT_PROFILES } from './filament-profiles.js';
+
+/**
+ * ⚠ 2 SINCE 2026-09-07, AND THE BUMP IS THE POINT. Version 1 answered a part key with a fixed
+ * finish. Version 2 answers a part key AND A FILAMENT LABEL, and can return values another
+ * repository authored — a consumer written against 1 would silently ignore `ctx.label` and render
+ * every profiled filament at the base. Both repos pin this constant, so the mismatch is a failing
+ * test rather than a picture nobody can explain.
+ */
+export const PART_MATERIAL_CONTRACT_VERSION = 2;
 
 /** A zone key is `Type` or `Type:zone`; the base type is what carries identity. */
 export const baseType = (key) => String(key).split(':')[0];
@@ -44,12 +53,14 @@ export const baseType = (key) => String(key).split(':')[0];
  * @param {object} [ctx]
  * @param {boolean} [ctx.holographicPlate] a holographic build-plate profile is active
  * @param {boolean} [ctx.plateContact]     this key is the face that touched the plate
+ * @param {string|null} [ctx.label]        the FILAMENT_DB label worn by this key, or null when
+ *                                         none is — see `activeLabel` in main.js
  * @returns {{kind:'standard'|'physical', roughness:number, metalness:number,
  *            clearcoat?:number, clearcoatRoughness?:number,
- *            envMapIntensity?:number, holographic?:boolean}}
+ *            envMapIntensity?:number, holographic?:boolean, profile?:string}}
  */
 export function partMaterialSpec(key, ctx = {}) {
-  const { holographicPlate = false, plateContact = false } = ctx;
+  const { holographicPlate = false, plateContact = false, label = null } = ctx;
 
   /* The holographic build plate transfers its own finish to the faceplate that
      was printed against it - polished where it made contact, ordinary elsewhere.
@@ -119,6 +130,26 @@ export function partMaterialSpec(key, ctx = {}) {
      default and is stated so the branch is not handed an undefined. What
      remains is a plain MeshPhysicalMaterial at its defaults, which is exactly
      what the Lab builds and what the comparison was judged on. */
-  return { kind: 'physical', roughness: 0.55, metalness: 0.05,
-    clearcoat: 0, clearcoatRoughness: 0, envMapIntensity: 1 };
+  const base = {
+    kind: 'physical', roughness: 0.55, metalness: 0.05,
+    clearcoat: 0, clearcoatRoughness: 0, envMapIntensity: 1,
+  };
+
+  /* ⚠ THE AUTHORED PROFILE, AND IT REPLACES TWO SCALARS AND NOTHING ELSE. P6 option A: the Lab
+     owns the per-label values and emits them into `filament-profiles.js`; this repo owns the key
+     vocabulary, because a filament exists here first or it has no label to be keyed by.
+
+     ⚠ ORDINARY PARTS ONLY, ON PURPOSE. It sits below the plate branch, so the holographic
+     transfer still wins where it applies — that finish describes what the BUILD PLATE did to a
+     surface, and a filament profile describing the filament cannot also describe that. It sits
+     below FootAdhesive for a different reason that needs no code: the foot is purchased, so
+     `colorLocked` is true for it and `activeLabel` never returns a label there.
+
+     ⚠ AND THE BASE STAYS 0.55 THIS SHIP. Landing profile one does not move the ordinary part.
+     A filament with no profile, and every part in instruction-colours mode and in the ?part=
+     embed — where no label exists at all — renders exactly what it rendered before, plus the
+     layer detail that shipped separately. See docs/P6-PROFILE-TRANSPORT.md in the Lab. */
+  const profile = label ? FILAMENT_PROFILES[label] : undefined;
+  if (!profile) return base;
+  return { ...base, roughness: profile.roughness, metalness: profile.metalness, profile: label };
 }

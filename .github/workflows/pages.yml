@@ -45,6 +45,33 @@ jobs:
       - name: Test (blocks the deploy)
         run: npm test
 
+      # ⚠ THE SUITE ABOVE CANNOT SEE A PIXEL. It runs without a browser, so it passes on a build
+      # whose viewer throws at boot and shows a black canvas forever — every protection in this
+      # repo was blind to the one failure a visitor actually experiences. This opens the two routes
+      # that reach users in a real headless Chrome and asserts they draw: no console errors, a
+      # canvas that is neither black nor a flat fill, and the two cross-repo modules loaded and
+      # doing their job. Mutation-checked both ways before it landed — a planted boot throw fails
+      # all three routes on console noise, and the layer-detail kill switch fails the module check
+      # alone while the picture stays fine.
+      # It is the only step here that needs node_modules, which is why the suite above still does
+      # not, and why this is a separate step rather than folded into npm test.
+      #
+      # profile-lands is the second half and answers a different question: the unit tests prove
+      # partMaterialSpec RETURNS the authored finish, which says nothing about whether anything on
+      # screen wears it. Three things sit between the spec and the picture - activeLabel finding the
+      # label, newPartMaterial passing it, and applyPalette carrying the FINISH and not only the
+      # colour - and the third was missing until it was written. It drives the picker's own sequence
+      # with no rebuild, and is mutation-checked: reverting applyPalette to colour-only fails it.
+      - name: Smoke test the deployed routes in a browser (blocks the deploy)
+        run: |
+          # ⚠ install, NOT ci. package-lock.json is gitignored in this repo (.gitignore:79), and
+          # `npm ci` refuses to run without one — it would have failed the deploy on the first
+          # push, in the step added to stop deploys failing.
+          npm install --no-audit --no-fund
+          npx playwright install --with-deps chromium
+          npm run smoke
+          npm run profile-lands
+
       # THE DERIVATION CHECK. Adhesive-Foot.lib.glb is CUT from the printed
       # foot by this script, so re-exporting the master silently leaves the
       # derivative wrong - both files still load, both still look like feet.
@@ -98,6 +125,13 @@ jobs:
           # ES module - requirement-scope.js and tabletop-completion.js are classic script tags,
           # stamped against index.html above. This one is a real import and needs a real line.
           sed -i "s|'./vendor/layer-detail.js'|'./vendor/layer-detail.js?v=$V'|" viewer/js/main.js
+          # ⚠ THE FIRST SPECIFIER THAT IS NOT IN main.js. filament-profiles.js is the Lab's authored
+          # per-filament finish, and part-material.js imports it as a SIBLING — so the sed target is
+          # part-material.js, not main.js, and a line copied from the block above would silently
+          # match nothing. The graph guard below walks every module in viewer/js/, so a forgotten
+          # line here fails the deploy rather than shipping a module that caches independently of
+          # the importer that reads it.
+          sed -i "s|'./filament-profiles.js'|'./filament-profiles.js?v=$V'|" viewer/js/part-material.js
 
       # Fail the deploy rather than ship a half-stamped module graph. A first
       # version of this guard was a single grep over main.js for

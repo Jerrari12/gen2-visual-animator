@@ -22,7 +22,11 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const main = readFileSync(join(root, 'viewer', 'js', 'main.js'), 'utf8').replace(/\r\n/g, '\n');
 
 test('the contract version is pinned - the Lab refuses a mismatch', () => {
-  assert.equal(PART_MATERIAL_CONTRACT_VERSION, 1);
+  /* ⚠ 2 SINCE 2026-09-07. Version 1 answered a part key with a fixed finish; version 2 answers a
+     part key AND a filament label, and can return values the Lab authored. A consumer written
+     against 1 would ignore ctx.label and render every profiled filament at the base - a wrong
+     picture with no error, which is what a version exists to turn into a failing test. */
+  assert.equal(PART_MATERIAL_CONTRACT_VERSION, 2);
 });
 
 test('an ordinary printed part is 0.55 / 0.05 physical', () => {
