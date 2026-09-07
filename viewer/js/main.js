@@ -6559,6 +6559,12 @@ renderer.setAnimationLoop(now => {
 // dev-only hook (mirrors the planner's guarded test-hook convention): ?debug=1
 if (new URLSearchParams(location.search).get('debug')) {
   window.__GEN2_VIEWER__ = { THREE, scene, camera, controls, goTo, applyState, instances, manifest, cinema, updateCinema, cinemaScene, party, confetti, confettiPop, fpFocus, fpEnv,
+    // The printed-relief handles, keyed by material key. ⚠ THE ONLY WAY TO REACH THE LAYER
+    // UNIFORMS FROM OUTSIDE: they live in the vendored module's closure, so a tool that wants to
+    // switch the relief off — the floor arm of any comparison against the Lab, and the one arm
+    // that says what a statistic reads with NO bands drawn — has no other route. Debug-only, like
+    // everything else on this object.
+    layerHandles,
     wall, surface,   // the mount backdrops, for capture tooling that needs the mounting surface as context
     renderer, table, grid, camPos, captureShot, get buildCenter() { return buildCenter; },
     // render-quality internals (2026-08-10) — the tier, the AO buffers and the
