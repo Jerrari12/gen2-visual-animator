@@ -82,10 +82,43 @@ export function partMaterialSpec(key, ctx = {}) {
      reasoned about). */
   if (key === 'FootAdhesive') return { kind: 'standard', roughness: 0.72, metalness: 0 };
 
-  /* ⚠ THE ORDINARY PRINTED PART, AND THE ONE THE LAB IS TRYING TO BEAT.
-     0.55 / 0.05 is every case, drawer, shelf and handle in the viewer. It is a
-     plausible plastic and nothing more: no layer lines, no anisotropy, no
-     dependence on how the part was printed or which filament it is. Roadmap
-     item 1 is the proposal to replace it. */
-  return { kind: 'standard', roughness: 0.55, metalness: 0.05 };
+  /* ⚠ THE ORDINARY PRINTED PART — every case, drawer, shelf and handle in the
+     viewer. 0.55 / 0.05 is a plausible plastic and nothing more: no layer lines,
+     no anisotropy, no dependence on how the part was printed or which filament
+     it is. Roadmap item 1 is the proposal to replace it.
+
+     ⚠ PHYSICAL SINCE 2026-09-07, ON THE ROADMAP'S GROUNDS AND NOT ON A
+     MEASUREMENT. B2 was scoped as promoting the class only "where a profile is
+     active"; it is promoted everywhere because the authored profile this viewer
+     is meant to consume was judged on a MeshPhysicalMaterial, and because the
+     two renderers being structurally the same is worth having on its own.
+
+     ⚠ THE MEASUREMENT THAT WAS FIRST OFFERED FOR IT IS WITHDRAWN. The Lab
+     reported the two pages 16.1 % apart in windowed mean at an identical rig and
+     paint and named this class as the only remaining difference. It was not: the
+     gap was the Lab's own control arm painting the part TWICE — its catalog
+     material carries the filament in coexColors with material.color left white,
+     and the coextrusion patch multiplies them. Promoting this class moved the
+     comparison by nothing at all, and once the control arm painted once the two
+     pages agreed to 0.1 % at three framings. So the "same shader" premise B2
+     rested on was never falsified, and this change fixes no defect.
+     See docs/RENDERING.md § 1.4s in the Lab, which records the retraction.
+
+     ⚠ AND IT IS FREE, WHICH IS THE ONLY REASON IT SURVIVED THE RETRACTION.
+     Benched on the 185 2W-2H at quality high, seven interleaved rounds against
+     the deployed main: the class costs −0.086 ms a frame, 4 of 7 rounds
+     disagreeing on the sign — unresolved, inside its own spread. The same
+     harness resolves layer detail at +2.171 ms with 7 of 7 agreeing and lands a
+     planted 1.25x-DPR cost at 1.558x against the 1.5625x its own arithmetic
+     predicts. A bench that pins a known cost to 0.3 % cannot see this one.
+     docs/data/bs-perf-b2.json.
+
+     The three extra fields are what the physical branch of newPartMaterial
+     reads. clearcoat 0 keeps USE_CLEARCOAT undefined, so no clearcoat lobe is
+     compiled and clearcoatRoughness is inert; envMapIntensity 1 is three's own
+     default and is stated so the branch is not handed an undefined. What
+     remains is a plain MeshPhysicalMaterial at its defaults, which is exactly
+     what the Lab builds and what the comparison was judged on. */
+  return { kind: 'physical', roughness: 0.55, metalness: 0.05,
+    clearcoat: 0, clearcoatRoughness: 0, envMapIntensity: 1 };
 }

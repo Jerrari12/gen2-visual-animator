@@ -25,12 +25,33 @@ test('the contract version is pinned - the Lab refuses a mismatch', () => {
   assert.equal(PART_MATERIAL_CONTRACT_VERSION, 1);
 });
 
-test('an ordinary printed part is 0.55 / 0.05 standard', () => {
+test('an ordinary printed part is 0.55 / 0.05 physical', () => {
   /* Every case, drawer, shelf and handle in the viewer. This is the surface
      roadmap item 1 proposes to replace, so it is the one that must not move by
-     accident. */
+     accident.
+
+     ⚠ PHYSICAL SINCE 2026-09-07, ON THE ROADMAP'S GROUNDS. The authored profile
+     this viewer is meant to consume was judged on a MeshPhysicalMaterial. The
+     16 % measurement first offered for it is WITHDRAWN - that gap was the Lab's
+     control arm painting its part twice, and promoting this class moved the
+     comparison by nothing. See the Lab's docs/RENDERING.md section 1.4s. */
   for (const key of ['Case', 'Drawer', 'ShelfInsert', 'Handle', 'Case:BODY']) {
-    assert.deepEqual(partMaterialSpec(key), { kind: 'standard', roughness: 0.55, metalness: 0.05 }, key);
+    assert.deepEqual(partMaterialSpec(key), {
+      kind: 'physical', roughness: 0.55, metalness: 0.05,
+      clearcoat: 0, clearcoatRoughness: 0, envMapIntensity: 1,
+    }, key);
+  }
+});
+
+test('⚔ and it gets no clearcoat lobe, which is what made the change free', () => {
+  /* ⚠ three defines USE_CLEARCOAT when clearcoat > 0, compiling a second specular
+     lobe and a second normal - real per-fragment work, on exactly the fill-bound
+     devices this viewer has never been benchmarked on. The class change measured
+     at -0.086 ms a frame on the 185 2W-2H at high, unresolved against its own
+     spread, by a harness that lands a planted 1.25x-DPR cost at 1.558x against a
+     predicted 1.5625x. That number is only true while this stays 0. */
+  for (const key of ['Case', 'Drawer', 'ShelfInsert', 'Handle']) {
+    assert.equal(partMaterialSpec(key).clearcoat, 0, key);
   }
 });
 
@@ -54,10 +75,24 @@ test('the holographic plate transfers a polished finish, and only where it touch
 
 test('⚔ the plate finish reaches faceplates only, and only when a plate is active', () => {
   /* Two ways this has to fail closed. A non-faceplate on a holographic plate is
-     an ordinary part; a faceplate with no plate active is an ordinary part. */
-  assert.equal(partMaterialSpec('Case', { holographicPlate: true, plateContact: true }).kind, 'standard');
-  assert.equal(partMaterialSpec('Faceplate', { holographicPlate: false, plateContact: true }).kind, 'standard');
-  assert.equal(partMaterialSpec('Faceplate').kind, 'standard');
+     an ordinary part; a faceplate with no plate active is an ordinary part.
+
+     ⚠ THIS USED TO ASSERT kind === 'standard', AND THAT WAS THE WRONG THING TO
+     ASSERT. It read as "the plate finish did not leak" only for as long as
+     ordinary parts happened to be standard - the marker, not the relation. When
+     the ordinary part went physical on 2026-09-07 the test went red on a change
+     that leaked nothing at all. What it means is that these keys get the ORDINARY
+     finish, whatever class that currently is, so that is what it now says. */
+  const ordinary = partMaterialSpec('Case');
+  assert.deepEqual(partMaterialSpec('Case', { holographicPlate: true, plateContact: true }), ordinary);
+  assert.deepEqual(partMaterialSpec('Faceplate', { holographicPlate: false, plateContact: true }), ordinary);
+  assert.deepEqual(partMaterialSpec('Faceplate'), ordinary);
+  /* and the two things that only the plate finish carries stay behind it */
+  for (const spec of [ordinary,
+    partMaterialSpec('Case', { holographicPlate: true, plateContact: true })]) {
+    assert.equal(spec.holographic, undefined);
+    assert.equal(spec.clearcoat, 0);
+  }
 });
 
 test('a zone key resolves to its base type', () => {
