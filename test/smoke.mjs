@@ -112,18 +112,32 @@ async function open(browser, base, query) {
   const noise = [];
   page.on('console', (m) => { if (m.type() === 'error') noise.push(`console: ${m.text()}`); });
   page.on('pageerror', (e) => noise.push(`uncaught: ${e.message}`));
-  page.on('requestfailed', (r) => noise.push(`request failed: ${r.url()}`));
+  /* ⚠ AN ABORTED REQUEST IS NOT A FAILED ONE. Navigation cancels in-flight loads, and under a
+     loaded machine that happens often enough to turn a deploy gate into a coin flip. A gate that
+     fails at random gets switched off, which is worse than not having it. */
+  page.on('requestfailed', (r) => {
+    const why = r.failure()?.errorText ?? '';
+    if (/ERR_ABORTED/.test(why)) return;
+    noise.push(`request failed: ${r.url()} (${why})`);
+  });
   await page.goto(`${base}/index.html${query}`, { waitUntil: 'load', timeout: 60_000 });
   /* The scene mounts asynchronously; give it a bounded chance rather than a fixed sleep. */
   await page.waitForFunction(
     () => document.querySelector('canvas') && document.querySelector('canvas').width > 0,
     null, { timeout: 60_000 },
   ).catch(() => {});
-  await page.waitForTimeout(4000);
-  /* ⚠ CALLED, NOT JUST EVALUATED. page.evaluate given a STRING evaluates it as an expression;
-     `() => ...` is then a function reference, which serialises to undefined and every assertion
-     below reads a property of nothing. The parentheses are the whole fix. */
-  const seen = await page.evaluate(`(${INSPECT})()`);
+  /* ⚠ WAIT ON THE PICTURE, NOT ON THE CLOCK. A fixed sleep is a guess about how long a machine
+     takes to mount a scene, and it was wrong the first time three browser suites ran back to back
+     — which is exactly what CI does. Poll until the canvas has actually drawn something, and let
+     the assertion below report the last reading if it never does.
+     ⚠ CALLED, NOT JUST EVALUATED: page.evaluate given a STRING evaluates it as an expression, so
+     `() => ...` is a function reference that serialises to undefined. The parentheses are the fix. */
+  let seen = null;
+  for (let i = 0; i < 40; i += 1) {
+    seen = await page.evaluate(`(${INSPECT})()`);
+    if (seen && !seen.why && seen.distinctColours > 40) break;
+    await page.waitForTimeout(500);
+  }
   return { page, noise, seen };
 }
 

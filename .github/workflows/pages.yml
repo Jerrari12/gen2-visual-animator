@@ -62,6 +62,15 @@ jobs:
       # label, newPartMaterial passing it, and applyPalette carrying the FINISH and not only the
       # colour - and the third was missing until it was written. It drives the picker's own sequence
       # with no rebuild, and is mutation-checked: reverting applyPalette to colour-only fails it.
+      #
+      # relief-tier is the third and guards a number. The printed relief is a per-fragment cost that
+      # the quality ladder did not reach, so `fast` - the tier a struggling device settles on - paid
+      # it in full while paying for nothing else: measured at 0.452x the deployed frame rate on a
+      # software rasteriser, against 0.739x at `high`. Putting relief on the ladder took `fast` back
+      # to 0.973x. The test asserts the material a mesh is WEARING carries no layer program at fast
+      # and does at high, because a flag only the next rebuild would honour saves nothing on the
+      # materials a struggling device already has. Mutation-checked: dropping the rebuild from
+      # applyQuality fails it.
       - name: Smoke test the deployed routes in a browser (blocks the deploy)
         run: |
           # ⚠ install, NOT ci. package-lock.json is gitignored in this repo (.gitignore:79), and
@@ -71,6 +80,7 @@ jobs:
           npx playwright install --with-deps chromium
           npm run smoke
           npm run profile-lands
+          npm run relief-tier
 
       # THE DERIVATION CHECK. Adhesive-Foot.lib.glb is CUT from the printed
       # foot by this script, so re-exporting the master silently leaves the

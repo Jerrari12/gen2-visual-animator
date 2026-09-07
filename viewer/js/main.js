@@ -440,10 +440,26 @@ labelThemeBtn();
 //
 // `fast` is deliberately BYTE-IDENTICAL to the pre-2026-08-10 renderer, so the
 // fallback is a known-good state rather than a half-disabled new one.
+// ⚠ `relief` IS THE PRINTED-LAYER TERM, AND IT IS ON THE LADDER BECAUSE OF A MEASUREMENT.
+// Benched against the deployed baseline under a forced software rasteriser, the candidate ran at
+// 0.739x the deployed frame rate at `high` and 0.452x at `fast` — WORSE at the cheap tier, because
+// `fast` turns off the environment, tone mapping, the key light, shadows, reflections and AO while
+// the relief, a per-fragment cost, kept running. The ladder's own floor was more than twice as
+// expensive as it had been, and a device that steps down BECAUSE it is struggling still paid it.
+//
+// ⚠ AND IT CANNOT BE A UNIFORM. The vendored module's `setMode` has no 'off': `averaged` still runs
+// the whole fragment term, band-limited. Taking the cost away means building the material WITHOUT
+// the shader patch, which is why `syncRelief` below drops the material cache when this flips rather
+// than poking a handle.
+//
+// balanced KEEPS it: `balanced` is the tier for a machine that is coping but not comfortable, it
+// already halves the pixels at dpr 1.5 — and the relief is fill-bound, so that alone takes most of
+// the cost — and dropping the appearance improvement at the first sign of trouble spends the whole
+// feature to buy a step the resolution drop has usually already bought.
 const QUALITY = {
-  high:     { env: true,  tone: true,  key: true,  shadow: true,  reflect: true,  ao: true,  dpr: 2 },
-  balanced: { env: true,  tone: true,  key: true,  shadow: true,  reflect: false, ao: false, dpr: 1.5 },
-  fast:     { env: false, tone: false, key: false, shadow: false, reflect: false, ao: false, dpr: 1 },
+  high:     { env: true,  tone: true,  key: true,  shadow: true,  reflect: true,  ao: true,  dpr: 2,   relief: true },
+  balanced: { env: true,  tone: true,  key: true,  shadow: true,  reflect: false, ao: false, dpr: 1.5, relief: true },
+  fast:     { env: false, tone: false, key: false, shadow: false, reflect: false, ao: false, dpr: 1,   relief: false },
 };
 const QUALITY_ORDER = ['high', 'balanced', 'fast'];
 var qualityReady = false;   // hoisted (see applyStageTheme) — true once a tier has been applied
@@ -519,6 +535,9 @@ function applyQuality(name) {
   if (!cinema.on) scene.environment = q.env ? studioEnv() : null;
 
   qualityReady = true;
+  /* ⚠ AFTER the tier is assigned and BEFORE the frame that follows it. syncRelief reads `quality`,
+     so calling it earlier would rebuild against the tier being replaced. */
+  syncRelief();
   applyShadowQuality();
   guardFx('reflection', applyReflectionQuality);   // also builds the render target
   labelQualityBtn();
@@ -1908,8 +1927,55 @@ function dropFaceplateMaterials() {
  */
 const LAYER_DETAIL_ENABLED = true;
 
+/**
+ * Whether a material built RIGHT NOW should carry the printed relief.
+ *
+ * ⚠ THE CONSTANT SITS ABOVE THE LADDER, NOT INSIDE IT. `LAYER_DETAIL_ENABLED` false takes the
+ * relief off every tier at once and is the thing you reach for at 2am; `QUALITY[tier].relief` is
+ * the lever the auto-downgrade can pull on its own, on a device that is struggling. They answer
+ * different questions and neither can stand in for the other.
+ */
+const reliefWanted = () => LAYER_DETAIL_ENABLED && !!QUALITY[quality].relief;
+
+/**
+ * Rebuild the part materials when the relief crosses the tier boundary.
+ *
+ * ⚠ THE CACHE IS DROPPED, NOT PATCHED, and it has to be: the relief is a shader injection, so a
+ * material that carries it carries it for the life of its program. `materialFor` rebuilds lazily
+ * from `newPartMaterial`, which is where `reliefWanted` is read — the same shape as
+ * `dropFaceplateMaterials`, which drops a subset for the same reason.
+ *
+ * ⚠ AND THE LIVE MESHES ARE RE-POINTED, or they keep the material objects that were just orphaned
+ * and the tier change does nothing visible until something else happens to rebuild the scene. That
+ * loop is `applyState`'s, verbatim, including dropping a highlight — the established idiom for
+ * "restore shared materials".
+ *
+ * ⚠ IT DOES NOT DISPOSE THE OLD MATERIALS, matching `dropFaceplateMaterials`. A tier change is
+ * rare and one-way, so the leak is bounded at a few dozen programs per session; disposing while a
+ * planned clone still holds a `src` reference is the more expensive mistake.
+ */
+let reliefApplied = null;
+function syncRelief() {
+  const want = reliefWanted();
+  if (want === reliefApplied) { reliefApplied = want; return; }
+  reliefApplied = want;
+  /* Boot: nothing is built yet, and everything built after this reads the flag anyway. */
+  if (!instances || !instances.size) return;
+  for (const map of [materials, highlightMats, altMaterials, altHighlightMats,
+    plannedMats, plannedHighlightMats]) {
+    for (const k of Object.keys(map)) delete map[k];
+  }
+  layerHandles.clear();
+  for (const inst of instances.values()) {
+    inst.group.traverse((o) => {
+      if (o.isMesh) o.material = materialFor(inst, false, o.userData.zone);
+    });
+  }
+  applyPalette();
+}
+
 function withLayerDetail(m, key) {
-  if (!LAYER_DETAIL_ENABLED) return m;
+  if (!reliefWanted()) return m;
   const up = buildAxisForKey(key);
   if (!up) return m;
   layerHandles.set(key, applyLayerDetail(m, {
@@ -6655,6 +6721,8 @@ if (new URLSearchParams(location.search).get('debug')) {
     // REASSIGNED (presets, uploads, relays) - returning the object once would hand out a stale one.
     // Debug-only, like everything else here.
     applyPalette, activeLabel, get customColors() { return customColors; },
+    // the relief lever, for the tier gate: `reliefWanted` is the constant AND the tier
+    LAYER_DETAIL_ENABLED, reliefWanted,
     COLOR_STORE_KEY,
     trackLog, track };
 }
