@@ -11,7 +11,7 @@
 
    WHY A MODULE AND NOT JSON. Each brand block ends in a `.map()` that DERIVES
    `label` and `url` from `name` (`label: \`Panchroma ${f.name}\``), so the
-   catalog is a computation, not a table. Baking it into JSON would freeze 101
+   catalog is a computation, not a table. Baking it into JSON would freeze 102
    derived labels and 27 derived links as literals, and the next colour added
    would have to repeat a pattern by hand instead of inheriting it.
    ⚠ AND main.js CANNOT READ JSON SYNCHRONOUSLY. `_db()` and `CLASSIC_FACE`
@@ -24,15 +24,15 @@
    direction: edit HERE ONLY, then re-vendor, and both suites gate on equality
    so a divergent copy fails rather than drifting.
 
-   THE SHAPE, MEASURED RATHER THAN ASSERTED (2026-09-05, 6 brands / 101 colours):
+   THE SHAPE, MEASURED RATHER THAN ASSERTED (re-measured 2026-09-06, 6 brands / 102 colours):
      brand   { brand, line, url, colors[] }              - all 6 identical
      colour  { name, label, hex, url } + optional `id`,  - 5 row shapes:
              `pick`, `pickNote`                            75 with id
-                                                            20 without
+                                                            21 without
                                                              3 +pick +pickNote
                                                              2 +id +pick +pickNote
                                                              1 +pick
-   `label` is UNIQUE across all brands - 101 labels, 0 collisions, 0 undefined -
+   `label` is UNIQUE across all brands - 102 labels, 0 collisions, 0 undefined -
    which is load-bearing: it is the identity key `customColors` stores, and the
    key `_db()` and the picker's active-ring match on.
 
@@ -176,6 +176,27 @@ const FILAMENT_DB = [
     // PLA Black is the Classic faceplate BODY default (Joey 2026-07-25)
     { name: 'PLA Black', label: 'Elegoo PLA Black', hex: '#1c1d20', url: 'https://amzn.to/4fqvv1O', pick: true,
       pickNote: ' · Joey’s black for faceplate bodies & shells' },
+    // ⚠ THE FIRST HEX IN THIS FILE MEASURED FROM A PRINTED PART, not sourced from a swatch site.
+    // Derived 2026-09-06 from FL-REF-1 printed in this filament, capture session
+    // 20260906-1122-mystery-orange-and-elegoo-grey: linear reflectance off the flat wall, anchored
+    // on a white card, sRGB OETF only (no tone map — these hexes are flat swatches, and a
+    // tone-mapped value would be double-curved when a renderer decodes it back to linear).
+    //
+    // ⚠ AND NOT FROM THE FRAME THAT LOOKS LIKE THE OBVIOUS ONE. At lamp lateral 0 the horizontal
+    // layer lines fire their specular straight into the lens — 9-33 % of that frame's flat-wall
+    // signal is specular, and its median is not even decode-stable (G/R moves 16 % between AHD and
+    // a Bayer-quad average, because at 6.3 px the stripe sits near the R/B sublattice Nyquist).
+    // This value is the specular-free chromaticity from the two OFF-AXIS frames, scaled to the
+    // lateral-0 diffuse geometry.
+    //
+    // ⚠ THE BIQU TD-1's OWN HEX FOR THIS SPOOL, #5474D1, IS REJECTED: it is blue and the part is
+    // grey. A TD meter measures transmission through a strand; its colour channel is not a surface
+    // reflectance, and on a low-saturation filament it has nothing to lock onto.
+    //
+    // What is solid: hue 153.7 deg and chroma C* 2.82 — very close to neutral, leaning green —
+    // because a scalar exposure cancels in the channel ratios. What is NOT: absolute lightness. The
+    // white card is uncalibrated, so +/-15 % moves L* by 7.4 units and this hex to #7D827E..#909591.
+    { name: 'PLA Grey', label: 'Elegoo PLA Grey', hex: '#878C88', url: 'https://amzn.to/3QWCdV6' },
   ] },
   // Printed Solid (Jessie) PLA — real solid Basic/Premium colors with printedsolid.com
   // product links (hexes = the flat swatches from 3dfilamentprofiles.com/filaments/printed-solid;

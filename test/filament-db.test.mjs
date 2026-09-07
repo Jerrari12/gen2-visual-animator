@@ -47,7 +47,7 @@ test('the catalog is the shape main.js and the Lab both read', () => {
 test('every colour carries the four fields a consumer may rely on', () => {
   /* ⚠ THE OPTIONAL FIELDS ARE DELIBERATELY NOT REQUIRED. `id` is a storefront
      variant id kept so plain deep links can be restored the day Superfiliate
-     supports them, and 20 of the 101 rows have none; `pick` / `pickNote` mark
+     supports them, and 25 of the 102 rows have none; `pick` / `pickNote` mark
      Joey's recommendations. Requiring them would make adding an ordinary colour
      fail this test for no reason. */
   let n = 0;
@@ -64,7 +64,7 @@ test('every colour carries the four fields a consumer may rely on', () => {
       if ('pickNote' in c) assert.ok(c.pick === true, `${where}: pickNote without pick`);
     }
   }
-  assert.equal(n, 101, 'one hundred and one colours');
+  assert.equal(n, 102, 'one hundred and two colours');
 });
 
 test('⚔ every label is unique across every brand', () => {
@@ -77,7 +77,7 @@ test('⚔ every label is unique across every brand', () => {
     }
   }
   assert.deepEqual(clashes, [], 'labels collide, and customColors keys on them');
-  assert.equal(seen.size, 101, 'every colour contributed a distinct label');
+  assert.equal(seen.size, 102, 'every colour contributed a distinct label');
 });
 
 test('⚔ each brand builds its labels the way its block says it does', () => {
