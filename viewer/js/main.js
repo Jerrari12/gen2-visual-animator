@@ -10,6 +10,7 @@ import { generateManifest, migrateOfficialBuild, resolvePartPreview, REQUIREMENT
 import { resolveEntry } from './entry.js';
 import { FILAMENT_DB } from './filament-db.js';
 import { partMaterialSpec } from './part-material.js';
+import { applyLayerDetail } from './vendor/layer-detail.js';
 
 /* Every entry-routing boolean below is derived by resolveEntry() in entry.js -
    a pure function of (search, hash) with no DOM or network - so the boot
@@ -1273,7 +1274,7 @@ function qualityTick(now) {
   const q = QUALITY[quality];
   const cap = Math.min(q.dpr, devicePixelRatio);
   if (cinema.on) {                       // the outro drives its own camera constantly
-    if (perf.dpr !== cap) { perf.dpr = cap; renderer.setPixelRatio(cap); renderer.setSize(canvas.clientWidth, canvas.clientHeight, false); }
+    if (perf.dpr !== cap) { perf.dpr = cap; renderer.setPixelRatio(cap); setLayerDetailPixelRatio(cap); renderer.setSize(canvas.clientWidth, canvas.clientHeight, false); }
     return;
   }
   const key = camera.position.toArray().concat(controls.target.toArray())
@@ -1295,6 +1296,11 @@ function qualityTick(now) {
   if (perf.dpr !== want) {
     perf.dpr = want;
     renderer.setPixelRatio(want);
+    /* ⚠ BOTH dpr PATHS, AND THERE ARE TWO. The relief's band limit is stated in CSS pixels per
+       layer, so it has to be told when the device pixel ratio moves under it — otherwise a tier
+       change draws the corrugation at the wrong sampling and nothing says so. The cinema branch
+       above is the other one. */
+    setLayerDetailPixelRatio(want);
     renderer.setSize(canvas.clientWidth, canvas.clientHeight, false);
   }
 
@@ -1809,6 +1815,77 @@ const holoUniforms = [];   // live intensity across every holo material
    What stays here is everything the spec deliberately does not carry: the
    colour (palette state, and the whole point of the picker), the THREE
    construction, and the holographic shader patch. */
+/* ── PRINTED LAYER RELIEF ────────────────────────────────────────────────────────────────────
+   Every part in this viewer is a 3D print, and until now none of them looked like one: the
+   surface is smooth where a real part carries 0.2 mm bead corrugation, a crown of light along
+   each bead crest, and a crest line on convex edges. `vendor/layer-detail.js` is the Filament
+   Material Lab's renderer for exactly that, vendored (see test/layer-detail-vendor.test.mjs).
+
+   Two print facts have to travel with it, because THIS REPO KNOWS NEITHER. There is no layer
+   height and no facet tilt anywhere in the viewer - a kit is geometry and a colour, and how it
+   was printed has never been part of that. Both are gated from the Lab's side, which is where
+   they were measured; see the ⚠ on each. */
+
+/* ⚠ AN ASSUMPTION, AND THE ONLY ONE THE SURFACE RESTS ON. The Lab calls it ASSUMED_LAYER_PITCH_MM
+   and derives it from its one preview recipe; nothing in a GEN2 manifest records a layer height,
+   so every part here is drawn as if printed at 0.2 mm. A part printed at 0.28 gets bands 40 % too
+   close together. That is a real error and it is bounded: it moves the SPACING, never the shape,
+   because the relief's amplitude is a slope. */
+const LAYER_PITCH_MM = 0.2;
+
+/* ⚠ MEASURED FROM A PRINT, 2026-09-05, not chosen. It is the peak facet tilt of the corrugation
+   and it is the ENTIRE amplitude of the relief - the model is a sinusoid whose only magnitude
+   term is tan(this). The Lab holds it as ASSUMED_LAYER_TILT_DEG across four sites plus the
+   shader's own tan() literal, with a gate that moves them together; this copy is the fifth site
+   and their test/unit/layerTiltAgreement.test.ts now reads it from here. */
+const LAYER_TILT_DEG = 22;
+
+/* Live handles, one per material that carries the relief, so the pixel-ratio can be re-pushed
+   when the quality tier changes the device pixel ratio under it (the band limit is stated in CSS
+   pixels per layer, so it moves when dpr does). ⚠ CLEARED WHEREVER `materials` IS, or a plate
+   swap leaves handles pointing at materials nothing draws - see setBuildPlate. */
+const layerHandles = [];
+function setLayerDetailPixelRatio(dpr) {
+  for (const h of layerHandles) h.setPixelRatio(dpr);
+}
+
+/**
+ * The build axis for a material key, in the part's OWN coordinates, or null when we do not know.
+ *
+ * ⚠ NULL IS THE HONEST ANSWER AND IT IS THE ONLY ONE THIS COMMIT GIVES. Layer bands drawn along a
+ * guessed axis are a picture of a print that does not exist - they would run the wrong way across
+ * every face and look exactly as convincing as correct ones. The derivation (R⁻¹·plateUp from the
+ * plate poses) is the next step; until it lands this returns null and the relief is not applied,
+ * so this commit changes no pixel. That is deliberate: it lets the SEAM - which is an ordering
+ * constraint that is invisible when wrong - be landed and gated on its own.
+ */
+function buildAxisForKey(/* key */) {
+  return null;
+}
+
+/**
+ * Attach the printed relief, if we know which way the part grew.
+ *
+ * ⚠ IT MUST RUN AFTER `attachHolo`, NEVER BEFORE, AND NOTHING ABOUT THE RESULT SAYS WHICH.
+ * `attachHolo` ASSIGNS `m.onBeforeCompile` and `m.customProgramCacheKey` outright; the Lab's
+ * module CHAINS onto whatever is already there. Chain-then-assign silently discards the chain, so
+ * a holographic faceplate would render with the rainbow and no layer lines - no error, no warning,
+ * and correct-looking everywhere else. Verified by compiling both orders: assign-then-chain gives
+ * a cache key of `holo1|ld` and both shader blocks present; the other order gives `holo1` and the
+ * layer block simply absent. test/layer-detail-seam.test.mjs is the gate.
+ */
+function withLayerDetail(m, key) {
+  const up = buildAxisForKey(key);
+  if (!up) return m;
+  layerHandles.push(applyLayerDetail(m, {
+    layerPitchMm: LAYER_PITCH_MM,
+    tiltDeg: LAYER_TILT_DEG,
+    pixelRatio: renderer.getPixelRatio(),
+    printUp: new THREE.Vector3(up[0], up[1], up[2]),
+  }));
+  return m;
+}
+
 function newPartMaterial(key) {
   const plateContact = plateContactKey(key);
   const spec = partMaterialSpec(key, { holographicPlate: plateActive(), plateContact });
@@ -1821,9 +1898,18 @@ function newPartMaterial(key) {
       clearcoat: spec.clearcoat, clearcoatRoughness: spec.clearcoatRoughness,
       envMapIntensity: spec.envMapIntensity,
     });
-    return spec.holographic ? attachHolo(m, plateContact) : m;
+    /* ⚠ TWO STATEMENTS, NOT ONE NESTED CALL, AND THE ORDER IS THE WHOLE POINT. attachHolo ASSIGNS
+       onBeforeCompile; withLayerDetail CHAINS onto it. Written as
+       `withLayerDetail(attachHolo(m), key)` the text reads in the opposite order to the way it
+       evaluates — which is a bad way to write a constraint whose failure is invisible, and it
+       defeats a source-order gate as well. attachHolo mutates and returns the same material, so
+       dropping its return changes nothing but the reading order. */
+    if (spec.holographic) attachHolo(m, plateContact);
+    return withLayerDetail(m, key);
   }
-  return new THREE.MeshStandardMaterial({ color, roughness: spec.roughness, metalness: spec.metalness });
+  const m = new THREE.MeshStandardMaterial(
+    { color, roughness: spec.roughness, metalness: spec.metalness });
+  return withLayerDetail(m, key);
 }
 /* A material's RESTING opacity. Every fade in this engine used to drive
    opacity from/to a hardcoded 1, which is only true while every part is
@@ -1844,6 +1930,11 @@ async function setBuildPlate(key) {
   track('opt:buildplate:' + key);
   build.buildPlate = key;
   holoUniforms.length = 0;
+  /* ⚠ THE LAYER HANDLES GO WITH THEM. The faceplate materials below are DELETED and rebuilt
+     through newPartMaterial, which pushes fresh handles; keeping the old ones would leave the
+     array growing on every plate swap and pointing at materials nothing draws. It sits beside
+     holoUniforms because it is the same class of live-handle registry, purged in the same place. */
+  layerHandles.length = 0;
   for (const k of Object.keys(materials)) if (k.split(':')[0] === 'Faceplate') delete materials[k];
   for (const k of Object.keys(highlightMats)) if (k.split(':')[0] === 'Faceplate') delete highlightMats[k];
   if (plateActive()) ensurePlateUVs();

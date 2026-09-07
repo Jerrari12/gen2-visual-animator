@@ -94,6 +94,10 @@ jobs:
           # added after it was written.
           sed -i "s|'./filament-db.js'|'./filament-db.js?v=$V'|" viewer/js/main.js
           sed -i "s|'./part-material.js'|'./part-material.js?v=$V'|" viewer/js/main.js
+          # ⚠ The Lab's renderer, and the first module we carry that another repo AUTHORS as an
+          # ES module - requirement-scope.js and tabletop-completion.js are classic script tags,
+          # stamped against index.html above. This one is a real import and needs a real line.
+          sed -i "s|'./vendor/layer-detail.js'|'./vendor/layer-detail.js?v=$V'|" viewer/js/main.js
 
       # Fail the deploy rather than ship a half-stamped module graph. A first
       # version of this guard was a single grep over main.js for
