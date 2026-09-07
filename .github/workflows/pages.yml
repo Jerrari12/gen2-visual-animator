@@ -88,6 +88,12 @@ jobs:
           sed -i "s|js/vendor/tabletop-completion.js|js/vendor/tabletop-completion.js?v=$V|" viewer/index.html
           sed -i "s|'./generate.js'|'./generate.js?v=$V'|" viewer/js/main.js
           sed -i "s|'./entry.js'|'./entry.js?v=$V'|" viewer/js/main.js
+          # ⚠ THE TWO CROSS-REPO MODULES. Both landed 2026-09-05 as new imports in main.js and
+          # neither got a line here, so the guard below has been failing the deploy ever since -
+          # exactly the forgotten-line case the comment above warns about, on the first two files
+          # added after it was written.
+          sed -i "s|'./filament-db.js'|'./filament-db.js?v=$V'|" viewer/js/main.js
+          sed -i "s|'./part-material.js'|'./part-material.js?v=$V'|" viewer/js/main.js
 
       # Fail the deploy rather than ship a half-stamped module graph. A first
       # version of this guard was a single grep over main.js for
