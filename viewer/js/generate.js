@@ -2679,23 +2679,104 @@ const PLATE_POSE = {
      platePoseFor answers null for any type not named here. */
   bracket: [-90, 0, 0],
 };
-function platePoseFor(probe) {
-  if (probe.hw) return probe.hw.plateRot; // hardware poses live on the entry ([] = as authored)
-  const k = probe.pick.type === 'Case' ? 'case'
-    : probe.pick.type === 'Drawer' ? 'drawer'
-    : probe.pick.type === 'Faceplate' ? 'faceplate:' + probe.build.faceStyle
-    : probe.pick.type === 'CoverU' ? 'coverUpper'
-    : probe.pick.type === 'CoverL' ? 'coverLower'
-    : probe.pick.type === 'FootrailU' ? 'footrailUpper'
-    : probe.pick.type === 'FootrailL' ? 'footrailLower'
-    : probe.pick.type === 'Rail' ? 'rail'
-    : probe.pick.type === 'CaseExtender' ? 'caseExtender'
-    : probe.pick.type === 'ShelfInsert' ? 'shelfInsert'
-    : probe.pick.type === 'ShelfLip' ? 'shelfLip'
-    : probe.pick.type === 'BackCover' ? 'backCover'
-    : probe.pick.type === 'Bracket' ? 'bracket'
+/* Every hardware entry, reachable by the TYPE it poses. Built once from the same table
+   platePoseFor reads, so the two cannot name different entries for one type. */
+const HW_BY_TYPE = {};
+for (const hw of Object.values(HARDWARE_PREVIEW)) if (hw.type) HW_BY_TYPE[hw.type] = hw;
+
+/**
+ * The plate pose for a part TYPE — an [x,y,z] Euler triple in degrees, a per-node map of them for
+ * a chiral pair, or null when this type has no confirmed pose.
+ *
+ * ⚠ EXTRACTED FROM `platePoseFor` SO THERE IS ONE AUTHOR OF THE TYPE MAPPING. The plate preview
+ * asks per PART and the renderer asks per MATERIAL, and a material is keyed by type; two copies of
+ * this switch would drift the day a family is added, and the symptom would be layer lines running
+ * the wrong way on one screen and the right way on the other.
+ */
+export function plateRotForType(type, faceStyle) {
+  if (HW_BY_TYPE[type]) return HW_BY_TYPE[type].plateRot;
+  const k = type === 'Case' ? 'case'
+    : type === 'Drawer' ? 'drawer'
+    : type === 'Faceplate' ? 'faceplate:' + faceStyle
+    : type === 'CoverU' ? 'coverUpper'
+    : type === 'CoverL' ? 'coverLower'
+    : type === 'FootrailU' ? 'footrailUpper'
+    : type === 'FootrailL' ? 'footrailLower'
+    : type === 'Rail' ? 'rail'
+    : type === 'CaseExtender' ? 'caseExtender'
+    : type === 'ShelfInsert' ? 'shelfInsert'
+    : type === 'ShelfLip' ? 'shelfLip'
+    : type === 'BackCover' ? 'backCover'
+    : type === 'Bracket' ? 'bracket'
     : null;
   return k != null && k in PLATE_POSE ? PLATE_POSE[k] : null;
+}
+
+/**
+ * The direction the part GREW, in its own authored coordinates — what a layer-line renderer needs.
+ *
+ * The plate pose R takes authored coordinates onto the plate, and the plate's up is +Y there. The
+ * axis we want is the direction that MAPS to plate-up, which is R⁻¹·(0,1,0); for a rotation the
+ * inverse is the transpose, so it is the SECOND ROW of R. Written out below rather than built with
+ * a matrix because this module has no dependencies and their node tests rely on that.
+ *
+ * ⚠ THE ROW EXPANSION IS three's 'XYZ' EULER CONVENTION AND NOTHING ELSE. It is retyped here, so
+ * the Filament Material Lab gates it against three's own Matrix4/Euler over every pose in this
+ * table plus a deterministic sweep of arbitrary triples — an agreement test, because a
+ * hand-expanded rotation matrix is exactly the kind of thing that is wrong in one quadrant and
+ * right everywhere anyone looked.
+ *
+ * ⚠ EXPORTED ONLY SO THAT GATE CAN REACH IT. Every pose this repo ships is a rotation about X
+ * alone, so the Y and Z terms below are exercised by no shipped data; a gate that could only go
+ * through buildAxisForType would have to restate the expansion to sweep them, and would then be
+ * comparing two copies of the same guess. Nothing here calls it directly.
+ */
+export function buildAxisFromEuler(rot) {
+  if (!Array.isArray(rot)) return null;
+  const [rx = 0, ry = 0, rz = 0] = rot.map(d => (d * Math.PI) / 180);
+  const c1 = Math.cos(rx), s1 = Math.sin(rx);
+  const c2 = Math.cos(ry), s2 = Math.sin(ry);
+  const c3 = Math.cos(rz), s3 = Math.sin(rz);
+  const snap = n => (Math.abs(n) < 1e-12 ? 0 : Math.round(n * 1e12) / 1e12);
+  return [
+    snap(c1 * s3 + c3 * s1 * s2),
+    snap(c1 * c3 - s1 * s2 * s3),
+    snap(-c2 * s1),
+  ];
+}
+
+/**
+ * The build axis for a TYPE, or null when this type does not have exactly one.
+ *
+ * ⚠ NULL IS A REAL ANSWER AND TWO DIFFERENT FACTS PRODUCE IT.
+ *
+ *   no confirmed pose   the type is not in the table — the same fail-closed answer platePoseFor
+ *                       gives, so a new family renders plain until its own words arrive.
+ *   a CHIRAL PAIR       QuickLock-L and QuickLock-R are mirror twins posed Rz(+90) and Rz(−90),
+ *                       so they grow along OPPOSITE axes, [1,0,0] and [−1,0,0] — and they share
+ *                       one material, because materials here are keyed by type. There is no single
+ *                       axis to give that material. Detected by comparing the derived axes rather
+ *                       than by naming QuickLock, so the next chiral family fails closed too.
+ */
+export function buildAxisForType(type, faceStyle) {
+  const rot = plateRotForType(type, faceStyle);
+  if (rot == null) return null;
+  const poses = Array.isArray(rot) ? [rot] : Object.values(rot);
+  if (!poses.length) return null;
+  const axes = poses.map(buildAxisFromEuler);
+  if (axes.some(a => a === null)) return null;
+  const first = axes[0];
+  for (const a of axes) {
+    if (a[0] !== first[0] || a[1] !== first[1] || a[2] !== first[2]) return null;
+  }
+  return first;
+}
+
+function platePoseFor(probe) {
+  // hardware poses live on the entry ([] = as authored); the probe already found it, and
+  // plateRotForType would find the same one by type.
+  if (probe.hw) return probe.hw.plateRot;
+  return plateRotForType(probe.pick.type, probe.build.faceStyle);
 }
 
 export function resolvePartPreview(slug, opts = {}) {

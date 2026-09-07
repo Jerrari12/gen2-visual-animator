@@ -120,13 +120,38 @@ test('⚔ the relief is withheld when the build axis is unknown, rather than gue
     'withLayerDetail no longer withholds the relief when the axis is unknown');
 });
 
-test('⚔ the live handles are cleared wherever the materials they point at are', () => {
-  /* setBuildPlate deletes every Faceplate material and rebuilds them through newPartMaterial,
-     which pushes fresh handles. Without the clear the array grows on every plate swap and keeps
-     dead materials alive — the same shape as holoUniforms, which is cleared two lines above. */
-  const fn = body('setBuildPlate');
-  assert.match(fn, /layerHandles\.length = 0;/,
-    'setBuildPlate purges the Faceplate materials without clearing their layer handles');
+test('⚔ the live handles are dropped wherever the materials they point at are', () => {
+  /* Two different build options invalidate the Faceplate materials — the build PLATE (its
+     impression on a face-down plate) and the FAMILY (which way the plate prints, and therefore
+     which way its layers run). Each used to know about only one. Both now go through one
+     function, and the handles are dropped there with the materials. */
+  const drop = body('dropFaceplateMaterials');
+  assert.match(drop, /delete materials\[k\]/, 'it no longer drops the materials');
+  assert.match(drop, /delete highlightMats\[k\]/, 'it no longer drops the highlight clones');
+  assert.match(drop, /layerHandles\.delete\(k\)/,
+    'the Faceplate materials are dropped without their layer handles — the map would keep dead '
+    + 'materials alive and grow on every swap');
+
+  /* ⚠ AND NOTHING ELSE MAY DO IT. A second place that deletes Faceplate materials inline is a
+     second author of the invalidation rule, and the one that forgets the handles is the one that
+     will be written next. This is the assertion that keeps the function load-bearing rather than
+     merely present. */
+  const all = decomment(main);
+  const inlineDeletes = [...all.matchAll(/delete materials\[[^\]]*\]/g)].length;
+  assert.equal(inlineDeletes, 1,
+    `${inlineDeletes} places delete from the materials registry; there must be exactly one, `
+    + 'inside dropFaceplateMaterials');
+});
+
+test('⚔ both build options that change a faceplate\'s axis invalidate its material', () => {
+  /* The family swap is the one that was missing: ensureMaterials is idempotent, so a Faceplate
+     material built under `classic` (grows +Z) survived a swap to `essential` (grows −Z) with the
+     old axis baked into its uniform. Neither symptom is an error — the bands simply run the wrong
+     way on a part that looks otherwise correct. */
+  for (const fn of ['setBuildPlate', 'applyFaceplateStyle']) {
+    assert.match(body(fn), /dropFaceplateMaterials\(\)/,
+      `${fn} changes what a faceplate's material should be without invalidating it`);
+  }
 });
 
 test('⚔ BOTH device-pixel-ratio paths re-push it, and there are two', () => {

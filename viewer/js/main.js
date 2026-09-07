@@ -6,7 +6,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { generateManifest, migrateOfficialBuild, resolvePartPreview, REQUIREMENT as REQ,
-  shelfLipModes, SHELF_LIP_LABEL } from './generate.js';
+  shelfLipModes, SHELF_LIP_LABEL, buildAxisForType } from './generate.js';
 import { resolveEntry } from './entry.js';
 import { FILAMENT_DB } from './filament-db.js';
 import { partMaterialSpec } from './part-material.js';
@@ -1840,27 +1840,45 @@ const LAYER_PITCH_MM = 0.2;
    and their test/unit/layerTiltAgreement.test.ts now reads it from here. */
 const LAYER_TILT_DEG = 22;
 
-/* Live handles, one per material that carries the relief, so the pixel-ratio can be re-pushed
-   when the quality tier changes the device pixel ratio under it (the band limit is stated in CSS
-   pixels per layer, so it moves when dpr does). ⚠ CLEARED WHEREVER `materials` IS, or a plate
-   swap leaves handles pointing at materials nothing draws - see setBuildPlate. */
-const layerHandles = [];
+/* Live handles, one per material that carries the relief, KEYED BY MATERIAL KEY.
+   ⚠ A MAP AND NOT AN ARRAY, because the registries they shadow are purged SELECTIVELY: a plate or
+   family swap deletes the `Faceplate*` materials and leaves every other one alive, so a flat array
+   could only be cleared wholesale — which would strand the surviving materials' handles and stop
+   the pixel-ratio ever reaching them again. Keyed, the handles are dropped exactly where their
+   materials are. */
+const layerHandles = new Map();
 function setLayerDetailPixelRatio(dpr) {
-  for (const h of layerHandles) h.setPixelRatio(dpr);
+  for (const h of layerHandles.values()) h.setPixelRatio(dpr);
 }
 
 /**
  * The build axis for a material key, in the part's OWN coordinates, or null when we do not know.
  *
- * ⚠ NULL IS THE HONEST ANSWER AND IT IS THE ONLY ONE THIS COMMIT GIVES. Layer bands drawn along a
- * guessed axis are a picture of a print that does not exist - they would run the wrong way across
- * every face and look exactly as convincing as correct ones. The derivation (R⁻¹·plateUp from the
- * plate poses) is the next step; until it lands this returns null and the relief is not applied,
- * so this commit changes no pixel. That is deliberate: it lets the SEAM - which is an ordering
- * constraint that is invisible when wrong - be landed and gated on its own.
+ * ⚠ NULL IS AN ANSWER, NOT A GAP, AND IT IS WHY THIS IS SAFE. Layer bands drawn along a guessed
+ * axis are a picture of a print that does not exist — they run the wrong way across every face and
+ * look exactly as convincing as correct ones. `buildAxisForType` answers null for a type with no
+ * confirmed plate pose AND for a chiral pair whose two nodes grow along opposite axes, and
+ * `withLayerDetail` then leaves the material plain.
+ *
+ * ⚠ THE FACEPLATE FAMILY IS PART OF THE QUESTION, which is why the style is passed. Classic,
+ * ClassicPro and EdgeLabel print back-down and grow along +Z; Essential and Chevron print
+ * FACE-down and grow along −Z. Same material key, opposite axes, decided by a build option the
+ * user can change mid-session — see the invalidation in `dropFaceplateMaterials`.
  */
-function buildAxisForKey(/* key */) {
-  return null;
+const faceStyleNow = () =>
+  (build && build.faceStyle) || (currentFaceplateStyle() && currentFaceplateStyle().key) || null;
+
+function buildAxisForKey(key) {
+  return buildAxisForType(key.split(':')[0], faceStyleNow());
+}
+
+/* One author for "the faceplate materials are no longer valid", because there are two reasons and
+   they used to know about only one. The build PLATE decides the impression on a face-down plate;
+   the FAMILY decides which way the plate prints at all, and therefore which way its layers run. */
+function dropFaceplateMaterials() {
+  for (const k of Object.keys(materials)) if (k.split(':')[0] === 'Faceplate') delete materials[k];
+  for (const k of Object.keys(highlightMats)) if (k.split(':')[0] === 'Faceplate') delete highlightMats[k];
+  for (const k of [...layerHandles.keys()]) if (k.split(':')[0] === 'Faceplate') layerHandles.delete(k);
 }
 
 /**
@@ -1877,7 +1895,7 @@ function buildAxisForKey(/* key */) {
 function withLayerDetail(m, key) {
   const up = buildAxisForKey(key);
   if (!up) return m;
-  layerHandles.push(applyLayerDetail(m, {
+  layerHandles.set(key, applyLayerDetail(m, {
     layerPitchMm: LAYER_PITCH_MM,
     tiltDeg: LAYER_TILT_DEG,
     pixelRatio: renderer.getPixelRatio(),
@@ -1934,9 +1952,7 @@ async function setBuildPlate(key) {
      through newPartMaterial, which pushes fresh handles; keeping the old ones would leave the
      array growing on every plate swap and pointing at materials nothing draws. It sits beside
      holoUniforms because it is the same class of live-handle registry, purged in the same place. */
-  layerHandles.length = 0;
-  for (const k of Object.keys(materials)) if (k.split(':')[0] === 'Faceplate') delete materials[k];
-  for (const k of Object.keys(highlightMats)) if (k.split(':')[0] === 'Faceplate') delete highlightMats[k];
+  dropFaceplateMaterials();
   if (plateActive()) ensurePlateUVs();
   await regenerate();
 }
@@ -4816,6 +4832,12 @@ function pageVisibility(inst) {
 let activeFaceplateStyle = null; // kit-swap memory (generated builds carry the family in build.faceStyle instead)
 async function applyFaceplateStyle(style) {
   ao.rev++;   // static kits swap plates/dressing in place - no mountManifest to bump it
+  /* ⚠ THE FAMILY DECIDES WHICH WAY THE PLATE PRINTS, so it decides which way its layer lines
+     run: Classic/ClassicPro/EdgeLabel print back-down and grow along +Z, Essential and Chevron
+     print FACE-down and grow along −Z. The Faceplate materials are keyed by type and are NOT
+     rebuilt by a style swap - ensureMaterials is idempotent - so without this they keep the
+     previous family's axis, and both paths below (generated and static-kit) need it. */
+  dropFaceplateMaterials();
   const prevActive = activeFaceplateStyle;
   activeFaceplateStyle = style;
   if (build) {
