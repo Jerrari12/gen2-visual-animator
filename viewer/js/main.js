@@ -1939,6 +1939,47 @@ function newPartMaterial(key) {
    so it is a currently-inert invariant - KEEP it: it is what makes the next
    translucent part safe, and it costs one property read. */
 const restOf = m => (m.userData && m.userData.rest != null) ? m.userData.rest : 1;
+
+/**
+ * Clone a part material and KEEP THE TWO THINGS three throws away.
+ *
+ * ⚠ `Material.copy()` CARRIES NEITHER `onBeforeCompile` NOR `customProgramCacheKey`. Read r185's
+ * `Material.copy` — it copies fifty-odd named fields and neither of those is among them, because
+ * both are prototype no-ops that a patch overrides per instance. So a cloned material silently
+ * renders WITHOUT whatever shader patch its source carried, and with a cache key that no longer
+ * distinguishes it.
+ *
+ * ⚠ AND THE SYMPTOM IS NEVER AN ERROR. Before this helper, three of the eight clone sites in this
+ * file hand-copied the pair and five did not:
+ *
+ *   altMatFor          PERMANENT, and on six tiled types (CoverL/U, FootrailL/U, Bracket, Rail).
+ *                      Every second tile rendered with no build-plate transfer and no layer
+ *                      relief, beside siblings that had both. A still frame shows it; nothing
+ *                      raises.
+ *   vanish/ghost/fade  for the duration of a tween, so a part goes smooth mid-animation and snaps
+ *   fpFocus            back when the tween restores the real material.
+ *
+ * The 2026-08-10 comment that used to sit on the highlight clone said exactly this about the build
+ * plate, on one of the three sites that already did it right. It is here now because the rule is
+ * not about highlights.
+ *
+ * ⚠ OWN PROPERTIES ONLY. `Material.prototype.onBeforeCompile` is a no-op METHOD, so `src.onBeforeCompile`
+ * is truthy on every material ever made and the old `if (src.onBeforeCompile)` guard was vacuous.
+ * Copying the prototype's no-op onto a clone is harmless but says something false — that this
+ * material is patched. A clone of an unpatched material must stay unpatched.
+ *
+ * ⚠ THE UNIFORMS ARE SHARED WITH THE SOURCE, DELIBERATELY. The patch closes over its uniform
+ * objects and hands the same ones to every shader it compiles, so a clone tracks the source's
+ * layer pitch, build axis and pixel ratio. That is what we want: a ghost of a part is the same
+ * print as the part.
+ */
+function cloneMaterial(mat) {
+  const m = mat.clone();
+  for (const k of ['onBeforeCompile', 'customProgramCacheKey']) {
+    if (Object.prototype.hasOwnProperty.call(mat, k)) m[k] = mat[k];
+  }
+  return m;
+}
 // Toggling rebuilds only the faceplate registry entries (a class swap, so it
 // cannot be done in place) and drops their highlight clones; the reassignment
 // onto meshes rides regenerate()'s normal applyState path like every other
@@ -1987,7 +2028,7 @@ const altLerp = type => (useCustom && customColors[type] && !colorLocked(type)) 
 const altMaterials = {};
 function altMatFor(type) {
   if (!altMaterials[type]) {
-    const m = (materials[type] || fallbackMat).clone();
+    const m = cloneMaterial(materials[type] || fallbackMat);
     m.color.set(activeHex(type)).lerp(new THREE.Color('#ffffff'), altLerp(type));
     altMaterials[type] = m;
   }
@@ -2365,7 +2406,7 @@ async function playStep(i) {
         const mats = [];
         inst.group.traverse(o => {
           if (!o.isMesh) return;
-          const m = materialFor(inst, false, o.userData.zone).clone();
+          const m = cloneMaterial(materialFor(inst, false, o.userData.zone));
           m.userData.rest = m.opacity; // 1 for every part shipping today; see restOf()
           m.transparent = true;
           o.material = m; mats.push(m);
@@ -2401,7 +2442,7 @@ async function playStep(i) {
       const mats = [];
       inst.group.traverse(o => {
         if (!o.isMesh) return;
-        const m = materialFor(inst, false, o.userData.zone).clone();
+        const m = cloneMaterial(materialFor(inst, false, o.userData.zone));
         m.userData.rest = m.opacity;
         m.transparent = true;
         o.material = m; mats.push(m);
@@ -2547,7 +2588,7 @@ async function playStep(i) {
       const mats = [];
       inst.group.traverse(o => {
         if (!o.isMesh) return;
-        const m = materialFor(inst, false, o.userData.zone).clone();
+        const m = cloneMaterial(materialFor(inst, false, o.userData.zone));
         m.userData.rest = m.opacity;
         m.transparent = true;
         m.opacity = 0;
@@ -3526,8 +3567,7 @@ const PLANNED_OPACITY = 0.35;
 const plannedMats = {}, plannedHighlightMats = {}; // cacheKey -> { mat, src }
 function plannedMatFor(src, cacheKey) {
   if (!plannedMats[cacheKey]) {
-    const m = src.clone();
-    if (src.onBeforeCompile) { m.onBeforeCompile = src.onBeforeCompile; m.customProgramCacheKey = src.customProgramCacheKey; }
+    const m = cloneMaterial(src);
     m.transparent = true; m.opacity = PLANNED_OPACITY; m.userData.rest = PLANNED_OPACITY;
     plannedMats[cacheKey] = { mat: m, src };
   }
@@ -3543,8 +3583,7 @@ function materialFor(inst, highlighted, zone = '') {
   if (!highlighted) return base;
   if (planned) {
     if (!plannedHighlightMats[pKey]) {
-      const m = base.clone();
-      if (base.onBeforeCompile) { m.onBeforeCompile = base.onBeforeCompile; m.customProgramCacheKey = base.customProgramCacheKey; }
+      const m = cloneMaterial(base);
       m.emissive = new THREE.Color(0xff8a40); m.emissiveIntensity = 0.4;
       plannedHighlightMats[pKey] = { mat: m, src: solid };
     }
@@ -3552,11 +3591,7 @@ function materialFor(inst, highlighted, zone = '') {
   }
   const cache = (inst.alt && !zone) ? altHighlightMats : highlightMats;
   if (!cache[key]) {
-    const m = base.clone();
-    // ⚠ Material.copy() does NOT carry onBeforeCompile/customProgramCacheKey, so
-    // a cloned highlight would silently lose a build-plate transfer — and the
-    // selected plate is exactly where it must not vanish.
-    if (base.onBeforeCompile) { m.onBeforeCompile = base.onBeforeCompile; m.customProgramCacheKey = base.customProgramCacheKey; }
+    const m = cloneMaterial(base);
     m.emissive = new THREE.Color(0xff8a40);
     m.emissiveIntensity = 0.4;
     cache[key] = m;
@@ -4017,7 +4052,7 @@ function fadeOutInstance(inst) {
   const mats = [];
   inst.group.traverse(o => {
     if (!o.isMesh) return;
-    const m = materialFor(inst, false, o.userData.zone).clone();
+    const m = cloneMaterial(materialFor(inst, false, o.userData.zone));
     m.userData.rest = m.opacity;
     m.transparent = true;
     m.userData.fpFade = true; // exit only reclaims meshes that still hold OUR clone

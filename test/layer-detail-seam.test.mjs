@@ -169,3 +169,51 @@ test('⚔ BOTH device-pixel-ratio paths re-push it, and there are two', () => {
       + 'tier change would draw the corrugation at the wrong sampling');
   }
 });
+
+/* ── CLONES ──────────────────────────────────────────────────────────────────────────────────
+ *
+ * ⚠ `Material.copy()` CARRIES NEITHER `onBeforeCompile` NOR `customProgramCacheKey`, so every
+ * cloned part material silently loses whatever shader patch its source had — the holographic
+ * plate transfer, and now the printed layer relief. Three of the eight clone sites in main.js
+ * hand-copied the pair; five did not, and the worst of those was `altMatFor`, which is PERMANENT
+ * and covers six tiled types: every second tile rendered plain beside siblings that did not.
+ *
+ * There is one helper now, and these are the assertions that keep it the only route.
+ */
+
+test('⚔ every part-material clone goes through the helper', () => {
+  /* ⚠ THE HELPER'S OWN `mat.clone()` MUST NOT MATCH THIS PATTERN, and naming its parameter `mat`
+     rather than `src` or `base` is what keeps it out — the receivers below are the expressions the
+     eight call sites actually used. A gate that matched the function it exists to enforce would go
+     red on a correct implementation, which for an unattended run is the worst possible failure. */
+  const src = decomment(main);
+  const RECEIVERS = [
+    /materialFor\([^)]*\)\.clone\(\)/g,
+    /fallbackMat\)\.clone\(\)/g,
+    /\bsrc\.clone\(\)/g,
+    /\bbase\.clone\(\)/g,
+  ];
+  for (const re of RECEIVERS) {
+    const hits = [...src.matchAll(re)].map((m) => m[0]);
+    assert.deepEqual(hits, [],
+      `a part material is cloned directly instead of through cloneMaterial: ${hits.join(', ')}`);
+  }
+});
+
+test('⚔ the helper copies OWN properties only, so an unpatched clone stays unpatched', () => {
+  const fn = body('cloneMaterial');
+  assert.match(fn, /hasOwnProperty\.call\(mat, k\)/,
+    'cloneMaterial copies the hooks without checking they are own properties. '
+    + 'Material.prototype.onBeforeCompile is a no-op METHOD, so a truthiness check is vacuous and '
+    + 'the clone would claim a patch it does not have.');
+  for (const k of ['onBeforeCompile', 'customProgramCacheKey']) {
+    assert.ok(fn.includes(k), `cloneMaterial does not carry ${k}`);
+  }
+});
+
+test('⚔ and it is used everywhere a part material is cloned — all eight sites', () => {
+  const src = decomment(main);
+  const uses = [...src.matchAll(/cloneMaterial\(/g)].length - 1;   // minus the declaration
+  assert.ok(uses >= 8,
+    `only ${uses} call sites use cloneMaterial; there were eight material clones in this file`);
+});
