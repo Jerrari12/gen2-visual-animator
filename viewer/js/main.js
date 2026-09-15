@@ -571,9 +571,7 @@ function applyShadowQuality() {
   renderer.shadowMap.type = THREE.PCFShadowMap;
   renderer.shadowMap.autoUpdate = false;
   sun.castShadow = on;
-  for (const inst of instances.values()) {
-    inst.group.traverse(o => { if (o.isMesh) { o.castShadow = on; o.receiveShadow = on; } });
-  }
+  for (const inst of instances.values()) setPartShadows(inst.group, on);
   table.receiveShadow = on;
   if (on) fitShadowCamera();
   // shadowMap.enabled is in the program cache key and three does NOT auto-detect
@@ -582,6 +580,23 @@ function applyShadowQuality() {
     if (!o.material) return;
     for (const m of (Array.isArray(o.material) ? o.material : [o.material])) m.needsUpdate = true;
   });
+}
+/* A STYLE SWAP IS A CHANGE MADE AT REST, SO IT ASKS FOR ITS OWN SHADOW RENDER (hotfix, Joey relaying Astra, 2026-09-15).
+   The map re-renders while the camera or a tween moves and once when that settles (qualityTick), so a handle swap or a
+   static kit's faceplate swap - which moves nothing - left the old part's shadow on screen until the next move (measured on
+   this code before the fix, p31 checks at High: 157,819 and 12,642 pixels against a forced-fresh map; 0 after). The fuller
+   fix on the build-plate-finish branch also covers a snap at rest (applyState, applyExploded, computeBounds); this hotfix
+   carries only the swaps. */
+function markShadowDirty() {
+  if (renderer.shadowMap.enabled) renderer.shadowMap.needsUpdate = true;
+}
+/* castShadow + receiveShadow for a part's meshes. The template roots are never flagged, so the clones a handle swap or a
+   static kit's faceplate swap adds had neither - the new part cast and received no shadow until the stage or tier was
+   re-applied (MEASURED 2026-09-14: 0 of 8 plate meshes, 0 of 4 and 0 of 3 handle meshes; a remembered non-default handle
+   lost them again on every regenerate). receiveShadow is a per-object uniform in r185, so a clone sharing a material
+   needs no recompile. */
+function setPartShadows(root, on) {
+  root.traverse(o => { if (o.isMesh) { o.castShadow = on; o.receiveShadow = on; } });
 }
 function fitShadowCamera() {
   if (!sun.castShadow || typeof assembledBox === 'undefined' || assembledBox.isEmpty()) return;
@@ -4878,8 +4893,10 @@ async function applyHandleStyle(style) {
     inst.cfg.node = style.node;
     inst.group.clear();
     inst.group.add(templates[style.node].clone(true));
+    setPartShadows(inst.group, renderer.shadowMap.enabled);   // the template was never flagged (see setPartShadows)
     inst.group.position.copy(basePos(inst, inst.staged)).add(off);
   }
+  markShadowDirty();   // the swap happens at rest
   if (!oldNode || oldNode === style.node) return;
   typeByNode[style.node] = 'Handle';
   const row = manifest.parts.find(p => p.node === oldNode);
@@ -5056,6 +5073,7 @@ async function applyFaceplateStyle(style) {
     typeByNode[newNode] = 'Faceplate';
     inst.group.clear();
     inst.group.add(templates[newNode].clone(true));
+    setPartShadows(inst.group, renderer.shadowMap.enabled);   // the template was never flagged (see setPartShadows)
     inst.group.position.copy(basePos(inst, inst.staged)).add(off);
   }
   // handles: EdgeLabel's grip is part of the plate print — no bolt-on part.
@@ -5069,6 +5087,7 @@ async function applyFaceplateStyle(style) {
     if (!fpFocus.id) inst.group.visible = pageVisibility(inst);
     else if (inst.styleHidden) inst.group.visible = false;
   }
+  markShadowDirty();   // new plates, and handles hidden or shown, at rest
   // BOM: faceplate rows follow the family; Handle rows hide with the style.
   // The original rows (labels/links/renders) are backed up on first swap so
   // returning to the manifest's own family restores them exactly.
