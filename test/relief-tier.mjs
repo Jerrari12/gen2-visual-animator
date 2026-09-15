@@ -77,7 +77,9 @@ test('the quality ladder reaches the printed relief', { skip: missing
     return {
       tier: V.quality,
       wanted: V.reliefWanted(),
-      inProgram: /\|ld$/.test(key),
+      /* `|ld` as a SEGMENT, not the end: the build plate's finish chains after the relief and
+         appends its own `|bf1` (2026-09-14), so the relief's mark is no longer last */
+      inProgram: /\|ld(?=\||$)/.test(key),
       cacheKey: key.slice(-16),
       handles: V.layerHandles.size,
     };

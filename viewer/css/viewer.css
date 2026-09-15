@@ -176,6 +176,13 @@ body.stage-dark .fm-accuracy { display: block; }
 .opt-seg button { font: inherit; font-size: 11px; font-weight: 700; padding: 5px 10px; border: none; background: #fff; color: var(--ink-soft); cursor: pointer; }
 .opt-seg button + button { border-left: 1px solid var(--panel-border); }
 .opt-seg button.on { background: var(--accent); color: #fff; }
+/* choices too long to sit beside their label - the three build plates, whose names match the planner's - stack under it:
+   side by side they need ~245 px and the desktop panel's options are 209 px wide, so "Powder-coated" broke at its hyphen
+   and "Holographic" ran past the panel's edge (measured, integration/scripts/p38/p38b.mjs) */
+.opt-row.opt-stack { flex-direction: column; align-items: stretch; gap: 4px; }
+.opt-row.opt-stack .opt-seg { flex-direction: column; }
+.opt-row.opt-stack .opt-seg button { text-align: left; white-space: nowrap; }
+.opt-row.opt-stack .opt-seg button + button { border-left: none; border-top: 1px solid var(--panel-border); }
 .opt-cycle button { color: var(--accent); padding: 5px 8px; }
 .opt-cycle-name { font-size: 11px; font-weight: 700; padding: 0 6px; align-self: center; min-width: 70px; text-align: center; }
 .opt-reset { width: 100%; font: inherit; font-size: 11.5px; font-weight: 700; margin-top: 4px; padding: 6px; border: 1px solid var(--panel-border); background: none; color: var(--ink-soft); border-radius: 7px; cursor: pointer; }

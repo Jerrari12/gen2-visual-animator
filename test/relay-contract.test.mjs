@@ -65,8 +65,11 @@ const LIP_MODES = (() => {
 
 // the real layoutKey, executable
 const layoutKey = new Function(`${declAt(viewerSrc, 'const layoutKey =')} return layoutKey;`)();
-// the real currentOpts - it reads only the module-level `build`
-const currentOpts = new Function('build', `${declAt(viewerSrc, 'function currentOpts()')} return currentOpts();`);
+// the real currentOpts - it reads the module-level `build`, and the build plate through the
+// resolver main.js imports, which is handed in here as the same real function
+const { plateFinishOf, PLATE_FINISHES } = await import(new URL('../viewer/js/bed-finish.js', import.meta.url).href);
+const currentOptsWith = new Function('build', 'plateFinishOf', `${declAt(viewerSrc, 'function currentOpts()')} return currentOpts();`);
+const currentOpts = (b) => currentOptsWith(b, plateFinishOf);
 
 const buildWith = (lip) => ({
   mount: 'tabletop', length: 185, gridW: 4, gridH: 4,
@@ -123,6 +126,21 @@ test('currentOpts keys lips by SHELF, and gives non-shelves no key at all', () =
   assert.ok(!(3 in o.lips), 'a cabinet got a lips entry - the loop is keyed on the wrong fill');
   assert.equal(o.closures[2], 'magnet', 'closures regressed');
   assert.ok(!(1 in o.closures), 'a shelf got a closures entry');
+});
+
+test('currentOpts relays the build plate RESOLVED, and as the last key', () => {
+  /* The planner's echo guard compares the viewer's JSON with its own, so the key has to be there
+     on every post and in the same place; a build that never stored a plate must still send what it
+     SHOWS (the default, Powder), or the planner cannot tell "never chose" from "chose Powder" and would re-post. */
+  const legacy = currentOpts(buildWith('front'));
+  assert.equal(legacy.buildPlate, 'powder', 'a build with no stored plate relays something other than what it shows');
+  assert.equal(Object.keys(legacy).at(-1), 'buildPlate', 'buildPlate is not the last key of the post');
+  const sent = PLATE_FINISHES.map((f) => currentOpts({ ...buildWith('front'), buildPlate: f }).buildPlate);
+  assert.deepEqual(sent, [...PLATE_FINISHES], 'a stored plate is not relayed as itself');
+  assert.equal(currentOpts({ ...buildWith('front'), buildPlate: 'carbon' }).buildPlate, 'powder',
+    'an unknown stored value is relayed raw - the receiver would have to guess');
+  /* the control: lips still ride unchanged beside it */
+  assert.equal(legacy.lips[1], 'front');
 });
 
 /* ---- cross-repo tripwire: needs the planner checkout, skips without it ----

@@ -1,12 +1,14 @@
-/* A STYLE SWAP'S SHADOWS (hotfix, Joey relaying Astra, 2026-09-15) - main.js, run against three r185's real objects.
+/* THE SHADOW MAP AFTER A CHANGE AT REST (Joey relaying Astra, 2026-09-14) - main.js, run against three r185's real objects.
  *
- * The defect, measured on the build-plate-finish branch (vault measurements.md, "Parts swapped in at rest carry no shadow
- * flags", and p31): castShadow/receiveShadow were written only by applyShadowQuality, so the template clones a handle swap
- * or a static kit's faceplate swap adds never cast or received a shadow; and a swap moves nothing, so the shadow map kept
- * the old part until the camera next moved.
- * The hotfix: the swaps flag their clones through setPartShadows(), the helper applyShadowQuality itself uses, and ask for
- * a shadow render with markShadowDirty(). The branch carries the fuller fix (snaps at rest too) and its own test,
- * test/shadow-at-rest.test.mjs; this file is the swap subset of it.
+ * Two defects older than the moving-frame savings, both measured in the viewer (vault measurements.md):
+ *   - the light stage's shadow map re-renders on moving frames and once on settling, so a change made while NOTHING moves -
+ *     a snap to another step, the checklist page, a style swap - left the map showing the scene the user had left;
+ *   - castShadow/receiveShadow were written only by applyShadowQuality, so the template clones a handle swap or a static
+ *     kit's faceplate swap adds never cast or received a shadow.
+ * The fix: the at-rest writers call markShadowDirty(), and the swaps flag their clones through setPartShadows(), the helper
+ * applyShadowQuality itself uses. Every other writer of part transforms or visibility runs inside a tween, which the moving
+ * gate (watchShadowCasters, qualityTick) already covers - see test/move-opt.test.mjs.
+ * The in-browser proof is integration/scripts/p31 (each bad case against a forced-fresh render, zero pixels differing).
  *
  * ⚠ THESE TESTS CALL THE CODE: main.js cannot be imported under node (it builds a WebGL renderer at module scope), so the
  * functions are extracted by balanced scan and evaluated with stubs, and each fix line is removed in a copy that must fail.
@@ -40,6 +42,9 @@ const mutate = (code, from, to) => {
 };
 
 const HELPERS = [takeAt('function markShadowDirty()', { fn: true }), takeAt('function setPartShadows(root, on)', { fn: true })].join('\n');
+const APPLY_STATE = takeAt('function applyState(i)', { fn: true });
+const APPLY_EXPLODED = takeAt('function applyExploded()', { fn: true });
+const COMPUTE_BOUNDS = takeAt('function computeBounds()', { fn: true });
 const SHADOW_QUALITY = [takeAt('function shadowsWanted()', { fn: true }), takeAt('function applyShadowQuality()', { fn: true })].join('\n');
 const HANDLE_SWAP = takeAt('async function applyHandleStyle(style)', { fn: true });
 const FACEPLATE_SWAP = takeAt('async function applyFaceplateStyle(style)', { fn: true });
@@ -61,6 +66,38 @@ const meshesOf = (group) => { const out = []; group.traverse((o) => { if (o.isMe
 const shadowMap = (enabled) => ({ enabled, needsUpdate: false, autoUpdate: false, type: null });
 
 /* ------------------------------------------------------------------------------------------------ the scenarios */
+function snapScenario(helpers, applyStateCode, applyExplodedCode) {
+  const failures = [];
+  for (const enabled of [true, false]) {
+    const renderer = { shadowMap: shadowMap(enabled) };
+    const instances = new Map([['a', instance('a', 'Case')], ['b', instance('b', 'Drawer')]]);
+    const afterState = [{ visible: new Set(['a']), settled: new Set() }];
+    const exploded = new Map([['a', new THREE.Vector3(10, 0, 0)], ['b', new THREE.Vector3(-10, 0, 0)]]);
+    const env = new Function('renderer', 'instances', 'afterState', 'exploded', 'killTweens', 'basePos', 'materialFor',
+      `${helpers}\n${applyStateCode}\n${applyExplodedCode}\nreturn { applyState, applyExploded };`)(
+      renderer, instances, afterState, exploded, () => {}, () => new THREE.Vector3(), () => new THREE.MeshStandardMaterial());
+    env.applyState(0);
+    if (renderer.shadowMap.needsUpdate !== enabled) failures.push(`applyState with shadows ${enabled ? 'on' : 'off'}: needsUpdate ${renderer.shadowMap.needsUpdate}`);
+    renderer.shadowMap.needsUpdate = false;
+    env.applyExploded();
+    if (renderer.shadowMap.needsUpdate !== enabled) failures.push(`applyExploded with shadows ${enabled ? 'on' : 'off'}: needsUpdate ${renderer.shadowMap.needsUpdate}`);
+  }
+  return failures;
+}
+
+function boundsScenario(helpers, code) {
+  const renderer = { shadowMap: shadowMap(true) };
+  const instances = new Map([['a', instance('a', 'Case')]]);
+  const env = new Function('THREE', 'renderer', 'instances', 'basePos', 'assembledBox', 'buildCenter',
+    `let buildRadius = 0;\n${helpers}\n${code}\nreturn { computeBounds, get radius() { return buildRadius; } };`)(
+    THREE, renderer, instances, () => new THREE.Vector3(5, 0, 0), new THREE.Box3(), new THREE.Vector3());
+  env.computeBounds();
+  const failures = [];
+  if (!renderer.shadowMap.needsUpdate) failures.push('computeBounds moved every part without asking for a shadow render');
+  if (!(env.radius > 0)) failures.push('computeBounds did not run (radius not set) - the scenario is broken');
+  return failures;
+}
+
 function qualityScenario(helpers, code) {
   const failures = [];
   const renderer = { shadowMap: shadowMap(false) };
@@ -90,13 +127,12 @@ async function handleSwapScenario(helpers, code) {
     const instances = new Map([['h1', handle]]);
     const templates = { Handle_BlockBar_B: template(false) };         // templates are never flagged
     const style = { node: 'Handle_BlockBar_B', label: 'BlockBar B', planner: 'blockbar', h: 9, d: 27 };
-    // the last four stubs are names the build-plate-finish branch's applyHandleStyle reads, so this file still runs after it lands
-    const applyHandleStyle = new Function('renderer', 'ao', 'activeHandleStyle', 'build', 'templates', 'loader', 'PARTS_BASE', 'materials',
-      'fallbackMat', 'instances', 'typeByNode', 'basePos', 'faceplateHeightOf', 'nodeDepth', 'manifest', 'HANDLE_LINKS', 'partInfoByNode',
-      'renderChecklist', 'syncBuildToPlanner', 'adoptTemplate', 'dropStaleAxisMaterials', 'materialFor', 'applyPalette',
+    const applyHandleStyle = new Function('renderer', 'ao', 'activeHandleStyle', 'build', 'templates', 'loader', 'PARTS_BASE', 'adoptTemplate',
+      'instances', 'typeByNode', 'basePos', 'faceplateHeightOf', 'nodeDepth', 'manifest', 'HANDLE_LINKS', 'partInfoByNode', 'renderChecklist',
+      'dropStaleAxisMaterials', 'materialFor', 'applyPalette', 'syncBuildToPlanner',
       `${helpers}\n${code}\nreturn applyHandleStyle;`)(
-      renderer, { rev: 0 }, null, null, templates, null, '', {}, null, instances, { Handle_Deco: 'Handle' }, () => new THREE.Vector3(),
-      () => 55, () => 5, { parts: [] }, {}, {}, () => {}, () => {}, null, () => [], () => new THREE.MeshStandardMaterial(), () => {});
+      renderer, { rev: 0 }, null, null, templates, null, '', null, instances, { Handle_Deco: 'Handle' }, () => new THREE.Vector3(),
+      () => 55, () => 5, { parts: [] }, {}, {}, () => {}, () => [], () => new THREE.MeshStandardMaterial(), () => {}, () => {});
     await applyHandleStyle(style);
     const meshes = meshesOf(handle.group);
     if (handle.cfg.node !== 'Handle_BlockBar_B' || meshes.length !== 1) { failures.push('the swap did not replace the handle - the scenario is broken'); continue; }
@@ -132,6 +168,12 @@ async function faceplateSwapScenario(helpers, code) {
 }
 
 /* ------------------------------------------------------------------------------------------------ the tests */
+test('a snap at rest - a step (applyState) or the checklist page (applyExploded) - asks for a shadow render when shadows are on', () => {
+  assert.deepEqual(snapScenario(HELPERS, APPLY_STATE, APPLY_EXPLODED), []);
+});
+test('computeBounds, which moves every part to its final place, asks for a shadow render', () => {
+  assert.deepEqual(boundsScenario(HELPERS, COMPUTE_BOUNDS), []);
+});
 test('applyShadowQuality flags every part mesh on the light stage and clears them on the dark stage', () => {
   assert.deepEqual(qualityScenario(HELPERS, SHADOW_QUALITY), []);
 });
@@ -144,7 +186,10 @@ test('a static kit\'s faceplate swap gives the new clones the current shadow fla
 
 test('each part of the fix has power: removed from a copy, its scenario fails', async () => {
   const cases = [
-    ['the dirty mark ignores the enabled state', () => handleSwapScenario(mutate(HELPERS, 'if (renderer.shadowMap.enabled) ', ''), HANDLE_SWAP)],
+    ['applyState no longer asks', () => snapScenario(HELPERS, mutate(APPLY_STATE, 'markShadowDirty();', ''), APPLY_EXPLODED)],
+    ['applyExploded no longer asks', () => snapScenario(HELPERS, APPLY_STATE, mutate(APPLY_EXPLODED, 'markShadowDirty();', ''))],
+    ['computeBounds no longer asks', () => boundsScenario(HELPERS, mutate(COMPUTE_BOUNDS, 'markShadowDirty();', ''))],
+    ['the dirty mark ignores the enabled state', () => snapScenario(mutate(HELPERS, 'if (renderer.shadowMap.enabled) ', ''), APPLY_STATE, APPLY_EXPLODED)],
     ['applyShadowQuality stops flagging', () => qualityScenario(HELPERS, mutate(SHADOW_QUALITY, 'setPartShadows(inst.group, on);', ''))],
     ['the handle swap stops flagging its clones', () => handleSwapScenario(HELPERS, mutate(HANDLE_SWAP, 'setPartShadows(inst.group, renderer.shadowMap.enabled);', ''))],
     ['the handle swap no longer asks', () => handleSwapScenario(HELPERS, mutate(HANDLE_SWAP, 'markShadowDirty();', ''))],

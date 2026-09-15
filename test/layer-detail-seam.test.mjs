@@ -69,16 +69,41 @@ test('⚔ the relief is attached AFTER the holographic patch, not before', () =>
     + 'faceplates will render with no layer lines and no error.');
 });
 
-test('⚔ every material newPartMaterial returns goes through the seam', () => {
+test('⚔ every material newPartMaterial returns goes through BOTH seams, the relief first', () => {
   const fn = body('newPartMaterial');
   /* Two branches — physical (faceplates, hardware) and standard (the ordinary printed part).
-     A seam on one of them looks entirely correct until you compare two parts side by side. */
-  const returns = [...fn.matchAll(/\breturn\s+([^;]+);/g)].map((m) => m[1].trim());
+     A seam on one of them looks entirely correct until you compare two parts side by side.
+     ⚠ SINCE 2026-09-14 A MATERIAL LEAVES THROUGH THE BUILD PLATE'S FINISH, and the relief must be
+     attached in the same branch BEFORE it: the finish's plain restore takes the relief's
+     bottom-skin fold off a plate-moulded face, so a finish chained first would be undoing a patch
+     that is not there yet. */
+  const returns = [...fn.matchAll(/\breturn\s+([^;]+);/g)];
   assert.ok(returns.length >= 2, `expected both branches to return, found ${returns.length}`);
+  let from = 0;
   for (const r of returns) {
-    assert.ok(r.startsWith('withLayerDetail('),
-      `a material leaves newPartMaterial without passing through the seam: return ${r}`);
+    const expr = r[1].trim();
+    assert.ok(expr.startsWith('withBedFinish('),
+      `a material leaves newPartMaterial without the build plate's finish: return ${expr}`);
+    const branch = fn.slice(from, r.index);
+    assert.ok(/\bwithLayerDetail\(m, key\);/.test(branch),
+      `the branch returning ${expr} does not attach the relief before the finish`);
+    from = r.index + r[0].length;
   }
+});
+
+test('⚔ the finish CHAINS, and is withheld where the relief is withheld', () => {
+  /* Same role derivation as the attachHolo test below: if the finish ever assigned instead of
+     chaining, it would discard the relief and the order above would stop being the constraint. */
+  const bf = readFileSync(join(root, 'viewer', 'js', 'bed-finish.js'), 'utf8').replace(/\r\n/g, '\n');
+  assert.match(bf, /const prior = Object\.prototype\.hasOwnProperty\.call\(material, 'onBeforeCompile'\)/,
+    'bed-finish.js no longer captures the material\'s own hook');
+  assert.match(bf, /if \(prior\) prior\.call\(this, shader, renderer\);/,
+    'bed-finish.js captures the previous hook but never calls it');
+  const fn = body('withBedFinish');
+  assert.match(fn, /const axis = buildAxisForKey\(key\);\s*if \(!axis\) return m;/,
+    'withBedFinish no longer withholds the finish when the build axis is unknown');
+  assert.match(fn, /if \(spec\.holographic\) return m;/,
+    'withBedFinish now patches the face-down faceplate transfer, which it must leave as it was');
 });
 
 test('⚔ the constraint still holds: attachHolo ASSIGNS and the vendored module CHAINS', () => {

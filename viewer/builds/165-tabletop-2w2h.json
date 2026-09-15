@@ -19,6 +19,7 @@
     "handleStyle": "deco",
     "wallStagger": false,
     "backCover": false,
+    "buildPlate": "powder",
     "removedStoppers": [],
     "gridW": 6,
     "gridH": 4,

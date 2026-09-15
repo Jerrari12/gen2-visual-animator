@@ -142,6 +142,13 @@ jobs:
           # line here fails the deploy rather than shipping a module that caches independently of
           # the importer that reads it.
           sed -i "s|'./filament-profiles.js'|'./filament-profiles.js?v=$V'|" viewer/js/part-material.js
+          # the build plate's bed-surface finish (2026-09-14) - a main.js import like the rest
+          sed -i "s|'./bed-finish.js'|'./bed-finish.js?v=$V'|" viewer/js/main.js
+          # the dimension labels' cover test (2026-09-14, the moving-frame savings) - a main.js import too
+          sed -i "s|'./dim-cover.js'|'./dim-cover.js?v=$V'|" viewer/js/main.js
+          # the orbit benchmark, ?bench=orbit (2026-09-14) - a main.js import (the version its results report is main.js's
+          # own ?v= stamp from index.html above, read through import.meta.url)
+          sed -i "s|'./orbit-bench.js'|'./orbit-bench.js?v=$V'|" viewer/js/main.js
 
       # Fail the deploy rather than ship a half-stamped module graph. A first
       # version of this guard was a single grep over main.js for

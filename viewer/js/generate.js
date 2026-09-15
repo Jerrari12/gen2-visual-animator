@@ -2678,6 +2678,22 @@ const PLATE_POSE = {
      family still boots fail-closed until its own words arrive, because
      platePoseFor answers null for any type not named here. */
   bracket: [-90, 0, 0],
+  /* Joey, 2026-09-14: the EdgeLabel accent - a separate print from its
+     faceplate, shared with Classic Pro - "prints face-down", its front on the
+     plate, so the front carries the build plate's texture (knowledge pack
+     family-print-settings.md, MODULITH cbd6fca). The same swing that lays an
+     Essential plate face-down. The accent's authored front is +Z: the
+     instance's corrective rot [0,0,180] turns about Z and leaves it there.
+     ⚠ NO SITE SLUG POSES AN ACCENT, so this entry reaches no plate preview and
+     no exported registry row - only the renderer's build axis. */
+  accent: [90, 0, 0],
+  /* Joey, 2026-09-14, of the Deco handle: "The way they are right now in the viewer, the side
+     facing up, that side prints face-down on the build plate." Installed, the handle's top faces
+     up, so it takes the Cover Upper's swing - the installed top onto the plate - and that top face
+     carries the plate's finish. KEYED BY HANDLE FAMILY, like the faceplates: the handle material is
+     one TYPE shared by every style, and BlockBar and Crystal have no confirmed pose, so they stay
+     plain. ⚠ NO SITE SLUG POSES A HANDLE, so, like the accent, only the renderer's axis reads it. */
+  'handle:deco': [180, 0, 0],
 };
 /* Every hardware entry, reachable by the TYPE it poses. Built once from the same table
    platePoseFor reads, so the two cannot name different entries for one type. */
@@ -2693,11 +2709,12 @@ for (const hw of Object.values(HARDWARE_PREVIEW)) if (hw.type) HW_BY_TYPE[hw.typ
  * this switch would drift the day a family is added, and the symptom would be layer lines running
  * the wrong way on one screen and the right way on the other.
  */
-export function plateRotForType(type, faceStyle) {
+export function plateRotForType(type, faceStyle, handleStyle) {
   if (HW_BY_TYPE[type]) return HW_BY_TYPE[type].plateRot;
   const k = type === 'Case' ? 'case'
     : type === 'Drawer' ? 'drawer'
     : type === 'Faceplate' ? 'faceplate:' + faceStyle
+    : type === 'Handle' ? 'handle:' + handleStyle
     : type === 'CoverU' ? 'coverUpper'
     : type === 'CoverL' ? 'coverLower'
     : type === 'FootrailU' ? 'footrailUpper'
@@ -2708,6 +2725,7 @@ export function plateRotForType(type, faceStyle) {
     : type === 'ShelfLip' ? 'shelfLip'
     : type === 'BackCover' ? 'backCover'
     : type === 'Bracket' ? 'bracket'
+    : type === 'Accent' ? 'accent'
     : null;
   return k != null && k in PLATE_POSE ? PLATE_POSE[k] : null;
 }
@@ -2757,9 +2775,13 @@ export function buildAxisFromEuler(rot) {
  *                       one material, because materials here are keyed by type. There is no single
  *                       axis to give that material. Detected by comparing the derived axes rather
  *                       than by naming QuickLock, so the next chiral family fails closed too.
+ *
+ * The FAMILY arguments matter to one type each: `faceStyle` to a Faceplate (Classic, ClassicPro and
+ * EdgeLabel print back-down, Essential and Chevron face-down), `handleStyle` to a Handle ('deco',
+ * 'blockbar', 'crystal' - only Deco has a confirmed pose).
  */
-export function buildAxisForType(type, faceStyle) {
-  const rot = plateRotForType(type, faceStyle);
+export function buildAxisForType(type, faceStyle, handleStyle) {
+  const rot = plateRotForType(type, faceStyle, handleStyle);
   if (rot == null) return null;
   const poses = Array.isArray(rot) ? [rot] : Object.values(rot);
   if (!poses.length) return null;

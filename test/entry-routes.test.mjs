@@ -152,13 +152,33 @@ test('the modes are mutually exclusive - never two at once', () => {
   assert.equal(hybrid.isRoot, false);
   assert.equal(hybrid.wantsOfficial, false);
   // at most one mode is true for every shape we can construct
-  for (const q of ['', '?kit=x', '?build=y', '?embed=1', '?part=x&mode=preview', '?part=x&mode=preview&embed=1']) {
+  for (const q of ['', '?kit=x', '?build=y', '?embed=1', '?part=x&mode=preview', '?part=x&mode=preview&embed=1',
+    '?bench=orbit', '?bench=orbit&embed=1', '?bench=orbit&build=y', '?part=x&mode=preview&bench=orbit']) {
     for (const h of ['', '#build=eyJhIjoxfQ==']) {
       const e = resolveEntry(q, h);
-      const modes = [e.isPart, e.isEmbed, e.isRoot].filter(Boolean).length;
+      const modes = [e.isPart, e.isEmbed, e.isRoot, e.isBench].filter(Boolean).length;
       assert.ok(modes <= 1, `${q} ${h} reported ${modes} simultaneous modes`);
     }
   }
+});
+
+test('?bench=orbit runs the orbit benchmark - its own fixed build, whatever hash, build or kit the URL carries (only a part preview outranks it)', () => {
+  /* The benchmark's workload must be the same on every device, so nothing a URL carries may swap the build under it:
+     not a planner hash, not a kit name, and it must never fall into the front door's official path either. */
+  for (const [q, h] of [['?bench=orbit', ''], ['?bench=orbit', '#build=eyJhIjoxfQ=='], ['?bench=orbit&build=240-tabletop-3w2h', ''],
+    ['?bench=orbit&kit=edgelabel-test&tier=high', '']]) {
+    const e = resolveEntry(q, h);
+    assert.equal(e.isBench, true, `${q}${h}`);
+    assert.equal(e.buildHash, null, `${q}${h}: a hash build must not replace the benchmark's`);
+    assert.equal(e.isRoot, false, `${q}${h}`);
+    assert.equal(e.wantsOfficial, false, `${q}${h}: the benchmark must not run the official branch`);
+    assert.equal(e.isEmbed, false, `${q}${h}`);
+  }
+  assert.equal(resolveEntry('?bench=gpu', '').isBench, false, 'only the orbit benchmark is a route');
+  assert.equal(resolveEntry('?bench=gpu', '').isRoot, true, 'an unknown bench value is just the front door');
+  const part = resolveEntry('?part=185-case-2w-1h&mode=preview&bench=orbit', '');
+  assert.equal(part.isPart, true, 'part preview still wins');
+  assert.equal(part.isBench, false);
 });
 
 test('?part= without mode=preview is NOT a part boot, and lands on the front door', () => {

@@ -11,6 +11,10 @@ import { resolveEntry } from './entry.js';
 import { FILAMENT_DB } from './filament-db.js';
 import { partMaterialSpec } from './part-material.js';
 import { applyLayerDetail } from './vendor/layer-detail.js';
+import { PLATE_FINISHES, PLATE_LABELS, HOLO_OPACITY, plateFinishOf, createBedFinishUniforms, setBedFinish,
+  setSettleDetail, applyBedFinish, bedFaceAttributes } from './bed-finish.js';
+import { createDimCoverTest } from './dim-cover.js';
+import { benchBuild, createOrbitBench } from './orbit-bench.js';
 
 /* Every entry-routing boolean below is derived by resolveEntry() in entry.js -
    a pure function of (search, hash) with no DOM or network - so the boot
@@ -36,6 +40,12 @@ const BUILD_HASH = ENTRY.buildHash;
 // location.search, so the mount/length-change self-reload keeps it.
 const IS_EMBED = ENTRY.isEmbed;
 document.body.classList.toggle('embed', IS_EMBED);
+/* ?bench=orbit - the orbit benchmark (orbit-bench.js, Joey relaying Astra 2026-09-14): its own fixed 80-unit build, a
+   warm-up and a timed camera orbit at a locked tier, a PASS/FAIL card. `benchHold` holds the resolution drop and the
+   automatic tier change off for the page once a run starts (qualityTick). Both are `var` for the same reason as
+   shadowWatch: the render loop and qualityTick read them, and a render can come before a `let` line has run. */
+const IS_BENCH = ENTRY.isBench;
+var orbitBench = null, benchHold = false;
 // ?part=<slug>&mode=preview — the MODULITH product-page embed (2026-08-19): a
 // TRANSPARENT iframe showing one part, poster-fast, slow idle spin until
 // interaction, orbit/zoom/reset and nothing else. The slug is the SITE'S frozen
@@ -110,6 +120,7 @@ const trackLog = [];
 if (new URLSearchParams(location.search).has('debug')) window.__GEN2_VIEWER__ = { trackLog };
 function track(name) {
   if (trackLog.length < 200) trackLog.push(name);
+  if (IS_BENCH) return;   // a benchmark run is a test, not a visitor: none of its events reach the dashboard (count.js still counts the page load itself)
   try {
     const gc = window.goatcounter;
     if (gc && gc.count) { gc.count({ path: name, title: name, event: true }); return; }
@@ -218,11 +229,51 @@ canvas.addEventListener('webglcontextlost', () => {
 });
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0xeef0f3);
+/* THE MOVING-FRAME SAVINGS (Joey and Astra, 2026-09-14, "Step 1"). Each one is a switch so a harness can run the viewer
+   with and without it IN ONE PAGE - to measure it, and to prove the image did not change. Only the ?debug=1 hook
+   (`moveOpt`) ever turns one off.
+     labels     the dimension labels' cover test walks the parts once per placement pass (dim-cover.js), not once per ray
+     shadow     the light stage's shadow map re-renders when a caster or the key light changed (watchShadowCasters),
+                not on every frame the camera moves
+     grounding  the dark stage's contact map is recomputed only when a part moved, showed or hid (updateGrounding)
+     cavity     the drawer cavity fill does nothing while it is off with nothing to restore (updateCavityFill)
+   MEASURED before them, on the 80-unit build: vault measurements.md "An 80-unit build: where a moving frame's CPU time
+   goes". ⚠ Declared beside the scene because scene.onBeforeRender reads it on every render of the scene. */
+const MOVE_OPT = { labels: true, shadow: true, grounding: true, cavity: true };
+scene.onBeforeRender = watchShadowCasters;   // after three updates world matrices, before its shadow pass
 
 const camera = new THREE.PerspectiveCamera(40, 1, 1, 8000);
 const controls = new OrbitControls(camera, canvas);
 controls.enableDamping = true;
 controls.maxPolarAngle = Math.PI * 0.52; // don't go under the table
+
+/* ⚠ THE ORBIT COAST IS STOPPED ONCE IT IS INVISIBLE. With damping on, a released drag keeps turning the camera by a
+   shrinking amount every update (x0.95, no time term), and that motion takes ~700 updates to round away to nothing.
+   MEASURED 2026-09-13 on the A5000 laptop at 120 Hz (orbit-coast-repro): under half a pixel per frame 0.7 s after
+   release, but not exactly still until 5.35 s. Everything that waits for a still camera waited with it - Very High's
+   settled image restarts on ANY change of the camera matrices, and the powder grain's detail form and the visible layer
+   lines exist only in that image; the AO settle uses the same exact compare. So the wait was set by the FRAME COUNT, not
+   the GPU: roughly twice as long at 60 fps, and about a minute on an iGPU (Joey 2026-09-14).
+   Once one update's own motion is under COAST_STILL_PX drawing-buffer pixels at the orbit target, the rest of the coast
+   is dropped: the camera stops where it is - the unplayed remainder is ~19 updates of that motion, under a pixel -
+   rather than jumping to where the coast would have ended. The visible glide is untouched. With a button or finger
+   still down the threshold is ten times smaller, so a slow pan is not cut off mid-gesture; and never while
+   auto-rotating, where the spin adds its angle to the same delta every update and zeroing it would hold the spin at
+   the damping factor's share of its speed. The translucent-filament lab's round-39 preview fix (review 01a09d71). */
+const COAST_STILL_PX = 0.05;
+const _coastPos = new THREE.Vector3(), _coastQuat = new THREE.Quaternion();
+function updateOrbit() {
+  _coastPos.copy(camera.position); _coastQuat.copy(camera.quaternion);
+  controls.update();
+  const delta = controls._sphericalDelta, pan = controls._panOffset;
+  if (!controls.enableDamping || controls.autoRotate || !delta || !pan) return;
+  const dist = camera.position.distanceTo(controls.target);
+  const mmPerPx = 2 * dist * Math.tan(camera.fov * Math.PI / 360) / Math.max(1, renderer.domElement.height);
+  _coastQuat.invert().multiply(camera.quaternion);
+  const turn = 2 * Math.atan2(Math.hypot(_coastQuat.x, _coastQuat.y, _coastQuat.z), Math.abs(_coastQuat.w));
+  const px = Math.max(camera.position.distanceTo(_coastPos), turn * dist) / Math.max(mmPerPx, 1e-9);
+  if (px < (controls.state === -1 ? COAST_STILL_PX : COAST_STILL_PX / 10)) { delta.set(0, 0, 0); pan.set(0, 0, 0); }
+}
 
 const hemi = new THREE.HemisphereLight(0xffffff, 0x8a8f98, 1.1);
 scene.add(hemi);
@@ -350,7 +401,18 @@ const STAGE_THEMES = {
   // desk size the far reaches are dimmer still) (34,40,70), L* 17, +12.4
   // over its room. A plane you see at once, still far below the parts.
   // Keep them low-chroma: bluer materials rendered as saturated blue here.
-  dark:  { bg: 0x0d0e21, bgWall: 0x150f30, table: 0x14163a, wall: 0x50526e,
+  // ⚠ THE FLOOR WAS LIFTED 0x14163a -> 0x282c66 (2026-09-10, Joey's pick from a
+  // four-rung sweep). NOT a mood change for its own sake: the near-black floor
+  // was the reason two separate contact cues measured as unusable - a black
+  // overlay came in under 5 levels at any strength, and attenuating the
+  // reflection only removed the one grounding cue that stage had. Both fail for
+  // the same reason, no tonal range near the contact, and the stage colour is an
+  // artistic choice rather than a constraint. Measured across the sweep: open
+  // floor 20.2 -> 35.6 luminance, and the contact darkening it can carry 3.22 ->
+  // 4.77 levels. The next rung up (0x343a7e, 47.8) carried more still and was
+  // rejected by eye as "noticeably brighter and bluer" - the deep navy is the
+  // point of this stage, so this is the brightest rung that keeps it.
+  dark:  { bg: 0x0d0e21, bgWall: 0x150f30, table: 0x282c66, wall: 0x50526e,
            surface: 0x6e7090, grid: 0x2b7f9e, dim: 0x8f9ad8 },
 };
 // DARK IS THE DEFAULT (Joey 2026-08-08). Both choices are stored explicitly,
@@ -376,6 +438,7 @@ try { if (localStorage.getItem('gen2-theme') === 'light') stageTheme = 'light'; 
 // color into the product palette and turn the light-stage-only shadow gates on.
 if (IS_PART) stageTheme = 'light';
 function applyStageTheme(name) {
+  perfGrace();   // a theme flip recompiles programs (the shadow map toggles); the stalls are not a frame rate
   stageTheme = STAGE_THEMES[name] ? name : 'light';
   const t = STAGE_THEMES[stageTheme];
   const wallish = typeof manifest !== 'undefined' && manifest && manifest.mount === 'wall';
@@ -411,6 +474,7 @@ function applyStageTheme(name) {
   // the dark stage substitutes part of the instruction palette (see
   // DARK_STAGE_PALETTE), so a theme flip has to repaint the materials
   if (typeof manifest !== 'undefined' && manifest && typeof applyPalette === 'function') applyPalette();
+  invalidateFrame();   // stage colours, grid, dim lines - all repainted
 }
 // NB plain getElementById here — this runs at module eval, BEFORE the `$`
 // helper below is initialized (a `$(...)` call here dies on the TDZ and takes
@@ -457,11 +521,37 @@ labelThemeBtn();
 // the cost — and dropping the appearance improvement at the first sign of trouble spends the whole
 // feature to buy a step the resolution drop has usually already bought.
 const QUALITY = {
+  /* ⚠ VERY HIGH IS `high` PLUS ONE FLAG, DELIBERATELY. It changes nothing about
+     a moving frame - same env, same rig, same shadow, same AO, same dpr - so a
+     device that copes with High copes with Very High while you orbit. The whole
+     difference is what happens once you stop: see accumFrame(). That is also
+     why it is safe to leave reachable on the pill rather than gating it behind
+     a GPU sniff.
+     It is NOT the default, for two reasons. The settle burst is real work; and
+     the two RGBA16F targets plus a depth buffer scale with the DRAWING BUFFER,
+     which is the canvas area times the square of the device pixel ratio:
+         1920x1080 buffer (a 1080p panel, dpr 1)      ~41 MB
+         3024x1964 buffer (a retina laptop at dpr 2) ~119 MB
+         3840x2160 buffer (a 4K panel at 200%, dpr 2) ~166 MB
+     So the worst case is a high-dpr 4K desktop - which is exactly the machine
+     most likely to be able to afford it - and an ordinary laptop pays a quarter
+     of that. Dropping MSAA from the scene target (see ACC_WARMUP) is what keeps
+     the top of that range at 166 MB instead of four times it. */
+  /* ⚠ NO `grounding` FLAG ON ANY TIER. The black-overlay version was built,
+     laddered and MEASURED not to work (see updateGrounding): darkening a
+     near-black floor has no range, exactly as this repo's own render-lab note
+     said before it was built. It is left in the file because the CONTACT MAP it
+     computes is what the reflection-attenuation experiment consumes - but it
+     draws nothing unless a debug session turns it on. "Harmless" is not a reason
+     to leave rendering work enabled in a shipping tier. */
+  veryhigh: { env: true,  tone: true,  key: true,  shadow: true,  reflect: true,  ao: true,  dpr: 2,   relief: true,  accum: true },
   high:     { env: true,  tone: true,  key: true,  shadow: true,  reflect: true,  ao: true,  dpr: 2,   relief: true },
   balanced: { env: true,  tone: true,  key: true,  shadow: true,  reflect: false, ao: false, dpr: 1.5, relief: true },
   fast:     { env: false, tone: false, key: false, shadow: false, reflect: false, ao: false, dpr: 1,   relief: false },
 };
-const QUALITY_ORDER = ['high', 'balanced', 'fast'];
+// the auto-downgrade walks this DOWNWARD only, so Very High sitting at index 0
+// means a device that cannot hold it steps back to High and stops there
+const QUALITY_ORDER = ['veryhigh', 'high', 'balanced', 'fast'];
 var qualityReady = false;   // hoisted (see applyStageTheme) — true once a tier has been applied
 let quality = 'high';
 let qualityLocked = false;   // an explicit user pick stops the auto-downgrade fighting them
@@ -491,8 +581,16 @@ const SHOT_QUALITY = 'high';
 // drift ~0 (measured max 2.4 deg vs a tinted room's 121 deg), the asymmetry is
 // what reads as "lit" rather than "brighter".
 let studioEnvTex = null;
-function studioEnv() {
-  if (studioEnvTex) return studioEnvTex;
+/* ⚠ THE ROOM IS ITS OWN FUNCTION so that nothing has to describe it TWICE. The
+   moment a second consumer needs this lighting - a path tracer, which cannot
+   read a PMREM and needs an equirectangular source - the panel table becomes
+   the kind of number that exists in two places and drifts. It exists here. The
+   caller owns disposing what it gets back.
+   ⚠ The PMREM's 0.04 blur is applied by `fromScene` and is NOT part of the room:
+   anything rebuilding this lighting from the room alone has to apply the
+   equivalent angular blur itself, or it is a different environment. */
+const STUDIO_SIGMA = 0.04;
+function studioRoom() {
   const room = new THREE.Scene();
   const panel = (hex, boost, w, h, x, y, z) => {
     const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h),
@@ -503,8 +601,13 @@ function studioEnv() {
   panel(0xffffff, 1.2, 9, 9, 8, 3, 2);       // fill
   panel(0xffffff, 2.2, 12, 3, 0, 5, -10);    // rim
   panel(0x9aa3b0, 0.7, 16, 16, 0, -9, 0);    // floor bounce
+  return room;
+}
+function studioEnv() {
+  if (studioEnvTex) return studioEnvTex;
+  const room = studioRoom();
   const pmrem = new THREE.PMREMGenerator(renderer);
-  studioEnvTex = pmrem.fromScene(room, 0.04).texture;
+  studioEnvTex = pmrem.fromScene(room, STUDIO_SIGMA).texture;
   pmrem.dispose();
   room.traverse(o => { if (o.isMesh) { o.geometry.dispose(); o.material.dispose(); } });
   return studioEnvTex;
@@ -518,6 +621,9 @@ const LIGHT_RIG = {
 let baseHemi = LIGHT_RIG.shipped.hemi;   // updateCinema fades FROM this, per tier
 
 function applyQuality(name) {
+  /* every tier change and every re-mount (mountManifest calls this) compiles programs on the next frames;
+     the auto-downgrade must not read those stalls as the new tier's frame rate */
+  perfGrace();
   quality = QUALITY[name] ? name : 'high';
   const q = QUALITY[quality];
 
@@ -538,6 +644,7 @@ function applyQuality(name) {
   /* ⚠ AFTER the tier is assigned and BEFORE the frame that follows it. syncRelief reads `quality`,
      so calling it earlier would rebuild against the tier being replaced. */
   syncRelief();
+  guardFx('grounding', updateGrounding);
   applyShadowQuality();
   guardFx('reflection', applyReflectionQuality);   // also builds the render target
   labelQualityBtn();
@@ -581,12 +688,15 @@ function applyShadowQuality() {
     for (const m of (Array.isArray(o.material) ? o.material : [o.material])) m.needsUpdate = true;
   });
 }
-/* A STYLE SWAP IS A CHANGE MADE AT REST, SO IT ASKS FOR ITS OWN SHADOW RENDER (hotfix, Joey relaying Astra, 2026-09-15).
-   The map re-renders while the camera or a tween moves and once when that settles (qualityTick), so a handle swap or a
-   static kit's faceplate swap - which moves nothing - left the old part's shadow on screen until the next move (measured on
-   this code before the fix, p31 checks at High: 157,819 and 12,642 pixels against a forced-fresh map; 0 after). The fuller
-   fix on the build-plate-finish branch also covers a snap at rest (applyState, applyExploded, computeBounds); this hotfix
-   carries only the swaps. */
+/* A PART CHANGED WHILE NOTHING MOVES ASKS FOR ITS OWN SHADOW RENDER (Joey relaying Astra, 2026-09-14). The map re-renders on
+   moving frames (watchShadowCasters) and once when motion settles, so a change made at rest never reached it: Back after
+   the user took the camera left the previous step's shadows on screen until the next move (p30, 94,749-189,496 pixels),
+   and so did the checklist page and both style swaps (p31). The at-rest writers of what the shadow pass reads call this -
+   applyState, applyExploded, computeBounds and the two swaps; every other writer of part transforms or visibility runs
+   inside a tween, which the moving gate covers. It changes only frames whose map was stale: a re-render with the same
+   casters draws the same map.
+   ⚠ NOT by making a snap count as motion: perf.moving also drives the resolution drop and holds Very High's accumulation,
+   so frames that are not stale would change too. The swap half reached production first as the 4279c3f hotfix. */
 function markShadowDirty() {
   if (renderer.shadowMap.enabled) renderer.shadowMap.needsUpdate = true;
 }
@@ -602,7 +712,15 @@ function fitShadowCamera() {
   if (!sun.castShadow || typeof assembledBox === 'undefined' || assembledBox.isEmpty()) return;
   const size = new THREE.Vector3(), c = new THREE.Vector3();
   assembledBox.getSize(size); assembledBox.getCenter(c);
-  const r = Math.max(size.x, size.y, size.z) * 0.85 + 40;
+  /* ⚠ A SPHERE WHEN THE KEY LIGHT MOVES. `high` fits the box for one fixed
+     light direction; Very High sweeps the light over a 6-degree disc, and a box
+     fit for the centre clips on the outer samples - a clipped frustum drops the
+     shadow entirely for those samples, which averages into a pale band rather
+     than an obvious error. The bounding sphere is rotation-invariant, so one
+     fit covers every sample (review catch, 2026-09-09). */
+  const r = QUALITY[quality].accum
+    ? size.length() / 2 + 60
+    : Math.max(size.x, size.y, size.z) * 0.85 + 40;
   const cam = sun.shadow.camera;
   cam.left = -r; cam.right = r; cam.top = r; cam.bottom = -r;
   cam.near = 1; cam.far = 3000;
@@ -610,12 +728,120 @@ function fitShadowCamera() {
   sun.target.position.copy(c);
   if (!sun.target.parent) scene.add(sun.target);
   sun.target.updateMatrixWorld();
-  sun.shadow.mapSize.set(1024, 1024);
+  /* Texel density is the FLOOR on the contact sharpness the accumulation can
+     deliver: no number of light samples makes a shadow edge finer than one
+     shadow-map texel plus the PCF tap. Very High spends the memory. */
+  const sm = QUALITY[quality].accum ? 2048 : 1024;
+  if (sun.shadow.mapSize.x !== sm) {
+    sun.shadow.mapSize.set(sm, sm);
+    if (sun.shadow.map) { sun.shadow.map.dispose(); sun.shadow.map = null; }   // three only allocates once
+  }
   // world units are MILLIMETRES and parts are 2-3mm thick — normalBias has to be a
   // fraction of a mm, not the ~0.02 a tutorial suggests
   sun.shadow.bias = -0.0004;
   sun.shadow.normalBias = 0.6;
   renderer.shadowMap.needsUpdate = true;   // THE flag that matters (see above)
+}
+
+/* THE SHADOW MAP RE-RENDERS WHEN WHAT IT SHOWS CHANGED (MOVE_OPT.shadow, Joey and Astra 2026-09-14).
+   It used to re-render on every frame `perf.moving` was true, and a moving CAMERA sets that - so an orbit on the light
+   stage drew every caster twice per frame. MEASURED on the 80-unit build at a 4x CPU throttle, High: holding it while
+   only the camera moved saved 13.3 ms of a 45 ms frame (20.5 -> 28.0 fps), 2,539 -> 1,271 draw calls.
+   What the map holds depends on the casters and the key light, never on the view camera: a directional light fixed in
+   the scene, a shadow camera fitted to the assembled bounds (fitShadowCamera). So this compares exactly those against
+   the last look and asks for a shadow render when any of them differ:
+     each caster (the instance meshes - applyShadowQuality flags exactly those): the mesh itself, its world matrix,
+     visible all the way up the tree, castShadow, its layers, its geometry, its material and that material's version;
+     the key light: its world matrix, its target's, and its shadow camera's projection.
+   It runs from scene.onBeforeRender, which three calls on EVERY render of the scene - after updating every world
+   matrix, before the shadow pass - so a part moved this frame (a tween, a snap in applyState, a fade that hides a group)
+   is in this frame's shadow.
+   ⚠ ONLY ON THE FRAMES THE OLD CODE RE-RENDERED THE MAP ON: `moving` mirrors perf.moving (qualityTick writes it).
+   At rest the old code left the map alone and so does this - the walk is not free: MEASURED on the 80-unit build it
+   added ~1 ms to every IDLE light-stage frame unthrottled and several ms at a 4x CPU throttle (p29, 2026-09-14), where
+   the old code spent nothing. Gated like that, on every moving frame the map holds exactly what the old code's map held.
+   A change made AT REST is not the watch's job: the writers that make one ask for the render themselves (markShadowDirty).
+   ⚠ `var`, for the same reason as perfGraceUntil: nothing may read a `let`/`const` before its line has run - which is
+   also why the gate is a field here and not a read of `perf` (declared far below; a render can precede it). */
+var shadowWatch = { n: -1, meshes: [], mats: [], geos: [],
+  m: new Float64Array(0), flags: new Uint8Array(0), layers: new Uint32Array(0), ver: new Float64Array(0),
+  light: new Float64Array(48), stack: [], vis: [], moving: false };
+function watchShadowCasters() {
+  if (!renderer.shadowMap.enabled || !MOVE_OPT.shadow || !shadowWatch || !shadowWatch.moving) return;
+  if (shadowInputsChanged(shadowWatch)) renderer.shadowMap.needsUpdate = true;
+}
+/* true when `into[at..at+15]` differed from `elements`; stores them either way */
+function storeChanged16(into, at, elements) {
+  let changed = false;
+  for (let k = 0; k < 16; k++) { const v = elements[k]; if (into[at + k] !== v) { into[at + k] = v; changed = true; } }
+  return changed;
+}
+function shadowInputsChanged(W) {
+  let changed = storeChanged16(W.light, 0, sun.matrixWorld.elements);
+  if (storeChanged16(W.light, 16, sun.target.matrixWorld.elements)) changed = true;
+  if (storeChanged16(W.light, 32, sun.shadow.camera.projectionMatrix.elements)) changed = true;
+  // walk every instance's subtree, carrying "visible all the way up" down the stack
+  const stack = W.stack, vis = W.vis;
+  stack.length = 0; vis.length = 0;
+  for (const inst of instances.values()) { stack.push(inst.group); vis.push(true); }
+  let j = 0;
+  while (stack.length) {
+    const o = stack.pop(), shown = vis.pop() && o.visible;
+    if (o.isMesh) {
+      if (j >= W.n) {   // more meshes than last time: grow and count it as a change
+        const n = Math.max(64, (j + 1) * 2);
+        const m = new Float64Array(n * 16); m.set(W.m); W.m = m;
+        const flags = new Uint8Array(n); flags.set(W.flags); W.flags = flags;
+        const layers = new Uint32Array(n); layers.set(W.layers); W.layers = layers;
+        const ver = new Float64Array(n); ver.set(W.ver); W.ver = ver;
+        W.n = n; changed = true;
+      }
+      if (W.meshes[j] !== o) { W.meshes[j] = o; changed = true; }
+      if (W.mats[j] !== o.material) { W.mats[j] = o.material; changed = true; }
+      if (W.geos[j] !== o.geometry) { W.geos[j] = o.geometry; changed = true; }
+      const mat = o.material;
+      const version = Array.isArray(mat) ? mat.reduce((s, x) => s + (x ? x.version : 0), 0) : (mat ? mat.version : 0);
+      if (W.ver[j] !== version) { W.ver[j] = version; changed = true; }
+      const flag = (shown ? 1 : 0) | (o.castShadow ? 2 : 0);
+      if (W.flags[j] !== flag) { W.flags[j] = flag; changed = true; }
+      // three's shadow pass tests each object's layers against the VIEW camera's (renderObject), which nothing changes
+      if (W.layers[j] !== o.layers.mask >>> 0) { W.layers[j] = o.layers.mask >>> 0; changed = true; }
+      if (storeChanged16(W.m, j * 16, o.matrixWorld.elements)) changed = true;
+      j++;
+    }
+    const children = o.children;
+    for (let k = children.length - 1; k >= 0; k--) { stack.push(children[k]); vis.push(shown); }
+  }
+  if (W.meshes.length !== j) { W.meshes.length = j; W.mats.length = j; W.geos.length = j; changed = true; }
+  return changed;
+}
+
+/* ⚠ DECLARED HERE, ABOVE THE REFLECTOR, AND THAT POSITION IS LOAD-BEARING.
+   ensureReflector() binds these arrays as uniforms and uses GROUND_MAX as a
+   shader define, and it can run during module evaluation via applyQuality.
+   A `const` referenced before its declaration is a TDZ crash that takes the
+   whole boot down - the `#btn-theme` and `lipUnit` lesson, twice already. */
+const GROUND_MAX = 24;          // patches per frame; a 6H board's low parts fit easily
+const GROUND_H = 90;            // mm above the stage past which a part contributes nothing
+const _gv = new THREE.Vector3();
+/* ⚠ THE ARRAYS ARE ALLOCATED HERE, NOT IN ensureGrounding(). The reflector's
+   material binds them as uniforms when IT is first built, and there is no
+   ordering guarantee between the two - a null uniform array is a silently dead
+   shader, not an error. */
+const ground = {
+  mesh: null, mat: null, boxes: null, rev: -1,
+  pos: new Float32Array(GROUND_MAX * 2),   // world x, z
+  siz: new Float32Array(GROUND_MAX * 2),   // half-extent x, z (already widened by height)
+  str: new Float32Array(GROUND_MAX),
+  seen: null,   // what the map was last computed from (groundingInputsChanged); null = compute next frame
+};
+/* Whether the contact MAP is computed. Deliberately separate from whether the
+   black overlay is DRAWN (`QUALITY[...].grounding`, off on every shipping tier):
+   the reflection-attenuation experiment needs the points and not the overlay. */
+function contactMapWanted() {
+  return stageTheme === 'dark' && !cinema.on
+    && !isWallBuild && !isUnderTableBuild && !IS_PART && !fxDead.grounding
+    && typeof assembledBox !== 'undefined' && !assembledBox.isEmpty();
 }
 
 // ---- planar floor reflection (dark stage) ----------------------------------
@@ -624,6 +850,9 @@ function fitShadowCamera() {
 // faint blurred reflection grounds the build while keeping the deep navy.
 // Refreshed only when the camera or the build moves.
 const refl = { rt: null, mesh: null, cam: null, tex: new THREE.Matrix4(), key: '' };
+/* The reflection's resting opacity. A moving camera sets the uniform to 0 and skips the mirror render
+   (see updateReflection), so this is the value it comes back to. */
+const REFL_OPACITY = 0.16;
 function reflectionWanted() {
   if (fxDead.reflection || !QUALITY[quality].reflect) return false;
   if (IS_PART) return false; // no floor to reflect in on the preview's clean float
@@ -644,17 +873,35 @@ function ensureReflector() {
   refl.rt.texture.minFilter = THREE.LinearFilter;
   refl.rt.texture.magFilter = THREE.LinearFilter;
   refl.cam = new THREE.PerspectiveCamera();
+  /* ⚠⚠ uContact IS AN EXPERIMENT AND DEFAULTS TO OFF (0).
+     The reasoning behind it: on the dark stage the only thing with any luminance
+     RANGE is this reflection - it is worth up to +47 levels where the build
+     stands, while a black overlay measured under 5. So a contact cue has a
+     chance if it modulates the reflection instead of painting darkness.
+     ⚠ IT IS NOT A PHYSICAL CORRECTION AND MUST NOT BE DESCRIBED AS ONE. A real
+     reflection runs right up to the contact point; suppressing it near contact
+     is an ARTISTIC grounding device that may read as convincing or may read as a
+     dark halo round the feet. The picture decides, and until it has, this is 0.
+     ⚠ Deliberately narrow: it scales the existing alpha and touches nothing
+     else, so the reflected feet stay recognisable rather than being cut away. */
   const mat = new THREE.ShaderMaterial({
     uniforms: { tRefl: { value: refl.rt.texture }, textureMatrix: { value: refl.tex },
-                uOpacity: { value: 0.16 }, uBlur: { value: 1.2 } },
+                uOpacity: { value: REFL_OPACITY }, uBlur: { value: 1.2 },
+                uContact: { value: 0 },
+                uPos: { value: ground.pos }, uSiz: { value: ground.siz },
+                uStr: { value: ground.str }, uCount: { value: 0 } },
+    defines: { GROUND_MAX },
     vertexShader: `
       uniform mat4 textureMatrix;
-      varying vec4 vProj; varying vec2 vUv;
+      varying vec4 vProj; varying vec2 vUv; varying vec2 vXZ;
       void main(){ vUv = uv; vProj = textureMatrix * vec4( position, 1.0 );
+        vXZ = ( modelMatrix * vec4( position, 1.0 ) ).xz;
         gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 ); }`,
     fragmentShader: `
-      uniform sampler2D tRefl; uniform float uOpacity, uBlur;
-      varying vec4 vProj; varying vec2 vUv;
+      uniform sampler2D tRefl; uniform float uOpacity, uBlur, uContact;
+      uniform vec2 uPos[ GROUND_MAX ]; uniform vec2 uSiz[ GROUND_MAX ];
+      uniform float uStr[ GROUND_MAX ]; uniform int uCount;
+      varying vec4 vProj; varying vec2 vUv; varying vec2 vXZ;
       void main(){
         vec2 uv = vProj.xy / vProj.w;
         float d = distance( vUv, vec2( 0.5 ) );
@@ -664,7 +911,18 @@ function ensureReflector() {
         c += texture2D( tRefl, uv - vec2( r, 0.0 ) ).rgb * 0.18;
         c += texture2D( tRefl, uv + vec2( 0.0, r ) ).rgb * 0.18;
         c += texture2D( tRefl, uv - vec2( 0.0, r ) ).rgb * 0.18;
-        gl_FragColor = vec4( c, uOpacity * smoothstep( 0.5, 0.05, d ) );
+        float a = uOpacity * smoothstep( 0.5, 0.05, d );
+        if ( uContact > 0.0 ) {
+          float open = 1.0;
+          for ( int i = 0; i < GROUND_MAX; i++ ) {
+            if ( i >= uCount ) break;
+            float rr = length( ( vXZ - uPos[ i ] ) / uSiz[ i ] );
+            float k = 1.0 - smoothstep( 0.0, 1.0, rr );
+            open *= 1.0 - uStr[ i ] * k * k;
+          }
+          a *= mix( 1.0, open, clamp( uContact, 0.0, 1.0 ) );
+        }
+        gl_FragColor = vec4( c, a );
       }`,
     transparent: true, depthWrite: false,
   });
@@ -699,8 +957,17 @@ function fitReflector() {
 const _rRw = new THREE.Vector3(), _rCw = new THREE.Vector3(), _rN = new THREE.Vector3(),
       _rRot = new THREE.Matrix4(), _rView = new THREE.Vector3(), _rLook = new THREE.Vector3(),
       _rTgt = new THREE.Vector3();
-function updateReflection(force = false) {
+function updateReflection(force = false, moving = false) {
   if (!refl.mesh || !refl.mesh.visible) return;
+  /* ⚠ WHILE THE CAMERA MOVES THE MIRROR IS NOT RENDERED AND THE FLOOR SHOWS NO REFLECTION (Joey and
+     Astra, 2026-09-14). The mirror render draws the whole build a second time on every moving frame -
+     on an 80-unit build a third of the 3,812 draw calls a High frame made - and a floor reflection is
+     not what anyone is watching mid-orbit. It is hidden, not frozen: a mirror image rendered for the
+     last still view would slide against the floor as the camera turns. The render loop passes `moving`
+     (motionLite); a forced call, from a tier change, always renders. */
+  const u = refl.mesh.material.uniforms;
+  if (moving && !force) { u.uOpacity.value = 0; refl.key = ''; return; }
+  if (u.uOpacity.value !== REFL_OPACITY) { u.uOpacity.value = REFL_OPACITY; force = true; }
   const key = camera.position.toArray().concat(controls.target.toArray(), refl.mesh.position.toArray())
     .map(v => v.toFixed(1)).join();
   if (!force && key === refl.key) return;
@@ -1247,9 +1514,12 @@ function updateAO(force = false) {
 // reports it once (error:fx-* so a driver-specific failure is actually visible in
 // the telemetry rather than being an invisible "it looked wrong on my phone").
 const fxDead = {};
+// ⚠ RETURNS THE CALLEE'S VALUE. accumFrame() reports whether it drew the canvas
+// itself, and a disabled or thrown effect must report `undefined` - falsy - so
+// the caller falls back to the plain render rather than showing nothing.
 function guardFx(name, fn) {
   if (fxDead[name]) return;
-  try { fn(); }
+  try { return fn(); }
   catch (e) {
     fxDead[name] = true;
     if (name === 'ao') { ao.busy = false; scene.overrideMaterial = null; }
@@ -1258,6 +1528,17 @@ function guardFx(name, fn) {
     console.warn(`[gen2] ${name} disabled after a render error —`, e);
     track('error:fx-' + name);
   }
+}
+/* Ambient occlusion waits while the CAMERA moves (see motionLite): the render loop calls this instead
+   of updateAO and skips the composite. Its per-frame pass redraws the whole build for depth and
+   normals - on an 80-unit build a third of a High frame's draw calls.
+   ⚠ `blocked` forces one regeneration on return, because the buffer holds another view.
+   ⚠ quietAt -Infinity when nothing is tweening: AO_ENGAGE_MS exists for the one-frame gaps between a
+   step's phases, and a camera that has just stopped has already been still for SETTLE_MS - so it
+   engages on the frame the debounce ends. A tween still running keeps the normal delay (-1). */
+function holdAOForMotion() {
+  ao.blocked = true;
+  ao.quietAt = tweens.size ? -1 : -Infinity;
 }
 function compositeAO() {
   if (!aoWanted() || !ao.rtAO || ao.busy || fxDead.ao || !ao.passes) return;
@@ -1274,9 +1555,762 @@ function compositeAO() {
   renderer.autoClear = prev;
 }
 
+/* ==========================================================================
+   VERY HIGH - accumulated settle rendering
+   ==========================================================================
+   The tier's whole idea is the one this viewer has been built on since the AO
+   burst landed: it is STATIC almost all the time, so render cheap while moving
+   and spend the budget the instant everything settles. AO already spends there.
+   Very High spends there on THE FRAME ITSELF.
+
+   Once nothing has moved, ACC_SAMPLES further frames are rendered into a linear
+   HDR target and averaged. Each sample jitters two things:
+
+     (a) THE KEY LIGHT'S POSITION, over an equal-area disk about its axis. The
+         average of many hard shadows from a disk of directions IS the shadow of
+         a disk-shaped source - so the penumbra widens with the distance from
+         the occluder to what it lands on, which is the thing a constant-width
+         blur (VSM, a blurred shadow map) can never do. Sharp under a foot, soft
+         under a drawer 100 mm up. That contact hardening IS the tier.
+     (b) THE PROJECTION, by a sub-pixel offset. It rides along for free and
+         cleans what MSAA cannot: specular aliasing and the shadow-map edge.
+
+   ⚠ IT IS A DISTANT DISK, NOT A SOFTBOX. Jittering a DirectionalLight's
+   direction integrates a distant uniformly-radiating disk emitter. That the
+   diffuse shading changes too is not a bug - it is the rest of the same
+   integral - but it will not reproduce the travelling highlight of a finite
+   rectangular source near the part. The PMREM environment and the fill light
+   are NOT jittered, so this is a deliberately hybrid studio model.
+
+   ⚠⚠ WHY NOT copyFramebufferToTexture FROM THE CANVAS. The first design
+   accumulated real canvas frames, so every sample would have been tone-mapped
+   and encoded by three exactly as `high` does and parity would have been free.
+   Rejected on review (2026-09-09): in WebGL2, copyTexSubImage2D from a
+   MULTISAMPLED read framebuffer - which is what `antialias: true` gives the
+   default framebuffer - is not a portable resolve path and may raise
+   INVALID_OPERATION. It would also have made the accumulation input 8-bit and
+   POST-tone-map. At a penumbra pixel that computes
+       vis * T(ambient + direct) + (1 - vis) * T(ambient)
+   where the honest answer is
+       T(ambient + vis * direct),
+   and Neutral is nonlinear, so mixed lit/shadow pixels come out too dark.
+   So the scene renders into an OWNED multisampled HDR target, is averaged in
+   LINEAR, and the mean reaches the screen through an ordinary three material -
+   which means three's own tone mapping and output encoding run, rather than a
+   private clone of NeutralToneMapping that could drift from `high`.
+
+   ⚠ AO IS COMPOSITED ONCE, AFTER THE RESOLVE, AT THE NOMINAL PROJECTION - and
+   never into the samples. Compositing one unjittered AO buffer into every
+   jittered sample would slide the occlusion against the geometry it darkens,
+   which is exactly the drawer gaps, dovetails and feet the product needs crisp.
+   It is also cheaper this way. The loop order already does it: blit, then
+   compositeAO - the same order in which `high` renders then composites.       */
+const ACC_SAMPLES = 24;
+/* Half-angle of the emitter disc, in degrees. 6 is a large studio source, not
+   the sun (the real sun is 0.27), and that is the point: this is a product
+   still and the reference is a softbox two feet away. ⚠ Wider is not free - a
+   wide penumbra eventually needs more than ACC_SAMPLES to stop banding into
+   separate shadows, which is what the "ghost shadows" failure looks like. */
+/* ⚠ `let`, and it is a TUNING KNOB with no measurement behind it yet - 6 looked
+   right on the 185 starter and that is the whole provenance. Exposed on the debug
+   hook so a softness ladder can be rendered without editing the file. */
+let ACC_SUN_HALF_DEG = 6;
+/* ⚠⚠ HOW THE BURST AVOIDS ANNOUNCING ITSELF, AND WHY THERE IS NO MSAA ON THE
+   SCENE TARGET. The first version gave rtScene `samples: 4` so that sample 0
+   looked like the multisampled canvas frame it replaced. MEASURED: an MSAA
+   RGBA16F colour buffer plus its multisampled depth is four times the memory,
+   and at a 3840x2160 drawing buffer that is ~400 MB of render targets for a
+   tier that is supposed to be the SAFE one. Ten times what the whole AO chain
+   costs.
+   So there is no MSAA, and the pop is solved for free instead: for the first
+   ACC_WARMUP frames of a burst the accumulator still takes its samples but does
+   NOT put the mean on screen - it reports "I did not draw" and the loop renders
+   the ordinary multisampled canvas frame, exactly what was on screen a moment
+   earlier while the camera moved. By the time the mean is shown it already
+   averages ACC_WARMUP+1 jittered samples, which resolves edges at least as well
+   as 4x MSAA and, unlike MSAA, resolves SHADING too. The handover is a small
+   improvement rather than a jump. Cost: one extra scene render on each of those
+   frames, about 2 ms each on the machine this was built on. */
+const ACC_WARMUP = 6;
+const acc = {
+  rtScene: null,    // owned MSAA linear-HDR target - one sample renders here
+  rtAcc: null,      // single-sample HalfFloat running mean, in LINEAR light
+  quad: null, qScene: null, qCam: null,
+  accMat: null,     // rtScene -> rtAcc, running mean via the blend constant
+  outMat: null,     // rtAcc -> canvas; an ordinary material, so three tone-maps it
+  n: 0, key: '', blocked: true, ok: false, probed: false,
+  jitter: true,     // debug: off makes sample 0 the exact `high` frame
+  sunHome: new THREE.Vector3(), disk: null,
+};
+/* ⚠ Float64Array, NOT Float32. Matrix4.elements are doubles; a Float32 copy
+   rounds, and the comparison then reports a moved camera on EVERY frame. That
+   exact mistake silently disabled the AO composite in production for two weeks
+   (see the AO section) and this is the same compare. */
+const _accCam = new Float64Array(32);
+const _accClear = new THREE.Color();
+function accCamMoved() {
+  const m = camera.matrixWorld.elements, p = camera.projectionMatrix.elements;
+  for (let i = 0; i < 16; i++) if (_accCam[i] !== m[i] || _accCam[16 + i] !== p[i]) return true;
+  return false;
+}
+function accCamStore() {
+  const m = camera.matrixWorld.elements, p = camera.projectionMatrix.elements;
+  for (let i = 0; i < 16; i++) { _accCam[i] = m[i]; _accCam[16 + i] = p[i]; }
+}
+/* Anything that changes the picture WITHOUT moving the camera, the step, the
+   instance count or ao.rev has to say so, or the held mean is a FROZEN VIEWER -
+   a far worse failure than stale AO, which is only wrong shading over correct
+   geometry. `accVerify()` on the debug hook is what turns "did I miss a call
+   site" into something testable rather than something hoped. */
+/* ⚠ `var`, and the counter lives OUTSIDE `acc`. applyStageTheme runs during
+   module evaluation - before `const acc` has initialised - and `typeof` does
+   NOT protect a const in its TDZ (the `#btn-theme` lesson, twice). A hoisted
+   var is callable from the first line of the file. */
+var accRev = 0;
+function invalidateFrame() { accRev++; }
+/* Equal-area disk, deterministic, index 0 at the CENTRE.
+   ⚠ NOT random. Sixteen random directions read as sixteen ghost shadows rather
+   than one soft one. A golden-angle spiral at r = sqrt(i/(n-1)) covers the disc
+   evenly and every PREFIX of it is roughly even too, so a burst interrupted
+   part-way still looks like a soft shadow rather than a smear.
+   ⚠ Index 0 is the centre so a ONE-sample accumulation is the `high` light
+   position exactly - which is what the parity test compares against. */
+function accDisk(n) {
+  const out = [new THREE.Vector2(0, 0)];
+  const g = Math.PI * (3 - Math.sqrt(5));
+  for (let i = 1; i < n; i++) {
+    const r = Math.sqrt(i / (n - 1)), a = i * g;
+    out.push(new THREE.Vector2(Math.cos(a) * r, Math.sin(a) * r));
+  }
+  return out;
+}
+function accWanted() {
+  /* ⚠ `!acc.probed || acc.ok`, NOT `acc.ok`. The probe only runs inside
+     ensureAcc(), which only runs from accumFrame(), which only runs when this
+     returns true - so gating on an `ok` that starts false is a deadlock the
+     tier never escapes, and it looks exactly like a tier that does nothing. */
+  return !!QUALITY[quality].accum && (!acc.probed || acc.ok) && !fxDead.accum
+    && !cinema.on && !IS_PART
+    && !tweens.size && !perf.moving
+    && fpEnv.k === fpEnv.target;   // the room fade is a per-frame lerp, not a tween
+}
+function ensureAcc() {
+  if (acc.rtScene) return;
+  /* The same evidence AO accumulation runs on: a complete float framebuffer
+     proves renderability, not that the constant-alpha running mean behaves.
+     Reuse the AO probe rather than writing a second one - it IS the identical
+     blend. On failure the tier degrades to a plain `high` frame for the
+     session; never a silently half-working mean. */
+  if (!acc.probed) { acc.probed = true; acc.ok = aoBlendProbe(); }
+  if (!acc.ok) return;
+  const w = Math.max(1, renderer.domElement.width), h = Math.max(1, renderer.domElement.height);
+  // depthBuffer is real here, unlike the AO quads: a scene render needs one.
+  // No MSAA - see ACC_WARMUP for what replaces it and why.
+  acc.rtScene = new THREE.WebGLRenderTarget(w, h, {
+    type: THREE.HalfFloatType, depthBuffer: true, stencilBuffer: false,
+  });
+  acc.rtAcc = new THREE.WebGLRenderTarget(w, h, {
+    type: THREE.HalfFloatType, depthBuffer: false, stencilBuffer: false,
+  });
+  /* LINEAR, stated. The mean is light, not a picture: three must not decode it
+     as sRGB when the output material samples it. */
+  acc.rtScene.texture.colorSpace = THREE.LinearSRGBColorSpace;
+  acc.rtAcc.texture.colorSpace = THREE.LinearSRGBColorSpace;
+  acc.accMat = new THREE.ShaderMaterial({
+    uniforms: { tSrc: { value: acc.rtScene.texture } },
+    vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4( position.xy, 0.0, 1.0 ); }',
+    fragmentShader: 'uniform sampler2D tSrc; varying vec2 vUv; void main(){ gl_FragColor = texture2D( tSrc, vUv ); }',
+    depthTest: false, depthWrite: false,
+  });
+  /* AN ORDINARY MATERIAL ON PURPOSE. MeshBasicMaterial compiles three's own
+     <tonemapping_fragment> and <colorspace_fragment>, so the mean reaches the
+     canvas through the exact path a `high` frame takes - there is no second
+     copy of NeutralToneMapping to drift.
+
+     ⚠⚠ AND IT COMPOSITES, IT DOES NOT REPLACE - because THE STAGE COLOUR IS
+     NOT TONE MAPPED AND MUST NOT BECOME SO. A `scene.background` Color is a
+     glClearColor: three writes it straight into the canvas in the output colour
+     space and the tone mapping chunk, which only runs on drawn geometry, never
+     touches it. Rendering into a linear target instead put that same colour
+     through the blit's tone mapping and the light stage came out EIGHT LEVELS
+     darker - #eef0f3 (238,240,243) landing at (230,232,235). Caught by the
+     parity test, which is the entire reason it exists.
+     So the accumulator owns only the LIT SCENE: samples render over a
+     transparent clear, and the stage colour is laid down here by the renderer's
+     own clear, exactly as three lays it down for `high`. The blend is
+     premultiplied because that is what an MSAA resolve over a transparent clear
+     produces at a silhouette. ⚠ Tone mapping a premultiplied edge texel is
+     very slightly wrong; it is sub-pixel and it buys exact stage colour. */
+  acc.outMat = new THREE.MeshBasicMaterial({
+    map: acc.rtAcc.texture, transparent: true, depthTest: false, depthWrite: false,
+    blending: THREE.CustomBlending, blendEquation: THREE.AddEquation,
+    blendSrc: THREE.OneFactor, blendDst: THREE.OneMinusSrcAlphaFactor,
+  });
+  acc.quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), acc.accMat);
+  acc.quad.frustumCulled = false;
+  acc.qScene = new THREE.Scene(); acc.qScene.add(acc.quad);
+  acc.qCam = new THREE.Camera();
+  acc.disk = accDisk(ACC_SAMPLES);
+  acc.sunHome.copy(sun.position);
+}
+function accResize() {
+  if (!acc.rtScene) return;
+  const w = Math.max(1, renderer.domElement.width), h = Math.max(1, renderer.domElement.height);
+  if (acc.rtScene.width === w && acc.rtScene.height === h) return;
+  acc.rtScene.setSize(w, h); acc.rtAcc.setSize(w, h);
+  acc.n = 0;
+}
+/* Point the key light at disk sample i and mark its shadow for re-rendering.
+   ⚠ THE SHADOW CAMERA IS FITTED TO THE BOUNDING SPHERE, NOT THE BOX, whenever
+   this tier is on (see fitShadowCamera). A box fitted for the central direction
+   is not valid for a CONE of directions - the margin `high` uses disappears
+   when a tall build is seen from 6 degrees off, and a clipped shadow frustum
+   drops the shadow entirely on some samples, which averages into a pale band.
+   A sphere is rotation-invariant by construction, so one fit covers the disk. */
+function accSetSun(i) {
+  const s = acc.disk[i];
+  if (s.x === 0 && s.y === 0) sun.position.copy(acc.sunHome);
+  else {
+    const axis = new THREE.Vector3().subVectors(acc.sunHome, sun.target.position);
+    const d = axis.length();
+    const u = new THREE.Vector3(0, 1, 0).cross(axis);
+    if (u.lengthSq() < 1e-6) u.set(1, 0, 0); else u.normalize();
+    const v = new THREE.Vector3().crossVectors(axis, u).normalize();
+    const t = Math.tan(ACC_SUN_HALF_DEG * Math.PI / 180) * d;
+    sun.position.copy(acc.sunHome).addScaledVector(u, s.x * t).addScaledVector(v, s.y * t);
+    // hold the distance constant so the ortho shadow frustum stays centred
+    sun.position.sub(sun.target.position).setLength(d).add(sun.target.position);
+  }
+  sun.updateMatrixWorld();
+  renderer.shadowMap.needsUpdate = true;
+}
+/**
+ * One frame of Very High. Returns true when it has drawn the canvas itself, in
+ * which case the caller must NOT render the scene again.
+ *
+ * Three states:
+ *   not wanted   -> false, and the loop renders `high` exactly as before
+ *   accumulating -> render one jittered sample, blend it in, blit the mean
+ *   converged    -> blit the held mean; ONE fullscreen quad, so a SETTLED Very
+ *                   High frame is cheaper than a settled `high` one
+ */
+function accumFrame() {
+  if (!accWanted()) { acc.blocked = true; return false; }
+  ensureAcc(); accResize();
+  if (!acc.ok || !acc.rtScene) return false;
+  camera.updateMatrixWorld();
+  const key = instances.size + '|' + cur + '|' + ao.rev + '|' + accRev + '|' + quality;
+  if (acc.blocked || key !== acc.key || accCamMoved()) {
+    acc.blocked = false; acc.n = 0; acc.key = key; accCamStore();
+  }
+  /* Only a Color or nothing. A texture or cube background would have to be
+     accumulated with the scene rather than cleared, and the outro - the one
+     thing here that uses a mesh dome - never accumulates. Anything else falls
+     back to the plain frame rather than being rendered wrong. */
+  const bg = scene.background;
+  if (bg && !bg.isColor) return false;
+  const prevAuto = renderer.autoClear;
+  if (acc.n < ACC_SAMPLES) {
+    const savedProj = camera.projectionMatrix, savedInv = camera.projectionMatrixInverse;
+    const jProj = new THREE.Matrix4(), jInv = new THREE.Matrix4();
+    const savedClear = renderer.getClearColor(_accClear).clone(), savedAlpha = renderer.getClearAlpha();
+    try {
+      accSetSun(acc.jitter ? acc.n : 0);
+      // the lit scene only - see the note on outMat
+      scene.background = null;
+      renderer.setClearColor(0x000000, 0);
+      /* ⚠ DERIVED FROM THE COMPOSED PROJECTION EVERY SAMPLE, never mutated in
+         place. `camera.setViewOffset` is live in this app - the filament menu
+         pans the projection to clear the docked panel - so the jitter has to
+         ride whatever offset is current and be dropped cleanly afterwards.
+         Elements 8/9 are the perspective form; this camera is always one. */
+      jProj.copy(camera.projectionMatrix);
+      if (acc.jitter && acc.n > 0) {
+        const s = acc.disk[acc.n];
+        jProj.elements[8] += s.x / acc.rtScene.width;
+        jProj.elements[9] += s.y / acc.rtScene.height;
+      }
+      jInv.copy(jProj).invert();
+      camera.projectionMatrix = jProj; camera.projectionMatrixInverse = jInv;
+      /* THE SETTLE-ONLY DETAIL - the one place either is drawn (Joey 2026-09-14: "place it on very
+         high for now", and for the layer lines "treated the same way as the powdercoated texture").
+         The build plate's powder grain in full: an ordinary frame folds the sub-pixel grain into
+         roughness, which reads almost like Smooth. And the visible layer lines (bed-finish.js
+         LAYER_LINES), a stripe pattern a single frame could only show as crawling moire. These samples
+         (the first at the centre, the rest jittered) average both. Not when the jitter is off:
+         unjittered samples would only repeat one aliased pattern, and accVerify('parity') compares
+         them against a plain frame. */
+      if (acc.jitter) setSettleDetail(bedFinishU, true, renderer.getPixelRatio());
+      renderer.autoClear = true;
+      renderer.setRenderTarget(acc.rtScene);
+      renderer.render(scene, camera);
+    } finally {
+      setSettleDetail(bedFinishU, false);   // every frame outside a sample: folded grain, no lines
+      camera.projectionMatrix = savedProj; camera.projectionMatrixInverse = savedInv;
+      accSetSun(0);
+      scene.background = bg;
+      renderer.setClearColor(savedClear, savedAlpha);
+      renderer.setRenderTarget(null);
+      renderer.autoClear = prevAuto;
+    }
+    /* blend the sample into the running mean: out = src/(n+1) + dst*n/(n+1).
+       ⚠ autoClear OFF, or renderer.render() clears rtAcc first and the "mean"
+       is silently just the newest sample, every frame, forever - which looks
+       exactly like accumulation that is working. */
+    if (acc.n === 0) acc.accMat.blending = THREE.NoBlending;
+    else {
+      acc.accMat.blending = THREE.CustomBlending;
+      acc.accMat.blendEquation = THREE.AddEquation;
+      acc.accMat.blendSrc = THREE.ConstantAlphaFactor;
+      acc.accMat.blendDst = THREE.OneMinusConstantAlphaFactor;
+      acc.accMat.blendAlpha = 1 / (acc.n + 1);
+    }
+    acc.quad.material = acc.accMat;
+    try {
+      renderer.autoClear = false;
+      renderer.setRenderTarget(acc.rtAcc);
+      renderer.render(acc.qScene, acc.qCam);
+    } finally {
+      renderer.setRenderTarget(null);
+      renderer.autoClear = prevAuto;
+    }
+    acc.n++;
+    /* The warm-up hand-back: the samples are banked, but the ordinary canvas
+       frame stays on screen until the mean is worth showing. Returning false
+       makes the loop render it. */
+    if (acc.n <= ACC_WARMUP) return false;
+  }
+  /* Lay the stage down the way three lays it down - same setClearColor path,
+     same conversion - then composite the lit scene over it. */
+  const savedClear2 = renderer.getClearColor(_accClear).clone(), savedAlpha2 = renderer.getClearAlpha();
+  acc.quad.material = acc.outMat;
+  try {
+    if (bg) renderer.setClearColor(bg, 1); else renderer.setClearColor(0x000000, 0);
+    renderer.autoClear = false;
+    renderer.clear();
+    renderer.render(acc.qScene, acc.qCam);
+  } finally {
+    renderer.setClearColor(savedClear2, savedAlpha2);
+    renderer.autoClear = prevAuto;
+  }
+  return true;
+}
+
+/* Very High's own tripwire. Two questions, both answered against the real
+   canvas, and both otherwise unanswerable by reading state.
+
+     mode 'parity'  - run the accumulation with the jitter OFF, so every sample
+                      is the nominal projection and the centre light position,
+                      and compare the held mean against a plain `high` frame.
+                      They must agree to within rounding. This is the test that
+                      catches the whole class of "the mean reaches the screen
+                      through a different colour pipeline than the scene does" -
+                      a tone-mapping or colour-space mistake shows up here as a
+                      flat offset over the entire frame.
+     mode 'stale'   - snapshot the mean currently on screen, force a full
+                      re-accumulation from the CURRENT scene state, and compare.
+                      A missed invalidateFrame() call site is exactly a held
+                      mean that no longer matches what the scene would render,
+                      and this is what turns "did I miss one" into a number.
+
+   ⚠ Reads happen in the SAME TASK as the render they read. preserveDrawingBuffer
+   is false, so any await between them hands back an empty buffer - the trap
+   this repo has paid for more than once. */
+function accVerify(mode = 'stale') {
+  if (!QUALITY[quality].accum) return { error: 'not on a tier that accumulates' };
+  renderer.setAnimationLoop(null);
+  const c2 = document.createElement('canvas');
+  const w = renderer.domElement.width, h = renderer.domElement.height;
+  c2.width = w; c2.height = h;
+  const ctx = c2.getContext('2d', { willReadFrequently: true });
+  const grab = () => { ctx.drawImage(renderer.domElement, 0, 0); return ctx.getImageData(0, 0, w, h).data; };
+  const converge = () => {
+    acc.blocked = true;                       // force a restart from sample 0
+    for (let i = 0; i < ACC_SAMPLES + 2; i++) { accumFrame(); compositeAO(); }
+  };
+  const savedJitter = acc.jitter;
+  let a, b, label;
+  try {
+    if (mode === 'parity') {
+      acc.jitter = false;
+      converge();
+      a = grab();                             // the accumulated mean, unjittered
+      renderer.render(scene, camera); compositeAO();
+      b = grab();                             // the plain `high` frame
+      label = 'unjittered mean vs plain frame';
+    } else {
+      accumFrame(); compositeAO();
+      a = grab();                             // whatever is being held right now
+      converge();
+      b = grab();                             // freshly accumulated from live state
+      label = 'held mean vs fresh mean';
+    }
+  } finally {
+    acc.jitter = savedJitter;
+    acc.blocked = true;
+    renderer.setAnimationLoop(renderLoop);   // see the note on renderLoop
+  }
+  /* ⚠ REPORTED TWICE, AND THE SECOND NUMBER IS THE ONE THAT MEANS SOMETHING.
+     There is no MSAA on the scene target (see ACC_WARMUP), so at any pixel with
+     FRACTIONAL COVERAGE - a silhouette, a grid line, a dimension callout - the
+     two arms are resolving coverage by different methods and are SUPPOSED to
+     differ. What must not differ is the colour pipeline, and that shows up on
+     flat pixels: background, and the interior of any shaded surface. So the
+     flat-pixel figures are the parity test; the overall ones are context. */
+  const W = w, H = h;
+  const flatAt = (i) => {
+    const x = (i / 4) % W, y = ((i / 4) / W) | 0;
+    if (x < 1 || y < 1 || x >= W - 1 || y >= H - 1) return false;
+    const L = (j) => 0.2126 * b[j] + 0.7152 * b[j + 1] + 0.0722 * b[j + 2];
+    const c = L(i);
+    return Math.abs(L(i - 4) - c) < 2 && Math.abs(L(i + 4) - c) < 2 &&
+           Math.abs(L(i - W * 4) - c) < 2 && Math.abs(L(i + W * 4) - c) < 2;
+  };
+  let max = 0, sum = 0, over1 = 0, over4 = 0;
+  let fMax = 0, fSum = 0, fOver1 = 0, fN = 0;
+  for (let i = 0; i < a.length; i += 4) {
+    const flat = flatAt(i);
+    for (let k = 0; k < 3; k++) {
+      const d = Math.abs(a[i + k] - b[i + k]);
+      if (d > max) max = d;
+      sum += d;
+      if (d > 1) over1++;
+      if (d > 4) over4++;
+      if (flat) { if (d > fMax) fMax = d; fSum += d; if (d > 1) fOver1++; fN++; }
+    }
+  }
+  const n = (a.length / 4) * 3;
+  return { mode, label, samples: ACC_SAMPLES, pixels: a.length / 4,
+           flatMaxDelta: fMax, flatMeanDelta: +(fSum / Math.max(fN, 1)).toFixed(4),
+           flatPctOver1: +(100 * fOver1 / Math.max(fN, 1)).toFixed(3), flatPixels: fN / 3,
+           allMaxDelta: max, allMeanDelta: +(sum / n).toFixed(4),
+           allPctOver1: +(100 * over1 / n).toFixed(3), allPctOver4: +(100 * over4 / n).toFixed(3) };
+}
+
+/* ==========================================================================
+   CONTACT GROUNDING - the dark stage's missing occlusion
+   ==========================================================================
+   MEASURED (2026-09-10): on the dark stage the FLOOR receives no occlusion of
+   any kind. No key-light shadow - `shadowsWanted()` gates on the light stage, so
+   `shadowMap.enabled` is false and neither directional light casts. And no AO -
+   toggling the AO composite moves the floor by 0.00 levels and 0.00 % of its
+   pixels, because the AO pass deliberately skips `table` and `grid` (a floor
+   disc occludes itself into a grey wash at grazing angles). The BUILD does get
+   AO, -5.14 levels over 58 % of its pixels. So the object is grounded only by
+   the planar reflection, which BRIGHTENS where the feet touch (+20.6 levels)
+   where the light stage goes 47 levels darker.
+
+   THE APPROACH, AND WHY IT IS NOT A RENDER PASS.
+   This is not a shadow solver. It is an approximation that uses what GEN2
+   already knows: where the parts are, how big their footprints are, and how far
+   each one currently sits above the stage. Every low-lying instance contributes
+   one soft elliptical patch, and the patch WIDENS and FADES as the part rises -
+   which is what a real contact shadow does, and which makes lifting, separating
+   and assembly behave correctly for free rather than needing a special case.
+
+   ⚠ WHY IT WILL NOT REPRODUCE THE GREY WASH THAT GOT FLOOR AO EXCLUDED.
+     - the plane is sized to the build's own footprint plus a margin, not to the
+       table, so there is no far field to wash;
+     - strength falls off steeply with height, so only things actually NEAR the
+       stage draw anything;
+     - contributions combine as 1 - PROD(1 - a). ⚠ THAT SATURATES, IT DOES NOT
+       MAKE OVERLAP NEUTRAL, and an earlier version of this comment claimed it
+       did. Two overlapping 0.5 masks give 0.75 - darker than either, just never
+       past 1. That is the intended behaviour (two parts really do occlude more
+       than one) but it is NOT a guarantee against a darker seam, and anything
+       relying on one has to say so itself.
+   ⚠ AND IT DOES NOT REPLACE THE REFLECTION. Both are on: the reflection says
+   "polished surface", the patch says "resting on it". They are different cues.  */
+function groundingWanted() {
+  return !!QUALITY[quality].grounding && stageTheme === 'dark' && !cinema.on
+    && !isWallBuild && !isUnderTableBuild && !IS_PART && !fxDead.grounding
+    && typeof assembledBox !== 'undefined' && !assembledBox.isEmpty();
+}
+function ensureGrounding() {
+  if (ground.mesh) return;
+  ground.mat = new THREE.ShaderMaterial({
+    uniforms: {
+      uPos: { value: ground.pos }, uSiz: { value: ground.siz }, uStr: { value: ground.str },
+      uCount: { value: 0 }, uDark: { value: 0.55 },
+    },
+    defines: { GROUND_MAX },
+    vertexShader: `
+      varying vec2 vXZ;
+      void main() {
+        vec4 wp = modelMatrix * vec4( position, 1.0 );
+        vXZ = wp.xz;
+        gl_Position = projectionMatrix * viewMatrix * wp;
+      }`,
+    fragmentShader: `
+      uniform vec2 uPos[ GROUND_MAX ];
+      uniform vec2 uSiz[ GROUND_MAX ];
+      uniform float uStr[ GROUND_MAX ];
+      uniform int uCount;
+      uniform float uDark;
+      varying vec2 vXZ;
+      void main() {
+        /* Each patch removes a fraction of the light still left, so the total
+           SATURATES at 1 instead of running away. ⚠ It does not make overlap
+           neutral: two 0.5 patches give 0.75. Seams get darker, bounded. */
+        float open = 1.0;
+        for ( int i = 0; i < GROUND_MAX; i++ ) {
+          if ( i >= uCount ) break;
+          vec2 d = ( vXZ - uPos[ i ] ) / uSiz[ i ];
+          float r = length( d );
+          // squared smoothstep: tight core, soft shoulder, exactly zero at r = 1
+          float a = 1.0 - smoothstep( 0.0, 1.0, r );
+          open *= 1.0 - uStr[ i ] * a * a;
+        }
+        float occ = ( 1.0 - open ) * uDark;
+        if ( occ < 0.002 ) discard;
+        gl_FragColor = vec4( 0.0, 0.0, 0.0, occ );
+      }`,
+    transparent: true, depthWrite: false, depthTest: true,
+  });
+  ground.mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), ground.mat);
+  ground.mesh.renderOrder = 1;          // over the grid, under everything solid
+  ground.mesh.frustumCulled = false;
+  ground.mesh.visible = false;
+  ground.mesh.userData.ghost = true;    // keep it out of the AO pass and the reflection
+  scene.add(ground.mesh);
+}
+/* Everything updateGrounding reads, compared against the last computation and stored: the box list (rebuilt with the
+   parts), each box's part - shown, and its position (the height test reads it, and its world position IS its position
+   while the part hangs straight off the scene and the scene sits at the origin, both checked) - the assembled bounds
+   (the plane's placement), and the two materials the counts are written into. true = compute. */
+function groundingInputsChanged(boxes) {
+  const s = ground.seen || (ground.seen = { boxes: null, mat: null, refl: null, reflMat: null,
+    v: new Float64Array(0), bounds: new Float64Array(6), sceneM: new Float64Array(16), first: true });
+  let changed = s.first;
+  s.first = false;
+  if (s.boxes !== boxes) { s.boxes = boxes; changed = true; }
+  if (s.mat !== ground.mat) { s.mat = ground.mat; changed = true; }
+  const rm = refl.mesh, rmat = rm ? rm.material : null;
+  if (s.refl !== rm || s.reflMat !== rmat) { s.refl = rm; s.reflMat = rmat; changed = true; }
+  if (storeChanged16(s.sceneM, 0, scene.matrixWorld.elements)) changed = true;
+  const b = assembledBox, bb = s.bounds;
+  if (bb[0] !== b.min.x || bb[1] !== b.min.y || bb[2] !== b.min.z || bb[3] !== b.max.x || bb[4] !== b.max.y || bb[5] !== b.max.z) {
+    bb[0] = b.min.x; bb[1] = b.min.y; bb[2] = b.min.z; bb[3] = b.max.x; bb[4] = b.max.y; bb[5] = b.max.z;
+    changed = true;
+  }
+  if (s.v.length !== boxes.length * 4) { s.v = new Float64Array(boxes.length * 4); changed = true; }
+  const v = s.v;
+  for (let i = 0; i < boxes.length; i++) {
+    const g = boxes[i].inst.group, o = i * 4;
+    if (g.parent !== scene) changed = true;   // a part under anything else: its world position is not its position
+    const shown = g.visible ? 1 : 0, p = g.position;
+    if (v[o] !== shown || v[o + 1] !== p.x || v[o + 2] !== p.y || v[o + 3] !== p.z) {
+      v[o] = shown; v[o + 1] = p.x; v[o + 2] = p.y; v[o + 3] = p.z;
+      changed = true;
+    }
+  }
+  return changed;
+}
+/* Each instance's LOCAL bounding box, computed once per scene revision. Calling
+   Box3.setFromObject every frame walks the geometry; transforming a cached local
+   box by the group matrix does not, and a lift animation needs this per frame. */
+function groundingBoxes() {
+  if (ground.rev === ao.rev && ground.boxes) return ground.boxes;
+  ground.boxes = [];
+  for (const inst of instances.values()) {
+    if (!inst.group) continue;
+    const b = new THREE.Box3();
+    inst.group.updateMatrixWorld(true);
+    b.setFromObject(inst.group);
+    if (b.isEmpty()) continue;
+    // store it relative to the group so it can be re-placed cheaply
+    ground.boxes.push({ inst, size: b.getSize(new THREE.Vector3()), base: b.min.y - inst.group.position.y });
+  }
+  ground.rev = ao.rev;
+  return ground.boxes;
+}
+function updateGrounding() {
+  const draw = groundingWanted();
+  ensureGrounding();
+  if (!ground.mesh) return;
+  ground.mesh.visible = draw;
+  if (!contactMapWanted()) { ground.mat.uniforms.uCount.value = 0; ground.seen = null; return; }
+
+  const boxes = groundingBoxes();
+  /* MOVE_OPT.grounding (2026-09-14): the map is where the PARTS are, and a moving camera does not move them - so when
+     no part moved, showed or hid since the last computation, the uniforms already hold this frame's answer. */
+  if (!MOVE_OPT.grounding) ground.seen = null;
+  else if (!groundingInputsChanged(boxes)) return;
+  const cand = [];
+  for (const e of boxes) {
+    const g = e.inst.group;
+    if (!g.visible) continue;
+    const h = g.position.y + e.base;                       // this part's height above the stage NOW
+    if (h > GROUND_H || h < -20) continue;
+    /* ⚠ THE PATCH GROWS AND FADES WITH HEIGHT, and that single line is what
+       makes assembly, lifting and separation behave without a special case: a
+       part carried up leaves a wider, weaker mark and then none at all, instead
+       of a hard shadow stuck to the floor under nothing. */
+    const k = 1.0 - Math.min(1, Math.max(0, h) / GROUND_H);
+    g.getWorldPosition(_gv);
+    cand.push({
+      x: _gv.x, z: _gv.z,
+      sx: e.size.x * 0.5 + 6 + h * 0.55,
+      sz: e.size.z * 0.5 + 6 + h * 0.55,
+      s: 0.85 * k * k,
+    });
+  }
+  // the strongest contacts win the slots; a 6H board has more low parts than uniforms
+  cand.sort((a, b) => b.s - a.s);
+  const n = Math.min(GROUND_MAX, cand.length);
+  for (let i = 0; i < n; i++) {
+    ground.pos[i * 2] = cand[i].x; ground.pos[i * 2 + 1] = cand[i].z;
+    ground.siz[i * 2] = cand[i].sx; ground.siz[i * 2 + 1] = cand[i].sz;
+    ground.str[i] = cand[i].s;
+  }
+  ground.mat.uniforms.uCount.value = n;
+  ground.mat.uniforms.uPos.value = ground.pos;
+  ground.mat.uniforms.uSiz.value = ground.siz;
+  ground.mat.uniforms.uStr.value = ground.str;
+  ground.mat.uniformsNeedUpdate = true;
+  /* the reflector reads the SAME arrays - one contact map, two possible
+     consumers, so the two can never disagree about where the contacts are */
+  if (refl.mesh) {
+    const u = refl.mesh.material.uniforms;
+    if (u.uCount) { u.uCount.value = n; u.uniformsNeedUpdate = true; refl.mesh.material.uniformsNeedUpdate = true; }
+  }
+
+  // sit the plane on the build's own footprint plus the widest patch, never the table
+  const c = assembledBox.getCenter(new THREE.Vector3());
+  const s = assembledBox.getSize(new THREE.Vector3());
+  const pad = 40 + GROUND_H * 0.55;
+  ground.mesh.position.set(c.x, 0.02, c.z);              // above the grid at 0.01
+  ground.mesh.scale.set(s.x + pad * 2, 1, s.z + pad * 2);
+}
+
+/* ==========================================================================
+   DRAWER CAVITY FILL - an assembly-aware approximation of interior bounce
+   ==========================================================================
+   THE CUE IT BORROWS, and the limits of what was established about it. Against a
+   path-traced reference on matched studio lighting, a drawer's interior differed
+   from the raster one mainly in COLOUR: normalising both so the red channel
+   matched exactly, the traced cavity carried ~60 % more blue (15.2 -> 24.3 of
+   255). ⚠ THAT MEASURED A COLOUR DIFFERENCE, NOT AN ISOLATION OF INDIRECT LIGHT -
+   material response, specular and the tone curve all move channel ratios too, and
+   the baseline is small. Bounce is the most plausible reading, not a proven one.
+   ⚠ The traced image is INSPIRATION, NOT A TARGET. This does not try to match it
+   numerically; it tries to look better.
+
+   WHAT IT DOES. A drawer's interior gets a small ADDITIVE fill - never a repaint
+   of the drawer's own colour, which would throw away the filament the user chose.
+   Two components, deliberately not one:
+     ROOM   neutral, rises with how far the drawer is out. An open drawer is in
+            the room and sees more of it.
+     CASE   tinted by the case the drawer sits in, and a PARABOLA in openness,
+            peaking half-open. ⚠ This is the part that must not simply increase
+            with opening distance: a drawer still inside its case is enclosed by
+            the case and sees mostly that; a drawer pulled right out has left the
+            cavity behind and sees the room instead.
+
+   ⚠⚠ SCALED BY THE DRAWER'S OWN ALBEDO, WHICH IS WHAT STOPS BLACK PLASTIC
+   GLOWING. Bounced light is light a surface REFLECTS; a near-black drawer
+   reflects almost none of it. Adding a flat emissive term to every drawer would
+   make the black ones glow like lamps - the single most likely artefact of this
+   whole idea - so the fill is multiplied by the drawer's own colour channels.
+   Black stays black by construction rather than by a tuned exception.        */
+const CAVITY = {
+  on: false,            // OFF until the matrix below has been judged by eye
+  strength: 0.30,       // overall scale
+  caseWeight: 0.75,     // how much of the fill is case-tinted vs neutral room
+  room: new THREE.Color(0xb9c2d6),   // the studio's own neutral, desaturated
+};
+const _cavA = new THREE.Color(), _cavB = new THREE.Color(), _cavC = new THREE.Color();
+/* ⚠ declared ABOVE the function that reads it, not below - the ordering lesson
+   this file has now paid for three times. */
+const cavity = { _list: null, _rev: -1, _palRev: -1, clones: false };   // clones: a drawer may still wear a fill clone
+/* the drawers this touches, and the case each one sits in - resolved from the
+   MANIFEST's own relationships, not from a hardcoded kit */
+function cavityDrawers() {
+  if (ground.rev === cavity._rev && cavity._list) return cavity._list;
+  cavity._list = [];
+  for (const inst of instances.values()) {
+    if (!/Drawer_/.test(inst.cfg.node) || inst.cfg.rides) continue;
+    // the case whose bay this drawer occupies: nearest case centre in x, same row
+    let best = null, bestD = Infinity;
+    for (const c of instances.values()) {
+      if (!/_Case$/.test(c.cfg.node)) continue;
+      const dy = Math.abs(c.cfg.pos[1] - inst.cfg.pos[1]);
+      if (dy > 40) continue;                       // a different row
+      const dx = Math.abs(c.cfg.pos[0] - inst.cfg.pos[0]);
+      if (dx < bestD) { bestD = dx; best = c; }
+    }
+    cavity._list.push({ inst, caseInst: best, z0: inst.cfg.pos[2], mats: null });
+  }
+  cavity._rev = ground.rev;
+  return cavity._list;
+}
+function cavityFillWanted() { return CAVITY.on && !cinema.on && !IS_PART; }
+function updateCavityFill() {
+  const on = cavityFillWanted();
+  /* MOVE_OPT.cavity (2026-09-14): switched off, with no drawer still wearing a fill clone, the loop below only computes
+     two colours per drawer and throws them away - every frame (0.33 ms per unthrottled frame on the 80-unit build in a
+     sampled profile, from a session that ran slow; vault measurements.md). */
+  if (MOVE_OPT.cavity && !on && !cavity.clones) return;
+  const list = cavityDrawers();
+  const travel = Math.max(1, (parseInt(manifest && manifest.collection, 10) || 185) - 20);
+  for (const d of list) {
+    const g = d.inst.group;
+    if (!g) continue;
+    /* openness from the drawer's OWN travel, so it tracks a live slide, a step
+       animation and the deep-pull focus without any of them knowing about this */
+    const o = Math.min(1, Math.max(0, (g.position.z - d.z0) / travel));
+    // the drawer's own colour is the albedo that scales everything
+    const key = primaryKey(d.inst.cfg.node);
+    _cavA.set(activeHex(key));
+    // room term rises with openness; case term is a parabola peaking half-open
+    const roomK = o;
+    const caseK = 4 * o * (1 - o);
+    _cavB.copy(CAVITY.room).multiplyScalar(roomK * (1 - CAVITY.caseWeight));
+    if (d.caseInst) {
+      _cavC.set(activeHex(primaryKey(d.caseInst.cfg.node)));
+      _cavB.add(_cavC.multiplyScalar(caseK * CAVITY.caseWeight));
+    }
+    // ⚠ times the drawer's own albedo: black plastic cannot glow
+    _cavB.multiply(_cavA).multiplyScalar(CAVITY.strength);
+    /* ⚠⚠ PER-DRAWER CLONES, BECAUSE THE REGISTRY MATERIAL IS SHARED PER TYPE.
+       Writing `emissive` onto what `materialFor` returns would light EVERY
+       drawer of that type at once - including the closed ones, whose fronts
+       would visibly come up. The fill is per-instance by definition, so it needs
+       per-instance materials. `cloneMaterial` is used rather than `.clone()`
+       because a bare clone drops onBeforeCompile and would silently lose the
+       printed-layer relief on the drawer body.
+       ⚠ KNOWN LIMITATION, and the reason this is off by default: the clones are
+       re-synced from the registry only when the palette revision moves. A
+       production version has to hook applyPalette properly rather than poll. */
+    if (on && !d.mats) {
+      d.mats = [];
+      g.traverse((m) => {
+        if (!m.isMesh || !m.material || !m.material.emissive) return;
+        const c = cloneMaterial(m.material);
+        c.userData.cavityClone = true;
+        m.userData.cavityOrig = m.material;
+        m.material = c;
+        d.mats.push({ mesh: m, mat: c });
+      });
+      cavity.clones = true;
+    }
+    if (!on && d.mats) {
+      for (const e of d.mats) {
+        e.mat.emissive.setRGB(0, 0, 0);
+        if (e.mesh.userData.cavityOrig) e.mesh.material = e.mesh.userData.cavityOrig;
+        e.mat.dispose();
+      }
+      d.mats = null;
+      continue;
+    }
+    if (d.mats) for (const e of d.mats) e.mat.emissive.copy(_cavB);
+  }
+  if (!on) cavity.clones = false;   // the loop just restored every drawer that wore one
+}
+
 // ---- the topbar control ----------------------------------------------------
 const btnQuality = document.getElementById('btn-quality');
-const QUALITY_LABEL = { high: 'High', balanced: 'Balanced', fast: 'Fast' };
+const QUALITY_LABEL = { veryhigh: 'Very High', high: 'High', balanced: 'Balanced', fast: 'Fast' };
 function labelQualityBtn() {
   if (!btnQuality) return;
   btnQuality.textContent = QUALITY_LABEL[quality];
@@ -1284,8 +2318,13 @@ function labelQualityBtn() {
   btnQuality.title = `Render quality: ${QUALITY_LABEL[quality]} — click to change`;
 }
 // returning from a background tab starts a FRESH window — the frames either side
-// of the gap describe two different situations
-document.addEventListener('visibilitychange', () => { perf.t0 = 0; perf.frames.length = 0; });
+// of the gap describe two different situations. perfFeed also does this per frame (a hidden frame
+// resets the window, and the first second back is ignored); the event covers a browser that stops
+// rAF entirely while hidden, so no hidden frame ever arrives to do it.
+document.addEventListener('visibilitychange', () => {
+  perf.lastNow = 0; perf.win.ms = 0; perf.win.n = 0;
+  if (document.hidden) perf.wasHidden = true;
+});
 btnQuality?.addEventListener('click', () => {
   const i = QUALITY_ORDER.indexOf(quality);
   setQuality(QUALITY_ORDER[(i + 1) % QUALITY_ORDER.length], { user: true });
@@ -1301,24 +2340,129 @@ btnQuality?.addEventListener('click', () => {
 // The auto-downgrade is SILENT and ONE-WAY (Joey 2026-08-10): it only ever steps
 // DOWN, never back up, so a brief stall can't start the tier oscillating. An
 // explicit user pick locks it out entirely.
-const perf = { key: '', moving: false, lastChange: 0, dpr: null, frames: [], t0: 0, checked: 0,
+const perf = { key: '', moving: false, lastChange: 0, dpr: null, checked: 0,
+               // the CAMERA alone - no tween count - for the passes that only a camera change invalidates
+               camKey: '', cameraMoving: false, camChange: 0,
+               // the auto-downgrade's window of accepted frame intervals (perfFeed)
+               win: { ms: 0, n: 0 }, lastNow: 0, wasHidden: false, returnGraceUntil: 0,
+               log: [],   // why each automatic quality change happened, newest last (debug hook: perf.log)
                thrifty: false };   // one-way: set once the device proves it needs the resolution drop
 const SETTLE_MS = 160;
+
+/**
+ * A MOVING-CAMERA frame: the floor reflection and ambient occlusion skip their scene renders and come
+ * back SETTLE_MS after the camera stops (Joey and Astra, 2026-09-14). MEASURED the same day on an
+ * 80-unit build: a moving High frame made 3,812 draw calls against Balanced's 1,271 - the main image,
+ * the mirror and the AO depth/normal pass each draw the whole build - and ran at 59.9 fps against 120.5.
+ *
+ * ⚠ THE CAMERA, NOT perf.moving. perf.moving also flips on a change in the tween count, so a step
+ * animation with a still camera would blink the reflection off at every phase boundary; the mirror and
+ * the AO buffer are invalidated by the camera, and AO already sits out tweens on its own (aoWanted).
+ * ⚠ NOT DURING THE OUTRO, whose reflection is the point and whose camera never stops; and not for a
+ * capture harness that holds AO on through motion (window.__FILM_AO_DURING_TWEENS, which the filming
+ * rig sets so every frame of a clip is shaded the same).
+ * The debounce is SETTLE_MS, inside the 100-200 ms Astra asked for, so small movements and touch inertia
+ * do not flip the passes on and off.
+ */
+function motionLite() {
+  return perf.cameraMoving && !cinema.on && !window.__FILM_AO_DURING_TWEENS;
+}
+
+/* ---- the auto-downgrade (rewritten 2026-09-14, Astra's rules) -------------------------------------
+   MEASURED before the rewrite: an 80-unit build under a 4x CPU throttle ran High at ~9 fps, and from a
+   fresh High the downgrade reached Balanced only after 25.9 s - because every 3 s window holding fewer
+   than 30 frames, i.e. anything under 10 fps, was discarded as "untrustworthy". The guard against a
+   throttled background tab threw away exactly the case that most needs the downgrade.
+   Now:
+   - a HIDDEN page is not sampled at all, and its first second back is ignored (the tab-switch case);
+   - a single frame interval over PERF_PAUSE_MS is a PAUSE, not a frame rate - a throttled or offscreen
+     frame, a compile stall, an alert - and is left out of the window rather than failing it;
+   - the second and a half after any quality change, stage-theme change or re-mount is ignored too,
+     because each of those compiles programs and the stalls are not the device's frame rate;
+   - SEVERE: under PERF_SEVERE.fps over 2 s of accepted frames steps the tier down at once (and turns on
+     the resolution drop), and again after the next 2 s window if it is still that slow - that window
+     starts when the tier change's 1.5 s grace ends, so a second severe step comes 3.5 s or more after
+     the first (in both measured runs of the 80-unit build under a 4x throttle the second step came
+     about 5 s after the first, by the moderate rule);
+   - MODERATE: the old rule on 3 s windows - under 30 fps the resolution drop, under 24 a tier step;
+   - the first window after boot is discarded, and nothing ever steps back UP (hysteresis by design:
+     one-way, so a recovered frame rate cannot start an oscillation).
+   ⚠ RESIDUAL RISK, stated: a page the browser keeps VISIBLE but throttles to between 2 and 15 fps would
+   read as a slow device. Hidden pages, paused rAF and 1 Hz throttling (Chrome's background tabs and
+   offscreen frames) all fall outside that band. */
+const PERF_PAUSE_MS = 500;
+const PERF_RETURN_GRACE_MS = 1000;
+/* minFrames 4 is what 2 s holds at the slowest rate that is not a pause (500 ms a frame) - a larger
+   minimum stretched the severe window past 2 s for exactly the slowest devices (review 01a0a19a) */
+const PERF_SEVERE = Object.freeze({ windowMs: 2000, minFrames: 4, fps: 15 });
+const PERF_MODERATE = Object.freeze({ windowMs: 3000, minFrames: 30, thriftyFps: 30, stepFps: 24 });
+/* ⚠ `var` WITH NO INITIALISER, AND A FUNCTION DECLARATION: applyQuality and applyStageTheme run during
+   module evaluation and call perfGrace, long before a `const` here would exist (the #btn-theme lesson).
+   An initialiser would also reset the value when this line finally runs. */
+var perfGraceUntil;
+function perfGrace(ms = 1500) {
+  perfGraceUntil = Math.max(perfGraceUntil || 0, performance.now() + ms);
+}
+/**
+ * The verdict on one window of accepted frame intervals, or null while it is too short to judge.
+ * Pure: test/quality-guard.test.mjs calls it.
+ */
+function perfVerdict(win, { thrifty, locked, canStep }) {
+  const fps = win.ms > 0 ? win.n / (win.ms / 1000) : 0;
+  if (win.ms >= PERF_SEVERE.windowMs && win.n >= PERF_SEVERE.minFrames && fps < PERF_SEVERE.fps) {
+    return { fps, severe: true, thrifty: !thrifty, step: !locked && canStep };
+  }
+  if (win.ms < PERF_MODERATE.windowMs) return null;
+  if (win.n < PERF_MODERATE.minFrames) return { fps, severe: false, thrifty: false, step: false };
+  if (fps < PERF_MODERATE.thriftyFps && !thrifty) return { fps, severe: false, thrifty: true, step: false };
+  return { fps, severe: false, thrifty: false, step: fps < PERF_MODERATE.stepFps && !locked && canStep };
+}
+/**
+ * Feed one frame to the window. Returns a verdict when a window closes (with its length in `windowMs`),
+ * else null. Touches nothing but `p`, so the test drives it with synthetic timestamps.
+ */
+function perfFeed(p, now, { hidden, graceUntil, thrifty, locked, canStep }) {
+  if (hidden) { p.lastNow = 0; p.win.ms = 0; p.win.n = 0; p.wasHidden = true; return null; }
+  if (p.wasHidden) { p.wasHidden = false; p.returnGraceUntil = now + PERF_RETURN_GRACE_MS; }
+  const dt = p.lastNow ? now - p.lastNow : 0;
+  p.lastNow = now;
+  if (now < Math.max(graceUntil || 0, p.returnGraceUntil || 0)) { p.win.ms = 0; p.win.n = 0; return null; }
+  if (!(dt > 0) || dt > PERF_PAUSE_MS) return null;
+  p.win.ms += dt; p.win.n++;
+  const v = perfVerdict(p.win, { thrifty, locked, canStep });
+  if (!v) return null;
+  v.windowMs = p.win.ms;
+  p.win.ms = 0; p.win.n = 0;
+  if (p.checked++ === 0) return null;   // the first window after boot is boot jank, not a verdict
+  return v;
+}
+function logQuality(line) {
+  perf.log.push({ t: Math.round(performance.now()), line });
+  if (perf.log.length > 20) perf.log.shift();
+  console.info('[gen2] ' + line);
+}
+
 function qualityTick(now) {
   const q = QUALITY[quality];
   const cap = Math.min(q.dpr, devicePixelRatio);
   if (cinema.on) {                       // the outro drives its own camera constantly
     if (perf.dpr !== cap) { perf.dpr = cap; renderer.setPixelRatio(cap); setLayerDetailPixelRatio(cap); renderer.setSize(canvas.clientWidth, canvas.clientHeight, false); }
+    perf.cameraMoving = false;           // and keeps its reflection (motionLite excludes it anyway)
     return;
   }
-  const key = camera.position.toArray().concat(controls.target.toArray())
-    .map(v => v.toFixed(2)).join() + '|' + tweens.size;
+  const camKey = camera.position.toArray().concat(controls.target.toArray()).map(v => v.toFixed(2)).join();
+  if (camKey !== perf.camKey) { perf.camKey = camKey; perf.camChange = now; perf.cameraMoving = true; }
+  else if (perf.cameraMoving && now - perf.camChange > SETTLE_MS) perf.cameraMoving = false;
+  const key = camKey + '|' + tweens.size;
   if (key !== perf.key) { perf.key = key; perf.lastChange = now; perf.moving = true; }
   else if (perf.moving && now - perf.lastChange > SETTLE_MS) {
     perf.moving = false;
     if (renderer.shadowMap.enabled) { renderer.shadowMap.autoUpdate = false; renderer.shadowMap.needsUpdate = true; }
   }
-  if (perf.moving && renderer.shadowMap.enabled) renderer.shadowMap.autoUpdate = true;
+  /* Before MOVE_OPT.shadow the shadow map re-rendered on every frame this was true, a camera-only move included. With
+     it, watchShadowCasters asks for a render when a caster or the light changed; the one refresh on settling stays. */
+  if (renderer.shadowMap.enabled) renderer.shadowMap.autoUpdate = perf.moving && !MOVE_OPT.shadow;
+  shadowWatch.moving = perf.moving;   // the watch runs on exactly these frames (see shadowWatch)
 
   // ⚠ The resolution drop is CONDITIONAL — it only engages on a device that has
   // actually shown it needs the help (perf.thrifty). It shipped unconditional and
@@ -1326,7 +2470,7 @@ function qualityTick(now) {
   // geometry — the cyber grid above all — visibly shimmered on each switch (Joey
   // caught it on a phone that never needed the saving). A rescue mechanism should
   // cost nothing on hardware that is coping.
-  const want = (perf.thrifty && perf.moving) ? Math.min(1, cap) : cap;
+  const want = (perf.thrifty && perf.moving && !benchHold) ? Math.min(1, cap) : cap;
   if (perf.dpr !== want) {
     perf.dpr = want;
     renderer.setPixelRatio(want);
@@ -1338,35 +2482,29 @@ function qualityTick(now) {
     renderer.setSize(canvas.clientWidth, canvas.clientHeight, false);
   }
 
-  // Sustained-low-fps guard, sampled over 3s. TWO stages, cheapest first:
-  //   < 30 fps -> turn on the resolution drop during motion (invisible when idle)
-  //   < 24 fps -> step the whole tier down
-  // 30 not 45: the drop is VISIBLE (thin geometry shimmers as the canvas resizes),
-  // so it has to mean "genuinely struggling", not "fine but not a solid 60". A
-  // 45 threshold tripped on a merely-throttled tab in testing.
-  // Both are ONE-WAY, so a brief stall can't start anything oscillating, and the
-  // first window is discarded because boot jank is not a verdict.
+  // The sustained-low-fps guard - the rules are above perfVerdict. Both actions are ONE-WAY.
+  // 30 not 45 for the resolution drop: it is VISIBLE (thin geometry shimmers as the canvas
+  // resizes), so it has to mean "genuinely struggling", not "fine but not a solid 60".
+  // ⚠ A BACKGROUNDED TAB IS NOT A SLOW DEVICE - browsers throttle rAF to ~1 Hz (or stop it) when
+  // a tab is hidden, and a sampler that believed it would silently cost you the good renderer.
+  // perfFeed skips hidden frames, drops intervals over PERF_PAUSE_MS, and waits a second after a
+  // return; it no longer discards a slow window, which is the case the downgrade exists for.
   if (quality === 'fast' && perf.thrifty) return;
-  // ⚠ A BACKGROUNDED TAB IS NOT A SLOW DEVICE. Browsers throttle rAF to ~1Hz (or
-  // stop it) when the tab is hidden, and an unguarded sampler reads that as a
-  // struggling GPU and silently downgrades — so backgrounding the studio and
-  // coming back would quietly cost you the good renderer, for nothing. Caught in
-  // testing, where the throttled pane tripped it every time.
-  // Two guards: skip while hidden, and refuse to judge a window that didn't
-  // collect enough frames to mean anything.
-  if (document.hidden) { perf.t0 = 0; perf.frames.length = 0; return; }
-  if (!perf.t0) { perf.t0 = now; return; }
-  perf.frames.push(now);
-  if (now - perf.t0 < 3000) return;
-  const elapsed = (now - perf.t0) / 1000;
-  const fps = perf.frames.length / elapsed;
-  const enough = perf.frames.length >= 30;          // < 10fps of samples = untrustworthy window
-  perf.frames.length = 0; perf.t0 = now;
-  if (perf.checked++ === 0 || !enough) return;      // discard the first window and any junk one
-  if (fps < 30 && !perf.thrifty) { perf.thrifty = true; track('quality:thrifty'); return; }
-  if (fps < 24 && !qualityLocked) {
-    const next = QUALITY_ORDER[QUALITY_ORDER.indexOf(quality) + 1];
-    if (next) { setQuality(next); track('quality:auto-' + next); }
+  if (benchHold) return;   // the orbit benchmark holds the tier and the resolution for the whole run (orbit-bench.js)
+  const v = perfFeed(perf, now, { hidden: document.hidden, graceUntil: perfGraceUntil, thrifty: perf.thrifty,
+    locked: qualityLocked, canStep: QUALITY_ORDER.indexOf(quality) < QUALITY_ORDER.length - 1 });
+  if (!v || !(v.thrifty || v.step)) return;
+  const units = build && Array.isArray(build.placed) ? ` (${build.placed.length} units)` : '';
+  const why = `${v.severe ? 'sustained' : 'averaged'} ${v.fps.toFixed(1)} fps over ${(v.windowMs / 1000).toFixed(1)} s, `
+    + `visible tab, ${instances.size} parts${units}`;
+  if (v.thrifty) {
+    perf.thrifty = true; track('quality:thrifty');
+    logQuality(`auto quality: resolution drop while moving - ${why}`);
+  }
+  if (v.step) {
+    const from = quality, next = QUALITY_ORDER[QUALITY_ORDER.indexOf(quality) + 1];
+    setQuality(next); track('quality:auto-' + next);
+    logQuality(`auto quality: ${QUALITY_LABEL[from]} → ${QUALITY_LABEL[next]} - ${why}`);
   }
 }
 
@@ -1554,6 +2692,16 @@ if (IS_PART) {
   }
   manifest = res.manifest;
   PARTS_BASE = 'parts/' + (manifest.collection || '185') + '/';
+} else if (IS_BENCH) {
+  // the orbit benchmark's fixed workload (benchBuild in orbit-bench.js; pinned part for part by test/orbit-bench.test.mjs)
+  build = benchBuild();
+  originalBuild = structuredClone(build);
+  let gen = null;
+  try { gen = generateManifest(build); } catch (e) { gen = { manifest: null, errors: [String((e && e.message) || e)] }; }
+  if (!gen.manifest) bootFail('<strong>The benchmark build can’t be shown</strong><br><br>' + gen.errors.map(e => '• ' + e).join('<br>'),
+    'benchmark build: ' + gen.errors.join('; '));
+  manifest = gen.manifest;
+  PARTS_BASE = 'parts/' + (manifest.collection || '185') + '/';
 } else if (BUILD_HASH) {
   // The message is the same either way, but the EVENT distinguishes three very
   // different problems: a mangled/truncated hash (the link), a build the
@@ -1681,6 +2829,7 @@ if (IS_ROOT) {
 track(IS_PART ? (PART_PLATE ? 'open:part-plate' : 'open:part')
   : OFFICIAL ? 'open:' + OFFICIAL.id
   : BUILD_HASH ? (IS_EMBED ? 'open:embed' : 'open:planner-link')
+  : IS_BENCH ? 'open:bench'   // never sent (track() stops benchmark events), but the local log should name the page
   : 'open:kit-' + KIT);
 track('collection:' + (manifest.collection || '185'));
 if (build?.mount) track('mount:' + build.mount);
@@ -1741,21 +2890,30 @@ function baseMatFor(type, zone = '') { // shared material per (type, zone) — z
   return materials[key];
 }
 
-// ---- build-plate transfer (2026-08-10) --------------------------------------
-// A faceplate printed FACE-DOWN takes an impression of the build plate it was
-// printed on. Only families whose front is a flat contact surface can do it —
-// Essential and Chevron. This is the first PLATE PROFILE; carbon / textured PEI
-// / geometric are the same mechanism with the diffraction pass turned off, so
-// keep new plates as PROFILE ROWS, never as new material code.
+// ---- build plate (2026-08-10; every eligible part since 2026-09-14) ----------
+// Every printed part's BED-CONTACT FACE takes the finish of the sheet it was
+// printed on - viewer/js/bed-finish.js holds the shader and the rules. The
+// choice is ONE build-wide field, `build.buildPlate`, and a build that never
+// stored one reads as the default, Powder-coated (DEFAULT_PLATE there says why).
 // ⚠ It is a FINISH, not a paint: the material's colour still comes from
 // activeHex(), so the user's filament pick drives it and the transfer rides on
 // top. Never hardcode a colour here.
-const PLATE_PROFILES = [
-  { key: 'smooth', label: 'Smooth', holo: 0 },
-  { key: 'holographic', label: 'Holographic', holo: 0.07 },
-];
-const PLATE_FAMILIES = new Set(['essential', 'chevron']); // printable face-down
-const plateProfile = () => PLATE_PROFILES.find(p => p.key === (build && build.buildPlate)) || PLATE_PROFILES[0];
+// ⚠ PER-PART FINISHES ARE A LATER STEP (Joey 2026-09-14: "it could be an option
+// to any part"). The intended model is "a part inherits the build's finish
+// unless it has its own"; nothing stores an override yet, and `plateProfile` is
+// where one would be consulted.
+const PLATE_PROFILES = PLATE_FINISHES.map(key =>
+  ({ key, label: PLATE_LABELS[key], holo: key === 'holographic' ? HOLO_OPACITY : 0 }));
+// The face-down faceplate families keep the holographic transfer they have had
+// since 2026-08-10, UNCHANGED (Astra 2026-09-14, "preserve existing holographic
+// behaviour"): their whole material takes the plate's polished spec and
+// attachHolo draws the diffraction. Every other eligible part - and these two
+// families under Powder or Smooth - goes through the bed-finish contact rule.
+const PLATE_FAMILIES = new Set(['essential', 'chevron']); // printed face-down
+const plateProfile = () => PLATE_PROFILES.find(p => p.key === plateFinishOf(build));
+/* One set of finish uniforms for every part material that carries the finish, so Powder <-> Smooth
+   is a uniform write and every clone of every material follows it. */
+const bedFinishU = createBedFinishUniforms();
 const plateSupported = () => !!build && PLATE_FAMILIES.has(currentFaceplateStyle()?.key);
 const plateActive = () => plateSupported() && plateProfile().holo > 0;
 // which key carries the CONTACT face: Chevron's raised strips are its FACE zone
@@ -1774,6 +2932,10 @@ function holoTexture() {
   }
   return holoTex;
 }
+// the same plate map for the bed-finish holographic program, as ONE shared uniform
+// object - built on first use, so a build that never picks Holographic never loads it
+let bedHoloTexU = null;
+const bedHoloTexture = () => bedHoloTexU || (bedHoloTexU = { value: holoTexture() });
 // planar UVs from each geometry's own bbox — the plate GLBs ship position+normal
 // only, and the transfer has to stay pinned to the plate as the drawer slides
 function ensurePlateUVs() {
@@ -1901,9 +3063,21 @@ function setLayerDetailPixelRatio(dpr) {
  */
 const faceStyleNow = () =>
   (build && build.faceStyle) || (currentFaceplateStyle() && currentFaceplateStyle().key) || null;
+/* ⚠ THE HANDLE FAMILY IS PART OF THE QUESTION TOO (Joey 2026-09-14: the Deco handle prints top-down;
+   BlockBar and Crystal have no confirmed pose). Read from the NODE NAME - Handle_Deco, Handle_BlockBar_C
+   - not from HANDLE_STYLES, which is declared thousands of lines below and would be in its TDZ if a
+   material were ever built during module evaluation. */
+const handleFamilyOfNode = (node) => {
+  const m = /^Handle_([A-Za-z]+)/.exec(node || '');
+  return m ? m[1].toLowerCase() : null;
+};
+/* The family the build's handles ARE: the manifest's Handle row, which a handle swap renames in place
+   (applyHandleStyle) and every regenerate re-emits - so a swap, a relayed style, a planner layout and
+   Reset all answer from the one place that describes what is on screen. */
+const handleFamilyNow = () => handleFamilyOfNode(manifest?.parts?.find((p) => p.type === 'Handle')?.node);
 
 function buildAxisForKey(key) {
-  return buildAxisForType(key.split(':')[0], faceStyleNow());
+  return buildAxisForType(key.split(':')[0], faceStyleNow(), handleFamilyNow());
 }
 
 /* One author for "the faceplate materials are no longer valid", because there are two reasons and
@@ -1976,11 +3150,7 @@ function syncRelief() {
   reliefApplied = want;
   /* Boot: nothing is built yet, and everything built after this reads the flag anyway. */
   if (!instances || !instances.size) return;
-  for (const map of [materials, highlightMats, altMaterials, altHighlightMats,
-    plannedMats, plannedHighlightMats]) {
-    for (const k of Object.keys(map)) delete map[k];
-  }
-  layerHandles.clear();
+  purgePartMaterials();
   for (const inst of instances.values()) {
     inst.group.traverse((o) => {
       if (o.isMesh) o.material = materialFor(inst, false, o.userData.zone);
@@ -1988,6 +3158,102 @@ function syncRelief() {
   }
   applyPalette();
 }
+
+/* Every part-material registry emptied, with the live handles that point into it - the one idiom for
+   "the shader patch these materials carry is no longer the one wanted". Two callers: the relief's
+   tier gate above, and the build plate's program switch below. It does NOT re-point meshes: syncRelief
+   does that itself, and the plate switch runs inside mountManifest, whose applyState reassigns every
+   mesh from the rebuilt registries. */
+function purgePartMaterials() {
+  for (const map of [materials, highlightMats, altMaterials, altHighlightMats,
+    plannedMats, plannedHighlightMats]) {
+    for (const k of Object.keys(map)) delete map[k];
+  }
+  layerHandles.clear();
+  holoUniforms.length = 0;
+}
+
+/**
+ * Drop the part materials whose build axis is no longer the one they were built with, and say which
+ * TYPES they were.
+ *
+ * ⚠ A MATERIAL KEY IS A TYPE, AND TWO TYPES' AXES DEPEND ON A BUILD OPTION: the faceplate FAMILY
+ * (back-down +Z, face-down -Z) and the handle FAMILY (Deco prints top-down; BlockBar and Crystal have no
+ * pose). ensureMaterials is idempotent, so a cached material keeps the axis it was built with - layer
+ * lines and a plate finish running the wrong way, or a guessed axis on a family that has none. Each
+ * material records its axis when it is built (recordAxis) and this compares. mountManifest runs it on
+ * every mount, which is every path that re-emits the build; the in-place handle swap mounts nothing
+ * and runs it itself.
+ *
+ * Every registry, by TYPE - the base key, its zones, and the alternate, planned and highlight clones
+ * (keyed `Type`, `Type:ZONE`, `Type|alt`) - so no clone outlives its base.
+ *
+ * `onlyTypes` narrows the check. The in-place handle swap passes ['Handle']: it changes the handle
+ * family and nothing else, so it has no business rebuilding another type - and on a static kit the
+ * faceplate family is read from the live instances, an input the swap does not control.
+ */
+function dropStaleAxisMaterials(onlyTypes = null) {
+  const typeOf = (k) => k.split(/[:|]/)[0];
+  const stale = new Set();
+  for (const [key, m] of Object.entries(materials)) {
+    if (m?.userData?.buildAxis === undefined || (onlyTypes && !onlyTypes.includes(typeOf(key)))) continue;
+    if (m.userData.buildAxis !== JSON.stringify(buildAxisForKey(key))) stale.add(typeOf(key));
+  }
+  if (!stale.size) return [];
+  for (const map of [materials, highlightMats, altMaterials, altHighlightMats, plannedMats, plannedHighlightMats]) {
+    for (const k of Object.keys(map)) if (stale.has(typeOf(k))) delete map[k];
+  }
+  for (const k of [...layerHandles.keys()]) if (stale.has(typeOf(k))) layerHandles.delete(k);
+  return [...stale];
+}
+/* The axis a part material was built with, as text (null and an array compare as strings), for
+   dropStaleAxisMaterials. */
+function recordAxis(m, key) {
+  m.userData = Object.assign({}, m.userData, { buildAxis: JSON.stringify(buildAxisForKey(key)) });
+  return m;
+}
+
+/**
+ * Point the shared finish uniforms at this build's plate, and purge the materials when the PROGRAM
+ * changes.
+ *
+ * Powder and Smooth are one program with a different uniform, so switching between them rebuilds
+ * nothing and compiles nothing. Holographic is a different program on every eligible part (and a
+ * different spec on the face-down faceplates), so crossing that boundary purges every registry.
+ *
+ * ⚠ IT RUNS AT THE TOP OF mountManifest, because every path that can change `build.buildPlate`
+ * reaches it: the Build options row, the planner's option relay, a planner layout (which replaces
+ * `build` wholesale), Reset to original, and boot.
+ */
+let bedFinishProgram = null;
+function syncBedFinish() {
+  const finish = setBedFinish(bedFinishU, plateFinishOf(build));
+  const program = finish === 'holographic' ? 'holographic' : 'profile';
+  if (bedFinishProgram !== null && program !== bedFinishProgram) purgePartMaterials();
+  bedFinishProgram = program;
+}
+/* Debug-hook handles for the finish (?debug=1 only): the shared uniforms - the readback views
+   (uBFDbg), the no-profile diagnostic (uBFPlain 0) and the representation hook - and a check that
+   every finished mesh was stamped along the axis its material tests against. */
+const bedFinishDebug = {
+  uniforms: bedFinishU, setBedFinish, plateFinishOf,
+  get program() { return bedFinishProgram; },
+  check() {
+    const out = { meshes: 0, finished: 0, byType: {}, noAttribute: [], axisMismatch: [] };
+    for (const inst of instances.values()) inst.group.traverse(o => {
+      if (!o.isMesh) return;
+      out.meshes++;
+      if (!o.material?.userData?.bedFinish) return;
+      out.finished++;
+      const type = typeByNode[inst.cfg.node];
+      out.byType[type] = (out.byType[type] || 0) + 1;
+      const stamped = o.geometry.userData.bedAxis, want = buildAxisForKey(zoneKey(type, o.userData.zone || ''));
+      if (!o.geometry.attributes.aBfMm) out.noAttribute.push(inst.cfg.node);
+      else if (!stamped || !want || stamped.some((v, i) => v !== want[i])) out.axisMismatch.push(inst.cfg.node);
+    });
+    return out;
+  },
+};
 
 function withLayerDetail(m, key) {
   if (!reliefWanted()) return m;
@@ -2016,18 +3282,58 @@ function newPartMaterial(key) {
       clearcoat: spec.clearcoat, clearcoatRoughness: spec.clearcoatRoughness,
       envMapIntensity: spec.envMapIntensity,
     });
-    /* ⚠ TWO STATEMENTS, NOT ONE NESTED CALL, AND THE ORDER IS THE WHOLE POINT. attachHolo ASSIGNS
-       onBeforeCompile; withLayerDetail CHAINS onto it. Written as
-       `withLayerDetail(attachHolo(m), key)` the text reads in the opposite order to the way it
-       evaluates — which is a bad way to write a constraint whose failure is invisible, and it
-       defeats a source-order gate as well. attachHolo mutates and returns the same material, so
-       dropping its return changes nothing but the reading order. */
+    /* ⚠ SEPARATE STATEMENTS, NOT ONE NESTED CALL, AND THE ORDER IS THE WHOLE POINT. attachHolo
+       ASSIGNS onBeforeCompile; withLayerDetail CHAINS onto it; withBedFinish CHAINS onto that.
+       Written as `withLayerDetail(attachHolo(m), key)` the text reads in the opposite order to the
+       way it evaluates — which is a bad way to write a constraint whose failure is invisible, and
+       it defeats a source-order gate as well. Each mutates and returns the same material, so
+       dropping a return changes nothing but the reading order. */
     if (spec.holographic) attachHolo(m, plateContact);
-    return withLayerDetail(m, key);
+    withLayerDetail(m, key);
+    recordAxis(m, key);   // withBedFinish merges userData, so the record survives it
+    return withBedFinish(m, key, spec);
   }
   const m = new THREE.MeshStandardMaterial(
     { color, roughness: spec.roughness, metalness: spec.metalness });
-  return withLayerDetail(m, key);
+  withLayerDetail(m, key);
+  recordAxis(m, key);
+  return withBedFinish(m, key, spec);
+}
+
+/* The contact surface the holographic plate leaves - the faceplate spec's own contact values, read
+   once rather than retyped, so a part that is not a faceplate polishes exactly as a faceplate does. */
+const HOLO_CONTACT = partMaterialSpec('Faceplate', { holographicPlate: true, plateContact: true });
+
+/**
+ * Attach the build plate's finish to a part's bed-contact face, when we know how the part printed.
+ *
+ * ⚠ AFTER withLayerDetail, NEVER BEFORE. Both chain, so neither discards the other; the order is
+ * what the finish's plain restore is written against - it takes the relief's bottom-skin fold and
+ * micro-relief OFF a plate-moulded face, and the relief is the patch it is undoing.
+ * test/layer-detail-seam.test.mjs gates the order.
+ *
+ * ⚠ THE FACE-DOWN FACEPLATE TRANSFER IS LEFT ALONE. When the spec says holographic, attachHolo has
+ * already given the material the finish it has had since 2026-08-10, and a second contact rule on
+ * top would change how it looks.
+ *
+ * ⚠ NULL AXIS, NO FINISH - the relief's rule. A texture on a guessed bed face is a picture of a
+ * print that does not exist.
+ */
+function withBedFinish(m, key, spec) {
+  if (spec.holographic) return m;
+  const axis = buildAxisForKey(key);
+  if (!axis) return m;
+  let holo = null;
+  if (plateProfile().key === 'holographic') {
+    holo = { texture: bedHoloTexture(), roughness: HOLO_CONTACT.roughness };
+    /* the clearcoat lobe has to be COMPILED for contact to wear it; the patch multiplies it by the
+       contact weight, so every face that never touched the plate keeps none, as before */
+    if (m.isMeshPhysicalMaterial) {
+      m.clearcoat = HOLO_CONTACT.clearcoat;
+      m.clearcoatRoughness = HOLO_CONTACT.clearcoatRoughness;
+    }
+  }
+  return applyBedFinish(m, { axis, uniforms: bedFinishU, holo });
 }
 /* A material's RESTING opacity. Every fade in this engine used to drive
    opacity from/to a hardcoded 1, which is only true while every part is
@@ -2080,12 +3386,14 @@ function cloneMaterial(mat) {
   }
   return m;
 }
-// Toggling rebuilds only the faceplate registry entries (a class swap, so it
-// cannot be done in place) and drops their highlight clones; the reassignment
-// onto meshes rides regenerate()'s normal applyState path like every other
-// build option.
+// Toggling drops the faceplate registry entries (their spec depends on the
+// plate) and regenerates; mountManifest's syncBedFinish then points the shared
+// finish uniforms at the new plate and purges every other registry only when
+// the shader PROGRAM changes (to or from Holographic). The reassignment onto
+// meshes rides regenerate()'s normal applyState path like every other build
+// option, and so does the relay to the planner.
 async function setBuildPlate(key) {
-  if (!build) return;
+  if (!build || !PLATE_FINISHES.includes(key)) return;
   track('opt:buildplate:' + key);
   build.buildPlate = key;
   holoUniforms.length = 0;
@@ -2151,7 +3459,7 @@ async function loadTemplates() {
   await Promise.all(need.map(async node => {
     try {
       const gltf = await loader.loadAsync(`${PARTS_BASE}${node}.lib.glb`);
-      templates[node] = adoptTemplate(gltf.scene, typeByNode[node]);
+      templates[node] = adoptTemplate(gltf.scene, typeByNode[node], node);
     } catch (e) { missing.push(node); }
   }));
   if (missing.length) {
@@ -2164,14 +3472,54 @@ async function loadTemplates() {
 // mesh (clones inherit it). 'BODY' means "the part's main color" = the plain
 // type key (so BOM chip / header swatch / presets all drive it). Material-free
 // parts get an unnamed default → no zone.
-function adoptTemplate(sceneRoot, type) {
+function adoptTemplate(sceneRoot, type, node) {
   sceneRoot.traverse(o => {
     if (!o.isMesh) return;
     const zone = (o.material?.name && o.material.name !== 'BODY') ? o.material.name : '';
     if (zone) o.userData.zone = zone;
     o.material = baseMatFor(type, zone);
   });
+  /* ⚠ A PART WHOSE BED FACES CANNOT BE STAMPED STAYS PLAIN, IT DOES NOT FAIL THE LOAD. This runs
+     inside loadTemplates' per-node try, whose catch reports a MISSING GLB - a throw here would tell
+     the user a file is absent that is not. Without the attribute the finish's contact weight reads
+     0, so the part simply wears no finish. */
+  try { stampBedFaces(sceneRoot, type, node); }
+  catch (e) { console.warn(`[bed finish] ${node}: ${(e && e.message) || e} - left plain`); }
   return sceneRoot;
+}
+/* The bed-finish attributes for one part template - aBfMm (authored position in mm, shifted so the
+   bed plane passes through 0 along the build axis) and aBfUv (the bed-plane coordinates the
+   holographic pattern is pinned to); bed-finish.js says how they are read. Per TEMPLATE, so every
+   instance of the node shares them. Skipped for a type with no confirmed print pose, whose material
+   carries no finish.
+   ⚠ THE AXIS IS THE NODE'S OWN. A faceplate node names its family and cannot change how it printed,
+   so it is read from the name rather than from the build's current style - which it agrees with
+   whenever the node is on screen, because the generator emits the family build.faceStyle names and
+   a static-kit swap loads the new family's nodes before it shows them. */
+const faceFamilyOfNode = node => (node && FACEPLATE_STYLES.find(s => node.startsWith(s.node('')))?.key) || null;
+function stampBedFaces(root, type, node) {
+  const axis = type
+    ? buildAxisForType(type, faceFamilyOfNode(node) || faceStyleNow(), handleFamilyOfNode(node) || handleFamilyNow())
+    : null;
+  if (!axis) return;
+  root.updateMatrixWorld(true);   // the template is not in the scene: its world IS the part frame
+  const meshes = [];
+  root.traverse(o => { if (o.isMesh) meshes.push(o); });
+  const v = new THREE.Vector3();
+  const positions = meshes.map(o => {
+    const pos = o.geometry.attributes.position, out = new Float32Array(pos.count * 3);
+    for (let i = 0; i < pos.count; i++) {
+      v.fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld);   // de-quantised, node transform applied: mm
+      out[3 * i] = v.x; out[3 * i + 1] = v.y; out[3 * i + 2] = v.z;
+    }
+    return out;
+  });
+  const { mm, uv } = bedFaceAttributes(positions, axis);
+  meshes.forEach((o, i) => {
+    o.geometry.setAttribute('aBfMm', new THREE.BufferAttribute(mm[i], 3));
+    o.geometry.setAttribute('aBfUv', new THREE.BufferAttribute(uv[i], 2));
+    o.geometry.userData.bedAxis = axis;
+  });
 }
 
 // ---------- instances ----------
@@ -2289,6 +3637,7 @@ function computeBounds() {
     // has to say so. (It briefly did not - 2026-08-21 to -22.)
     if (!inst.cfg.node.startsWith('WoodScrew')) assembledBox.expandByObject(inst.group);
   }
+  markShadowDirty();   // every part was just moved to its final place
   if (!box.isEmpty()) {
     box.getCenter(buildCenter);
     buildRadius = box.getSize(new THREE.Vector3()).length() / 2; // ≈ bounding-sphere radius
@@ -2348,6 +3697,7 @@ function applyState(i) { // instant snap to "after step i" (i = -1 for nothing)
     // restore shared materials (an interrupted fade leaves per-mesh clones)
     inst.group.traverse(o => { if (o.isMesh) o.material = materialFor(inst, false, o.userData.zone); });
   }
+  markShadowDirty();   // a snap at rest (Back, a regenerate, a restored page) moves no camera and starts no tween
 }
 
 // ---------- exploded parts preview (checklist step) ----------
@@ -2394,6 +3744,7 @@ function applyExploded() {
     if (inst.group.children[0]) inst.group.children[0].position.set(0, 0, 0); // clear a stranded label lift
     inst.group.traverse(o => { if (o.isMesh) o.material = materialFor(inst, false, o.userData.zone); });
   }
+  markShadowDirty();   // the checklist page, snapped at rest
 }
 // animated variant: parts drift from wherever they are (the finished cover
 // assembly) out to the exploded spread while the camera pans in from the cover
@@ -3108,19 +4459,6 @@ function renderOptions() {
     const next = document.createElement('button'); next.textContent = '▶'; next.onclick = () => cycleHandleStyle(1);
     grp.append(prev, name, next); row.append(lab, grp); box.appendChild(row);
   }
-  // Build plate — only for families printed FACE-DOWN (Essential, Chevron):
-  // their front IS the plate-contact surface, so it can take a transfer. Sits
-  // under Faceplate/Handle because it describes how that plate was PRINTED.
-  if (plateSupported()) {
-    box.appendChild(optSeg('Build plate', PLATE_PROFILES.map(p => ({ label: p.label, val: p.key })),
-      plateProfile().key, setBuildPlate));
-    const note = document.createElement('div');
-    note.className = 'opt-note';
-    note.textContent = plateProfile().holo
-      ? 'Simulated — the real effect shifts with lighting and angle.'
-      : 'Printed face-down, this plate can take a build-surface pattern.';
-    box.appendChild(note);
-  }
   // faceplate back cover — a universal decor-faceplate accessory (every family
   // seats the same SHARED part, both collections); fills the new open-front
   // Decor drawer's gap, off = older closed-front drawers
@@ -3163,6 +4501,23 @@ function renderOptions() {
     box.appendChild(optSeg('Top cover', [{ label: 'Per-column', val: false }, { label: 'Staggered', val: true }], !!build.wallStagger,
       async v => { track('opt:topcover:' + (v ? 'staggered' : 'per-column')); build.wallStagger = v; await regenerate(); }));
   }
+  // Build plate - the sheet the whole build printed on. Every part with a
+  // confirmed print pose takes its finish on the face that lay on the plate, so
+  // the row shows on every generated build and sits last, apart from the
+  // part-specific options above. Mirrors the planner's "Build plate" control;
+  // the relay carries it.
+  const plateRow = optSeg('Build plate', PLATE_PROFILES.map(p => ({ label: p.label, val: p.key })),
+    plateProfile().key, setBuildPlate);
+  plateRow.classList.add('opt-stack');   // three long names: stacked under the label (viewer.css .opt-stack)
+  box.appendChild(plateRow);
+  const plateNote = document.createElement('div');
+  plateNote.className = 'opt-note';
+  plateNote.textContent = {
+    powder: 'The powder-coated sheet\'s grain, on every face that printed against the plate.',
+    smooth: 'A smooth sheet: plain, untextured faces where parts touched the plate.',
+    holographic: 'Simulated - the real effect shifts with lighting and angle.',
+  }[plateProfile().key];
+  box.appendChild(plateNote);
   const reset = document.createElement('button'); reset.className = 'opt-reset'; reset.textContent = '↺ Reset to original';
   reset.onclick = resetBuild; box.appendChild(reset);
 }
@@ -3645,6 +5000,7 @@ document.addEventListener('pointerdown', () => { if (tapHintShown) dismissTapHin
 controls.addEventListener('start', dismissTapHint);
 addEventListener('keydown', e => {
   if (IS_PART) return; // the preview has no pages — arrows must not walk into the step machinery
+  if (IS_BENCH) return; // nor the benchmark: one stray arrow mid-run would page to the outro and time a different workload
   if (e.key === 'ArrowRight') goTo(cur + 1);
   if (e.key === 'ArrowLeft') goTo(cur - 1, { animate: false });
 });
@@ -3981,6 +5337,9 @@ function setSelected(id) {
     if (seatable && carrier === inst) enterDrawerFocus(carrier);
     else exitDrawerFocus();
   }
+  // the highlight emissive, the pointer line and the drawer/faceplate focus all
+  // change the picture without moving the camera or the step
+  invalidateFrame();
 }
 
 // ---------- drawer focus: camera zoom + INNER dimensions ----------
@@ -4386,7 +5745,8 @@ const PRESETS = [
 
 // official kits get their own palette slot (keyed by kit id) so a saved color
 // scheme sticks to THAT kit — planner hand-offs share one 'custom-build' slot
-const COLOR_STORE_KEY = 'gen2-colors:' + (BUILD_HASH ? 'custom-build' : OFFICIAL ? 'official-' + OFFICIAL.id : KIT);
+// the benchmark keeps its own key, so a palette saved for the demo kit never repaints the benchmark's build
+const COLOR_STORE_KEY = 'gen2-colors:' + (IS_BENCH ? 'bench' : BUILD_HASH ? 'custom-build' : OFFICIAL ? 'official-' + OFFICIAL.id : KIT);
 let customColors = {}, useCustom = false; // customColors: type -> {name, hex, url}
 // userPalette = the last palette the user built BY HAND (individual swatch
 // picks / per-type resets / file upload). Hand edits mirror the whole working
@@ -4513,6 +5873,7 @@ function applyPalette() {
     $('identify-swatch').style.background = activeHex(primaryKey(inst.cfg.node));
     renderZoneChips(inst); // keep the Body/Grip dots tracking the live palette
   }
+  invalidateFrame();   // every part material just changed colour
 }
 function updateColorToggle() {
   const btn = $('color-toggle');
@@ -4863,9 +6224,10 @@ async function applyHandleStyle(style) {
   if (!templates[style.node]) {
     try {
       const gltf = await loader.loadAsync(`${PARTS_BASE}${style.node}.lib.glb`);
-      const mat = materials.Handle || fallbackMat;
-      gltf.scene.traverse(o => { if (o.isMesh) o.material = mat; });
-      templates[style.node] = gltf.scene;
+      /* through adoptTemplate like every other part load, so the node's bed faces are STAMPED. This
+         path used to assign the material by hand and skip the stamp - harmless only while no handle
+         had a confirmed pose. */
+      templates[style.node] = adoptTemplate(gltf.scene, 'Handle', style.node);
     } catch (e) {
       // GLB absent from this kit's folder (static kits carry their own parts/):
       // roll the state back and report `false` so the ▶ cycle can skip past —
@@ -4907,6 +6269,17 @@ async function applyHandleStyle(style) {
     delete partInfoByNode[oldNode];
     partInfoByNode[style.node] = row;
     renderChecklist();
+  }
+  /* The family can change the handle's BUILD AXIS (Deco prints top-down; BlockBar and Crystal have no
+     pose), and nothing here re-mounts - so drop the stale materials and put the live meshes of those
+     types back on rebuilt ones. After the row rename above: handleFamilyNow reads that row. */
+  const staleTypes = dropStaleAxisMaterials(['Handle']);
+  if (staleTypes.length) {
+    for (const inst of instances.values()) {
+      if (!staleTypes.includes(typeByNode[inst.cfg.node])) continue;
+      inst.group.traverse((o) => { if (o.isMesh) o.material = materialFor(inst, false, o.userData.zone); });
+    }
+    applyPalette();
   }
   syncBuildToPlanner(); // live-sync the planner tab that opened us (no-op if opened cold)
 }
@@ -5051,7 +6424,7 @@ async function applyFaceplateStyle(style) {
       const node = style.node(code);
       if (templates[node]) return;
       const gltf = await loader.loadAsync(`${PARTS_BASE}${node}.lib.glb`);
-      templates[node] = adoptTemplate(gltf.scene, 'Faceplate');
+      templates[node] = adoptTemplate(gltf.scene, 'Faceplate', node);
     }));
   } catch (e) {
     // a family size missing from this kit's folder: roll back and report
@@ -5366,6 +6739,7 @@ function buildDimLines(wFront, lRight, hsx, hsz) {
   scene.add(dims.group);
 }
 const dimRay = new THREE.Raycaster();
+const dimCover = createDimCoverTest(THREE);   // MOVE_OPT.labels: one walk of the parts per placement pass, see dim-cover.js
 function updateDims() { // render-loop: pick edges for the camera, then place labels ON their lines
   if (!dims.on) return;
   const r = canvas.getBoundingClientRect();
@@ -5416,10 +6790,14 @@ function updateDims() { // render-loop: pick edges for the camera, then place la
   if (choice !== dims.choice || !dims.group) { dims.choice = choice; buildDimLines(wFront, lRight, hPick.sx, hPick.sz); }
   // ---- place the labels on their lines -------------------------------------
   const targets = [...instances.values()].filter(i => i.group.visible).map(i => i.group);
+  let coverPrepared = false;
   const modelCovers = (ndcX, ndcY, worldPt) => { // is the model IN FRONT of this line point?
     dimRay.setFromCamera(new THREE.Vector2(ndcX, ndcY), camera);
-    const hit = dimRay.intersectObjects(targets, true)[0];
-    return !!hit && hit.distance < camera.position.distanceTo(worldPt) - 2;
+    const maxD = camera.position.distanceTo(worldPt) - 2;
+    if (!MOVE_OPT.labels) { const hit = dimRay.intersectObjects(targets, true)[0]; return !!hit && hit.distance < maxD; }
+    // the same answer without a scene-graph walk per ray: one walk per pass (dim-cover.js, test/dim-cover.test.mjs)
+    if (!coverPrepared) { dimCover.prepare(targets); coverPrepared = true; }
+    return dimCover.covers(dimRay, maxD);
   };
   // center-out walk: 0.5, ±1/16, ±2/16 … — the label sits at the line's MIDDLE
   // whenever the view allows and only slides along the line as far as needed
@@ -5983,7 +7361,9 @@ function currentOpts() {
   // key is what means the latter.
   const lips = {};
   for (const u of build.placed) if (u.fill === 'shelf') lips[u.id] = u.lip ?? 'none';
-  return { closures, lips, removedStoppers: build.removedStoppers || [], wallStagger: !!build.wallStagger, handleStyle: build.handleStyle, faceStyle: build.faceStyle, backCover: !!build.backCover, feet: build.feet === 'adhesive' ? 'adhesive' : 'tpu' };
+  // buildPlate goes out RESOLVED (a build that never stored one sends the default, 'powder'), and LAST, in the
+  // same key order as the planner's post - its echo guard compares the two JSON strings
+  return { closures, lips, removedStoppers: build.removedStoppers || [], wallStagger: !!build.wallStagger, handleStyle: build.handleStyle, faceStyle: build.faceStyle, backCover: !!build.backCover, feet: build.feet === 'adhesive' ? 'adhesive' : 'tpu', buildPlate: plateFinishOf(build) };
 }
 // The planner window, wherever we live: a popped-out tab talks to its opener,
 // the docked split-view iframe talks to its parent.
@@ -6133,6 +7513,8 @@ addEventListener('message', async (e) => {
   if (o.faceStyle && o.faceStyle !== build.faceStyle) changed = true;
   if (typeof o.backCover === 'boolean' && o.backCover !== !!build.backCover) changed = true;
   if ((o.feet === 'tpu' || o.feet === 'adhesive') && o.feet !== (build.feet === 'adhesive' ? 'adhesive' : 'tpu')) changed = true;
+  // compared RESOLVED, so a planner's 'powder' against a build that never stored a plate is no change
+  if (PLATE_FINISHES.includes(o.buildPlate) && o.buildPlate !== plateFinishOf(build)) changed = true;
   if (o.lips) for (const u of build.placed)
     if (u.fill === 'shelf' && LIP_MODES.has(o.lips[u.id]) && o.lips[u.id] !== (u.lip ?? 'none')) changed = true;
   if (!changed) return;
@@ -6145,6 +7527,7 @@ addEventListener('message', async (e) => {
     if (o.faceStyle) build.faceStyle = o.faceStyle;
     if (typeof o.backCover === 'boolean') build.backCover = o.backCover;
     if (o.feet === 'tpu' || o.feet === 'adhesive') build.feet = o.feet;
+    if (PLATE_FINISHES.includes(o.buildPlate)) build.buildPlate = o.buildPlate;   // anything else is dropped
     if (o.lips) for (const u of build.placed) {
       if (u.fill !== 'shelf' || !LIP_MODES.has(o.lips[u.id])) continue;
       const v = o.lips[u.id];
@@ -6179,6 +7562,8 @@ async function mountManifest(m) {
   document.title = m.title;
   typeByNode = Object.fromEntries(m.parts.map(p => [p.node, p.type]));
   partInfoByNode = Object.fromEntries(m.parts.map(p => [p.node, p]));
+  syncBedFinish();   // before any material is built: the plate decides which program they get
+  dropStaleAxisMaterials();   // and a faceplate or handle FAMILY change decides which way their layers run
   ensureMaterials();
   await loadTemplates();
   if (plateActive()) ensurePlateUVs();   // plate GLBs ship position+normal only
@@ -6567,6 +7952,19 @@ if (IS_PART) {
   goTo(0); // open on the cover
 }
 booted = true;
+// ?bench=orbit: the benchmark's start card sits over the landing page until Start (orbit-bench.js)
+if (IS_BENCH) orbitBench = createOrbitBench({
+  THREE, camera, controls, renderer,
+  goTo, stepCount: () => manifest.steps.length, tweenCount: () => tweens.size,
+  applyQuality, applyStageTheme, quality: () => quality, stage: () => stageTheme,
+  setHold: (on) => { benchHold = !!on; if (on) { perf.thrifty = false; qualityLocked = true; } },
+  // stops and restarts the viewer's own loop, so the browser's bare frame cadence can be read (see renderLoop's note)
+  pauseLoop: (on) => renderer.setAnimationLoop(on ? null : renderLoop),
+  closePanel: () => setChecklist(false),
+  bounds: () => ({ center: buildCenter, radius: buildRadius }),
+  instanceCount: () => instances.size,
+  version: new URL(import.meta.url).searchParams.get('v') || 'dev',
+});
 // ?shot=1 (dev-only, like ?debug): capture the FINISHED build as a 3/4 gallery
 // thumbnail and download it as <id>.jpg for viewer/builds/img/ — planner-card
 // backdrop (--panel #3a3b3f), no table/grid/wall/surface, canvas-only (DOM
@@ -6664,14 +8062,19 @@ if (IS_EMBED && build) setTimeout(() => {
   requestAnimationFrame(tick);
 }, 2000);
 
-renderer.setAnimationLoop(now => {
+/* ⚠ A NAMED DECLARATION, not an inline arrow. three r185 has no
+   `getAnimationLoop`, so anything that pauses the loop to drive frames by hand
+   (accVerify, the film rig, a capture harness) has nothing to put back unless
+   the callback has a name. Restoring `null` freezes the viewer permanently. */
+function renderLoop(now) {
   // offscreen part-preview cards stop rendering entirely (only after the ready
   // frame was posted — the site must never wait on a suspended first frame)
   if (IS_PART && partView.posted && !partView.visible) return;
   resize();
+  if (orbitBench) orbitBench.tick(now);   // the benchmark's camera, placed before anything this frame reads it
   qualityTick(now);
   stepTweens(now);
-  if (cinema.on) updateCinema(now); else controls.update();
+  if (cinema.on) updateCinema(now); else updateOrbit();
   // the wall is a backdrop, not part of the model — drop it out of the way when
   // the camera orbits behind it, so you can inspect the pegs/case backs freely.
   if (isWallBuild && !cinema.on) wall.visible = camera.position.z > wall.position.z;
@@ -6691,10 +8094,17 @@ renderer.setAnimationLoop(now => {
   // entirely, which is far worse than losing an effect. So each one is guarded
   // and disables ITSELF permanently on first failure, degrading to the plain
   // render instead of taking the studio down on some GPU we've never seen.
-  guardFx('reflection', updateReflection);
-  guardFx('ao', updateAO);
-  renderer.render(scene, camera);
-  guardFx('ao', compositeAO);   // laid over the finished frame; no composer in the path
+  guardFx('grounding', updateGrounding);
+  guardFx('cavity', updateCavityFill);
+  // while the camera moves, the floor reflection and ambient occlusion wait (motionLite)
+  const lite = motionLite();
+  guardFx('reflection', () => updateReflection(false, lite));
+  if (lite) holdAOForMotion(); else guardFx('ao', updateAO);
+  // Very High puts its own accumulated mean on the canvas and says so; every
+  // other tier renders the scene straight to it, exactly as before. A thrown or
+  // disabled accumulator returns undefined and we fall back to the plain frame.
+  if (!guardFx('accum', accumFrame)) renderer.render(scene, camera);
+  if (!lite) guardFx('ao', compositeAO);   // laid over the finished frame; no composer in the path
   // partReady only after a REAL rendered frame exists — posted from inside the
   // loop, not after mount, so the site never drops its poster onto a blank
   // canvas (the parent contract adds a short crossfade on top: render
@@ -6711,7 +8121,8 @@ renderer.setAnimationLoop(now => {
     partView.posted = true;
     postToEmbedder({ gen2: 'partReady' });
   }
-});
+}
+renderer.setAnimationLoop(renderLoop);
 
 // dev-only hook (mirrors the planner's guarded test-hook convention): ?debug=1
 if (new URLSearchParams(location.search).get('debug')) {
@@ -6722,6 +8133,7 @@ if (new URLSearchParams(location.search).get('debug')) {
     // that says what a statistic reads with NO bands drawn — has no other route. Debug-only, like
     // everything else on this object.
     layerHandles,
+    bedFinish: bedFinishDebug,   // the build plate's finish, see bedFinishDebug
     wall, surface,   // the mount backdrops, for capture tooling that needs the mounting surface as context
     renderer, table, grid, camPos, captureShot, get buildCenter() { return buildCenter; },
     // render-quality internals (2026-08-10) — the tier, the AO buffers and the
@@ -6729,7 +8141,30 @@ if (new URLSearchParams(location.search).get('debug')) {
     // of squinting at a screenshot
     QUALITY, get quality() { return quality; }, applyQuality, setQuality,
     ao, updateAO, compositeAO, aoWanted, refl, updateReflection, studioEnv,
+    // the room itself, so a second renderer can be given THE SAME lighting
+    // rather than a description of it (see studioRoom)
+    studioRoom, STUDIO_SIGMA, set studioEnvTex(t) { studioEnvTex = t; },
+    /* Very High's accumulator (2026-09-09). `accVerify` is the tripwire - the
+       parity arm proves the mean reaches the canvas through three's own tone
+       mapping, the stale arm proves the invalidation set is complete. Neither
+       is answerable by reading state, and both need the drawing buffer read in
+       the same task as its render. */
+    ground, updateGrounding, groundingWanted, contactMapWanted,
+    CAVITY, updateCavityFill, cavityDrawers,
+    // the reflection-attenuation experiment's one knob (0 = off, as shipped)
+    setContactReflection(v) { if (refl.mesh) refl.mesh.material.uniforms.uContact.value = +v; },
+    /* the moving-frame savings' switches (2026-09-14) and what they work on, so a harness can measure the viewer with
+       and without each in one page and prove the image unchanged - see MOVE_OPT */
+    moveOpt: MOVE_OPT, dimCover, shadowWatch, get cavityClones() { return cavity.clones; },   // ground.seen: see `ground`
+    acc, accumFrame, accVerify, invalidateFrame, accWanted,
+    get accSamples() { return acc.n; }, ACC_SAMPLES, ACC_WARMUP,
+    get sunHalfDeg() { return ACC_SUN_HALF_DEG; },
+    setSunHalfDeg(v) { ACC_SUN_HALF_DEG = +v; acc.blocked = true; },
     fxDead, perf, get tweenCount() { return tweens.size; },
+    get orbitBench() { return orbitBench; },   // ?bench=orbit's controller (phase, result), for a harness that checks the run
+    // the stage half of the render question: the contact shadow is LIGHT-STAGE
+    // only, so a shadow measurement that does not state the stage means nothing
+    applyStageTheme, get stageTheme() { return stageTheme; },
     get build() { return build; }, regenerate, setSelected, get selectedId() { return selectedId; },
     // part-preview internals (2026-08-19) — the mode flag, the view state and
     // the resolver, so an embed question is answerable by reading state
@@ -6739,9 +8174,30 @@ if (new URLSearchParams(location.search).get('debug')) {
     // these are the two handles it touches. `customColors` is a getter because the binding is
     // REASSIGNED (presets, uploads, relays) - returning the object once would hand out a stale one.
     // Debug-only, like everything else here.
-    applyPalette, activeLabel, get customColors() { return customColors; },
+    applyPalette, activeLabel, activeHex, get customColors() { return customColors; },
+    /* ⚠ `useCustom` IS THE GATE, and without it `customColors` is inert. A test
+       that assigned customColors and called applyPalette repainted NOTHING and
+       produced eighteen identical arms that looked like a working matrix. */
+    get useCustom() { return useCustom; }, set useCustom(v) { useCustom = !!v; },
     // the relief lever, for the tier gate: `reliefWanted` is the constant AND the tier
     LAYER_DETAIL_ENABLED, reliefWanted,
+    // the print pose's axis per material key - a buried-infill experiment needs
+    // the LAYER PLANE, and object XY is only that for a part posed identity
+    buildAxisForKey,
+    /* ⚠ regenerate() TAKES NO ARGUMENTS - it reads module-scope `build`. A
+       harness that passed it a mutated copy had the copy silently ignored and
+       kept rendering the previous faceplate family. The family swap must go
+       through applyFaceplateStyle, which also drops the faceplate materials so
+       the new family's BUILD AXIS takes effect.
+       ⚠⚠ AND IT TAKES A STYLE *OBJECT*, NOT AN ID. Passing the string
+       'edgelabel' set build.faceStyle to `undefined` (it reads style.key), so the
+       generator fell back to its default family - a single-zone plate printed
+       face-down on -Z, i.e. Essential - while the call returned normally. Pass
+       FACEPLATE_STYLES.find(s => s.key === 'edgelabel'). */
+    applyFaceplateStyle, FACEPLATE_STYLES,
+    // the handle swap, so a harness can swap at rest with nothing selected (selecting a handle slides its drawer open,
+    // and that motion would hide an at-rest shadow defect). Takes a style OBJECT from HANDLE_STYLES, like the plates.
+    applyHandleStyle, HANDLE_STYLES,
     COLOR_STORE_KEY,
     trackLog, track };
 }
