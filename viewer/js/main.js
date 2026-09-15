@@ -5965,15 +5965,18 @@ $('preset-file').onchange = e => { if (e.target.files[0]) loadPresetFile(e.targe
 // the preset block collapses (chevron, session-remembered) so a growing preset
 // library never crowds the parts panel — the head keeps naming the active
 // palette while folded (Joey 2026-07-13)
+/* ⚠ STORAGE CAN THROW, and this runs while the module loads: a browser that blocks the site's storage throws on the
+   first touch of sessionStorage, which stopped main.js right here - no viewer, no benchmark (found by the p34
+   benchmark harness, 2026-09-15). The fold works without it; it is just not remembered. */
 const setPresetsOpen = open => {
-  sessionStorage.setItem('gen2-presets-open', open ? '1' : '0');
+  try { sessionStorage.setItem('gen2-presets-open', open ? '1' : '0'); } catch (e) { /* storage blocked */ }
   $('preset-chips').classList.toggle('hidden', !open);
   $('preset-io').classList.toggle('hidden', !open);
   $('preset-head').classList.toggle('collapsed', !open);
   $('preset-head').setAttribute('aria-expanded', String(open));
 };
 $('preset-head').onclick = () => setPresetsOpen($('preset-chips').classList.contains('hidden'));
-setPresetsOpen(sessionStorage.getItem('gen2-presets-open') !== '0');
+setPresetsOpen((() => { try { return sessionStorage.getItem('gen2-presets-open'); } catch (e) { return null; } })() !== '0');
 renderPresets();
 
 let fmType = null;     // the part type/zone key the filament menu is editing
