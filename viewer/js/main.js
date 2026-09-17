@@ -1690,9 +1690,9 @@ if (!ENTRY.isPart && parseSeeInto(location.search)) seeInto = createSeeInto({
   // Very High only: the tier that spends its budget once the camera stops (Astra's control 2)
   wanted: () => !!QUALITY[quality].accum && !cinema.on && !renderer.getContext().isContextLost(),
   sceneKey: () => instances.size + '|' + cur + '|' + ao.rev + '|' + accRev + '|' + quality + '|' + stageTheme,
-  /* ⚠ OFF unless `?siskip=state` asks for it: the rule below is a state rule, and p62 measured that it is NOT a proof
-     of invisibility (a shut drawer's cover still shows through the gap it fills). With the switch on it bounds what a
-     correct visibility test could save; without it the experiment renders exactly as it was measured. */
+  /* ⚠ ON by default since local integration, `?siskip=off` to disable for diagnosis: the rule below is a STATE rule, not
+     a proof of invisibility (a shut drawer's cover still shows through the gap it fills), and Astra accepted that measured
+     residual. Without it every behind-cover pass runs, which is what failed the moving-cost limit. */
   coversVisible: parseSeeIntoSkip(location.search) ? seeIntoCoversVisible : null,
   // the scene depth the AO pass already renders, so the AO weighting can tell a visible cover from a hidden one
   sceneDepth: () => (ao.rtN ? ao.rtN.depthTexture : null),

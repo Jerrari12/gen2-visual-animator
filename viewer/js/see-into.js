@@ -58,12 +58,20 @@ export function parseSeeInto(search) {
   return v && Object.prototype.hasOwnProperty.call(SEE_INTO_PRESETS, v) ? v : null;
 }
 
-/** How the experiment may skip its extra renders. `?siskip=state` turns on the assembly-state rule (Astra's option 1
+/** How the experiment skips its extra renders. The assembly-state rule is ON by default since local integration and
+ *  `?siskip=off` disables it for diagnosis. ⚠ It is an APPROXIMATION: measured page against page over 58 views per build
+ *  (p62 skipsweep.mjs) it changes 13 of 58 views on the representative build and 17 of 58 on the 80-unit one, by at most
+ *  43-45 px, the worst a 3 x 263 hairline at a case seam. Astra accepted that on 2026-09-17 from the sheets in
+ *  integration/results/p62/sweep/. Older text below, kept for the reasoning:
+ *  `?siskip=state` turns on the assembly-state rule (Astra's option 1
  *  as first built). It is OFF by default because the rule is NOT a proof of invisibility: measured 2026-09-17 (p62), a
  *  shut drawer's cover still occupies 6-60 px in 19 of 138 ordinary outside views of the representative build, ~900 px
  *  in a close view, and the whole frame from a camera inside the drawer - it shows through the very gap it fills. With
  *  the switch on those pixels render as plain frost (the see-through is 0, never a stale interior). */
-export const SEE_INTO_SKIP_DEFAULT = null;   // ⚠ INTEGRATION IS THIS ONE VALUE: 'state' turns the skip on by default
+/* The skip is ON by default as of local integration (Astra 2026-09-17: "accept the residual seam/sliver compromise shown in
+   these sheets and make the skip the default for local integration. Keep ?siskip=off for diagnosis."). Measured residual: it
+   changes at most 43-45 px in any of 58 swept views per build, the worst being a 3 x 263 hairline at a case seam. */
+export const SEE_INTO_SKIP_DEFAULT = 'state';
 export function parseSeeIntoSkip(search) {
   const v = new URLSearchParams(search || '').get('siskip');
   if (v === 'off') return null;              // the diagnosis switch: always available, whatever the default becomes
