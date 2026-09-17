@@ -8151,11 +8151,13 @@ function renderLoop(now) {
   /* ⚠ moving = a TWEEN, not perf.moving: the passes already re-run when the camera matrices change (see-into.js compares them
      exactly), and perf.moving stays true for 160 ms after the camera stops, which re-ran them on frames with an unchanged view.
      A tween moves parts under a still camera, so it must force the re-run itself. */
-  if (seeInto) guardFx('seeinto', () => { if (ao.compMat) seeInto.patchAO(ao.compMat); seeInto.prepare({ moving: tweens.size > 0 }); });
+  if (seeInto) guardFx('seeinto', () => seeInto.prepare({ moving: tweens.size > 0 }));
   // while the camera moves, the floor reflection and ambient occlusion wait (motionLite)
   const lite = motionLite();
   guardFx('reflection', () => updateReflection(false, lite));
   if (lite) holdAOForMotion(); else guardFx('ao', updateAO);
+  // the see-into experiment weights AO on its parts: patch the composite as soon as updateAO has built it, before it draws
+  if (seeInto && ao.compMat) guardFx('seeinto', () => seeInto.patchAO(ao.compMat));
   // Very High puts its own accumulated mean on the canvas and says so; every
   // other tier renders the scene straight to it, exactly as before. A thrown or
   // disabled accumulator returns undefined and we fall back to the plain frame.

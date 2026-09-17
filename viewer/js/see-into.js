@@ -184,7 +184,10 @@ export function createSeeInto(o) {
   function patchAO(compMat) {
   if (comp === compMat) return false;
   comp = compMat;
-  comp.uniforms.tSIMask = { value: placeholder };
+  /* ⚠ THE MASK THE PASSES ALREADY MADE, NOT THE PLACEHOLDER: the composite is created on AO's first frame, which on a still view
+     comes AFTER this frame's passes - a placeholder here would leave the AO weight off until the camera next moved (local review
+     local-20260917-101900-641, extended) */
+  comp.uniforms.tSIMask = { value: rtMask && hasRef ? rtMask.texture : placeholder };
   comp.uniforms.uSIAOWeight = { value: 1 };
   comp.fragmentShader = replaceOnce(comp.fragmentShader,
     'uniform sampler2D tAO; uniform float uStrength; varying vec2 vUv;',
@@ -318,7 +321,16 @@ export function createSeeInto(o) {
     if (!moving && hasRef && key === keyRef && same) return false;
     stats.lastReason = moving ? 'moving' : !hasRef ? 'first' : key !== keyRef ? 'scene: ' + keyRef + ' -> ' + key : 'camera';
     const t0 = performance.now();
-    runPasses(dims);
+    /* ⚠ A THROW MUST TURN THE SHADER SIDE OFF TOO. main.js's guardFx disables this effect after a throw and never calls prepare
+       again - with uSIActive left at 1 and the interior bound to the black placeholder, every cover would render wrong for the
+       rest of the page. */
+    try { runPasses(dims); }
+    catch (e) {
+      uniforms.uSIActive.value = 0; uniforms.uSIBehind.value = placeholder;
+      if (comp) comp.uniforms.uSIAOWeight.value = 1;
+      hasRef = false; stats.active = false;
+      throw e;
+    }
     stats.lastMs = performance.now() - t0;
     stats.passRuns++;
     if (!moving) stats.passRunsStill++;

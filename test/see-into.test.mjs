@@ -92,6 +92,9 @@ test('the viewer wires it only behind the switch, at the two places part materia
   const at = (s) => loop.indexOf(s);
   assert.ok(at("guardFx('seeinto'") > 0 && at("guardFx('seeinto'") < at("guardFx('reflection'"));
   assert.ok(at("guardFx('seeinto'") < at("guardFx('accum', accumFrame)"));
+  // the AO composite is patched after updateAO builds it and before compositeAO draws it
+  const patchAt = at('seeInto.patchAO(ao.compMat)');
+  assert.ok(patchAt > at("guardFx('ao', updateAO)") && patchAt < at("guardFx('ao', compositeAO)"));
   assert.match(main, /QUALITY\[quality\]\.accum && !cinema\.on/, 'Very High only');
 });
 
