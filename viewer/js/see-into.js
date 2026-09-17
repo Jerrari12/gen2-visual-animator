@@ -155,6 +155,11 @@ export function patchSeeIntoMaterial(material, uniforms, lightsParsChunk) {
  * @param o.parts()          the translucent parts now: [{ partId, meshes: [Mesh] }] (visible or not; hidden meshes draw nothing)
  * @param o.wanted()         whether the effect may run this frame (Very High, not the outro, not a part preview)
  * @param o.sceneKey()       a string that changes whenever the scene changes without the camera moving
+ * @param o.coversVisible()  optional: false ONLY when no translucent part can contribute to any view of this frame
+ *                           (Astra 2026-09-17, option 1). While it says false the three renders do not run, the
+ *                           see-through is 0 and the AO weight is 1, so nothing samples a stale interior. It must be
+ *                           view-INDEPENDENT (see main.js): the floor reflection draws the same parts from a second
+ *                           camera in the same frame, and a mirror does not un-hide an enclosed part.
  * @param o.pauseShadowWatch(on)  suspend the viewer's shadow-caster watch while the passes swap materials (see runPasses)
  * The AO composite is patched separately, once it exists (`patchAO`): main.js builds it lazily on AO's first frame.
  */
@@ -176,7 +181,7 @@ export function createSeeInto(o) {
     uSIBehind: { value: null },
     uSIRes: { value: new T.Vector2(1, 1) },
   };
-  const stats = { passRuns: 0, passRunsStill: 0, lastMs: 0, active: false, parts: 0, lastReason: '' };
+  const stats = { passRuns: 0, passRunsStill: 0, skippedHidden: 0, lastMs: 0, active: false, parts: 0, lastReason: '' };
   const placeholder = (() => { const t = new T.DataTexture(new Uint8Array([0, 0, 0, 255]), 1, 1); t.needsUpdate = true; return t; })();
   uniforms.uSIBehind.value = placeholder;
 
@@ -323,7 +328,20 @@ export function createSeeInto(o) {
     stats.active = on;
     uniforms.uSIActive.value = on ? 1 : 0;
     if (comp) comp.uniforms.uSIAOWeight.value = on ? P.aoWeight : 1;
-    if (!on) { hasRef = false; return false; }
+    if (!on) { hasRef = false; lastMoving = false; uniforms.uSISee.value = P.see; return false; }
+    /* ⚠ NO COVER IN ANY VIEW, NO RENDERS (Astra 2026-09-17, option 1). The see-through goes to 0 rather than keeping the
+       last interior: a skipped frame must never sample a stale image, and a part that leaks a few pixels through a slot
+       then renders as plain frost instead of wrongly. hasRef is dropped, so the frame a cover becomes visible again -
+       decided on THAT frame, not from the last one - runs the passes before anything is drawn. */
+    if (o.coversVisible && !o.coversVisible()) {
+      uniforms.uSISee.value = 0;
+      if (comp) comp.uniforms.uSIAOWeight.value = 1;
+      uniforms.uSIBehind.value = placeholder;
+      hasRef = false; lastMoving = false;
+      stats.skippedHidden++; stats.lastReason = 'no cover visible';
+      return false;
+    }
+    uniforms.uSISee.value = P.see;
     C.updateMatrixWorld();
     const dims = ensureTargets();
     const key = o.sceneKey() + '|' + dims.w + 'x' + dims.h;

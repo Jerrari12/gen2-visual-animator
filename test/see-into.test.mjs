@@ -112,7 +112,7 @@ test('on the REAL chain the viewer builds - layer relief, then plate finish, the
 });
 
 /* prepare() against a counting fake renderer: which frames run the passes (Sol review 2026-09-17) */
-function fakeSeeInto() {
+function fakeSeeInto(extra = {}) {
   let renders = 0;
   const R = {
     autoClear: true, shadowMap: { needsUpdate: false },
@@ -122,7 +122,7 @@ function fakeSeeInto() {
   const S = new THREE.Scene(), C = new THREE.PerspectiveCamera();
   const mesh = new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshStandardMaterial());
   const si = SI.createSeeInto({ THREE, renderer: R, scene: S, camera: C, presetKey: 'frosted',
-    parts: () => [{ partId: 'bc1', meshes: [mesh] }], wanted: () => true, sceneKey: () => 'k' });
+    parts: () => [{ partId: 'bc1', meshes: [mesh] }], wanted: () => true, sceneKey: () => 'k', ...extra });
   return { si, C, runs: () => renders / 3 };   // pass A, mask, pass B
 }
 
@@ -147,4 +147,95 @@ test('prepare: a camera change re-runs; withoutSeeThrough zeroes only the see-th
   assert.throws(() => si.withoutSeeThrough(() => { throw new Error('x'); }));
   assert.equal(si.uniforms.uSISee.value, see);
   assert.equal(si.uniforms.uSIActive.value, 1);
+});
+
+/* ---------------------------------------------------------------- option 1: no cover visible, no extra renders
+   Astra 2026-09-17: "skip the behind-cover rendering when no eligible cover can contribute to the displayed image ...
+   uncertain cases should render normally". The decision lives in main.js (`seeIntoCoversVisible`) and is extracted and
+   CALLED here with fake instances - asserting on its source text would prove nothing (the relay-contract lesson). */
+const mainSrc = readFileSync(join(root, 'viewer', 'js', 'main.js'), 'utf8');
+function fnAt(src, needle) {
+  const start = src.indexOf(needle);
+  assert.ok(start >= 0, `"${needle}" not found in main.js - if it was renamed, update this test rather than deleting it`);
+  let depth = 0;
+  for (let i = src.indexOf('{', start); i < src.length; i++) {
+    if (src[i] === '{') depth++;
+    else if (src[i] === '}' && --depth === 0) return src.slice(start, i + 1);
+  }
+  assert.fail(`unterminated function for "${needle}"`);
+}
+const coversVisibleWith = new Function('THREE', 'manifest', 'PAGES', 'cur', 'instances', 'tweens', 'fpFocus', 'dFocus',
+  `${fnAt(mainSrc, 'function basePos(')}\n${fnAt(mainSrc, 'function seeIntoCoversVisible(')}\nreturn seeIntoCoversVisible();`);
+
+function scene(over = {}) {
+  const inst = (id, node, rides, pos) => ({ cfg: { id, node, rides, pos }, staged: false,
+    group: { visible: true, position: new THREE.Vector3(...pos), children: [{ position: new THREE.Vector3() }] } });
+  const list = [inst('d0', 'DecorDrawer_185-1W-1H', null, [0, 10, 5]), inst('bc0', 'BackCover_EdgeLabel_1W-1H', 'd0', [0, 30, 92])];
+  const s = {
+    manifest: { steps: [{}, {}], stages: {}, incomplete: null }, PAGES: [{ cover: true }, {}, {}, { outro: true }],
+    cur: 2, instances: new Map(list.map((x) => [x.cfg.id, x])), tweens: new Set(), fpFocus: { id: null }, dFocus: { carrier: null },
+  };
+  Object.assign(s, over);
+  s.cover = s.instances.get('bc0'); s.drawer = s.instances.get('d0');
+  return s;
+}
+const ask = (s) => coversVisibleWith(THREE, s.manifest, s.PAGES, s.cur, s.instances, s.tweens, s.fpFocus, s.dFocus);
+
+test('hidden covers: the finished build with every drawer shut needs no behind-cover render', () => {
+  assert.equal(ask(scene()), false);
+});
+
+test('hidden covers: anything that could expose one answers "render"', () => {
+  let s = scene(); s.drawer.group.position.z += 40;            // a drawer peek / deep pull
+  assert.equal(ask(s), true, 'open drawer');
+  s = scene(); s.cover.group.children[0].position.y = 4;        // the cover's own removal ritual
+  assert.equal(ask(s), true, 'cover lifted');
+  s = scene(); s.tweens.add({});
+  assert.equal(ask(s), true, 'a tween is running');
+  s = scene({ cur: 1 });
+  assert.equal(ask(s), true, 'mid-assembly page');
+  s = scene({ cur: 0 });
+  assert.equal(ask(s), true, 'the cover page');
+  s = scene({ cur: 3 });
+  assert.equal(ask(s), true, 'the outro');
+  s = scene(); s.fpFocus.id = 'fp0';
+  assert.equal(ask(s), true, 'faceplate isolation');
+  s = scene(); s.dFocus.carrier = {};
+  assert.equal(ask(s), true, 'drawer focus');
+  s = scene(); s.manifest.incomplete = { areas: 1 };
+  assert.equal(ask(s), true, 'the in-progress preview draws planned covers translucent');
+  s = scene(); s.cover.staged = true;
+  assert.equal(ask(s), true, 'a staged cover sits on a bench');
+  s = scene(); s.cover.cfg.rides = 'gone';
+  assert.equal(ask(s), true, 'a cover whose carrier cannot be found is not ruled out');
+});
+
+test('hidden covers: an invisible cover is not a reason to render, even with its drawer open', () => {
+  const s = scene();
+  s.cover.group.visible = false; s.drawer.group.position.z += 40;
+  assert.equal(ask(s), false);
+});
+
+test('prepare: while no cover is visible nothing renders and the see-through is off, and it returns the same frame it is needed', () => {
+  let visible = false;
+  const { si, runs } = fakeSeeInto({ coversVisible: () => visible });
+  si.prepare({ moving: false });
+  assert.equal(runs(), 0, 'no passes while hidden');
+  assert.equal(si.uniforms.uSISee.value, 0, 'no see-through, so no stale interior is sampled');
+  assert.equal(si.uniforms.uSIActive.value, 1, 'the frosted colour stays');
+  si.prepare({ moving: false }); si.prepare({ moving: true });
+  assert.equal(runs(), 0);
+  visible = true;
+  si.prepare({ moving: false });     // the camera never moved and the scene key is unchanged
+  assert.equal(runs(), 1, 'the frame a cover becomes visible runs the passes');
+  assert.equal(si.uniforms.uSISee.value, SI.SEE_INTO_PRESETS.frosted.see);
+  si.prepare({ moving: false });
+  assert.equal(runs(), 1, 'then reused while still');
+  visible = false;
+  si.prepare({ moving: false });
+  assert.equal(si.uniforms.uSISee.value, 0);
+  visible = true;
+  si.prepare({ moving: false });
+  assert.equal(runs(), 2, 'a fresh interior after every hidden stretch');
+  assert.equal(si.stats.skippedHidden, 4);
 });

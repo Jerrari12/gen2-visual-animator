@@ -1643,6 +1643,32 @@ let ACC_SUN_HALF_DEG = 6;
    improvement rather than a jump. Cost: one extra scene render on each of those
    frames, about 2 ms each on the machine this was built on. */
 const ACC_WARMUP = 6;
+/* ⚠⚠ CAN A BACK COVER BE SEEN AT ALL THIS FRAME? (Astra 2026-09-17: "skip the behind-cover rendering when no eligible
+   cover can contribute to the displayed image ... uncertain cases should render normally".) A back cover clips onto the
+   BACK of a faceplate, facing into its drawer, so in the finished build with that drawer shut it is enclosed by the
+   drawer, the plate and the case. The answer here is therefore about ASSEMBLY STATE, never about the camera - which is
+   what makes it right for the floor reflection too: a second camera in the same frame cannot un-hide an enclosed part,
+   and a frustum test would have answered "in view" on exactly the whole-build frames that show no cover.
+   It returns TRUE (render) for everything it cannot rule out: any tween, a focus/isolation fade, the in-progress
+   preview's translucent covers, any page but the finished build, and any cover or drawer not exactly at its resting
+   pose. ⚠ It reads no camera and no bounds ON PURPOSE - keep it that way, or the reflection needs its own answer. */
+function seeIntoCoversVisible() {
+  if (tweens.size) return true;                                   // anything moving: the enclosure may be opening
+  if (fpFocus.id || dFocus.carrier) return true;                  // isolation fades the room / pulls a drawer open
+  if (manifest.incomplete) return true;                           // planned covers render translucent
+  const page = PAGES[cur];
+  if (!page || page.cover || page.outro) return true;
+  if (cur !== manifest.steps.length) return true;                 // mid-assembly: parts sit on benches, cases are missing
+  const atRest = (inst) => !inst.staged && inst.group.position.distanceToSquared(basePos(inst, false)) < 1e-6
+    && (!inst.group.children[0] || inst.group.children[0].position.lengthSq() < 1e-6);
+  for (const inst of instances.values()) {
+    if (!/^BackCover/.test(inst.cfg.node) || !inst.group || !inst.group.visible) continue;   // a hidden cover draws nothing
+    if (!atRest(inst)) return true;                               // its own removal ritual is running or stranded
+    const carrier = inst.cfg.rides ? instances.get(inst.cfg.rides) : null;
+    if (!carrier || !atRest(carrier)) return true;                // the drawer it rides is open (a peek, a deep pull, a cinema glide)
+  }
+  return false;
+}
 if (!ENTRY.isPart && parseSeeInto(location.search)) seeInto = createSeeInto({
   THREE, renderer, scene, camera, presetKey: parseSeeInto(location.search),
   // every back cover, one part per instance (hidden meshes draw nothing in the passes)
@@ -1659,6 +1685,7 @@ if (!ENTRY.isPart && parseSeeInto(location.search)) seeInto = createSeeInto({
   // Very High only: the tier that spends its budget once the camera stops (Astra's control 2)
   wanted: () => !!QUALITY[quality].accum && !cinema.on && !renderer.getContext().isContextLost(),
   sceneKey: () => instances.size + '|' + cur + '|' + ao.rev + '|' + accRev + '|' + quality + '|' + stageTheme,
+  coversVisible: seeIntoCoversVisible,
   // the passes swap cover materials and layers; the shadow-caster watch must not read those as moved casters (see-into.js)
   pauseShadowWatch: (on) => { if (on) { shadowWatch.pausedMoving = shadowWatch.moving; shadowWatch.moving = false; } else shadowWatch.moving = shadowWatch.pausedMoving; },
 });
