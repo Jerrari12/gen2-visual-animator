@@ -110,3 +110,41 @@ test('on the REAL chain the viewer builds - layer relief, then plate finish, the
   assert.ok(sh.vertexShader.includes('vSIObjNrm = objectNormal;'));
   assert.match(m.customProgramCacheKey(), /\|seeinto$/);
 });
+
+/* prepare() against a counting fake renderer: which frames run the passes (Sol review 2026-09-17) */
+function fakeSeeInto() {
+  let renders = 0;
+  const R = {
+    autoClear: true, shadowMap: { needsUpdate: false },
+    getDrawingBufferSize: (v) => v.set(64, 48), getRenderTarget: () => null, setRenderTarget() {},
+    getClearColor: (c) => c.set(0), getClearAlpha: () => 1, setClearColor() {}, clear() {}, render() { renders++; },
+  };
+  const S = new THREE.Scene(), C = new THREE.PerspectiveCamera();
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshStandardMaterial());
+  const si = SI.createSeeInto({ THREE, renderer: R, scene: S, camera: C, presetKey: 'frosted',
+    parts: () => [{ partId: 'bc1', meshes: [mesh] }], wanted: () => true, sceneKey: () => 'k' });
+  return { si, C, runs: () => renders / 3 };   // pass A, mask, pass B
+}
+
+test('prepare: a still view reuses the passes, and the frame after a tween ends runs them once more', () => {
+  const { si, runs } = fakeSeeInto();
+  si.prepare({ moving: false }); assert.equal(runs(), 1, 'first use');
+  si.prepare({ moving: false }); assert.equal(runs(), 1, 'still: reused');
+  si.prepare({ moving: true }); si.prepare({ moving: true }); assert.equal(runs(), 3, 'every tween frame');
+  si.prepare({ moving: false }); assert.equal(runs(), 4, 'the frame the tween ended on (its final pose)');
+  assert.equal(si.stats.lastReason, 'tween ended');
+  si.prepare({ moving: false }); si.prepare({ moving: false }); assert.equal(runs(), 4, 'then reused again');
+});
+
+test('prepare: a camera change re-runs; withoutSeeThrough zeroes only the see-through and restores it, even on a throw', () => {
+  const { si, C, runs } = fakeSeeInto();
+  si.prepare({ moving: false });
+  C.position.x += 1e-9; C.updateMatrixWorld();
+  si.prepare({ moving: false }); assert.equal(runs(), 2);
+  const see = si.uniforms.uSISee.value;
+  assert.equal(si.withoutSeeThrough(() => si.uniforms.uSISee.value), 0);
+  assert.equal(si.uniforms.uSISee.value, see);
+  assert.throws(() => si.withoutSeeThrough(() => { throw new Error('x'); }));
+  assert.equal(si.uniforms.uSISee.value, see);
+  assert.equal(si.uniforms.uSIActive.value, 1);
+});

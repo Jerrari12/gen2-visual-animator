@@ -260,7 +260,7 @@ export function createSeeInto(o) {
 
   // the still-view key: the camera matrices (64-bit exact, like the accumulator's), the scene key, the buffer size
   const camRef = new Float64Array(32);
-  let keyRef = '', hasRef = false;
+  let keyRef = '', hasRef = false, lastMoving = false;
   const camSame = () => { const m = C.matrixWorld.elements, p = C.projectionMatrix.elements;
     for (let i = 0; i < 16; i++) if (camRef[i] !== m[i] || camRef[16 + i] !== p[i]) return false; return true; };
   const camStore = () => { const m = C.matrixWorld.elements, p = C.projectionMatrix.elements;
@@ -328,8 +328,12 @@ export function createSeeInto(o) {
     const dims = ensureTargets();
     const key = o.sceneKey() + '|' + dims.w + 'x' + dims.h;
     const same = camSame();
-    if (!moving && hasRef && key === keyRef && same) return false;
-    stats.lastReason = moving ? 'moving' : !hasRef ? 'first' : key !== keyRef ? 'scene: ' + keyRef + ' -> ' + key : 'camera';
+    /* ⚠ THE FRAME AFTER A TWEEN ENDS RE-RUNS TOO (Sol review 2026-09-17): stepTweens applies a tween's FINAL pose and deletes it
+       in the same frame, before this runs, so that frame reads moving = false with an unchanged camera and scene key - and the
+       image from the previous, not-quite-final pose would be kept until the camera next moved. */
+    const wasMoving = lastMoving; lastMoving = moving;
+    if (!moving && !wasMoving && hasRef && key === keyRef && same) return false;
+    stats.lastReason = moving ? 'moving' : wasMoving ? 'tween ended' : !hasRef ? 'first' : key !== keyRef ? 'scene: ' + keyRef + ' -> ' + key : 'camera';
     const t0 = performance.now();
     /* ⚠ A THROW MUST TURN THE SHADER SIDE OFF TOO. main.js's guardFx disables this effect after a throw and never calls prepare
        again - with uSIActive left at 1 and the interior bound to the black placeholder, every cover would render wrong for the
@@ -348,7 +352,15 @@ export function createSeeInto(o) {
     return true;
   }
 
-  return { uniforms, prepare, patchAO, stats, preset: P, presetKey: o.presetKey, invalidate() { hasRef = false; },
+  /* ⚠ ANOTHER CAMERA'S RENDER MUST NOT SAMPLE THE INTERIOR (Sol review 2026-09-17): the interior image is registered to the main
+     camera's pixels, so a cover drawn into the floor reflection would show unrelated imagery. The reflection render is bracketed
+     with this: the cover keeps its frosted colour and loses only the see-through. */
+  function withoutSeeThrough(fn) {
+    const s = uniforms.uSISee.value; uniforms.uSISee.value = 0;
+    try { return fn(); } finally { uniforms.uSISee.value = s; }
+  }
+
+  return { uniforms, prepare, patchAO, withoutSeeThrough, stats, preset: P, presetKey: o.presetKey, invalidate() { hasRef = false; },
     patch(material, axis) {
       if (axis) uniforms.uSIAxis.value.set(axis[0], axis[1], axis[2]).normalize();
       return patchSeeIntoMaterial(material, uniforms, T.ShaderChunk.lights_physical_pars_fragment);

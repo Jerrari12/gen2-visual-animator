@@ -8156,7 +8156,8 @@ function renderLoop(now) {
   if (seeInto) guardFx('seeinto', () => seeInto.prepare({ moving: tweens.size > 0 }));
   // while the camera moves, the floor reflection and ambient occlusion wait (motionLite)
   const lite = motionLite();
-  guardFx('reflection', () => updateReflection(false, lite));
+  // the see-into experiment's interior belongs to the main camera: a reflected cover drops its see-through (see-into.js)
+  guardFx('reflection', () => { const mirror = () => updateReflection(false, lite); return seeInto ? seeInto.withoutSeeThrough(mirror) : mirror(); });
   if (lite) holdAOForMotion(); else guardFx('ao', updateAO);
   // the see-into experiment weights AO on its parts: patch the composite as soon as the AO step above has built it, before it draws
   if (seeInto && ao.compMat) guardFx('seeinto', () => seeInto.patchAO(ao.compMat));
