@@ -68,10 +68,9 @@
 const POLY_LINK = q => `https://shop.polymaker.com/JERRARI?q=${q}`;
 const PM = id => POLY_LINK('pla');           // id retained in the colour rows, unused for now
 const PM_SILK = POLY_LINK('silk-pla');
-/* ⚠ THIS FEED HANDLE IS NOT YET MINTED. Only values minted in the Superfiliate portal route; an unknown
-   one fails SOFT - the Ambassador attribution and the 15% first-purchase code still attach and the shopper
-   lands on the store root instead of the Translucent PLA page. Joey mints `translucent-pla` in the portal;
-   until he confirms it, every link in this section is that soft landing, not a broken URL. */
+/* Minted and VERIFIED 2026-09-17 (Joey minted it, then the live link was followed): it resolves to
+   /products/translucent-pla carrying utm_campaign=JERRARI and ref=superfiliate-JERRARI, so attribution
+   attaches. ⚠ Only portal-minted handles route; an unknown one fails soft to the store root. */
 const PM_TRANS = POLY_LINK('translucent-pla');
 const POLYMAKER_URL = PM(44863271895097);
 const FILAMENT_DB = [
