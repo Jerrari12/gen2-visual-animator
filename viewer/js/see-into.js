@@ -204,12 +204,27 @@ export function createSeeInto(o) {
      local-20260917-101900-641, extended) */
   comp.uniforms.tSIMask = { value: rtMask && hasRef ? rtMask.texture : placeholder };
   comp.uniforms.uSIAOWeight = { value: 1 };
+  /* ⚠⚠ THE MASK HAS NO DEPTH TEST - IT IS THE COVERS' WHOLE SILHOUETTE. The mask pass draws the translucent parts alone
+     on their own layer, so it marks them even where the faceplate and the drawer stand in front, and weighting AO by
+     that mask lightened contact shading across a band on every drawer front: 37,225 px, up to 89 levels, on one ordinary
+     view of the representative build, which was 97% of everything the candidate changed against today's Very High
+     (p62, 2026-09-17). The weighting is now gated on the cover really being the nearest surface - pass A's cover depth
+     against the scene depth the AO pass already renders. Both are window depth from the same camera; the AO depth is
+     half resolution, so a silhouette edge can land in the neighbouring texel, which shows as full AO on a cover's
+     outermost pixel and never as a band on the part in front of it. */
+  /* ⚠ NEVER A NULL SAMPLER (local review local-20260917-154809-151): the fetch happens whether or not the weight ends up
+     at 1, so both start on the 1x1 placeholder and the weight is forced to 1 until a real pair exists. */
+  comp.uniforms.tSICoverDepth = { value: placeholder };
+  comp.uniforms.tSISceneDepth = { value: (o.sceneDepth && o.sceneDepth()) || placeholder };
   comp.fragmentShader = replaceOnce(comp.fragmentShader,
     'uniform sampler2D tAO; uniform float uStrength; varying vec2 vUv;',
-    'uniform sampler2D tAO; uniform float uStrength; varying vec2 vUv; uniform sampler2D tSIMask; uniform float uSIAOWeight;', 'AO composite head');
+    'uniform sampler2D tAO; uniform float uStrength; varying vec2 vUv; uniform sampler2D tSIMask; uniform float uSIAOWeight; uniform sampler2D tSICoverDepth; uniform sampler2D tSISceneDepth;', 'AO composite head');
   comp.fragmentShader = replaceOnce(comp.fragmentShader,
     'gl_FragColor = vec4( 0.0, 0.0, 0.0, clamp( ( 1.0 - a ) * uStrength, 0.0, 1.0 ) );',
-    'float siW = mix( 1.0, uSIAOWeight, clamp( texture2D( tSIMask, vUv ).r, 0.0, 1.0 ) );\n' +
+    'float siM = clamp( texture2D( tSIMask, vUv ).r, 0.0, 1.0 );\n' +
+    'if ( siM > 0.0 ) { float cd = texture2D( tSICoverDepth, vUv ).x, sd = texture2D( tSISceneDepth, vUv ).x;\n' +
+    '  siM *= step( cd, sd ); }\n' +
+    'float siW = mix( 1.0, uSIAOWeight, siM );\n' +
     'gl_FragColor = vec4( 0.0, 0.0, 0.0, clamp( ( 1.0 - a ) * uStrength * siW, 0.0, 1.0 ) );', 'AO composite output');
   comp.needsUpdate = true;
   return true;
@@ -274,7 +289,7 @@ export function createSeeInto(o) {
 
   // the still-view key: the camera matrices (64-bit exact, like the accumulator's), the scene key, the buffer size
   const camRef = new Float64Array(32);
-  let keyRef = '', hasRef = false, lastMoving = false;
+  let keyRef = '', hasRef = false, lastMoving = false, hasDepthPair = false;
   const camSame = () => { const m = C.matrixWorld.elements, p = C.projectionMatrix.elements;
     for (let i = 0; i < 16; i++) if (camRef[i] !== m[i] || camRef[16 + i] !== p[i]) return false; return true; };
   const camStore = () => { const m = C.matrixWorld.elements, p = C.projectionMatrix.elements;
@@ -331,7 +346,13 @@ export function createSeeInto(o) {
     }
     uniforms.uSIBehind.value = rtB.texture;
     uniforms.uSIRes.value.set(dims.w, dims.h);
-    if (comp) comp.uniforms.tSIMask.value = rtMask.texture;
+    if (comp) {
+      comp.uniforms.tSIMask.value = rtMask.texture;
+      comp.uniforms.tSICoverDepth.value = rtA.depthTexture;
+      const sd = o.sceneDepth ? o.sceneDepth() : null;
+      comp.uniforms.tSISceneDepth.value = sd || placeholder;   // the AO pass's target is rebuilt on resize
+      hasDepthPair = !!sd;
+    }
   }
 
   /**
@@ -348,6 +369,11 @@ export function createSeeInto(o) {
        last interior: a skipped frame must never sample a stale image, and a part that leaks a few pixels through a slot
        then renders as plain frost instead of wrongly. hasRef is dropped, so the frame a cover becomes visible again -
        decided on THAT frame, not from the last one - runs the passes before anything is drawn. */
+    if (comp) {
+      const sd = o.sceneDepth ? o.sceneDepth() : null;
+      comp.uniforms.tSISceneDepth.value = sd || placeholder;
+      if (!sd || !hasDepthPair) comp.uniforms.uSIAOWeight.value = 1;   // no depth pair to judge visibility by, no weighting
+    }
     if (o.coversVisible && !o.coversVisible()) {
       uniforms.uSISee.value = 0;
       if (comp) comp.uniforms.uSIAOWeight.value = 1;

@@ -1694,6 +1694,8 @@ if (!ENTRY.isPart && parseSeeInto(location.search)) seeInto = createSeeInto({
      of invisibility (a shut drawer's cover still shows through the gap it fills). With the switch on it bounds what a
      correct visibility test could save; without it the experiment renders exactly as it was measured. */
   coversVisible: parseSeeIntoSkip(location.search) ? seeIntoCoversVisible : null,
+  // the scene depth the AO pass already renders, so the AO weighting can tell a visible cover from a hidden one
+  sceneDepth: () => (ao.rtN ? ao.rtN.depthTexture : null),
   // the passes swap cover materials and layers; the shadow-caster watch must not read those as moved casters (see-into.js)
   pauseShadowWatch: (on) => { if (on) { shadowWatch.pausedMoving = shadowWatch.moving; shadowWatch.moving = false; } else shadowWatch.moving = shadowWatch.pausedMoving; },
 });
