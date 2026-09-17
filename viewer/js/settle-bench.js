@@ -35,6 +35,7 @@ export const MEASURED_STOPS = 8;
 export const INTERRUPT_STOPS = 4;
 export const MARGIN_MS = 1000;             // converged frames kept after a stop settles
 export const HOLD_CAP_MS = 15000;          // a stop not settled by then voids the run
+export const POSE_TOL_MM = 0.001;          // the rendered camera position may differ from the commanded pose by this much (review 01a0ad2b)
 export const SETTLE_TIERS = ['veryhigh', 'high'];
 const TIER_LABEL = { veryhigh: 'Very High', high: 'High' };
 
@@ -63,8 +64,9 @@ export function armConfig({ accum, ao, refl, ACC_SAMPLES, ACC_WARMUP, aoAccumMax
 
 /* A frame record is columns of equal length (compact to store and post):
    t (rAF ms), seg (segment index), lite (0/1), accN, accDrew (0/1), aoPasses, sampleCount, detailCount, passCount, reflCount,
-   reflOpacity, still (0/1: the camera matrices equal the hold's first frame's; 1 on move frames). */
-export const COLUMNS = ['t', 'seg', 'lite', 'accN', 'accDrew', 'aoPasses', 'sampleCount', 'detailCount', 'passCount', 'reflCount', 'reflOpacity', 'still'];
+   reflOpacity, still (0/1: the camera matrices equal the hold's first frame's; 1 on move frames), poseErr (mm between the
+   rendered camera position and the pose the benchmark commanded that frame, to 1e-6). */
+export const COLUMNS = ['t', 'seg', 'lite', 'accN', 'accDrew', 'aoPasses', 'sampleCount', 'detailCount', 'passCount', 'reflCount', 'reflOpacity', 'still', 'poseErr'];
 export function emptyFrames() { const f = {}; for (const c of COLUMNS) f[c] = []; return f; }
 
 const delta = (col, i) => (i > 0 ? col[i] - col[i - 1] : 0);
@@ -97,15 +99,18 @@ export function holdProgress(F, h0, i, cfg) {
   return out;
 }
 
-/* Whether the hold that began at row h0 ends after row i (the next frame starts the next move). An interrupt hold ends on
-   its break row; a full hold once the frames after the settling frame span MARGIN_MS (they start at the settling frame's
-   end); either ends at HOLD_CAP_MS unfinished, which voids the run. One rule for the page and for the tests' simulator. */
-export function holdShouldEnd(F, h0, i, cfg, stopKind) {
+/* Whether the hold that began at row h0 ends before the frame that starts at nextT (row i, the hold's last recorded row, ends
+   there). Decided at the START of that frame, when row i's end is known (review 01a0ad2b): an interrupt hold ends on its break
+   row; a full hold once the frames after the settling frame span MARGIN_MS - and not one frame more; either ends at
+   HOLD_CAP_MS from tStill. A stop whose settling frame ENDS after the cap is not settled (summarizeStop). One rule for the page
+   and for the tests' simulator. */
+export function holdShouldEnd(F, h0, i, cfg, stopKind, nextT) {
   const p = holdProgress(F, h0, i, cfg);
-  const heldMs = F.t[i] - F.t[h0];
-  if (stopKind === 'interrupt') return p.breakRow !== null || heldMs >= HOLD_CAP_MS;
-  if (p.settledRow !== null) return p.settledRow < i && F.t[i] - F.t[p.settledRow + 1] >= MARGIN_MS;
-  return heldMs >= HOLD_CAP_MS;
+  const endOf = (r) => (r < i ? F.t[r + 1] : nextT);
+  const held = nextT - F.t[h0];
+  if (stopKind === 'interrupt') return p.breakRow !== null || held >= HOLD_CAP_MS;
+  if (p.settledRow !== null && endOf(p.settledRow) - F.t[h0] <= HOLD_CAP_MS) return nextT - endOf(p.settledRow) >= MARGIN_MS;
+  return held >= HOLD_CAP_MS;
 }
 
 /* One hold's statistics (section 4 + A1). h0 = its first row, h1 = one past its last row (the next segment's first row, or
@@ -121,6 +126,8 @@ export function summarizeStop(F, h0, h1, cfg, stopKind) {
   // the camera stayed exactly still for the whole hold
   s.still = true;
   for (let k = h0; k < h1; k++) if (!F.still[k]) { s.still = false; break; }
+  s.poseErrMm = 0;
+  for (let k = h0; k < h1; k++) if (F.poseErr[k] > s.poseErrMm) s.poseErrMm = F.poseErr[k];
   // accumulation generations: a sample that brought acc.n to 1 starts one
   let gens = 0, lastGen = null, samples = 0, details = 0;
   for (let k = h0; k < h1; k++) {
@@ -137,7 +144,8 @@ export function summarizeStop(F, h0, h1, cfg, stopKind) {
   s.accDoneMs = cfg.accum ? since(p.accDone) : null;
   s.aoDoneMs = cfg.ao ? since(p.aoDone) : null;
   s.reflMs = cfg.refl ? since(p.reflDone) : null;
-  s.settled = stopKind !== 'interrupt' && p.settledRow !== null && end(p.settledRow) !== null;
+  s.settled = stopKind !== 'interrupt' && p.settledRow !== null && end(p.settledRow) !== null && since(p.settledRow) <= HOLD_CAP_MS;
+  if (stopKind !== 'interrupt' && p.settledRow !== null && !s.settled) s.missing = [...s.missing, `finished only after the ${HOLD_CAP_MS / 1000} s cap`];
   s.settledMs = s.settled ? since(p.settledRow) : null;
   if (s.settled) {
     const burst = [];
@@ -203,7 +211,7 @@ export function analyzeRun(F, cfg) {
     for (let j = si + 1; j < segs.length; j++) if (firstRow[j] !== null) { b = firstRow[j]; break; }
     return [a, b];
   };
-  const stops = [], checks = { reached: true, paused: [], restarted: [], detail: [], still: [] };
+  const stops = [], checks = { reached: true, paused: [], restarted: [], detail: [], still: [], pose: [] };
   for (let si = 0; si < segs.length; si++) {
     const sg = segs[si], r = range(si);
     if (!r) { checks.reached = false; continue; }
@@ -215,11 +223,18 @@ export function analyzeRun(F, cfg) {
     st.stop = sg.stop; st.azimuthDeg = sg.az;
     stops.push(st);
     checks.still.push({ stop: sg.stop, ok: st.still });
+    checks.pose.push({ stop: sg.stop, ok: st.poseErrMm <= POSE_TOL_MM, mm: st.poseErrMm });
     if (sg.stopKind !== 'interrupt') checks.detail.push({ stop: sg.stop, ok: st.detailOk });
     if (sg.stop > MEASURED_STOPS + 1 && cfg.interruptOn) checks.restarted.push({ stop: sg.stop, ok: restartedAt(F, r[0], r[1], cfg) });
   }
   const measured = stops.filter((s) => s.stopKind === 'measured');
   const inter = stops.filter((s) => s.stopKind === 'interrupt');
+  /* every registered statistic a stop owes, present and finite - a missing one voids the run rather than quietly shrinking a
+     median (review 01a0ad2b) */
+  const owed = ['settledMs', 'burstMaxFrameMs', 'burstP95FrameMs', 'settledFrameMs', ...(cfg.accum ? ['firstMeanMs', 'warmupMaxFrameMs'] : [])];
+  const incomplete = [];
+  for (const st of measured) if (st.settled) for (const k of owed) if (!Number.isFinite(st[k])) incomplete.push({ stop: st.stop, statistic: k });
+  for (const st of inter) if (st.brokeOff && !Number.isFinite(st.interruptDelayMs)) incomplete.push({ stop: st.stop, statistic: 'interruptDelayMs' });
   const cold = stops.find((s) => s.stopKind === 'cold') || null;
   const vals = (list, k) => list.map((s) => s[k]).filter((v) => v != null && Number.isFinite(v));
   const med = (list, k) => { const v = vals(list, k); return v.length ? median(v) : null; };
@@ -244,7 +259,7 @@ export function analyzeRun(F, cfg) {
   const pauses = after.filter((v) => v >= PAUSE_MS).length;
   return { stops, headline, cold: coldStop, checks, pauses, medianIntervalAfterColdMs: after.length ? median(after) : null,
     unsettled: stops.filter((s) => s.stopKind !== 'interrupt' && !s.settled).map((s) => ({ stop: s.stop, missing: s.missing })),
-    notBrokenOff: inter.filter((s) => !s.brokeOff).map((s) => s.stop) };
+    notBrokenOff: inter.filter((s) => !s.brokeOff).map((s) => s.stop), incomplete };
 }
 
 /* Whether a run counts - the first reason wins, in the pre-registered order (section 5 + A1). */
@@ -258,6 +273,8 @@ export function judgeSettleRun({ analysis: A, spoiled = null, frames = 0, tierCo
   if (!A.checks.reached) return fail('the run did not reach every stop');
   const moved = A.checks.still.find((c) => !c.ok);
   if (moved) return fail(`the camera was not exactly still during the hold at stop ${moved.stop}`);
+  const off = A.checks.pose.find((c) => !c.ok);
+  if (off) return fail(`the camera was not at stop ${off.stop}'s view (${off.mm} mm from it)`);
   if (A.unsettled.length) { const u = A.unsettled[0]; return fail(`stop ${u.stop} did not settle within ${HOLD_CAP_MS / 1000} s (${u.missing.join(', ') || 'no frame after it'})`, 'unsettled'); }
   if (A.notBrokenOff.length) return fail(`the interrupt at stop ${A.notBrokenOff[0]} did not break off mid-burst`, 'check');
   const np = A.checks.paused.find((c) => !c.ok);
@@ -266,8 +283,10 @@ export function judgeSettleRun({ analysis: A, spoiled = null, frames = 0, tierCo
   if (nd) return fail(`the settle detail was not on for every accumulation sample at stop ${nd.stop}`, 'check');
   const nr = A.checks.restarted.find((c) => !c.ok);
   if (nr) return fail(`the settle did not restart from zero after the interrupt before stop ${nr.stop}`, 'check');
+  if (A.incomplete.length) return fail(`stop ${A.incomplete[0].stop} has no ${A.incomplete[0].statistic}`, 'check');
   if (A.pauses > 0 && !(A.medianIntervalAfterColdMs >= PAUSE_MS)) return fail(`${A.pauses} ${A.pauses === 1 ? 'pause' : 'pauses'} of half a second or more during the run`, 'pauses');
-  if (Number.isFinite(browserHz) && Number.isFinite(browserHzAfter) && Math.abs(browserHzAfter - browserHz) > LIMIT_DRIFT * browserHz) {
+  if (!(browserHz > 0) || !(browserHzAfter > 0)) return fail("the browser's own frame rate could not be read before and after the run");
+  if (Math.abs(browserHzAfter - browserHz) > LIMIT_DRIFT * browserHz) {
     return fail(`the browser's own frame rate changed during the run (${Math.round(browserHz * 10) / 10} to ${Math.round(browserHzAfter * 10) / 10} frames a second)`);
   }
   return { valid: true, invalidReason: null, kind: null };
@@ -340,9 +359,9 @@ export function createSettleBench(api) {
     phase: 'idle',                         // idle -> preparing -> run -> closing -> done
     tier: SETTLE_TIERS.includes(params.get('tier')) ? params.get('tier') : 'veryhigh',
     stage: params.get('stage') === 'light' ? 'light' : 'dark',
-    prerollAt: 0, seg: 0, segStart: 0, holdStart: -1, cfg: null, F: emptyFrames(), pendingRow: false,
+    prerollAt: 0, cmdPos: new api.THREE.Vector3(), seg: 0, segStart: 0, holdStart: -1, cfg: null, F: emptyFrames(), pendingRow: false,
     camRef: new Float64Array(32), dprs: new Set(), tiers: new Set(), sizes: new Set(),
-    aoAccumMaxChanges: [], invalid: null, browserHz: null, browserHzAfter: null, wake: null, result: null, judged: null, endHold: false,
+    aoAccumMaxChanges: [], invalid: null, browserHz: null, browserHzAfter: null, wake: null, result: null, judged: null,
   };
   const el = {};
   const SERIES_STORE = 'gen2-settle-bench-series';
@@ -483,13 +502,20 @@ export function createSettleBench(api) {
     }
     if (state.phase !== 'run') return;
     let sg = segs[state.seg];
-    if (sg.kind === 'hold' && state.endHold) {           // afterFrame decided: this frame begins the next move
-      state.endHold = false;
+    const last = state.F.t.length - 1;
+    // the hold's end is decided here, where the last row's end (now) is known - review 01a0ad2b
+    if (sg.kind === 'hold' && last >= state.holdStart && !state.pendingRow && holdShouldEnd(state.F, state.holdStart, last, state.cfg, sg.stopKind, now)) {
       state.seg++;
-      if (state.seg >= segs.length) { state.phase = 'closing'; Promise.resolve().then(closeRun); return; }
+      if (state.seg >= segs.length) {
+        // the closing row: this frame's start is the final hold's last end; it belongs to no segment
+        state.F.t.push(now); state.F.seg.push(segs.length);
+        for (const c of COLUMNS) if (c !== 't' && c !== 'seg') state.F[c].push(state.F[c][state.F[c].length - 1]);
+        state.phase = 'closing'; Promise.resolve().then(closeRun); return;
+      }
       sg = segs[state.seg];
       /* the move's clock starts at the last hold frame's START, one frame early: started at `now` its first frame would sit
-         exactly on the held view, and S3 times the first frame drawn at a NEW view */
+         exactly on the held view, and S3 times the first frame drawn at a NEW view. So a displayed move lasts one frame less than
+       MOVE_MS (review 01a0ad2b, finding 3, kept by decision: no statistic depends on it; amendment A3). */
       state.segStart = state.lastT;
     }
     if (sg.kind === 'move') {
@@ -502,6 +528,7 @@ export function createSettleBench(api) {
         placeCamera(sg.az);
       } else placeCamera(sg.from + ((sg.to - sg.from) * el) / sg.ms);
     } else placeCamera(sg.az);
+    state.cmdPos.copy(api.camera.position);   // the commanded pose; afterFrame compares what was rendered against it
     if (api.tweenCount() > 0 && !state.invalid) state.invalid = 'the build moved during the run';
     if (!state.invalid && api.renderer.getContext().isContextLost()) state.invalid = 'the graphics context was lost during the run';
     state.F.t.push(now); state.F.seg.push(state.seg);
@@ -533,7 +560,7 @@ export function createSettleBench(api) {
     F.sampleCount.push(S.sampleCount); F.detailCount.push(S.detailCount); F.passCount.push(S.passCount);
     F.reflCount.push(S.reflCount); F.reflOpacity.push(S.reflOpacity === null ? -1 : S.reflOpacity);
     F.still.push(sg.kind === 'hold' ? (camSame() ? 1 : 0) : 1);
-    if (sg.kind === 'hold' && holdShouldEnd(F, state.holdStart, i, state.cfg, sg.stopKind)) state.endHold = true;
+    F.poseErr.push(Math.round(api.camera.position.distanceTo(state.cmdPos) * 1e6) / 1e6);
   }
 
   function showPill(text) {
@@ -558,10 +585,6 @@ export function createSettleBench(api) {
   }
 
   async function closeRun() {
-    // the last row of the final hold ends at the first frame after it: one more animation frame gives it an end
-    const tail = await nextFrame();
-    state.F.t.push(tail); state.F.seg.push(segs.length);
-    for (const c of COLUMNS) if (c !== 't' && c !== 'seg') state.F[c].push(state.F[c][state.F[c].length - 1]);
     state.browserHzAfter = await browserCadence();
     finish();
   }

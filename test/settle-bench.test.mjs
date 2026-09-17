@@ -11,7 +11,7 @@ import { pathToFileURL } from 'node:url';
 
 const MOD = process.env.SETTLE_BENCH_MODULE ? pathToFileURL(process.env.SETTLE_BENCH_MODULE).href : '../viewer/js/settle-bench.js';
 const B = await import(MOD);
-const { runSegments, analyzeRun, judgeSettleRun, armConfig, holdShouldEnd, emptyFrames, COLUMNS, accumMemoryMb,
+const { runSegments, analyzeRun, judgeSettleRun, armConfig, holdShouldEnd, emptyFrames, COLUMNS, accumMemoryMb, HOLD_CAP_MS,
   addSettleRun, addSettleVoided, judgeSettleSeries, settleSeriesKey } = B;
 
 const VH = (over = {}) => armConfig({ accum: true, ao: true, refl: true, ACC_SAMPLES: 24, ACC_WARMUP: 6, aoAccumMax: 16, ...over });
@@ -22,7 +22,9 @@ const HIGH = (over = {}) => armConfig({ accum: false, ao: true, refl: true, ACC_
  * sab: { drift: stop, noPause: true (neither lite nor a hidden mirror), noLite: true, mirrorNeverHidden: true, noDetail: stop,
  *        noRestart: true, noRestartAfterInterrupt: true, stuckAt: stop (acc.n stops at 20), noRefl: true,
  *        renderHidden: stop (the mirror renders while hidden and is later shown without rendering),
- *        restartAt: [stop, row] (the accumulator is reset mid-hold, as a scene change would) }
+ *        restartAt: [stop, row] (the accumulator is reset mid-hold, as a scene change would),
+ *        offPose: stop (the rendered camera 0.5 mm from the commanded pose on every frame of that hold),
+ *        noMean: stop (the accumulated mean is never drawn at that stop) }
  */
 function simulate(cfg, { dur = () => 10, sab = {} } = {}) {
   const segs = runSegments();
@@ -61,14 +63,17 @@ function simulate(cfg, { dur = () => 10, sab = {} } = {}) {
           const cap = sab.stuckAt === sg.stop ? 20 : cfg.ACC_SAMPLES;
           if (accN < cap) { accN++; sampleCount++; if (sab.noDetail !== sg.stop) detailCount++; accDrew = accN > cfg.ACC_WARMUP ? 1 : 0; }
           else accDrew = 1;
+          if (sab.noMean === sg.stop) accDrew = 0;
         }
       }
       F.t.push(t); F.seg.push(si); F.lite.push(sab.noPause || sab.noLite ? 0 : lite ? 1 : 0); F.accN.push(accN); F.accDrew.push(accDrew);
       F.aoPasses.push(aoPasses); F.sampleCount.push(sampleCount); F.detailCount.push(detailCount); F.passCount.push(passCount);
       F.reflCount.push(reflCount); F.reflOpacity.push(cfg.refl ? reflOpacity : -1);
       F.still.push(sg.kind === 'hold' && sab.drift === sg.stop && r === 5 ? 0 : 1);
+      F.poseErr.push(sg.kind === 'hold' && sab.offPose === sg.stop ? 0.5 : 0);
       t += dur(g, si, r); g++;
-      if (sg.kind === 'hold' && holdShouldEnd(F, h0, F.t.length - 1, cfg, sg.stopKind)) { afterInterrupt = sg.stopKind === 'interrupt'; break; }
+      // the page decides at the start of the next frame, when this row's end (t) is known
+      if (sg.kind === 'hold' && holdShouldEnd(F, h0, F.t.length - 1, cfg, sg.stopKind, t)) { afterInterrupt = sg.stopKind === 'interrupt'; break; }
     }
   }
   // the closing row: gives the final hold's last frame its end (the page does the same)
@@ -76,7 +81,7 @@ function simulate(cfg, { dur = () => 10, sab = {} } = {}) {
   for (const c of COLUMNS) if (c !== 't' && c !== 'seg') F[c].push(F[c][F[c].length - 1]);
   return F;
 }
-const judge = (F, cfg, extra = {}) => { const A = analyzeRun(F, cfg); return { A, J: judgeSettleRun({ analysis: A, frames: F.t.length, ...extra }) }; };
+const judge = (F, cfg, extra = {}) => { const A = analyzeRun(F, cfg); return { A, J: judgeSettleRun({ analysis: A, frames: F.t.length, browserHz: 120, browserHzAfter: 120, ...extra }) }; };
 
 test('the run: a 6 s lead-in, stops 0-13 45 degrees apart, cold / measured / interrupt / final', () => {
   const segs = runSegments();
@@ -101,8 +106,9 @@ test('Very High, dark, 10 ms frames: every number worked by hand', () => {
   assert.deepEqual([s1.reflMs, s1.aoDoneMs, s1.firstMeanMs, s1.accDoneMs, s1.settledMs], [180, 330, 240, 410, 410]);
   assert.deepEqual([s1.burstFrames, s1.burstMaxFrameMs, s1.burstP95FrameMs, s1.burstMedianFrameMs, s1.burstOver2xMedian, s1.warmupMaxFrameMs, s1.settledFrameMs], [41, 10, 10, 10, 0, 10, 10]);
   assert.deepEqual([s1.samplesRendered, s1.detailSamples, s1.accRestarts], [24, 24, 0]);
-  // margin: frames 41.. until t[i] - t[41] >= 1000 -> frame 141 is the last; 142 rows in the hold
-  assert.equal(s1.rows, 142);
+  // margin: the settling frame ends at 410; the hold ends at the first frame START 1,000 ms later (1410 = frame 141), so its
+  // last row is frame 140: 141 rows
+  assert.equal(s1.rows, 141);
   const i9 = A.stops.find((s) => s.stop === 9);
   assert.deepEqual([i9.brokeOff, i9.burstFrameMs, i9.firstMoveFrameMs, i9.interruptDelayMs, i9.breakRow], [true, 10, 10, 20, 28]);
   assert.equal(i9.settled, false, 'an interrupt stop is not a settled stop');
@@ -198,7 +204,7 @@ test('an accumulator that is not restarted: at a full hold it never settles; aft
 
 test('the inherited voids, in order, and the browser-rate drift last', () => {
   const cfg = VH(); const A = analyzeRun(simulate(cfg), cfg);
-  const j = (x) => judgeSettleRun({ analysis: A, frames: 999, ...x });
+  const j = (x) => judgeSettleRun({ analysis: A, frames: 999, browserHz: 120, browserHzAfter: 120, ...x });
   assert.match(j({ spoiled: 'the tab was hidden during the run', tierCount: 2 }).invalidReason, /hidden/);
   assert.match(j({ tierCount: 2 }).invalidReason, /quality tier changed/);
   assert.match(j({ pixelRatioCount: 2 }).invalidReason, /pixel ratio/);
@@ -206,6 +212,8 @@ test('the inherited voids, in order, and the browser-rate drift last', () => {
   assert.match(j({ frames: 2 }).invalidReason, /too few frames/);
   assert.match(j({ browserHz: 120, browserHzAfter: 107 }).invalidReason, /browser's own frame rate changed/);
   assert.equal(j({ browserHz: 120, browserHzAfter: 109 }).valid, true, '9.2% is inside the 10% rule');
+  assert.match(j({ browserHzAfter: null }).invalidReason, /could not be read/, 'a missing reading is not a pass');
+  assert.match(j({ browserHz: NaN }).invalidReason, /could not be read/);
 });
 
 test('a run that stops early did not reach every stop', () => {
@@ -220,7 +228,7 @@ test('a hold reaching the cap: the page ends it, the run is void', () => {
   const F = simulate(cfg, { sab: { stuckAt: 1 } });
   const segs = runSegments(); const s1 = segs.findIndex((s) => s.kind === 'hold' && s.stop === 1);
   const rows = F.seg.filter((v) => v === s1).length;
-  assert.equal(rows, 1501, '15,000 ms of 10 ms frames: row 1500 is the first at the cap');
+  assert.equal(rows, 1500, '15,000 ms of 10 ms frames: row 1499 ends at the cap, and the hold ends there');
 });
 
 test('memory is computed from the drawing buffer: 1920x1080 -> 39.6 MiB, 3840x2160 -> 158.2 MiB', () => {
@@ -244,10 +252,33 @@ test('the series: 3 valid runs; mean of the medians; the worst run by its slowes
   assert.equal(key, 'settle|1|1|v|veryhigh|dark|landscape|2');
 });
 
-test('the margin: the frames after the settling frame, not including it (41..141 at 10 ms)', () => {
+test('the margin: the frames after the settling frame, not including it, and not one more (41..140 at 10 ms)', () => {
   const cfg = VH();
   const s1 = judge(simulate(cfg), cfg).A.stops.find((s) => s.stop === 1);
-  assert.equal(s1.settledFrames, 101);
+  assert.equal(s1.settledFrames, 100);
+});
+
+test('a stop whose settling frame ENDS after the cap is not settled, although the frame started inside it', () => {
+  /* stop 4: frame 40 (the 24th sample) lasts 15,000 ms - it starts at 400 and ends at 15,400, past the 15,000 cap */
+  const segs = runSegments(); const s4 = segs.findIndex((s) => s.kind === 'hold' && s.stop === 4);
+  const cfg = VH();
+  const { A, J } = judge(simulate(cfg, { dur: (g, si, r) => (si === s4 && r === 40 ? HOLD_CAP_MS : 10) }), cfg);
+  assert.equal(A.stops.find((s) => s.stop === 4).settled, false);
+  assert.match(J.invalidReason, /stop 4 did not settle within 15 s \(finished only after the 15 s cap\)/);
+});
+
+test('the rendered camera must be at the commanded view, not merely still', () => {
+  const cfg = VH();
+  const { A, J } = judge(simulate(cfg, { sab: { offPose: 3 } }), cfg);
+  assert.equal(A.checks.still.every((c) => c.ok), true, 'a consistently wrong pose is still still');
+  assert.match(J.invalidReason, /camera was not at stop 3's view \(0.5 mm from it\)/);
+});
+
+test('a missing statistic voids the run instead of shrinking the median', () => {
+  const cfg = VH();
+  const { A, J } = judge(simulate(cfg, { sab: { noMean: 5 } }), cfg);
+  assert.deepEqual(A.incomplete, [{ stop: 5, statistic: 'firstMeanMs' }]);
+  assert.match(J.invalidReason, /stop 5 has no firstMeanMs/);
 });
 
 test('a restart mid-hold: completion and the first mean come from the LAST accumulation', () => {
