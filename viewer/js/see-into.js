@@ -58,6 +58,15 @@ export function parseSeeInto(search) {
   return v && Object.prototype.hasOwnProperty.call(SEE_INTO_PRESETS, v) ? v : null;
 }
 
+/** How the experiment may skip its extra renders. `?siskip=state` turns on the assembly-state rule (Astra's option 1
+ *  as first built). It is OFF by default because the rule is NOT a proof of invisibility: measured 2026-09-17 (p62), a
+ *  shut drawer's cover still occupies 6-60 px in 19 of 138 ordinary outside views of the representative build, ~900 px
+ *  in a close view, and the whole frame from a camera inside the drawer - it shows through the very gap it fills. With
+ *  the switch on those pixels render as plain frost (the see-through is 0, never a stale interior). */
+export function parseSeeIntoSkip(search) {
+  return new URLSearchParams(search || '').get('siskip') === 'state' ? 'state' : null;
+}
+
 /** Component ids, 1..N, one per translucent PART (not per mesh: a part's own faces must share an id, or its internal
  *  surfaces would read as another part behind it). 0 means "no translucent surface". The 8-bit id holds 254. */
 export function componentIds(entries) {
@@ -181,7 +190,7 @@ export function createSeeInto(o) {
     uSIBehind: { value: null },
     uSIRes: { value: new T.Vector2(1, 1) },
   };
-  const stats = { passRuns: 0, passRunsStill: 0, skippedHidden: 0, lastMs: 0, active: false, parts: 0, lastReason: '' };
+  const stats = { passRuns: 0, passRunsStill: 0, skippedHidden: 0, lastMs: 0, lastMsA: 0, lastMsMask: 0, lastMsB: 0, active: false, parts: 0, lastReason: '' };
   const placeholder = (() => { const t = new T.DataTexture(new Uint8Array([0, 0, 0, 255]), 1, 1); t.needsUpdate = true; return t; })();
   uniforms.uSIBehind.value = placeholder;
 
@@ -292,10 +301,14 @@ export function createSeeInto(o) {
       for (const e of entries) e.mesh.layers.enable(LAYER_A);
       C.layers.set(LAYER_A); S.background = null; S.overrideMaterial = null;
       entries.forEach((e, k) => { e.mesh.material = idMat(cids[k]); });
+      const tA = performance.now();
       R.setRenderTarget(rtA); R.autoClear = true; R.setClearColor(0x000000, 1); R.clear(); R.render(S, C);
+      stats.lastMsA = performance.now() - tA;
       // AO mask: the same parts, white
       S.overrideMaterial = maskMat;
+      const tM = performance.now();
       R.setRenderTarget(rtMask); R.clear(); R.render(S, C);
+      stats.lastMsMask = performance.now() - tM;
       S.overrideMaterial = null;
       C.layers.mask = prev.mask;
       // pass B: the whole scene behind the near translucent surface, background kept
@@ -306,7 +319,9 @@ export function createSeeInto(o) {
       entries.forEach((e, k) => { e.mesh.material = peelMat(cids[k]); });
       // ⚠ nothing drawn into pass B may sample it (WebGL drops the draw): every patched part samples a placeholder meanwhile
       uniforms.uSIBehind.value = placeholder;
+      const tB = performance.now();
       R.setRenderTarget(rtB); R.setClearColor(prev.cc, prev.ca); R.clear(); R.render(S, C);
+      stats.lastMsB = performance.now() - tB;
     } finally {
       entries.forEach((e, k) => { e.mesh.material = saved[k]; e.mesh.layers.disable(LAYER_A); });
       C.layers.mask = prev.mask; S.overrideMaterial = prev.ov; S.background = prev.bg;

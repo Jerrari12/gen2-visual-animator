@@ -164,7 +164,7 @@ function fnAt(src, needle) {
   }
   assert.fail(`unterminated function for "${needle}"`);
 }
-const coversVisibleWith = new Function('THREE', 'manifest', 'PAGES', 'cur', 'instances', 'tweens', 'fpFocus', 'dFocus',
+const coversVisibleWith = new Function('THREE', 'manifest', 'PAGES', 'cur', 'instances', 'tweens', 'fpFocus', 'dFocus', 'assembledBox', 'camera',
   `${fnAt(mainSrc, 'function basePos(')}\n${fnAt(mainSrc, 'function seeIntoCoversVisible(')}\nreturn seeIntoCoversVisible();`);
 
 function scene(over = {}) {
@@ -174,12 +174,14 @@ function scene(over = {}) {
   const s = {
     manifest: { steps: [{}, {}], stages: {}, incomplete: null }, PAGES: [{ cover: true }, {}, {}, { outro: true }],
     cur: 2, instances: new Map(list.map((x) => [x.cfg.id, x])), tweens: new Set(), fpFocus: { id: null }, dFocus: { carrier: null },
+    assembledBox: new THREE.Box3(new THREE.Vector3(-50, 0, -50), new THREE.Vector3(50, 60, 50)),
+    camera: { position: new THREE.Vector3(0, 40, 400) },      // outside the build, looking in
   };
   Object.assign(s, over);
   s.cover = s.instances.get('bc0'); s.drawer = s.instances.get('d0');
   return s;
 }
-const ask = (s) => coversVisibleWith(THREE, s.manifest, s.PAGES, s.cur, s.instances, s.tweens, s.fpFocus, s.dFocus);
+const ask = (s) => coversVisibleWith(THREE, s.manifest, s.PAGES, s.cur, s.instances, s.tweens, s.fpFocus, s.dFocus, s.assembledBox, s.camera);
 
 test('hidden covers: the finished build with every drawer shut needs no behind-cover render', () => {
   assert.equal(ask(scene()), false);
@@ -208,6 +210,8 @@ test('hidden covers: anything that could expose one answers "render"', () => {
   assert.equal(ask(s), true, 'a staged cover sits on a bench');
   s = scene(); s.cover.cfg.rides = 'gone';
   assert.equal(ask(s), true, 'a cover whose carrier cannot be found is not ruled out');
+  s = scene(); s.camera.position.set(0, 30, 0);
+  assert.equal(ask(s), true, 'a camera inside the build sees covers directly (p62 measured the whole frame)');
 });
 
 test('hidden covers: an invisible cover is not a reason to render, even with its drawer open', () => {

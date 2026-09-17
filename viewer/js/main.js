@@ -16,7 +16,7 @@ import { PLATE_FINISHES, PLATE_LABELS, HOLO_OPACITY, plateFinishOf, createBedFin
 import { createDimCoverTest } from './dim-cover.js';
 import { benchBuild, createOrbitBench } from './orbit-bench.js';
 import { createSettleBench } from './settle-bench.js';
-import { parseSeeInto, createSeeInto } from './see-into.js';
+import { parseSeeInto, parseSeeIntoSkip, createSeeInto } from './see-into.js';
 
 /* Every entry-routing boolean below is derived by resolveEntry() in entry.js -
    a pure function of (search, hash) with no DOM or network - so the boot
@@ -1659,6 +1659,11 @@ function seeIntoCoversVisible() {
   const page = PAGES[cur];
   if (!page || page.cover || page.outro) return true;
   if (cur !== manifest.steps.length) return true;                 // mid-assembly: parts sit on benches, cases are missing
+  /* ⚠ ONE CAMERA CLAUSE, AND IT IS SOUND FOR THE MIRROR TOO: inside the build nothing is enclosed - a camera within a
+     case sees the cover directly (p62 measured the whole frame). The floor reflection's camera is the main one mirrored
+     through the floor, and the build stands ON the floor, so whenever the real camera is outside this box the mirrored
+     one is further outside it. `assembledBox` is the build's own envelope, kept by computeBounds. */
+  if (assembledBox && !assembledBox.isEmpty() && assembledBox.containsPoint(camera.position)) return true;
   const atRest = (inst) => !inst.staged && inst.group.position.distanceToSquared(basePos(inst, false)) < 1e-6
     && (!inst.group.children[0] || inst.group.children[0].position.lengthSq() < 1e-6);
   for (const inst of instances.values()) {
@@ -1685,7 +1690,10 @@ if (!ENTRY.isPart && parseSeeInto(location.search)) seeInto = createSeeInto({
   // Very High only: the tier that spends its budget once the camera stops (Astra's control 2)
   wanted: () => !!QUALITY[quality].accum && !cinema.on && !renderer.getContext().isContextLost(),
   sceneKey: () => instances.size + '|' + cur + '|' + ao.rev + '|' + accRev + '|' + quality + '|' + stageTheme,
-  coversVisible: seeIntoCoversVisible,
+  /* ⚠ OFF unless `?siskip=state` asks for it: the rule below is a state rule, and p62 measured that it is NOT a proof
+     of invisibility (a shut drawer's cover still shows through the gap it fills). With the switch on it bounds what a
+     correct visibility test could save; without it the experiment renders exactly as it was measured. */
+  coversVisible: parseSeeIntoSkip(location.search) ? seeIntoCoversVisible : null,
   // the passes swap cover materials and layers; the shadow-caster watch must not read those as moved casters (see-into.js)
   pauseShadowWatch: (on) => { if (on) { shadowWatch.pausedMoving = shadowWatch.moving; shadowWatch.moving = false; } else shadowWatch.moving = shadowWatch.pausedMoving; },
 });
