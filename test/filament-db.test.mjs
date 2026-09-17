@@ -25,6 +25,7 @@ import { FILAMENT_DB } from '../viewer/js/filament-db.js';
 const LABEL_PREFIX = {
   'Panchroma™ PLA': 'Panchroma ',
   'Panchroma™ Silk PLA': 'Panchroma ',
+  'Panchroma™ Translucent PLA': 'Panchroma ',
   PETG: 'Polymaker ',
   'PLA / PETG': null,                 // Elegoo, explicit per row
   PLA: 'Printed Solid ',
@@ -33,7 +34,7 @@ const LABEL_PREFIX = {
 
 test('the catalog is the shape main.js and the Lab both read', () => {
   assert.ok(Array.isArray(FILAMENT_DB), 'FILAMENT_DB is an array');
-  assert.equal(FILAMENT_DB.length, 6, 'six brand entries');
+  assert.equal(FILAMENT_DB.length, 7, 'seven brand entries');
 
   for (const b of FILAMENT_DB) {
     const where = `${b.brand} / ${b.line}`;
@@ -64,7 +65,7 @@ test('every colour carries the four fields a consumer may rely on', () => {
       if ('pickNote' in c) assert.ok(c.pick === true, `${where}: pickNote without pick`);
     }
   }
-  assert.equal(n, 102, 'one hundred and two colours');
+  assert.equal(n, 111, 'one hundred and eleven colours');
 });
 
 test('⚔ every label is unique across every brand', () => {
@@ -77,7 +78,7 @@ test('⚔ every label is unique across every brand', () => {
     }
   }
   assert.deepEqual(clashes, [], 'labels collide, and customColors keys on them');
-  assert.equal(seen.size, 102, 'every colour contributed a distinct label');
+  assert.equal(seen.size, 111, 'every colour contributed a distinct label');
 });
 
 test('⚔ each brand builds its labels the way its block says it does', () => {

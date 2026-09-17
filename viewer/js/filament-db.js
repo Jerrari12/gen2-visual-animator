@@ -68,6 +68,11 @@
 const POLY_LINK = q => `https://shop.polymaker.com/JERRARI?q=${q}`;
 const PM = id => POLY_LINK('pla');           // id retained in the colour rows, unused for now
 const PM_SILK = POLY_LINK('silk-pla');
+/* ⚠ THIS FEED HANDLE IS NOT YET MINTED. Only values minted in the Superfiliate portal route; an unknown
+   one fails SOFT - the Ambassador attribution and the 15% first-purchase code still attach and the shopper
+   lands on the store root instead of the Translucent PLA page. Joey mints `translucent-pla` in the portal;
+   until he confirms it, every link in this section is that soft landing, not a broken URL. */
+const PM_TRANS = POLY_LINK('translucent-pla');
 const POLYMAKER_URL = PM(44863271895097);
 const FILAMENT_DB = [
   { brand: 'Polymaker', line: 'Panchroma™ PLA', url: POLYMAKER_URL, colors: [
@@ -171,6 +176,29 @@ const FILAMENT_DB = [
     { name: 'PETG Galaxy Blue',      hex: '#2b4a8c', id: 45588259176505 },
     { name: 'PETG Galaxy Red',       hex: '#8c2430', id: 45588259504185 },
   ].map(f => ({ ...f, label: `Polymaker ${f.name}`, url: POLY_LINK('petg') })) },
+  /* Polymaker Panchroma™ Translucent PLA — the EXTRA-TRANSPARENT family only (Joey 2026-09-17).
+     ⚠ HEXES HERE ARE THE SHOP'S OWN PUBLISHED SWATCH VALUES, not approximations like every section
+     above: the product page carries each colour as `--custom-swatch-hex` on its swatch and shows it
+     on hover (read from the live page 2026-09-17). Variant ids from the same page's product JSON.
+     ⚠ THE SEMI-TRANSPARENT FOUR ARE DELIBERATELY ABSENT — Translucent Cyan #08ABFB (43595097800761),
+     Magenta #D93B90 (43595097833529), Yellow #F9ED3D (43595097866297) and Grey #9199A4 (43595097899065),
+     plus Natural in that family (46478202765369). Joey owns only the extra-transparent spools and the
+     semi-transparent transmission distance is unmeasured, so nothing here would be able to say how they
+     print translucent. Add them when a TD measurement exists, not before.
+     ★ Translucent Natural is the filament the see-into frosted back cover was profiled from (the lab's
+     round 39), which is why it carries the note rather than a recommendation. */
+  { brand: 'Polymaker', line: 'Panchroma™ Translucent PLA', url: PM_TRANS, colors: [
+    { name: 'Translucent Natural',      hex: '#E1E7E5', id: 46315863212089, pick: true,
+      pickNote: ' · the translucent filament the frosted back cover was profiled from' },
+    { name: 'Translucent Red',          hex: '#990002', id: 46315863244857 },
+    { name: 'Translucent Green',        hex: '#008729', id: 46315863277625 },
+    { name: 'Translucent Light Green',  hex: '#7FEBE2', id: 46315863310393 },
+    { name: 'Translucent Light Blue',   hex: '#46BAE0', id: 46315863343161 },
+    { name: 'Translucent Light Purple', hex: '#A7A8D9', id: 46315863375929 },
+    { name: 'Translucent Light Pink',   hex: '#EEBCC8', id: 46315863408697 },
+    { name: 'Translucent Brown',        hex: '#C08559', id: 46315863441465 },
+    { name: 'Translucent Jade',         hex: '#AAF2D6', id: 46315863474233 },
+  ].map(f => ({ ...f, label: `Panchroma ${f.name}`, url: PM_TRANS })) },
   { brand: 'Elegoo', line: 'PLA / PETG', url: 'https://amzn.to/3QWCdV6', colors: [
     { name: 'PETG Black', label: 'Elegoo PETG Black', hex: '#232427', url: 'https://amzn.to/3QWCdV6', pick: true },
     // PLA Black is the Classic faceplate BODY default (Joey 2026-07-25)
