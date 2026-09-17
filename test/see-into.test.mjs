@@ -243,3 +243,11 @@ test('prepare: while no cover is visible nothing renders and the see-through is 
   assert.equal(runs(), 2, 'a fresh interior after every hidden stretch');
   assert.equal(si.stats.skippedHidden, 4);
 });
+
+test('the skip switch: off by default, askable, and always disable-able for diagnosis', () => {
+  assert.equal(SI.parseSeeIntoSkip(''), SI.SEE_INTO_SKIP_DEFAULT);
+  assert.equal(SI.parseSeeIntoSkip('?siskip=state'), 'state');
+  assert.equal(SI.parseSeeIntoSkip('?siskip=off'), null, 'off wins whatever the default becomes');
+  assert.equal(SI.parseSeeIntoSkip('?siskip=1'), SI.SEE_INTO_SKIP_DEFAULT, 'an unknown value is not a switch');
+  assert.ok(SI.SEE_INTO_SKIP_DEFAULT === null || SI.SEE_INTO_SKIP_DEFAULT === 'state');
+});

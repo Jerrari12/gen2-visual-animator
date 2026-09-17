@@ -63,8 +63,12 @@ export function parseSeeInto(search) {
  *  shut drawer's cover still occupies 6-60 px in 19 of 138 ordinary outside views of the representative build, ~900 px
  *  in a close view, and the whole frame from a camera inside the drawer - it shows through the very gap it fills. With
  *  the switch on those pixels render as plain frost (the see-through is 0, never a stale interior). */
+export const SEE_INTO_SKIP_DEFAULT = null;   // ⚠ INTEGRATION IS THIS ONE VALUE: 'state' turns the skip on by default
 export function parseSeeIntoSkip(search) {
-  return new URLSearchParams(search || '').get('siskip') === 'state' ? 'state' : null;
+  const v = new URLSearchParams(search || '').get('siskip');
+  if (v === 'off') return null;              // the diagnosis switch: always available, whatever the default becomes
+  if (v === 'state') return 'state';
+  return SEE_INTO_SKIP_DEFAULT;
 }
 
 /** Component ids, 1..N, one per translucent PART (not per mesh: a part's own faces must share an id, or its internal
