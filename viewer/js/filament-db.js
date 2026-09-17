@@ -197,7 +197,10 @@ const FILAMENT_DB = [
     { name: 'Translucent Light Pink',   hex: '#EEBCC8', id: 46315863408697 },
     { name: 'Translucent Brown',        hex: '#C08559', id: 46315863441465 },
     { name: 'Translucent Jade',         hex: '#AAF2D6', id: 46315863474233 },
-  ].map(f => ({ ...f, label: `Panchroma ${f.name}`, url: PM_TRANS })) },
+  /* ⚠ `translucent` IS THE PRODUCT FAMILY THE SHOP PUBLISHES, not a measurement: 'extra' = Extra-Transparent.
+     The viewer reads it to decide which filaments a SUPPORTED component previews as translucent (main.js
+     SEE_INTO_COMPONENTS). A transmission distance is a Lab measurement and does not live here. */
+  ].map(f => ({ ...f, translucent: 'extra', label: `Panchroma ${f.name}`, url: PM_TRANS })) },
   { brand: 'Elegoo', line: 'PLA / PETG', url: 'https://amzn.to/3QWCdV6', colors: [
     { name: 'PETG Black', label: 'Elegoo PETG Black', hex: '#232427', url: 'https://amzn.to/3QWCdV6', pick: true },
     // PLA Black is the Classic faceplate BODY default (Joey 2026-07-25)

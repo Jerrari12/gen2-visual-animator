@@ -1653,6 +1653,15 @@ const ACC_WARMUP = 6;
    preview's translucent covers, any page but the finished build, and any cover or drawer not exactly at its resting
    pose. ⚠ It reads no camera and no bounds ON PURPOSE - keep it that way, or the reflection needs its own answer. */
 function seeIntoCoversVisible() {
+  /* ⚠ A SUPPORTED COMPONENT IS NOT ENCLOSED BY ANYTHING. The rule below reasons about back covers shut inside
+     drawers; a faceplate grip faces the room on the front of the build, so whenever one is wearing translucent
+     filament and its plate is on screen's page at all, the passes run. Astra 2026-09-17: "The closed-drawer skip
+     won't hide these surfaces, so report their actual cost rather than relying on the cover benchmark." */
+  if (seeIntoDriven.size) {
+    for (const inst of instances.values()) {
+      if (inst.group && inst.group.visible && typeByNode[inst.cfg.node] === 'Faceplate') return true;
+    }
+  }
   if (tweens.size) return true;                                   // anything moving: the enclosure may be opening
   if (fpFocus.id || dFocus.carrier) return true;                  // isolation fades the room / pulls a drawer open
   if (manifest.incomplete) return true;                           // planned covers render translucent
@@ -1680,10 +1689,22 @@ if (!ENTRY.isPart && parseSeeInto(location.search)) seeInto = createSeeInto({
   parts: () => {
     const out = [];
     for (const inst of instances.values()) {
-      if (!/^BackCover/.test(inst.cfg.node) || !inst.group) continue;
-      const meshes = [];
-      inst.group.traverse((o) => { if (o.isMesh) meshes.push(o); });
-      out.push({ partId: inst.cfg.id, meshes });
+      if (!inst.group) continue;
+      if (/^BackCover/.test(inst.cfg.node)) {                    // the reference piece: the whole part is translucent
+        const meshes = [];
+        inst.group.traverse((o) => { if (o.isMesh) meshes.push(o); });
+        out.push({ partId: inst.cfg.id, meshes });
+        continue;
+      }
+      /* A supported component is a ZONE of a bigger part, so only its own primitives go in - the plate body and face
+         beside it stay opaque and must keep occluding, which is exactly what leaving them out of pass A does. */
+      if (seeIntoDriven.size && typeByNode[inst.cfg.node] === 'Faceplate') {
+        const meshes = [];
+        inst.group.traverse((o) => {
+          if (o.isMesh && seeIntoDriven.has(zoneKey('Faceplate', o.userData.zone || ''))) meshes.push(o);
+        });
+        if (meshes.length) out.push({ partId: inst.cfg.id + ':zone', meshes });
+      }
     }
     return out;
   },
@@ -2956,8 +2977,46 @@ function ensureMaterials() { // one shared material per type/zone key (idempoten
     if (!materials[key]) materials[key] = seeIntoPatched(key, newPartMaterial(key));
 }
 /* the see-into experiment's patch on the back cover material, or the material unchanged (see-into.js) */
+/* ---------------------------------------------------------------- supported translucent previews (Astra 2026-09-17)
+   WHICH COMPONENTS RENDER A TRANSLUCENT FILAMENT AS TRANSLUCENT. This is a RENDERING scope and never a claim about
+   what can be printed: any part can be printed in translucent filament, and a part outside this set simply keeps its
+   ordinary shading until its component is supported. Astra's order: the faceplate GRIP first, accents next if the
+   grip holds up; cases, drawer bodies and structural parts are out of scope. The back cover stays the reference
+   piece and is patched by the switch alone, not by a filament pick.
+   ⚠ A zone with no pick of its own INHERITS the plate body's (activeLabel), so assigning translucent filament to the
+   plate body turns its grip translucent too - which is what a plate printed in that filament would look like. */
+const SEE_INTO_COMPONENTS = new Set(['Faceplate:GRIP']);
+const TRANSLUCENT_BY_LABEL = new Map(FILAMENT_DB.flatMap(
+  b => b.colors.filter(c => c.translucent).map(c => [c.label, c.translucent])));
+function translucentFamilyFor(key) {
+  const label = activeLabel(key);      // null in instruction-colour mode and in the part embed, so neither previews
+  return label ? (TRANSLUCENT_BY_LABEL.get(label) || null) : null;
+}
+let seeIntoDriven = new Set();         // the supported keys wearing a translucent filament RIGHT NOW
+const seeIntoDrivenKey = key => !!seeInto && SEE_INTO_COMPONENTS.has(key) && !!translucentFamilyFor(key);
+/* Translucency is STRUCTURAL - it patches the shader and changes the program cache key - so it cannot be moved by
+   applyPalette's in-place repaint the way colour and roughness are. When a pick crosses the line in either
+   direction the affected faceplate materials are rebuilt and re-assigned, which is `dropFaceplateMaterials`'s own
+   job. ⚠ Re-assigning stomps a faceplate isolation fade if one is up; it heals on deselect. */
+function syncSeeIntoComponents() {
+  if (!seeInto) return false;
+  const want = new Set([...SEE_INTO_COMPONENTS].filter(k => translucentFamilyFor(k)));
+  if (want.size === seeIntoDriven.size && [...want].every(k => seeIntoDriven.has(k))) return false;
+  seeIntoDriven = want;
+  dropFaceplateMaterials();
+  ensureMaterials();
+  for (const inst of instances.values()) {
+    if (!inst.group || typeByNode[inst.cfg.node] !== 'Faceplate') continue;
+    inst.group.traverse(o => { if (o.isMesh) o.material = materialFor(inst, inst.cfg.id === selectedId, o.userData.zone); });
+  }
+  seeInto.invalidate();                // the interior was rendered for a scene that shaded differently
+  invalidateFrame();
+  return true;
+}
 function seeIntoPatched(key, m) {
-  if (seeInto && key === 'BackCover') seeInto.patch(m, buildAxisForKey(key));
+  if (!seeInto) return m;
+  if (key === 'BackCover') seeInto.patch(m, buildAxisForKey(key));                    // the reference piece: preset look
+  else if (seeIntoDrivenKey(key)) seeInto.patch(m, buildAxisForKey(key), { own: true }); // filament-driven: its own colour
   return m;
 }
 function baseMatFor(type, zone = '') { // shared material per (type, zone) — zones build lazily off the active palette
@@ -5925,6 +5984,7 @@ function applyPalette() {
      recompiling. Anything structural — the clearcoat the holographic plate transfers, the material
      CLASS — still comes from a rebuild, exactly as it did before, because nothing here can change
      it without one. */
+  syncSeeIntoComponents();   // a translucent filament arriving on (or leaving) a supported component rebuilds it first
   const repaint = (type, mat) => {
     mat.color.set(activeHex(type));
     const spec = finishFor(type);

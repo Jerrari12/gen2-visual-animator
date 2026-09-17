@@ -98,7 +98,9 @@ export const WRAP_TO = 'reflectedLight.directDiffuse += mix( dotNL, saturate( ( 
 export const FRAG_HEAD = [
   'varying vec3 vSIObjNrm;',
   'uniform float uSIActive, uSIRough, uSISee, uSIBlurPx, uSIWallOpaque, uSIGraze, uSIWrap;',
-  'uniform vec3 uSIColor, uSITint, uSIAxis;',
+  'uniform float uSIOwn;',                       // per-material: 1 = keep this part's own colour and roughness
+  'uniform vec3 uSIAxisM;',                      // per-material: the direction this part printed in
+  'uniform vec3 uSIColor, uSITint;',
   'uniform sampler2D uSIBehind;',
   'uniform vec2 uSIRes;',
   'float gSIGate = 0.0;',
@@ -106,11 +108,19 @@ export const FRAG_HEAD = [
 
 /* right after roughnessmap_fragment: before the layer relief (normal_fragment_maps) and the plate finish (emissivemap)
    modulate normal and roughness, so both still ride on top of the translucent part's own colour and roughness */
+/* ⚠ uSIAxisM AND uSIOwn ARE PER-MATERIAL, not shared (2026-09-17, the faceplate-grip scope). The axis is the
+   direction that part PRINTED in, and a grip does not print the way a back cover does, so one shared axis would
+   put the face gate on the wrong faces. uSIOwn is 1 for a part whose translucency comes from the FILAMENT the
+   user assigned: it then keeps its own colour and roughness (Astra: "Don't force the frosted colour onto parts
+   assigned opaque filament" - and equally, a translucent pick should look like the filament picked, not like the
+   cover's preset). The reference back cover keeps uSIOwn 0 and wears the preset. */
 export const FRAG_SURFACE = [
   'if ( uSIActive > 0.5 ) {',
-  '  gSIGate = smoothstep( 0.72, 0.93, abs( dot( normalize( vSIObjNrm ), normalize( uSIAxis ) ) ) );',
-  '  diffuseColor.rgb = uSIColor;',
-  '  roughnessFactor = uSIRough;',
+  '  gSIGate = smoothstep( 0.72, 0.93, abs( dot( normalize( vSIObjNrm ), normalize( uSIAxisM ) ) ) );',
+  '  if ( uSIOwn < 0.5 ) {',
+  '    diffuseColor.rgb = uSIColor;',
+  '    roughnessFactor = uSIRough;',
+  '  }',
   '}',
 ].join('\n');
 
@@ -147,12 +157,12 @@ const replaceOnce = (src, anchor, to, what) => {
  * - a highlight, a fade - reads the same values). `lightsParsChunk` is three's ShaderChunk.lights_physical_pars_fragment,
  * passed in so this stays importable without three.
  */
-export function patchSeeIntoMaterial(material, uniforms, lightsParsChunk) {
+export function patchSeeIntoMaterial(material, uniforms, lightsParsChunk, own = null) {
   if (!lightsParsChunk || !lightsParsChunk.includes(WRAP_FROM)) throw new Error('see-into: the wrap anchor is missing from lights_physical_pars_fragment');
   const prior = material.onBeforeCompile;
   material.onBeforeCompile = (shader, renderer) => {
     if (prior) prior.call(material, shader, renderer);
-    Object.assign(shader.uniforms, uniforms);
+    Object.assign(shader.uniforms, uniforms, own || {});
     shader.vertexShader = replaceOnce(shader.vertexShader, '#include <common>', '#include <common>\nvarying vec3 vSIObjNrm;', 'vertex common');
     shader.vertexShader = replaceOnce(shader.vertexShader, '#include <begin_vertex>', '#include <begin_vertex>\nvSIObjNrm = objectNormal;', 'begin_vertex');
     shader.fragmentShader = replaceOnce(shader.fragmentShader, '#include <common>', '#include <common>\n' + FRAG_HEAD, 'fragment common');
@@ -164,7 +174,7 @@ export function patchSeeIntoMaterial(material, uniforms, lightsParsChunk) {
   };
   const priorKey = material.customProgramCacheKey;
   // ⚠ A NEW CACHE KEY OR THE PATCH NEVER COMPILES: three would reuse the unpatched program (the lab's round-3 trap)
-  material.customProgramCacheKey = () => `${priorKey ? priorKey.call(material) : ''}|seeinto`;
+  material.customProgramCacheKey = () => `${priorKey ? priorKey.call(material) : ''}|seeinto`;   // the per-material uniforms do not change the PROGRAM, only its values
   material.needsUpdate = true;
   return material;
 }
@@ -198,7 +208,6 @@ export function createSeeInto(o) {
     uSIWallOpaque: { value: P.wallOpaque },
     uSIGraze: { value: P.graze },
     uSIWrap: { value: P.wrap },
-    uSIAxis: { value: new T.Vector3(0, 0, 1) },
     uSIBehind: { value: null },
     uSIRes: { value: new T.Vector2(1, 1) },
   };
@@ -432,8 +441,17 @@ export function createSeeInto(o) {
   }
 
   return { uniforms, prepare, patchAO, withoutSeeThrough, stats, preset: P, presetKey: o.presetKey, invalidate() { hasRef = false; },
-    patch(material, axis) {
-      if (axis) uniforms.uSIAxis.value.set(axis[0], axis[1], axis[2]).normalize();
-      return patchSeeIntoMaterial(material, uniforms, T.ShaderChunk.lights_physical_pars_fragment);
+    /**
+     * Patch one part material. `axis` is THAT part's build axis - the direction it printed in - and `own` is true when the
+     * translucency came from the FILAMENT the user assigned: the part then keeps its own colour and roughness and only the
+     * interior is mixed in. Both are PER-MATERIAL uniforms, so a patched grip cannot move a patched cover.
+     */
+    patch(material, axis, { own = false } = {}) {
+      const perMaterial = {
+        uSIAxisM: { value: new T.Vector3(...(axis && axis.length === 3 ? axis : [0, 0, 1])).normalize() },
+        uSIOwn: { value: own ? 1 : 0 },
+      };
+      material.userData.seeInto = { own: !!own, axis: perMaterial.uSIAxisM.value.toArray() };
+      return patchSeeIntoMaterial(material, uniforms, T.ShaderChunk.lights_physical_pars_fragment, perMaterial);
     } };
 }

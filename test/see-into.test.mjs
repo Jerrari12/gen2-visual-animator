@@ -164,7 +164,7 @@ function fnAt(src, needle) {
   }
   assert.fail(`unterminated function for "${needle}"`);
 }
-const coversVisibleWith = new Function('THREE', 'manifest', 'PAGES', 'cur', 'instances', 'tweens', 'fpFocus', 'dFocus', 'assembledBox', 'camera',
+const coversVisibleWith = new Function('THREE', 'manifest', 'PAGES', 'cur', 'instances', 'tweens', 'fpFocus', 'dFocus', 'assembledBox', 'camera', 'seeIntoDriven', 'typeByNode',
   `${fnAt(mainSrc, 'function basePos(')}\n${fnAt(mainSrc, 'function seeIntoCoversVisible(')}\nreturn seeIntoCoversVisible();`);
 
 function scene(over = {}) {
@@ -176,12 +176,14 @@ function scene(over = {}) {
     cur: 2, instances: new Map(list.map((x) => [x.cfg.id, x])), tweens: new Set(), fpFocus: { id: null }, dFocus: { carrier: null },
     assembledBox: new THREE.Box3(new THREE.Vector3(-50, 0, -50), new THREE.Vector3(50, 60, 50)),
     camera: { position: new THREE.Vector3(0, 40, 400) },      // outside the build, looking in
+    seeIntoDriven: new Set(),                                 // no supported component wears translucent filament
+    typeByNode: { 'DecorDrawer_185-1W-1H': 'Drawer', 'BackCover_EdgeLabel_1W-1H': 'BackCover', 'Faceplate_EdgeLabel_1W-1H': 'Faceplate' },
   };
   Object.assign(s, over);
   s.cover = s.instances.get('bc0'); s.drawer = s.instances.get('d0');
   return s;
 }
-const ask = (s) => coversVisibleWith(THREE, s.manifest, s.PAGES, s.cur, s.instances, s.tweens, s.fpFocus, s.dFocus, s.assembledBox, s.camera);
+const ask = (s) => coversVisibleWith(THREE, s.manifest, s.PAGES, s.cur, s.instances, s.tweens, s.fpFocus, s.dFocus, s.assembledBox, s.camera, s.seeIntoDriven, s.typeByNode);
 
 test('hidden covers: the finished build with every drawer shut needs no behind-cover render', () => {
   assert.equal(ask(scene()), false);
@@ -250,4 +252,36 @@ test('the skip switch: off by default, askable, and always disable-able for diag
   assert.equal(SI.parseSeeIntoSkip('?siskip=off'), null, 'off wins whatever the default becomes');
   assert.equal(SI.parseSeeIntoSkip('?siskip=1'), SI.SEE_INTO_SKIP_DEFAULT, 'an unknown value is not a switch');
   assert.ok(SI.SEE_INTO_SKIP_DEFAULT === null || SI.SEE_INTO_SKIP_DEFAULT === 'state');
+});
+
+test('hidden covers: a grip wearing translucent filament is never treated as hidden', () => {
+  /* Astra 2026-09-17: the closed-drawer skip cannot claim a faceplate grip - it faces the room. */
+  const s = scene();
+  const fp = { cfg: { id: 'fp0', node: 'Faceplate_EdgeLabel_1W-1H', pos: [0, 30, 95] }, staged: false,
+    group: { visible: true, position: new THREE.Vector3(0, 30, 95), children: [{ position: new THREE.Vector3() }] } };
+  s.instances.set('fp0', fp);
+  assert.equal(ask(s), false, 'with no translucent pick the plate is just another part');
+  s.seeIntoDriven = new Set(['Faceplate:GRIP']);
+  assert.equal(ask(s), true, 'a translucent grip on screen means the passes run');
+  fp.group.visible = false;
+  assert.equal(ask(s), false, 'a hidden plate cannot show its grip');
+});
+
+test('filament-driven patch: a supported component keeps its own colour, the reference cover wears the preset', () => {
+  /* Astra 2026-09-17: "Don't force the frosted colour onto parts assigned opaque filament" - and a translucent pick
+     should look like the filament picked, not like the cover's preset. The flag and the print axis are PER MATERIAL. */
+  const { si } = fakeSeeInto();
+  const own = si.patch(new THREE.MeshPhysicalMaterial(), [0, 1, 0], { own: true });
+  const ref = si.patch(new THREE.MeshPhysicalMaterial(), [0, 0, 1]);
+  assert.deepEqual(own.userData.seeInto, { own: true, axis: [0, 1, 0] });
+  assert.deepEqual(ref.userData.seeInto, { own: false, axis: [0, 0, 1] });
+  const compile = (m) => { const sh = { vertexShader: THREE.ShaderLib.physical.vertexShader, fragmentShader: THREE.ShaderLib.physical.fragmentShader, uniforms: {} }; m.onBeforeCompile(sh, {}); return sh; };
+  const a = compile(own), b = compile(ref);
+  assert.equal(a.uniforms.uSIOwn.value, 1);
+  assert.equal(b.uniforms.uSIOwn.value, 0);
+  assert.deepEqual(a.uniforms.uSIAxisM.value.toArray(), [0, 1, 0], 'the grip carries its own print axis');
+  assert.deepEqual(b.uniforms.uSIAxisM.value.toArray(), [0, 0, 1]);
+  assert.ok(a.uniforms.uSISee === b.uniforms.uSISee, 'the pass parameters stay shared');
+  assert.match(a.fragmentShader, /if \( uSIOwn < 0\.5 \) \{[\s\S]*diffuseColor\.rgb = uSIColor;/,
+    'the preset colour override is behind the own-colour gate');
 });
