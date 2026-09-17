@@ -149,6 +149,9 @@ jobs:
           # the orbit benchmark, ?bench=orbit (2026-09-14) - a main.js import (the version its results report is main.js's
           # own ?v= stamp from index.html above, read through import.meta.url)
           sed -i "s|'./orbit-bench.js'|'./orbit-bench.js?v=$V'|" viewer/js/main.js
+          # the settle benchmark, ?bench=settle (2026-09-16) - a main.js import, and it imports orbit-bench.js itself
+          sed -i "s|'./settle-bench.js'|'./settle-bench.js?v=$V'|" viewer/js/main.js
+          sed -i "s|'./orbit-bench.js'|'./orbit-bench.js?v=$V'|" viewer/js/settle-bench.js
 
       # Fail the deploy rather than ship a half-stamped module graph. A first
       # version of this guard was a single grep over main.js for

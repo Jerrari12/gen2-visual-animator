@@ -12,9 +12,10 @@ import { FILAMENT_DB } from './filament-db.js';
 import { partMaterialSpec } from './part-material.js';
 import { applyLayerDetail } from './vendor/layer-detail.js';
 import { PLATE_FINISHES, PLATE_LABELS, HOLO_OPACITY, plateFinishOf, createBedFinishUniforms, setBedFinish,
-  setSettleDetail, applyBedFinish, bedFaceAttributes } from './bed-finish.js';
+  setSettleDetail, settleDetailIsOn, applyBedFinish, bedFaceAttributes } from './bed-finish.js';
 import { createDimCoverTest } from './dim-cover.js';
 import { benchBuild, createOrbitBench } from './orbit-bench.js';
+import { createSettleBench } from './settle-bench.js';
 
 /* Every entry-routing boolean below is derived by resolveEntry() in entry.js -
    a pure function of (search, hash) with no DOM or network - so the boot
@@ -45,7 +46,10 @@ document.body.classList.toggle('embed', IS_EMBED);
    automatic tier change off for the page once a run starts (qualityTick). Both are `var` for the same reason as
    shadowWatch: the render loop and qualityTick read them, and a render can come before a `let` line has run. */
 const IS_BENCH = ENTRY.isBench;
-var orbitBench = null, benchHold = false;
+/* ?bench=settle (settle-bench.js, 2026-09-16) shares the fixed build, the hold and every guard IS_BENCH carries; it reads the
+   settle machinery through the four monotonic counters below (acc.sampleCount, acc.detailCount, ao.passCount,
+   refl.renderCount) and a per-frame afterFrame call from the render loop. Nothing else in the viewer reads them. */
+var orbitBench = null, settleBench = null, benchHold = false;
 // ?part=<slug>&mode=preview — the MODULITH product-page embed (2026-08-19): a
 // TRANSPARENT iframe showing one part, poster-fast, slow idle spin until
 // interaction, orbit/zoom/reset and nothing else. The slug is the SITE'S frozen
@@ -849,7 +853,7 @@ function contactMapWanted() {
 // no luminance range left to darken, and lifting it costs the retrowave mood. A
 // faint blurred reflection grounds the build while keeping the deep navy.
 // Refreshed only when the camera or the build moves.
-const refl = { rt: null, mesh: null, cam: null, tex: new THREE.Matrix4(), key: '' };
+const refl = { rt: null, mesh: null, cam: null, tex: new THREE.Matrix4(), key: '', renderCount: 0 };
 /* The reflection's resting opacity. A moving camera sets the uniform to 0 and skips the mirror render
    (see updateReflection), so this is the value it comes back to. */
 const REFL_OPACITY = 0.16;
@@ -1006,6 +1010,7 @@ function updateReflection(force = false, moving = false) {
   renderer.clear();
   renderer.render(scene, vc);
   renderer.setRenderTarget(null);
+  refl.renderCount++;   // the settle benchmark's "the mirror came back" reading (settle-bench.js)
   scene.background = prevBg;
   for (const o of hidden) o.visible = true;
 }
@@ -1053,7 +1058,7 @@ const ao = { rtN: null, rtAO: null, normalMat: null, aoMat: null, compMat: null,
              // The TABLE never does - a floor disc occludes itself into a grey
              // wash at grazing angles. The site's frame capture turns this off
              // for its plain pass (the core's shading must match across mounts).
-             backdrops: true };
+             backdrops: true, passCount: 0 };
 // ⚠ `!tweens.size` is load-bearing, not an optimisation. The AO buffer is
 // regenerated off a key built from the CAMERA — but a step animation moves the
 // PARTS while the camera sits still, so the key never changes, the stale buffer
@@ -1472,6 +1477,7 @@ function updateAO(force = false) {
     renderer.render(ao.qScene, ao.qCam);
     // commit identity only after the passes actually rendered
     ao.passes++;
+    ao.passCount++;   // monotonic, never reset: the settle benchmark's pass counter (settle-bench.js)
     if (changed) { ao.key = key; aoCamStore(); }
     // The RESTING image must not depend on which jitter happened to come
     // last: the bilateral classifies the accumulated mean against rtN, which
@@ -1641,6 +1647,8 @@ const acc = {
   n: 0, key: '', blocked: true, ok: false, probed: false,
   jitter: true,     // debug: off makes sample 0 the exact `high` frame
   sunHome: new THREE.Vector3(), disk: null,
+  // monotonic, never reset: samples rendered, and samples rendered with the settle detail on (settle-bench.js)
+  sampleCount: 0, detailCount: 0,
 };
 /* ⚠ Float64Array, NOT Float32. Matrix4.elements are doubles; a Float32 copy
    rounds, and the comparison then reports a moved camera on EVERY frame. That
@@ -1844,6 +1852,7 @@ function accumFrame() {
       renderer.autoClear = true;
       renderer.setRenderTarget(acc.rtScene);
       renderer.render(scene, camera);
+      if (settleDetailIsOn(bedFinishU)) acc.detailCount++;   // read after the render: the detail really drew (settle-bench.js)
     } finally {
       setSettleDetail(bedFinishU, false);   // every frame outside a sample: folded grain, no lines
       camera.projectionMatrix = savedProj; camera.projectionMatrixInverse = savedInv;
@@ -1875,6 +1884,7 @@ function accumFrame() {
       renderer.autoClear = prevAuto;
     }
     acc.n++;
+    acc.sampleCount++;
     /* The warm-up hand-back: the samples are banked, but the ordinary canvas
        frame stays on screen until the mean is worth showing. Returning false
        makes the loop render it. */
@@ -7956,7 +7966,7 @@ if (IS_PART) {
 }
 booted = true;
 // ?bench=orbit: the benchmark's start card sits over the landing page until Start (orbit-bench.js)
-if (IS_BENCH) orbitBench = createOrbitBench({
+const benchApi = !IS_BENCH ? null : ({
   THREE, camera, controls, renderer,
   goTo, stepCount: () => manifest.steps.length, tweenCount: () => tweens.size,
   applyQuality, applyStageTheme, quality: () => quality, stage: () => stageTheme,
@@ -7968,6 +7978,17 @@ if (IS_BENCH) orbitBench = createOrbitBench({
   instanceCount: () => instances.size,
   version: new URL(import.meta.url).searchParams.get('v') || 'dev',
 });
+if (benchApi && ENTRY.benchKind === 'settle') settleBench = createSettleBench({
+  ...benchApi,
+  // the settle machinery, read after every frame's render (settle-bench.js)
+  ACC_SAMPLES, ACC_WARMUP,
+  settleState: () => ({ accN: acc.n, sampleCount: acc.sampleCount, detailCount: acc.detailCount, accOk: acc.ok,
+    aoPasses: ao.passes, passCount: ao.passCount, aoAccumMax: ao.accumMax,
+    reflCount: refl.renderCount, reflOpacity: refl.mesh ? refl.mesh.material.uniforms.uOpacity.value : null,
+    shadowOn: renderer.shadowMap.enabled }),
+  tierFlags: () => ({ accum: !!QUALITY[quality].accum, ao: !!QUALITY[quality].ao, refl: reflectionWanted() }),
+});
+else if (benchApi) orbitBench = createOrbitBench(benchApi);
 // ?shot=1 (dev-only, like ?debug): capture the FINISHED build as a 3/4 gallery
 // thumbnail and download it as <id>.jpg for viewer/builds/img/ — planner-card
 // backdrop (--panel #3a3b3f), no table/grid/wall/surface, canvas-only (DOM
@@ -8075,6 +8096,7 @@ function renderLoop(now) {
   if (IS_PART && partView.posted && !partView.visible) return;
   resize();
   if (orbitBench) orbitBench.tick(now);   // the benchmark's camera, placed before anything this frame reads it
+  if (settleBench) settleBench.tick(now);
   qualityTick(now);
   stepTweens(now);
   if (cinema.on) updateCinema(now); else updateOrbit();
@@ -8106,8 +8128,10 @@ function renderLoop(now) {
   // Very High puts its own accumulated mean on the canvas and says so; every
   // other tier renders the scene straight to it, exactly as before. A thrown or
   // disabled accumulator returns undefined and we fall back to the plain frame.
-  if (!guardFx('accum', accumFrame)) renderer.render(scene, camera);
+  const accDrew = !!guardFx('accum', accumFrame);
+  if (!accDrew) renderer.render(scene, camera);
   if (!lite) guardFx('ao', compositeAO);   // laid over the finished frame; no composer in the path
+  if (settleBench) settleBench.afterFrame({ accDrew, lite });   // the frame's post-render settle state (settle-bench.js)
   // partReady only after a REAL rendered frame exists — posted from inside the
   // loop, not after mount, so the site never drops its poster onto a blank
   // canvas (the parent contract adds a short crossfade on top: render
@@ -8164,7 +8188,7 @@ if (new URLSearchParams(location.search).get('debug')) {
     get sunHalfDeg() { return ACC_SUN_HALF_DEG; },
     setSunHalfDeg(v) { ACC_SUN_HALF_DEG = +v; acc.blocked = true; },
     fxDead, perf, get tweenCount() { return tweens.size; },
-    get orbitBench() { return orbitBench; },   // ?bench=orbit's controller (phase, result), for a harness that checks the run
+    get orbitBench() { return orbitBench; }, get settleBench() { return settleBench; },   // ?bench=orbit's controller (phase, result), for a harness that checks the run
     // the stage half of the render question: the contact shadow is LIGHT-STAGE
     // only, so a shadow measurement that does not state the stage means nothing
     applyStageTheme, get stageTheme() { return stageTheme; },

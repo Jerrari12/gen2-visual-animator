@@ -14,7 +14,8 @@
  *
  * PRECEDENCE, highest first:
  *   1. part preview   ?part=<slug>&mode=preview   (the MODULITH iframe)
- *   2. ?bench=orbit   the orbit benchmark, on its own fixed build (orbit-bench.js)
+ *   2. ?bench=orbit   the orbit benchmark, on its own fixed build (orbit-bench.js); ?bench=settle, the settle benchmark
+ *                     on the same build (settle-bench.js)
  *   3. #build=<b64>   the planner hand-off        (wins over any other query)
  *   4. ?build=<id>    a named official kit
  *   5. ?kit=<name>    a hand-authored static kit
@@ -56,7 +57,10 @@ export function resolveEntry(search = '', hash = '') {
   /* ?bench=orbit - the orbit benchmark (orbit-bench.js). ⚠ ITS BUILD IS FIXED: every device must run the same workload,
      so nothing else a URL carries - a planner hash, a kit name - may replace it, and it never takes the front door's
      official path. That is why the hash is dropped here rather than merely outranked below. */
-  const isBench = !isPart && QS.get('bench') === 'orbit';
+  /* ?bench=settle - the settle benchmark (settle-bench.js, 2026-09-16): the same fixed build and the same rule; it times what
+     the viewer spends AFTER the camera stops. benchKind names which one; isBench is true for both. */
+  const benchKind = !isPart && ['orbit', 'settle'].includes(QS.get('bench')) ? QS.get('bench') : null;
+  const isBench = !!benchKind;
 
   // the planner hand-off, matched out of the hash rather than parsed as a query
   const buildHash = isBench ? null : (hash || '').match(/build=([^&]+)/);
@@ -105,6 +109,7 @@ export function resolveEntry(search = '', hash = '') {
     partPlate: isPart && QS.has('plate') ? parsePlate(QS.get('plate')) : null,
     isEmbed,
     isBench,
+    benchKind,
     isRoot,
     officialId,
     wantsOfficial,

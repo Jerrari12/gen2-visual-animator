@@ -209,6 +209,13 @@ export function setSettleDetail(u, on, pixelRatio) {
   if (Number.isFinite(pixelRatio) && pixelRatio > 0) u.uLLPxRatio.value = pixelRatio;
 }
 
+/** Whether the settle detail is on at this moment: the grain in its detail form AND the layer lines drawn. Read, never written,
+ *  by the viewer's accumulator right after a sample renders, so the settle benchmark (settle-bench.js) counts samples that
+ *  really drew the detail rather than samples that merely asked for it. */
+export function settleDetailIsOn(u) {
+  return u.uLLOn.value === 1 && u.uPCFadeLo.value === POWDER_FADE.detail[0] && u.uPCFadeHi.value === POWDER_FADE.detail[1];
+}
+
 /* ---- the shader ------------------------------------------------------------------------------ */
 
 /* The plain surface at contact: the normal as three built it before any patch (normal_fragment_begin)

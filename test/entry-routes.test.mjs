@@ -181,6 +181,16 @@ test('?bench=orbit runs the orbit benchmark - its own fixed build, whatever hash
   assert.equal(part.isBench, false);
 });
 
+test('?bench=settle runs the settle benchmark on the same fixed build, under the same rules; benchKind names which', () => {
+  for (const [q, h] of [['?bench=settle', ''], ['?bench=settle', '#build=eyJhIjoxfQ=='], ['?bench=settle&build=240-tabletop-3w2h&tier=high', '']]) {
+    const e = resolveEntry(q, h);
+    assert.deepEqual([e.isBench, e.benchKind, e.buildHash, e.isRoot, e.wantsOfficial, e.isEmbed], [true, 'settle', null, false, false, false], `${q}${h}`);
+  }
+  assert.equal(resolveEntry('?bench=orbit', '').benchKind, 'orbit');
+  assert.equal(resolveEntry('', '').benchKind, null);
+  assert.equal(resolveEntry('?part=185-case-2w-1h&mode=preview&bench=settle', '').isBench, false, 'part preview still wins');
+});
+
 test('?part= without mode=preview is NOT a part boot, and lands on the front door', () => {
   /* mode=preview is what the site's iframe always sends; a bare ?part= is a
      hand-edited or truncated URL. It must not boot the part embed (chrome

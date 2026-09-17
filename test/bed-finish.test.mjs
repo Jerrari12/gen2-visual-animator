@@ -351,6 +351,19 @@ test('⚔ only a jittered Very High sample turns the settle detail on, and it is
     'main.js writes a settle uniform directly - the one switch is setSettleDetail');
 });
 
+test('settleDetailIsOn reads the switch: on only with the grain detail AND the layer lines, off after setSettleDetail(false)', () => {
+  const u = BF.createBedFinishUniforms();
+  assert.equal(BF.settleDetailIsOn(u), false, 'a fresh set of uniforms draws no settle detail');
+  BF.setSettleDetail(u, true, 2);
+  assert.equal(BF.settleDetailIsOn(u), true);
+  u.uLLOn.value = 0;
+  assert.equal(BF.settleDetailIsOn(u), false, 'layer lines off is not the settle detail');
+  BF.setSettleDetail(u, true, 2); BF.setGrainRepresentation(u, 'moving');
+  assert.equal(BF.settleDetailIsOn(u), false, 'the folded grain is not the settle detail');
+  BF.setSettleDetail(u, false);
+  assert.equal(BF.settleDetailIsOn(u), false);
+});
+
 test('a clone carries the finish and SHARES the switch, so highlights and tiles follow it', () => {
   const u = BF.createBedFinishUniforms();
   const m = new THREE.MeshPhysicalMaterial();
