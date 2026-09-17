@@ -8156,7 +8156,7 @@ function renderLoop(now) {
   const lite = motionLite();
   guardFx('reflection', () => updateReflection(false, lite));
   if (lite) holdAOForMotion(); else guardFx('ao', updateAO);
-  // the see-into experiment weights AO on its parts: patch the composite as soon as updateAO has built it, before it draws
+  // the see-into experiment weights AO on its parts: patch the composite as soon as the AO step above has built it, before it draws
   if (seeInto && ao.compMat) guardFx('seeinto', () => seeInto.patchAO(ao.compMat));
   // Very High puts its own accumulated mean on the canvas and says so; every
   // other tier renders the scene straight to it, exactly as before. A thrown or
