@@ -16,6 +16,7 @@ import { PLATE_FINISHES, PLATE_LABELS, HOLO_OPACITY, plateFinishOf, createBedFin
 import { createDimCoverTest } from './dim-cover.js';
 import { benchBuild, createOrbitBench } from './orbit-bench.js';
 import { createSettleBench } from './settle-bench.js';
+import { parseSeeInto, createSeeInto } from './see-into.js';
 
 /* Every entry-routing boolean below is derived by resolveEntry() in entry.js -
    a pure function of (search, hash) with no DOM or network - so the boot
@@ -50,6 +51,10 @@ const IS_BENCH = ENTRY.isBench;
    settle machinery through the four monotonic counters below (acc.sampleCount, acc.detailCount, ao.passCount,
    refl.renderCount) and a per-frame afterFrame call from the render loop. Nothing else in the viewer reads them. */
 var orbitBench = null, settleBench = null, benchHold = false;
+/* ?seeinto=<preset> - the see-into translucent filament EXPERIMENT (see-into.js; Astra 2026-09-17: "Keep it optional and
+   isolated"). Null without the switch, and then nothing below changes a single material or pass. `var`: newPartMaterial and
+   the render loop read it, and both can run before a `let` line would have. */
+var seeInto = null;
 // ?part=<slug>&mode=preview — the MODULITH product-page embed (2026-08-19): a
 // TRANSPARENT iframe showing one part, poster-fast, slow idle spin until
 // interaction, orbit/zoom/reset and nothing else. The slug is the SITE'S frozen
@@ -1638,6 +1643,23 @@ let ACC_SUN_HALF_DEG = 6;
    improvement rather than a jump. Cost: one extra scene render on each of those
    frames, about 2 ms each on the machine this was built on. */
 const ACC_WARMUP = 6;
+if (!ENTRY.isPart && parseSeeInto(location.search)) seeInto = createSeeInto({
+  THREE, renderer, scene, camera, presetKey: parseSeeInto(location.search),
+  // every back cover, one part per instance (hidden meshes draw nothing in the passes)
+  parts: () => {
+    const out = [];
+    for (const inst of instances.values()) {
+      if (!/^BackCover/.test(inst.cfg.node) || !inst.group) continue;
+      const meshes = [];
+      inst.group.traverse((o) => { if (o.isMesh) meshes.push(o); });
+      out.push({ partId: inst.cfg.id, meshes });
+    }
+    return out;
+  },
+  // Very High only: the tier that spends its budget once the camera stops (Astra's control 2)
+  wanted: () => !!QUALITY[quality].accum && !cinema.on && !renderer.getContext().isContextLost(),
+  sceneKey: () => instances.size + '|' + cur + '|' + ao.rev + '|' + accRev + '|' + quality + '|' + stageTheme,
+});
 const acc = {
   rtScene: null,    // owned MSAA linear-HDR target - one sample renders here
   rtAcc: null,      // single-sample HalfFloat running mean, in LINEAR light
@@ -2892,11 +2914,16 @@ const fallbackMat = new THREE.MeshStandardMaterial({ color: 0xb9bcc2, roughness:
 const zoneKey = (type, zone) => zone ? `${type}:${zone}` : type;
 function ensureMaterials() { // one shared material per type/zone key (idempotent across re-mounts)
   for (const [key, hex] of Object.entries(manifest.colors))
-    if (!materials[key]) materials[key] = newPartMaterial(key);
+    if (!materials[key]) materials[key] = seeIntoPatched(key, newPartMaterial(key));
+}
+/* the see-into experiment's patch on the back cover material, or the material unchanged (see-into.js) */
+function seeIntoPatched(key, m) {
+  if (seeInto && key === 'BackCover') seeInto.patch(m, buildAxisForKey(key));
+  return m;
 }
 function baseMatFor(type, zone = '') { // shared material per (type, zone) — zones build lazily off the active palette
   const key = zoneKey(type, zone);
-  if (!materials[key]) materials[key] = newPartMaterial(key);
+  if (!materials[key]) materials[key] = seeIntoPatched(key, newPartMaterial(key));
   return materials[key];
 }
 
@@ -8121,6 +8148,10 @@ function renderLoop(now) {
   // render instead of taking the studio down on some GPU we've never seen.
   guardFx('grounding', updateGrounding);
   guardFx('cavity', updateCavityFill);
+  /* ⚠ moving = a TWEEN, not perf.moving: the passes already re-run when the camera matrices change (see-into.js compares them
+     exactly), and perf.moving stays true for 160 ms after the camera stops, which re-ran them on frames with an unchanged view.
+     A tween moves parts under a still camera, so it must force the re-run itself. */
+  if (seeInto) guardFx('seeinto', () => { if (ao.compMat) seeInto.patchAO(ao.compMat); seeInto.prepare({ moving: tweens.size > 0 }); });
   // while the camera moves, the floor reflection and ambient occlusion wait (motionLite)
   const lite = motionLite();
   guardFx('reflection', () => updateReflection(false, lite));
@@ -8188,7 +8219,7 @@ if (new URLSearchParams(location.search).get('debug')) {
     get sunHalfDeg() { return ACC_SUN_HALF_DEG; },
     setSunHalfDeg(v) { ACC_SUN_HALF_DEG = +v; acc.blocked = true; },
     fxDead, perf, get tweenCount() { return tweens.size; },
-    get orbitBench() { return orbitBench; }, get settleBench() { return settleBench; },   // ?bench=orbit's controller (phase, result), for a harness that checks the run
+    get orbitBench() { return orbitBench; }, get settleBench() { return settleBench; }, get seeInto() { return seeInto; },   // ?bench=orbit's controller (phase, result), for a harness that checks the run
     // the stage half of the render question: the contact shadow is LIGHT-STAGE
     // only, so a shadow measurement that does not state the stage means nothing
     applyStageTheme, get stageTheme() { return stageTheme; },
