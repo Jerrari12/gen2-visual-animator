@@ -1659,6 +1659,8 @@ if (!ENTRY.isPart && parseSeeInto(location.search)) seeInto = createSeeInto({
   // Very High only: the tier that spends its budget once the camera stops (Astra's control 2)
   wanted: () => !!QUALITY[quality].accum && !cinema.on && !renderer.getContext().isContextLost(),
   sceneKey: () => instances.size + '|' + cur + '|' + ao.rev + '|' + accRev + '|' + quality + '|' + stageTheme,
+  // the passes swap cover materials and layers; the shadow-caster watch must not read those as moved casters (see-into.js)
+  pauseShadowWatch: (on) => { if (on) { shadowWatch.pausedMoving = shadowWatch.moving; shadowWatch.moving = false; } else shadowWatch.moving = shadowWatch.pausedMoving; },
 });
 const acc = {
   rtScene: null,    // owned MSAA linear-HDR target - one sample renders here

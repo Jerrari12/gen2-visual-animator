@@ -155,6 +155,7 @@ export function patchSeeIntoMaterial(material, uniforms, lightsParsChunk) {
  * @param o.parts()          the translucent parts now: [{ partId, meshes: [Mesh] }] (visible or not; hidden meshes draw nothing)
  * @param o.wanted()         whether the effect may run this frame (Very High, not the outro, not a part preview)
  * @param o.sceneKey()       a string that changes whenever the scene changes without the camera moving
+ * @param o.pauseShadowWatch(on)  suspend the viewer's shadow-caster watch while the passes swap materials (see runPasses)
  * The AO composite is patched separately, once it exists (`patchAO`): main.js builds it lazily on AO's first frame.
  */
 export function createSeeInto(o) {
@@ -273,7 +274,14 @@ export function createSeeInto(o) {
     const cids = componentIds(entries);
     const saved = entries.map((e) => e.mesh.material);
     const prev = { rt: R.getRenderTarget(), auto: R.autoClear, bg: S.background, ov: S.overrideMaterial, mask: C.layers.mask,
-      cc: R.getClearColor(new T.Color()), ca: R.getClearAlpha() };
+      cc: R.getClearColor(new T.Color()), ca: R.getClearAlpha(), shadowNeeds: R.shadowMap.needsUpdate };
+    /* ⚠⚠ THE SHADOW MAP MUST NOT SEE THESE RENDERS (p61, 2026-09-17). main.js's shadow-caster watch runs in scene.onBeforeRender,
+       so it runs inside every pass here - where the covers wear id and peel materials on an extra layer - and it read those
+       swaps as moved casters: the light stage re-rendered its whole shadow map on every moving frame (orbit draw calls 1,271 ->
+       2,539, moving-frame GPU time +10 ms against +5.4 on the shadowless dark stage). The watch is paused for the passes, and a
+       pending refresh is held for the viewer's own render rather than spent on a pass. */
+    if (o.pauseShadowWatch) o.pauseShadowWatch(true);
+    R.shadowMap.needsUpdate = false;
     try {
       // pass A: nearest translucent surface, depth + id
       for (const e of entries) e.mesh.layers.enable(LAYER_A);
@@ -298,6 +306,8 @@ export function createSeeInto(o) {
       entries.forEach((e, k) => { e.mesh.material = saved[k]; e.mesh.layers.disable(LAYER_A); });
       C.layers.mask = prev.mask; S.overrideMaterial = prev.ov; S.background = prev.bg;
       R.setRenderTarget(prev.rt); R.autoClear = prev.auto; R.setClearColor(prev.cc, prev.ca);
+      R.shadowMap.needsUpdate = prev.shadowNeeds;
+      if (o.pauseShadowWatch) o.pauseShadowWatch(false);
     }
     uniforms.uSIBehind.value = rtB.texture;
     uniforms.uSIRes.value.set(dims.w, dims.h);
