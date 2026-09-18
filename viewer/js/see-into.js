@@ -93,7 +93,7 @@ export function componentIds(entries) {
 
 /* ---------------------------------------------------------------------------------------------- shader patch strings */
 export const WRAP_FROM = 'reflectedLight.directDiffuse += irradiance * BRDF_Lambert( material.diffuseContribution );';
-export const WRAP_TO = 'reflectedLight.directDiffuse += mix( dotNL, saturate( ( dot( geometryNormal, directLight.direction ) + uSIWrap ) / ( 1.0 + uSIWrap ) ), ( 1.0 - gSIGate ) * uSIActive ) * directLight.color * BRDF_Lambert( material.diffuseContribution );';
+export const WRAP_TO = 'reflectedLight.directDiffuse += mix( dotNL, saturate( ( dot( geometryNormal, directLight.direction ) + uSIWrap ) / ( 1.0 + uSIWrap ) ), gSIWrapK * uSIActive ) * directLight.color * BRDF_Lambert( material.diffuseContribution );';
 
 export const FRAG_HEAD = [
   'varying vec3 vSIObjNrm;',
@@ -103,23 +103,42 @@ export const FRAG_HEAD = [
   'uniform vec3 uSIColor, uSITint;',
   'uniform sampler2D uSIBehind;',
   'uniform vec2 uSIRes;',
-  'float gSIGate = 0.0;',
+  /* TWO weights, because they answer two different questions (Astra 2026-09-17). gSISee = how much of what is behind
+     the part shows through HERE; gSIWrapK = how much the direct light wraps past the terminator HERE. They used to be
+     one axis-aligned value and its complement, which made the PRINT DIRECTION decide which faces were made of
+     translucent material. */
+  'float gSISee = 0.0;',
+  'float gSIWrapK = 0.0;',
 ].join('\n');
 
 /* right after roughnessmap_fragment: before the layer relief (normal_fragment_maps) and the plate finish (emissivemap)
    modulate normal and roughness, so both still ride on top of the translucent part's own colour and roughness */
-/* ⚠ uSIAxisM AND uSIOwn ARE PER-MATERIAL, not shared (2026-09-17, the faceplate-grip scope). The axis is the
-   direction that part PRINTED in, and a grip does not print the way a back cover does, so one shared axis would
-   put the face gate on the wrong faces. uSIOwn is 1 for a part whose translucency comes from the FILAMENT the
-   user assigned: it then keeps its own colour and roughness (Astra: "Don't force the frosted colour onto parts
-   assigned opaque filament" - and equally, a translucent pick should look like the filament picked, not like the
-   cover's preset). The reference back cover keeps uSIOwn 0 and wears the preset. */
+/* ⚠ uSIAxisM AND uSIOwn ARE PER-MATERIAL, not shared (2026-09-17, the faceplate-grip scope). uSIOwn is 1 for a part
+   whose translucency comes from the FILAMENT the user assigned: it then keeps its own colour and roughness (Astra:
+   "Don't force the frosted colour onto parts assigned opaque filament" - and equally, a translucent pick should look
+   like the filament picked, not like the cover's preset). The reference back cover keeps uSIOwn 0 and wears the preset.
+
+   ⚠⚠ TRANSLUCENCY IS A PROPERTY OF THE MATERIAL, NOT OF A FACE DIRECTION (Astra 2026-09-17: "print direction should
+   control printed surface detail and bed-contact texture, not decide which faces are made of translucent material").
+   A FILAMENT-DRIVEN part is therefore translucent on EVERY face - front, slopes and edges alike - and the only thing
+   that modulates the see-through is the grazing term in FRAG_COMPOSITE, which stands in for the longer path light
+   takes through the part at a shallow angle. The print direction still governs what it always governed, in the two
+   modules that own those jobs: the printed relief and layer lines (bed-finish.js, keyed by buildAxisForKey) and the
+   build-plate finish on the bed-contact face. This shader no longer reads uSIAxisM for a filament-driven part.
+   ⚠ The REFERENCE COVER keeps the axis-weighted behaviour byte for byte: its appearance was accepted on 2026-09-17
+   from the measured sheets, and re-tuning it would reopen that acceptance and tomorrow's release. The same question
+   applies to it in principle - flagged, not changed. */
 export const FRAG_SURFACE = [
   'if ( uSIActive > 0.5 ) {',
-  '  gSIGate = smoothstep( 0.72, 0.93, abs( dot( normalize( vSIObjNrm ), normalize( uSIAxisM ) ) ) );',
   '  if ( uSIOwn < 0.5 ) {',
+  '    float siAxis = smoothstep( 0.72, 0.93, abs( dot( normalize( vSIObjNrm ), normalize( uSIAxisM ) ) ) );',
+  '    gSISee = siAxis;',                       // the reference cover: plate-parallel faces see through, walls stay
+  '    gSIWrapK = 1.0 - siAxis;',               // and the walls are where the scatter wrap lands
   '    diffuseColor.rgb = uSIColor;',
   '    roughnessFactor = uSIRough;',
+  '  } else {',
+  '    gSISee = 1.0;',                          // translucent throughout: every face shows what is behind it,
+  '    gSIWrapK = 1.0;',                        // and light wraps on every face, because it is one material
   '  }',
   '}',
 ].join('\n');
@@ -132,7 +151,7 @@ export const FRAG_COMPOSITE = [
   '    float gr = uSIBlurPx * sqrt( ( float( i ) + 0.5 ) / 12.0 );',
   '    siAcc += texture2D( uSIBehind, suv + vec2( cos( ga ), sin( ga ) ) * gr / uSIRes ).rgb; siW += 1.0; }',
   '  vec3 seeC = ( siAcc / siW ) * uSITint;',
-  '  float kSee = uSISee * mix( 1.0, gSIGate, clamp( uSIWallOpaque, 0.0, 1.0 ) );',
+  '  float kSee = uSISee * mix( 1.0, gSISee, clamp( uSIWallOpaque, 0.0, 1.0 ) );',
   '  float nvS = clamp( dot( geometryNormal, geometryViewDir ), 0.0, 1.0 );',
   '  float Fg = 0.04 + 0.96 * pow( 1.0 - nvS, 5.0 );',
   '  kSee *= mix( 1.0, 1.0 - Fg, uSIGraze );',

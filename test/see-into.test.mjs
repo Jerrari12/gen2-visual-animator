@@ -285,3 +285,36 @@ test('filament-driven patch: a supported component keeps its own colour, the ref
   assert.match(a.fragmentShader, /if \( uSIOwn < 0\.5 \) \{[\s\S]*diffuseColor\.rgb = uSIColor;/,
     'the preset colour override is behind the own-colour gate');
 });
+
+test('translucency is a property of the material, not of a face direction', () => {
+  /* Astra 2026-09-17: "print direction should control printed surface detail and bed-contact texture, not decide which
+     faces are made of translucent material." So the filament-driven branch must not consult the print axis at all, and
+     the reference cover must keep the axis-weighted behaviour it was accepted with. */
+  const surface = SI.FRAG_SURFACE;
+  const own = surface.slice(surface.indexOf('} else {'));
+  const preset = surface.slice(surface.indexOf('if ( uSIOwn < 0.5 )'), surface.indexOf('} else {'));
+  assert.ok(!own.includes('uSIAxisM'), 'a filament-driven part reads no print axis in this shader');
+  assert.match(own, /gSISee = 1\.0;/, 'it shows what is behind it on every face');
+  assert.match(own, /gSIWrapK = 1\.0;/, 'and the scatter wrap is on every face, because it is one material');
+  assert.match(preset, /gSISee = siAxis;/, 'the reference cover keeps its axis-weighted see-through');
+  assert.match(preset, /gSIWrapK = 1\.0 - siAxis;/, 'and its walls keep the wrap');
+  /* the two weights must reach their two consumers, or the separation is only in the comments */
+  assert.ok(SI.WRAP_TO.includes('gSIWrapK * uSIActive') && !SI.WRAP_TO.includes('gSISee'),
+    'the light wrap consumes the wrap weight');
+  assert.ok(SI.FRAG_COMPOSITE.includes('mix( 1.0, gSISee,') && !SI.FRAG_COMPOSITE.includes('gSIWrapK'),
+    'the see-through consumes the see weight');
+  assert.ok(SI.FRAG_HEAD.includes('float gSISee = 0.0;') && SI.FRAG_HEAD.includes('float gSIWrapK = 0.0;'),
+    'both are declared, so a fragment that runs neither branch is opaque and unwrapped');
+  assert.ok(!surface.includes('gSIGate') && !SI.FRAG_COMPOSITE.includes('gSIGate') && !SI.WRAP_TO.includes('gSIGate'),
+    'the one-value-for-two-jobs name is gone, so it cannot come back by accident');
+});
+
+test('the grazing term is what modulates a filament-driven part, and it is not the print axis', () => {
+  /* The only thing left standing between "translucent material" and "how much shows through here" is path length at a
+     shallow angle. Astra: don't simply remove the gate and assume the flat-cover method transfers - this pins WHAT
+     replaced it, and the visual check for slopes and edges is in integration/results/p63. */
+  const comp = SI.FRAG_COMPOSITE;
+  assert.match(comp, /float nvS = clamp\( dot\( geometryNormal, geometryViewDir \)/, 'it measures the view angle');
+  assert.match(comp, /kSee \*= mix\( 1\.0, 1\.0 - Fg, uSIGraze \);/, 'and scales the see-through by it');
+  assert.ok(comp.indexOf('float kSee') < comp.indexOf('kSee *= mix'), 'the graze applies after the face weight');
+});
