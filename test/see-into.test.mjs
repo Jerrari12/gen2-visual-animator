@@ -83,11 +83,17 @@ test('a missing anchor fails loudly instead of compiling a shader that silently 
   assert.throws(() => m.onBeforeCompile(shader, null), /transmission_fragment/);
 });
 
-test('the viewer wires it only behind the switch, at the two places part materials are registered, and before the reflection, AO and accumulator', () => {
+test('the viewer wires it by default (covers only behind the switch), at the two places part materials are registered, and before the reflection, AO and accumulator', () => {
   const main = readFileSync(join(root, 'viewer', 'js', 'main.js'), 'utf8');
   assert.equal((main.match(/seeIntoPatched\(key, newPartMaterial\(key\)\)/g) || []).length, 2);
   assert.equal((main.match(/materials\[key\] = newPartMaterial\(key\)/g) || []).length, 0, 'no registration bypasses the patch helper');
-  assert.match(main, /if \(!ENTRY\.isPart && parseSeeInto\(location\.search\)\) seeInto = createSeeInto\(/);
+  assert.match(main, /if \(!ENTRY\.isPart\) seeInto = createSeeInto\(/);
+  assert.match(main, /const SEE_INTO_COVERS = parseSeeInto\(location\.search\);/);
+  // the back-cover preset stays behind the switch at BOTH places it enters: the pass list and the material patch
+  assert.match(main, /if \(SEE_INTO_COVERS && \/\^BackCover\/\.test\(inst\.cfg\.node\)\)/);
+  assert.match(main, /if \(key === 'BackCover'\) \{ if \(SEE_INTO_COVERS\) seeInto\.patch\(/);
+  // no translucent part, no passes: `wanted` is gated on there being something to draw
+  assert.match(main, /wanted: \(\) => \(!!SEE_INTO_COVERS \|\| seeIntoDriven\.size > 0\)/);
   const loop = main.slice(main.indexOf('function renderLoop(now) {'));
   const at = (s) => loop.indexOf(s);
   assert.ok(at("guardFx('seeinto'") > 0 && at("guardFx('seeinto'") < at("guardFx('reflection'"));

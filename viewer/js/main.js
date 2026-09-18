@@ -51,10 +51,15 @@ const IS_BENCH = ENTRY.isBench;
    settle machinery through the four monotonic counters below (acc.sampleCount, acc.detailCount, ao.passCount,
    refl.renderCount) and a per-frame afterFrame call from the render loop. Nothing else in the viewer reads them. */
 var orbitBench = null, settleBench = null, benchHold = false;
-/* ?seeinto=<preset> - the see-into translucent filament EXPERIMENT (see-into.js; Astra 2026-09-17: "Keep it optional and
-   isolated"). Null without the switch, and then nothing below changes a single material or pass. `var`: newPartMaterial and
-   the render loop read it, and both can run before a `let` line would have. */
+/* The see-into translucent filament (see-into.js). ON BY DEFAULT since 2026-09-18 (Joey, after his live check on the showcase
+   laptop: "those all are running extremely well", "yeah they look good") for the SUPPORTED components only - a translucent
+   filament picked on a grip, Essential's face or Chevron's faces (SEE_INTO_COMPONENTS_BY_FAMILY). Nothing is patched and no
+   pass runs until such a pick exists (`wanted` below). ⚠ The frosted BACK COVER is a PRESET, not a filament pick, so it stays
+   behind `?seeinto=<preset>` (SEE_INTO_COVERS): turning it on by default would change every build's covers whatever the user
+   picked. Null only in part-preview mode. `var`: newPartMaterial and the render loop read it, and both can run before a
+   `let` line would have. */
 var seeInto = null;
+const SEE_INTO_COVERS = parseSeeInto(location.search);   // null = back covers stay ordinary opaque parts
 // ?part=<slug>&mode=preview — the MODULITH product-page embed (2026-08-19): a
 // TRANSPARENT iframe showing one part, poster-fast, slow idle spin until
 // interaction, orbit/zoom/reset and nothing else. The slug is the SITE'S frozen
@@ -1683,14 +1688,16 @@ function seeIntoCoversVisible() {
   }
   return false;
 }
-if (!ENTRY.isPart && parseSeeInto(location.search)) seeInto = createSeeInto({
-  THREE, renderer, scene, camera, presetKey: parseSeeInto(location.search),
-  // every back cover, one part per instance (hidden meshes draw nothing in the passes)
+if (!ENTRY.isPart) seeInto = createSeeInto({
+  /* the preset's constants drive the filament-driven components too (they keep their own colour through `own`); 'frosted'
+     is the one every grip/face measurement and Joey's live check ran on */
+  THREE, renderer, scene, camera, presetKey: SEE_INTO_COVERS || 'frosted',
+  // every back cover (only behind the switch), one part per instance (hidden meshes draw nothing in the passes)
   parts: () => {
     const out = [];
     for (const inst of instances.values()) {
       if (!inst.group) continue;
-      if (/^BackCover/.test(inst.cfg.node)) {                    // the reference piece: the whole part is translucent
+      if (SEE_INTO_COVERS && /^BackCover/.test(inst.cfg.node)) {                    // the reference piece: the whole part is translucent
         const meshes = [];
         inst.group.traverse((o) => { if (o.isMesh) meshes.push(o); });
         out.push({ partId: inst.cfg.id, meshes });
@@ -1709,7 +1716,10 @@ if (!ENTRY.isPart && parseSeeInto(location.search)) seeInto = createSeeInto({
     return out;
   },
   // Very High only: the tier that spends its budget once the camera stops (Astra's control 2)
-  wanted: () => !!QUALITY[quality].accum && !cinema.on && !renderer.getContext().isContextLost(),
+  /* ⚠ NOTHING TRANSLUCENT, NOTHING RUNS: without the cover switch and without a driven component there is no part for the
+     passes to draw, and seeIntoCoversVisible() still says yes on every moving frame - a whole-scene render for nothing. */
+  wanted: () => (!!SEE_INTO_COVERS || seeIntoDriven.size > 0)
+    && !!QUALITY[quality].accum && !cinema.on && !renderer.getContext().isContextLost(),
   sceneKey: () => instances.size + '|' + cur + '|' + ao.rev + '|' + accRev + '|' + quality + '|' + stageTheme,
   /* ⚠ ON by default since local integration, `?siskip=off` to disable for diagnosis: the rule below is a STATE rule, not
      a proof of invisibility (a shut drawer's cover still shows through the gap it fills), and Astra accepted that measured
@@ -3109,7 +3119,7 @@ function syncSeeIntoComponents() {
 }
 function seeIntoPatched(key, m) {
   if (!seeInto) return m;
-  if (key === 'BackCover') seeInto.patch(m, buildAxisForKey(key));                    // the reference piece: preset look
+  if (key === 'BackCover') { if (SEE_INTO_COVERS) seeInto.patch(m, buildAxisForKey(key)); }   // the reference piece: preset look, switch only
   else if (seeIntoDrivenKey(key)) seeInto.patch(m, buildAxisForKey(key), { own: true }); // filament-driven: its own colour
   return m;
 }

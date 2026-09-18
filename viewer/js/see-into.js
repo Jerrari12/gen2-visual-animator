@@ -1,4 +1,5 @@
-/* SEE-INTO TRANSLUCENT FILAMENT - an EXPERIMENT, OFF unless the URL asks for it (`?seeinto=frosted`).
+/* SEE-INTO TRANSLUCENT FILAMENT. Since 2026-09-18 ON BY DEFAULT for a translucent filament picked on a supported component
+ * (grip / Essential face / Chevron faces - main.js); the frosted back-cover PRESET is still behind `?seeinto=frosted`.
  *
  * Astra, 2026-09-17 (vault decisions.md, "Are the settle benchmark's pass limits agreed, and what is the first graphics
  * candidate"): "Please prepare the first representative-build comparison using the existing frosted/translucent filament
