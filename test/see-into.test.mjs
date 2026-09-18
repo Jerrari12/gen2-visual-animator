@@ -324,6 +324,26 @@ const detailWith = (mode, drawsPerPart, parts) => new Function('instances', 'loc
     group: { visible: true, traverse(f) { f(this); for (let m = 0; m < drawsPerPart; m++) f({ isMesh: true, visible: true }); } },
   }])), { search: mode }, 250);
 
+test('the supported keys are per faceplate family, because one key means different geometry in each', () => {
+  /* Joey 2026-09-18: "On the essential, allow the face, and on the Chevron faceplate allow the faces". Essential is a
+     single-zone plate, so its face IS the plain Faceplate key; Chevron's chevrons are one FACE zone; the grip families
+     keep the grip. A flat set cannot express that - `Faceplate` is ALSO the body key behind everything on EdgeLabel and
+     Classic, and `Faceplate:FACE` also exists on Classic, and neither was asked for. */
+  const keysFor = (famKey) => new Function('currentFaceplateStyle',
+    `${fnAt(mainSrc, 'const SEE_INTO_COMPONENTS_BY_FAMILY =').replace(/^const/, 'const')}
+     ${fnAt(mainSrc, 'function seeIntoComponentKeys(')}
+     return seeIntoComponentKeys();`)(() => (famKey ? { key: famKey } : null));
+  assert.deepEqual(keysFor('essential'), ['Faceplate'], 'the single-zone plate: its face is the plate key');
+  assert.deepEqual(keysFor('chevron'), ['Faceplate:FACE'], 'the chevron strips, as one FACE zone');
+  assert.deepEqual(keysFor('edgelabel'), ['Faceplate:GRIP']);
+  assert.deepEqual(keysFor('classic'), ['Faceplate:GRIP'], 'Classic HAS a FACE zone, and it is deliberately not in scope');
+  assert.deepEqual(keysFor('classicpro'), ['Faceplate:GRIP']);
+  assert.deepEqual(keysFor(null), [], 'before a family is known, nothing is supported');
+  assert.deepEqual(keysFor('nosuchfamily'), [], 'and an unknown family adds nothing');
+  /* the body key must NOT be supported on a family whose body sits behind other zones */
+  for (const fam of ['edgelabel', 'classic', 'classicpro']) assert.ok(!keysFor(fam).includes('Faceplate'), fam);
+});
+
 test('the fallback is decided by the scene DRAW count, so a zoned plate is charged per zone', () => {
   /* Joey 2026-09-18: does a Chevron plate's many printed chevrons count once or many times? In the viewer a faceplate
      is ONE placed part whatever it prints as, but a zoned plate draws once per zone - so the measure must be draws,

@@ -2985,7 +2985,24 @@ function ensureMaterials() { // one shared material per type/zone key (idempoten
    piece and is patched by the switch alone, not by a filament pick.
    ⚠ A zone with no pick of its own INHERITS the plate body's (activeLabel), so assigning translucent filament to the
    plate body turns its grip translucent too - which is what a plate printed in that filament would look like. */
-const SEE_INTO_COMPONENTS = new Set(['Faceplate:GRIP']);
+/* ⚠ THE SUPPORTED SET IS PER FACEPLATE FAMILY, because the same material key means different geometry in each one
+   (Joey 2026-09-18: "On the essential, allow the face, and on the Chevron faceplate allow the faces"). Essential is a
+   SINGLE-ZONE plate, so its face IS the plain `Faceplate` key; Chevron's chevrons ship as one `FACE` zone; the three
+   families with a grip keep the grip. A flat set could not express that: `Faceplate` is also the BODY key behind
+   everything on EdgeLabel and Classic, and `Faceplate:FACE` also exists on Classic - neither of which Joey asked for,
+   and neither of which is in Astra's scope for this release. */
+const SEE_INTO_COMPONENTS_BY_FAMILY = {
+  essential: ['Faceplate'],            // one zone: the whole plate, printed face-down
+  chevron: ['Faceplate:FACE'],         // the chevron strips, merged into one FACE zone
+  edgelabel: ['Faceplate:GRIP'],
+  classic: ['Faceplate:GRIP'],
+  classicpro: ['Faceplate:GRIP'],
+};
+/* The keys supported RIGHT NOW - the active family's, or the grip alone before a family is known (boot order). */
+function seeIntoComponentKeys() {
+  const fam = typeof currentFaceplateStyle === 'function' ? currentFaceplateStyle() : null;
+  return SEE_INTO_COMPONENTS_BY_FAMILY[fam && fam.key] || [];
+}
 const TRANSLUCENT_BY_LABEL = new Map(FILAMENT_DB.flatMap(
   b => b.colors.filter(c => c.translucent).map(c => [c.label, c.translucent])));
 function translucentFamilyFor(key) {
@@ -3053,7 +3070,7 @@ function seeIntoDetailAllowed() {
   return partMeshCount() <= SEE_INTO_DETAIL_LIMIT;
 }
 let seeIntoDriven = new Set();         // the supported keys wearing a translucent filament RIGHT NOW
-const seeIntoDrivenKey = key => !!seeInto && SEE_INTO_COMPONENTS.has(key) && !!translucentFamilyFor(key)
+const seeIntoDrivenKey = key => !!seeInto && seeIntoComponentKeys().includes(key) && !!translucentFamilyFor(key)
   && !seeIntoSimplified;               // simplified: the filament's colour stays, the extra passes do not run
 /* Translucency is STRUCTURAL - it patches the shader and changes the program cache key - so it cannot be moved by
    applyPalette's in-place repaint the way colour and roughness are. When a pick crosses the line in either
@@ -3061,7 +3078,7 @@ const seeIntoDrivenKey = key => !!seeInto && SEE_INTO_COMPONENTS.has(key) && !!t
    job. ⚠ Re-assigning stomps a faceplate isolation fade if one is up; it heals on deselect. */
 function syncSeeIntoComponents() {
   if (!seeInto) return false;
-  const picked = new Set([...SEE_INTO_COMPONENTS].filter(k => translucentFamilyFor(k)));
+  const picked = new Set(seeIntoComponentKeys().filter(k => translucentFamilyFor(k)));
   /* the fallback decision rides HERE, with the pick and the build, so it cannot flip mid-orbit. It is only asked when
      something is actually picked - an opaque build pays nothing for the count. */
   const simplify = picked.size > 0 && !seeIntoDetailAllowed();
@@ -4728,7 +4745,7 @@ function renderOptions() {
      component. Astra 2026-09-17: "Show a small explanation: 'Simplified translucency for performance.' Keep a user
      override for the full effect." The override is per session (a URL switch carries it across reloads), and choosing
      it re-decides once - not per frame. */
-  if (seeInto && [...SEE_INTO_COMPONENTS].some(k => !!translucentFamilyFor(k))) {
+  if (seeInto && seeIntoComponentKeys().some(k => !!translucentFamilyFor(k))) {
     const note = document.createElement('div');
     note.className = 'opt-note';
     note.textContent = seeIntoSimplified
@@ -8448,6 +8465,9 @@ if (new URLSearchParams(location.search).get('debug')) {
        face-down on -Z, i.e. Essential - while the call returned normally. Pass
        FACEPLATE_STYLES.find(s => s.key === 'edgelabel'). */
     applyFaceplateStyle, FACEPLATE_STYLES,
+    // which material keys the translucent preview supports for the ACTIVE faceplate family - a harness cannot read
+    // the per-family table any other way, and the answer changes with the family (Joey 2026-09-18)
+    seeIntoComponentKeys,
     // the handle swap, so a harness can swap at rest with nothing selected (selecting a handle slides its drawer open,
     // and that motion would hide an at-rest shadow defect). Takes a style OBJECT from HANDLE_STYLES, like the plates.
     applyHandleStyle, HANDLE_STYLES,
