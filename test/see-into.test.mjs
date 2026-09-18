@@ -309,6 +309,59 @@ test('translucency is a property of the material, not of a face direction', () =
     'the one-value-for-two-jobs name is gone, so it cannot come back by accident');
 });
 
+/* ---- the performance fallback: simplified translucency above a measured build-complexity limit --------------------
+   Joey asked for it and Astra scoped it (2026-09-17): keep the filament and its colour, drop the see-through when the
+   whole-scene render would be too expensive, decide on a build or pick change rather than during an orbit, and keep a
+   user override. These call the real functions out of main.js; the limit itself is measured (p65). */
+const detailWith = (mode, drawsPerPart, parts) => new Function('instances', 'location', 'SEE_INTO_DETAIL_LIMIT_OVERRIDE',
+  `${fnAt(mainSrc, 'function parseSeeIntoDetail(')}
+   ${fnAt(mainSrc, 'function sceneDrawCount(')}
+   const SEE_INTO_DETAIL_LIMIT = SEE_INTO_DETAIL_LIMIT_OVERRIDE;
+   let seeIntoDetailMode = parseSeeIntoDetail(location.search);
+   ${fnAt(mainSrc, 'function seeIntoDetailAllowed(')}
+   return { allowed: seeIntoDetailAllowed(), draws: sceneDrawCount(), mode: seeIntoDetailMode };`)(
+  new Map(Array.from({ length: parts }, (_, i) => [i, {
+    group: { visible: true, traverse(f) { f(this); for (let m = 0; m < drawsPerPart; m++) f({ isMesh: true, visible: true }); } },
+  }])), { search: mode }, 250);
+
+test('the fallback is decided by the scene DRAW count, so a zoned plate is charged per zone', () => {
+  /* Joey 2026-09-18: does a Chevron plate's many printed chevrons count once or many times? In the viewer a faceplate
+     is ONE placed part whatever it prints as, but a zoned plate draws once per zone - so the measure must be draws,
+     not parts, or a 4-zone Classic build reads as cheap as a 2-zone Chevron one. */
+  assert.equal(detailWith('', 2, 100).draws, 200, '100 two-zone parts are 200 draws');
+  assert.equal(detailWith('', 4, 100).draws, 400, 'the same 100 parts with four zones each are 400');
+  assert.equal(detailWith('', 2, 100).allowed, true, '200 draws is inside the measured limit');
+  assert.equal(detailWith('', 4, 100).allowed, false, '400 draws is not - and it is the same part count');
+  assert.equal(detailWith('', 1, 250).allowed, true, 'the limit itself is allowed (<=)');
+  assert.equal(detailWith('', 1, 251).allowed, false);
+});
+
+test('the override wins over the measured rule, in both directions', () => {
+  assert.equal(detailWith('?sidetail=full', 4, 400).allowed, true, 'the user can ask for the full effect anyway');
+  assert.equal(detailWith('?sidetail=simple', 1, 10).allowed, false, 'and can force the fallback on a tiny build');
+  assert.equal(detailWith('?sidetail=nonsense', 1, 10).mode, 'auto', 'anything else is the measured rule');
+  assert.equal(detailWith('', 1, 10).mode, 'auto');
+});
+
+test('simplified translucency keeps the filament but runs no passes', () => {
+  /* the two things that must both be true, or the fallback is either a lie or not a saving: the driven-key test says
+     NO (so nothing is patched and the interior pass has nothing to serve), and the see-into scope set is empty (so
+     `seeIntoCoversVisible` does not force the passes on and `parts()` collects no grip) */
+  const src = fnAt(mainSrc, 'function syncSeeIntoComponents(');
+  assert.match(src, /const simplify = picked\.size > 0 && !seeIntoDetailAllowed\(\);/, 'the decision is taken here');
+  assert.match(src, /const want = simplify \? new Set\(\) : picked;/, 'and simplified means an EMPTY driven set');
+  const key = mainSrc.slice(mainSrc.indexOf('const seeIntoDrivenKey ='), mainSrc.indexOf('/* Translucency is STRUCTURAL'));
+  assert.match(key, /&& !seeIntoSimplified/, 'and no material is patched while simplified');
+  /* and it is decided on a pick or a build change, never per frame: the only callers are applyPalette (a pick) and the
+     override button. A call from the render loop would switch it mid-orbit, which Astra ruled out. */
+  const callers = [...mainSrc.matchAll(/^.*syncSeeIntoComponents\(\).*$/gm)].map((m) => m[0].trim());
+  for (const line of callers) {
+    assert.ok(/function syncSeeIntoComponents|syncSeeIntoComponents\(\);\s*\/\/ a translucent filament|if \(syncSeeIntoComponents\(\)\)/.test(line)
+      || /assert|fnAt|match/.test(line),
+      `unexpected caller of syncSeeIntoComponents - is it per frame? ${line}`);
+  }
+});
+
 test('the grazing term is what modulates a filament-driven part, and it is not the print axis', () => {
   /* The only thing left standing between "translucent material" and "how much shows through here" is path length at a
      shallow angle. Astra: don't simply remove the gate and assume the flat-cover method transfers - this pins WHAT

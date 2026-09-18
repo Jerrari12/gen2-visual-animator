@@ -2992,17 +2992,78 @@ function translucentFamilyFor(key) {
   const label = activeLabel(key);      // null in instruction-colour mode and in the part embed, so neither previews
   return label ? (TRANSLUCENT_BY_LABEL.get(label) || null) : null;
 }
+/* ---------------------------------------------------------------- the performance fallback (Joey + Astra 2026-09-17)
+   Joey: "after a certain number of transparent models we just make them non transparent?" Astra agreed as a release
+   safeguard AND corrected the trigger: "transparent-part count alone isn't enough. In this implementation, even one
+   visible translucent part can trigger rendering the entire build behind it. A small transparent-part count on a huge
+   build could still be costly. Use a conservative total-build complexity limit, informed by the tests."
+   So the limit is on how much the interior pass has to REDRAW, not on how many parts are translucent.
+
+   ⚠ THE MEASURE IS THE SCENE'S DRAW COUNT, NOT THE PLACED-PART COUNT (Joey's question, 2026-09-18: does a Chevron
+   plate's many printed chevrons count once or many times?). A faceplate is ONE placed part whatever it prints as - the
+   chevron strips ship merged into a single FACE zone - but a zoned plate draws once per zone, so Classic (4 zones)
+   costs twice what Chevron (2) does for the same part count. Counting meshes charges that honestly.
+
+   MEASURED on the A5000 at 3,840 x 2,400 uncapped, translucent grips against opaque, EdgeLabel grid builds
+   (p65 cutoff.mjs, results integration/results/p65/):
+     73 draws (4 units, 66 parts)   frame 3.90 ms against 1.35 opaque   (+2.55)
+     203 draws (12 units, 188)      frame 4.83 ms against 1.65          (+3.18)
+     399 draws (24 units, 372)      frame 8.10 ms against 2.50          (+5.60)
+     639 draws (40 units, 596)      frame 11.8 ms against 3.50          (+8.30)
+    1266 draws (80 units, 1188)     frame 26.3 ms against 7.40          (+18.9, 38 fps)
+   The 120 Hz internal panel's budget is 8.33 ms a frame and the booth monitor's is 16.7. The limit below keeps the
+   translucent frame near 5 ms at 4K - inside the 120 Hz budget with room for the rest of the app - which puts it
+   between the 203-draw build that measures 4.83 ms and the 399-draw one that already spends the whole 120 Hz budget.
+   ⚠ It is a CONSERVATIVE line drawn through five measured points, not a threshold anyone derived: raise or lower it
+   with new measurements, not by feel. */
+const SEE_INTO_DETAIL_LIMIT = 250;     // scene draws above which the see-through is simplified away
+/* `?sidetail=full` keeps the full effect whatever the build costs (the user override Astra asked for), `simple` forces
+   the fallback for diagnosis, anything else is the measured rule. */
+function parseSeeIntoDetail(search) {
+  const v = new URLSearchParams(search || '').get('sidetail');
+  return v === 'full' || v === 'simple' ? v : 'auto';
+}
+let seeIntoDetailMode = parseSeeIntoDetail(location.search);
+let seeIntoSimplified = false;         // true while a driven component is rendering WITHOUT the see-through
+/* How many draws the interior pass would carry: every mesh of every visible placed part. Counted at a build change or
+   a filament pick, NEVER per frame - Astra: "Decide when the build or filament selection changes, rather than
+   switching repeatedly during orbit." */
+function sceneDrawCount() {
+  let n = 0;
+  for (const inst of instances.values()) {
+    if (!inst.group || !inst.group.visible) continue;
+    inst.group.traverse(o => { if (o.isMesh && o.visible) n++; });
+  }
+  return n;
+}
+/* The decision, and the only place it is made. Returns true when the detailed see-through may run. */
+function seeIntoDetailAllowed() {
+  if (seeIntoDetailMode === 'full') return true;
+  if (seeIntoDetailMode === 'simple') return false;
+  return sceneDrawCount() <= SEE_INTO_DETAIL_LIMIT;
+}
 let seeIntoDriven = new Set();         // the supported keys wearing a translucent filament RIGHT NOW
-const seeIntoDrivenKey = key => !!seeInto && SEE_INTO_COMPONENTS.has(key) && !!translucentFamilyFor(key);
+const seeIntoDrivenKey = key => !!seeInto && SEE_INTO_COMPONENTS.has(key) && !!translucentFamilyFor(key)
+  && !seeIntoSimplified;               // simplified: the filament's colour stays, the extra passes do not run
 /* Translucency is STRUCTURAL - it patches the shader and changes the program cache key - so it cannot be moved by
    applyPalette's in-place repaint the way colour and roughness are. When a pick crosses the line in either
    direction the affected faceplate materials are rebuilt and re-assigned, which is `dropFaceplateMaterials`'s own
    job. ⚠ Re-assigning stomps a faceplate isolation fade if one is up; it heals on deselect. */
 function syncSeeIntoComponents() {
   if (!seeInto) return false;
-  const want = new Set([...SEE_INTO_COMPONENTS].filter(k => translucentFamilyFor(k)));
-  if (want.size === seeIntoDriven.size && [...want].every(k => seeIntoDriven.has(k))) return false;
+  const picked = new Set([...SEE_INTO_COMPONENTS].filter(k => translucentFamilyFor(k)));
+  /* the fallback decision rides HERE, with the pick and the build, so it cannot flip mid-orbit. It is only asked when
+     something is actually picked - an opaque build pays nothing for the count. */
+  const simplify = picked.size > 0 && !seeIntoDetailAllowed();
+  const want = simplify ? new Set() : picked;
+  if (simplify === seeIntoSimplified && want.size === seeIntoDriven.size && [...want].every(k => seeIntoDriven.has(k))) return false;
+  const noteChanged = simplify !== seeIntoSimplified;
+  seeIntoSimplified = simplify;
   seeIntoDriven = want;
+  /* ⚠ A BUILD CHANGE DECIDES THIS TOO, and mountManifest renders the panel BEFORE it calls applyPalette - so growing a
+     build past the limit in the planner would leave the old note on screen until something else re-rendered it.
+     renderOptions is declared below (hoisted) and returns early with no box and on a static kit. */
+  if (noteChanged) renderOptions();
   dropFaceplateMaterials();
   ensureMaterials();
   for (const inst of instances.values()) {
@@ -4653,6 +4714,28 @@ function renderOptions() {
     holographic: 'Simulated - the real effect shifts with lighting and angle.',
   }[plateProfile().key];
   box.appendChild(plateNote);
+  /* The translucency fallback's own line, and only when a translucent filament is actually picked on a supported
+     component. Astra 2026-09-17: "Show a small explanation: 'Simplified translucency for performance.' Keep a user
+     override for the full effect." The override is per session (a URL switch carries it across reloads), and choosing
+     it re-decides once - not per frame. */
+  if (seeInto && [...SEE_INTO_COMPONENTS].some(k => !!translucentFamilyFor(k))) {
+    const note = document.createElement('div');
+    note.className = 'opt-note';
+    note.textContent = seeIntoSimplified
+      ? 'Simplified translucency for performance. The filament\'s colour and printed texture are unchanged.'
+      : 'Full translucency: this build renders what is behind the part.';
+    box.appendChild(note);
+    const flip = document.createElement('button');
+    flip.className = 'opt-reset';
+    flip.textContent = seeIntoSimplified ? 'Use the full effect' : 'Use simplified translucency';
+    flip.onclick = () => {
+      seeIntoDetailMode = seeIntoSimplified ? 'full' : 'simple';
+      track('opt:sidetail:' + seeIntoDetailMode);
+      applyPalette();        // its first call is syncSeeIntoComponents, which re-decides and rebuilds the materials
+      renderChecklist();     // renders renderOptions(), so the note and the button read the new state
+    };
+    box.appendChild(flip);
+  }
   const reset = document.createElement('button'); reset.className = 'opt-reset'; reset.textContent = '↺ Reset to original';
   reset.onclick = resetBuild; box.appendChild(reset);
 }
