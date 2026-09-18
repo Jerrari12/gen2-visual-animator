@@ -3027,6 +3027,12 @@ function translucentFamilyFor(key) {
    single FACE zone - but a zoned plate draws once per zone, so Classic (4 zones) costs twice what Chevron (2) does at
    the same part count. Counting meshes charges that honestly.
 
+   ⚠ MULTI-ZONE PARTS CONTRIBUTE THE SAME WAY HERE AS THEY DID IN THE MEASUREMENT, and that is checkable rather than
+   asserted: every measured build was EdgeLabel, whose plate is two zones, and in all five the mesh count exceeds the
+   placed-part count by EXACTLY the number of plates (70-66=4, 200-188=12, 396-372=24, 636-596=40, 1268-1188=80). So a
+   zone is one mesh, one plate of N zones is N, and the rule counts what the timings were taken against. A Classic
+   plate (4 zones) therefore contributes 4 and an Essential plate (1 zone) contributes 1.
+
    MEASURED on the Dell Precision 7760 (A5000) at 3,840 x 2,400 uncapped, translucent grips against opaque, EdgeLabel
    grid builds, in THIS unit (p65 cutoff.mjs + confirm.mjs, results integration/results/p65/):
        70 part meshes (4 units, 66 parts)    frame 3.90 ms against 1.35 opaque   (+2.55)
