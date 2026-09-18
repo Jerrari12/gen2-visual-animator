@@ -315,11 +315,11 @@ test('translucency is a property of the material, not of a face direction', () =
    user override. These call the real functions out of main.js; the limit itself is measured (p65). */
 const detailWith = (mode, drawsPerPart, parts) => new Function('instances', 'location', 'SEE_INTO_DETAIL_LIMIT_OVERRIDE',
   `${fnAt(mainSrc, 'function parseSeeIntoDetail(')}
-   ${fnAt(mainSrc, 'function sceneDrawCount(')}
+   ${fnAt(mainSrc, 'function partMeshCount(')}
    const SEE_INTO_DETAIL_LIMIT = SEE_INTO_DETAIL_LIMIT_OVERRIDE;
    let seeIntoDetailMode = parseSeeIntoDetail(location.search);
    ${fnAt(mainSrc, 'function seeIntoDetailAllowed(')}
-   return { allowed: seeIntoDetailAllowed(), draws: sceneDrawCount(), mode: seeIntoDetailMode };`)(
+   return { allowed: seeIntoDetailAllowed(), draws: partMeshCount(), mode: seeIntoDetailMode };`)(
   new Map(Array.from({ length: parts }, (_, i) => [i, {
     group: { visible: true, traverse(f) { f(this); for (let m = 0; m < drawsPerPart; m++) f({ isMesh: true, visible: true }); } },
   }])), { search: mode }, 250);

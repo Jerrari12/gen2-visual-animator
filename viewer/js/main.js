@@ -2999,24 +2999,34 @@ function translucentFamilyFor(key) {
    build could still be costly. Use a conservative total-build complexity limit, informed by the tests."
    So the limit is on how much the interior pass has to REDRAW, not on how many parts are translucent.
 
-   ⚠ THE MEASURE IS THE SCENE'S DRAW COUNT, NOT THE PLACED-PART COUNT (Joey's question, 2026-09-18: does a Chevron
-   plate's many printed chevrons count once or many times?). A faceplate is ONE placed part whatever it prints as - the
-   chevron strips ship merged into a single FACE zone - but a zoned plate draws once per zone, so Classic (4 zones)
-   costs twice what Chevron (2) does for the same part count. Counting meshes charges that honestly.
+   ⚠⚠ ONE DEFINITION, AND IT IS THE ONE BELOW (Astra 2026-09-17: "'Draw count' has one precise definition matching the
+   measured workload; don't interchange it with mesh count or count all renderer passes"). The number is
+   `partMeshCount()`: the VISIBLE MESHES OF VISIBLE PLACED PARTS. It is not `renderer.info.render.calls` (that also
+   counts the stage and, on an effect frame, the effect's own passes) and it is not the placed-part count. For the
+   builds measured here the renderer's own count for one ordinary frame runs exactly 3 higher - the table, the grid and
+   the floor - so the two are one explainable step apart, and the rule uses only the first.
+   ⚠ Why meshes and not placed parts (Joey's question, 2026-09-18: does a Chevron plate's many printed chevrons count
+   once or many times?): a faceplate is ONE placed part whatever it prints as - the chevron strips ship merged into a
+   single FACE zone - but a zoned plate draws once per zone, so Classic (4 zones) costs twice what Chevron (2) does at
+   the same part count. Counting meshes charges that honestly.
 
-   MEASURED on the A5000 at 3,840 x 2,400 uncapped, translucent grips against opaque, EdgeLabel grid builds
-   (p65 cutoff.mjs, results integration/results/p65/):
-     73 draws (4 units, 66 parts)   frame 3.90 ms against 1.35 opaque   (+2.55)
-     203 draws (12 units, 188)      frame 4.83 ms against 1.65          (+3.18)
-     399 draws (24 units, 372)      frame 8.10 ms against 2.50          (+5.60)
-     639 draws (40 units, 596)      frame 11.8 ms against 3.50          (+8.30)
-    1266 draws (80 units, 1188)     frame 26.3 ms against 7.40          (+18.9, 38 fps)
-   The 120 Hz internal panel's budget is 8.33 ms a frame and the booth monitor's is 16.7. The limit below keeps the
+   MEASURED on the Dell Precision 7760 (A5000) at 3,840 x 2,400 uncapped, translucent grips against opaque, EdgeLabel
+   grid builds, in THIS unit (p65 cutoff.mjs + confirm.mjs, results integration/results/p65/):
+       70 part meshes (4 units, 66 parts)    frame 3.90 ms against 1.35 opaque   (+2.55)
+      200 part meshes (12 units, 188)        frame 4.83 ms against 1.65          (+3.18)
+      396 part meshes (24 units, 372)        frame 8.10 ms against 2.50          (+5.60)
+      636 part meshes (40 units, 596)        frame 11.8 ms against 3.50          (+8.30)   [ONE valid round: the
+                                             other recorded no interior pass at all, so it was not the translucent
+                                             arm and is EXCLUDED rather than averaged]
+     1268 part meshes (80 units, 1188)       frame 26.3 ms against 7.40          (+18.9, 38 fps)
+   The 120 Hz internal panel's budget is 8.33 ms a frame; the booth monitor's is 16.7. The limit below keeps the
    translucent frame near 5 ms at 4K - inside the 120 Hz budget with room for the rest of the app - which puts it
-   between the 203-draw build that measures 4.83 ms and the 399-draw one that already spends the whole 120 Hz budget.
-   ⚠ It is a CONSERVATIVE line drawn through five measured points, not a threshold anyone derived: raise or lower it
-   with new measurements, not by feel. */
-const SEE_INTO_DETAIL_LIMIT = 250;     // scene draws above which the see-through is simplified away
+   between the 200-mesh build that measures 4.83 ms and the 396-mesh one that already spends the whole 120 Hz budget.
+   ⚠⚠ IT IS PROVISIONAL AND IT IS THIS MACHINE'S (Astra: "a reasonable conservative starting point for the tested
+   Dell - not a universal performance guarantee. Draw count is a useful proxy, but resolution, geometry and device
+   capability still matter"). A weaker GPU, a denser part or a higher resolution can all miss the budget below this
+   line, and a stronger one can beat it above. Raise or lower it with new measurements, never by feel. */
+const SEE_INTO_DETAIL_LIMIT = 250;     // visible part meshes above which the see-through is simplified away
 /* `?sidetail=full` keeps the full effect whatever the build costs (the user override Astra asked for), `simple` forces
    the fallback for diagnosis, anything else is the measured rule. */
 function parseSeeIntoDetail(search) {
@@ -3028,7 +3038,7 @@ let seeIntoSimplified = false;         // true while a driven component is rende
 /* How many draws the interior pass would carry: every mesh of every visible placed part. Counted at a build change or
    a filament pick, NEVER per frame - Astra: "Decide when the build or filament selection changes, rather than
    switching repeatedly during orbit." */
-function sceneDrawCount() {
+function partMeshCount() {
   let n = 0;
   for (const inst of instances.values()) {
     if (!inst.group || !inst.group.visible) continue;
@@ -3040,7 +3050,7 @@ function sceneDrawCount() {
 function seeIntoDetailAllowed() {
   if (seeIntoDetailMode === 'full') return true;
   if (seeIntoDetailMode === 'simple') return false;
-  return sceneDrawCount() <= SEE_INTO_DETAIL_LIMIT;
+  return partMeshCount() <= SEE_INTO_DETAIL_LIMIT;
 }
 let seeIntoDriven = new Set();         // the supported keys wearing a translucent filament RIGHT NOW
 const seeIntoDrivenKey = key => !!seeInto && SEE_INTO_COMPONENTS.has(key) && !!translucentFamilyFor(key)
