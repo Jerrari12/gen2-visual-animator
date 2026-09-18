@@ -6,7 +6,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { generateManifest, migrateOfficialBuild, resolvePartPreview, REQUIREMENT as REQ,
-  shelfLipModes, SHELF_LIP_LABEL, buildAxisForType } from './generate.js';
+  shelfLipModes, SHELF_LIP_LABEL, buildAxisForType, gridfinitySizeOk } from './generate.js';
 import { resolveEntry } from './entry.js';
 import { FILAMENT_DB } from './filament-db.js';
 import { partMaterialSpec } from './part-material.js';
@@ -4659,6 +4659,13 @@ function optSeg(label, options, activeVal, onPick) {
 // sync mutates `build` directly — so tracking here counts local decisions only.
 async function setAllClosure(val) { track('opt:closure:' + val); drawersInBuild().forEach(u => u.closure = val); await regenerate(); }
 async function setAllStoppers(on) { track('opt:stoppers:' + (on ? 'all' : 'none')); build.removedStoppers = on ? [] : allStopperKeys(); await regenerate(); }
+// the Decor drawers that have a Gridfinity version; absence of `variant` is the standard drawer
+const gridfinityDrawers = () => drawersInBuild().filter(u => gridfinitySizeOk(+build.length, u));
+async function setAllVariant(v) {
+  track('opt:gridfinity:' + v);
+  for (const u of gridfinityDrawers()) { if (v === 'gridfinity') u.variant = v; else delete u.variant; }
+  await regenerate();
+}
 async function resetBuild() { track('opt:reset'); build = structuredClone(originalBuild); activeHandleStyle = null; activeFaceplateStyle = null; await regenerate(); }
 function renderOptions() {
   const box = $('build-options');
@@ -4676,6 +4683,15 @@ function renderOptions() {
     const removed = new Set(build.removedStoppers || []), keys = allStopperKeys();
     const stopActive = removed.size === 0 ? 'all' : (keys.length && keys.every(k => removed.has(k))) ? 'none' : null;
     box.appendChild(optSeg('Drawer stoppers', [{ label: 'All', val: 'all' }, { label: 'None', val: 'none' }], stopActive, v => setAllStoppers(v === 'all')));
+    // Gridfinity Decor drawers (v2609): an all-drawers master over every Decor
+    // drawer that HAS a Gridfinity version, beside the per-drawer ◀▶ on the
+    // identify card and the planner's per-unit choice. null = they disagree.
+    const gridable = gridfinityDrawers();
+    if (gridable.length) {
+      const vals = gridable.map(u => u.variant === 'gridfinity' ? 'gridfinity' : 'standard');
+      box.appendChild(optSeg('Decor drawers', [{ label: 'Standard', val: 'standard' }, { label: 'Gridfinity', val: 'gridfinity' }],
+        vals.every(v => v === vals[0]) ? vals[0] : null, setAllVariant));
+    }
   }
   if (currentFaceplateStyle() && availableFaceplateStyles().length > 1) {
     const row = document.createElement('div'); row.className = 'opt-row';
@@ -4710,6 +4726,13 @@ function renderOptions() {
   if (drawersInBuild().length) {
     box.appendChild(optSeg('Faceplate back cover', [{ label: 'Off', val: false }, { label: 'On', val: true }], !!build.backCover,
       async v => { track('opt:backcover:' + (v ? 'on' : 'off')); build.backCover = v; await regenerate(); }));
+    // otherwise "On" with only Gridfinity drawers changes nothing on screen or in the list
+    if (build.backCover && gridfinityDrawers().some(u => u.variant === 'gridfinity')) {
+      const note = document.createElement('div');
+      note.className = 'opt-note';
+      note.textContent = 'Not on the Gridfinity drawers: their tear-away front does the same job.';
+      box.appendChild(note);
+    }
   }
   // tabletop feet: printed TPU feet or purchased adhesive rubber feet - one-
   // for-one alternatives (same count, same spots); the BOM bills the pick.
@@ -5447,6 +5470,10 @@ let selAnchor = new THREE.Vector3(); // selected part's bbox-center offset from 
    zone throws a ReferenceError that takes the entire boot down — the same trap
    the #btn-theme wiring hit. */
 let lipUnit = null;
+/* The Decor drawer whose Standard / Gridfinity body the identify card is
+   switching (null otherwise). Assigned in setSelected, read by cycleVariant.
+   Declared up here for the same TDZ reason as lipUnit. */
+let variantUnit = null;
 function setSelected(id) {
   if (selectedId === id) return;
   // "did they discover tap-to-identify at all" — once per session, because the
@@ -5545,6 +5572,13 @@ function setSelected(id) {
     ? build.placed.find(p => p.id === inst.cfg.owner && p.fill === 'shelf') : null;
   $('identify-lip').classList.toggle('hidden', !lipUnit);
   if (lipUnit) $('lip-name').textContent = SHELF_LIP_LABEL[lipUnit.lip ?? null];
+  /* Standard / Gridfinity ◀▶ — on a Decor drawer BODY whose size has a
+     Gridfinity version (115-270, 1H / 1.5H / 2H). The drawer instance names its
+     planner unit in `owner`. Generated builds only. */
+  variantUnit = (build && rmType === 'Drawer' && inst.cfg.owner != null)
+    ? build.placed.find(p => p.id === inst.cfg.owner && gridfinitySizeOk(+build.length, p)) || null : null;
+  $('identify-variant').classList.toggle('hidden', !variantUnit);
+  if (variantUnit) $('variant-name').textContent = variantUnit.variant === 'gridfinity' ? 'Gridfinity drawer' : 'Standard drawer';
   card.classList.remove('hidden');
   // drawer-open interaction (assembled scenes only — the drawer must be resting
   // in its FINAL seat, not staged or mid-step). Selecting the drawer BODY pulls
@@ -6823,6 +6857,31 @@ const cycleLip = async (dir) => {
 };
 $('lip-prev').onclick = () => cycleLip(-1);
 $('lip-next').onclick = () => cycleLip(1);
+
+/* Two stops, so ◀ and ▶ both flip it. ⚠ The field's ABSENCE is the standard
+   drawer — never write `variant: 'standard'`, for the same share-link reason as
+   the lip. The drawer is open and the camera zoomed on it when this runs:
+   regenerate() deselects, which starts the zoom-out, and paging lands the step's
+   camera. Holding the pose and the pre-zoom view across the swap keeps the new
+   body sliding out in the same shot, and closing it still returns to the view
+   from before the zoom. */
+const cycleVariant = async () => {
+  if (!variantUnit || regenBusy) return;
+  const next = variantUnit.variant === 'gridfinity' ? 'standard' : 'gridfinity';
+  if (next === 'gridfinity') variantUnit.variant = next; else delete variantUnit.variant;
+  track('opt:gridfinity:' + next);
+  const keep = selectedId;
+  const home = dFocus.saved && { pos: dFocus.saved.pos.clone(), target: dFocus.saved.target.clone() };
+  const pose = { pos: camera.position.clone(), target: controls.target.clone() };
+  await regenerate();
+  if (!instances.has(keep)) return;
+  ++camTweenToken;                      // the deselect's zoom-out
+  camera.position.copy(pose.pos); controls.target.copy(pose.target);
+  if (home) dFocus.saved = home;
+  setSelected(keep);
+};
+$('variant-prev').onclick = cycleVariant;
+$('variant-next').onclick = cycleVariant;
 // remove the selected optional part (magnet closure for its drawer, or a 1W
 // stopper pair), then regenerate + update the BOM
 $('identify-remove').onclick = async () => {
@@ -7622,6 +7681,8 @@ function updatePointerLine() {
 let applyingRemote = false;
 // the only shelf-lip values that may cross the relay - anything else is dropped
 const LIP_MODES = new Set(['none', 'front', 'both']);
+// the only drawer-body values that may cross the relay (absence of `variant` = 'standard')
+const VARIANT_MODES = new Set(['standard', 'gridfinity']);
 function currentOpts() {
   if (!build) return null;
   const closures = {};
@@ -7632,9 +7693,14 @@ function currentOpts() {
   // key is what means the latter.
   const lips = {};
   for (const u of build.placed) if (u.fill === 'shelf') lips[u.id] = u.lip ?? 'none';
+  // Standard / Gridfinity drawer bodies, the same per-unit-map shape: every DECOR
+  // unit gets an entry, whether or not its size has a Gridfinity version - the
+  // generator keeps a variant on a size without one and renders the standard body
+  const variants = {};
+  for (const u of build.placed) if (u.fill === 'decor') variants[u.id] = u.variant === 'gridfinity' ? 'gridfinity' : 'standard';
   // buildPlate goes out RESOLVED (a build that never stored one sends the default, 'powder'), and LAST, in the
   // same key order as the planner's post - its echo guard compares the two JSON strings
-  return { closures, lips, removedStoppers: build.removedStoppers || [], wallStagger: !!build.wallStagger, handleStyle: build.handleStyle, faceStyle: build.faceStyle, backCover: !!build.backCover, feet: build.feet === 'adhesive' ? 'adhesive' : 'tpu', buildPlate: plateFinishOf(build) };
+  return { closures, lips, variants, removedStoppers: build.removedStoppers || [], wallStagger: !!build.wallStagger, handleStyle: build.handleStyle, faceStyle: build.faceStyle, backCover: !!build.backCover, feet: build.feet === 'adhesive' ? 'adhesive' : 'tpu', buildPlate: plateFinishOf(build) };
 }
 // The planner window, wherever we live: a popped-out tab talks to its opener,
 // the docked split-view iframe talks to its parent.
@@ -7726,7 +7792,7 @@ const hideBlocked = () => $('blocked-overlay').classList.add('hidden');
    half-broken channel (exactly how `lip` shipped: the planner posted the
    change, this key ignored it, the toggle did nothing). */
 const layoutKey = b => JSON.stringify([b.mount, +b.length, (b.placed || []).map(u =>
-  [u.id, u.x, u.y, u.w, u.hh, u.fill, u.shelves || 0, u.label || '', u.closure || '', u.lip || '', JSON.stringify(u.interior ?? null)])]);
+  [u.id, u.x, u.y, u.w, u.hh, u.fill, u.shelves || 0, u.label || '', u.closure || '', u.lip || '', u.variant || '', JSON.stringify(u.interior ?? null)])]);
 async function applyRemoteLayout(nb) {
   if (!booted || !nb || !Array.isArray(nb.placed) || !nb.placed.length) return;
   if (regenBusy) { // mid-regenerate from an earlier message — retry, never drop the newest state
@@ -7788,6 +7854,9 @@ addEventListener('message', async (e) => {
   if (PLATE_FINISHES.includes(o.buildPlate) && o.buildPlate !== plateFinishOf(build)) changed = true;
   if (o.lips) for (const u of build.placed)
     if (u.fill === 'shelf' && LIP_MODES.has(o.lips[u.id]) && o.lips[u.id] !== (u.lip ?? 'none')) changed = true;
+  if (o.variants) for (const u of build.placed)
+    if (u.fill === 'decor' && VARIANT_MODES.has(o.variants[u.id]) &&
+        o.variants[u.id] !== (u.variant === 'gridfinity' ? 'gridfinity' : 'standard')) changed = true;
   if (!changed) return;
   applyingRemote = true;
   try {
@@ -7803,6 +7872,10 @@ addEventListener('message', async (e) => {
       if (u.fill !== 'shelf' || !LIP_MODES.has(o.lips[u.id])) continue;
       const v = o.lips[u.id];
       if (v === 'none') delete u.lip; else u.lip = v;      // absence IS "no lip"
+    }
+    if (o.variants) for (const u of build.placed) {
+      if (u.fill !== 'decor' || !VARIANT_MODES.has(o.variants[u.id])) continue;
+      if (o.variants[u.id] === 'gridfinity') u.variant = 'gridfinity'; else delete u.variant;   // absence IS standard
     }
     await regenerate();
   } finally { applyingRemote = false; }

@@ -143,6 +143,86 @@ test('currentOpts relays the build plate RESOLVED, and as the last key', () => {
   assert.equal(legacy.lips[1], 'front');
 });
 
+/* ---- the Gridfinity drawer body (`variant`, 2026-09-18) ----
+   A per-unit field like `lip`, so it rides both channels and needs the same four
+   places: layoutKey, currentOpts, the incoming handler, and the planner's half.
+   Absence of `variant` is the standard drawer; the only value written is 'gridfinity'. */
+const VARIANT_MODES = (() => {
+  const m = viewerSrc.match(/const VARIANT_MODES = new Set\(\[([^\]]*)\]\)/);
+  assert.ok(m, 'VARIANT_MODES not found in main.js');
+  return [...m[1].matchAll(/'([^']*)'/g)].map((x) => x[1]);
+})();
+const drawerBuild = (variant, fill = 'decor') => ({
+  mount: 'tabletop', length: 185, gridW: 4, gridH: 4,
+  placed: [{ id: 1, x: 0, y: 2, w: 2, hh: 2, fill, shelves: 0, ...(variant ? { variant } : {}) }],
+});
+
+test('VARIANT_MODES is exactly standard and gridfinity', () => {
+  assert.deepEqual([...VARIANT_MODES].sort(), ['gridfinity', 'standard']);
+});
+
+test('layoutKey DISTINGUISHES a drawer-body-only change', () => {
+  const std = layoutKey(drawerBuild(null)), grid = layoutKey(drawerBuild('gridfinity'));
+  assert.equal(layoutKey(drawerBuild('gridfinity')), grid, 'layoutKey is not deterministic - extraction is wrong');
+  assert.notEqual(std, grid, 'layoutKey ignores `variant` - a planner layout that only switches a drawer body is dropped as an echo');
+});
+
+test('currentOpts relays a body per DECOR drawer, right after lips', () => {
+  assert.equal(currentOpts(drawerBuild(null)).variants[1], 'standard', 'absence must relay as standard');
+  assert.equal(currentOpts(drawerBuild('gridfinity')).variants[1], 'gridfinity');
+  assert.equal(currentOpts(drawerBuild('bogus')).variants[1], 'standard', 'an unknown stored value is relayed raw');
+  for (const fill of ['classic', 'shelf', 'cabinet'])
+    assert.ok(!(1 in currentOpts(drawerBuild('gridfinity', fill)).variants), `a ${fill} unit got a variants entry`);
+  // the planner's echo guard compares JSON strings, so the key sits where the planner puts it
+  const keys = Object.keys(currentOpts(drawerBuild(null)));
+  assert.equal(keys[keys.indexOf('lips') + 1], 'variants', `variants is not right after lips: ${keys.join(', ')}`);
+});
+
+/* The viewer's INCOMING buildOptions half, executed: everything from the channel check to
+   the end of the apply block, run with stubs for the two module lets it touches. */
+const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
+const applyOpts = (() => {
+  const a = viewerSrc.indexOf("if (d.gen2 !== 'buildOptions'");
+  const endMark = '} finally { applyingRemote = false; }';
+  const b = viewerSrc.indexOf(endMark, a);
+  assert.ok(a >= 0 && b > a, 'the incoming buildOptions block was not found in main.js');
+  const fn = new AsyncFunction('d', 'build', 'regenerate', 'LIP_MODES', 'VARIANT_MODES', 'PLATE_FINISHES', 'plateFinishOf',
+    `let applyingRemote = false; const regenBusy = false; ${viewerSrc.slice(a, b + endMark.length)}`);
+  return async (b0, opts) => {
+    let regens = 0;
+    await fn({ gen2: 'buildOptions', opts }, b0, async () => { regens++; }, new Set(LIP_MODES), new Set(VARIANT_MODES),
+      PLATE_FINISHES, plateFinishOf);
+    return regens;
+  };
+})();
+
+test('an incoming body switch is applied, and absence is written for standard', async () => {
+  // the control: the extracted block really is the handler (a closure change applies)
+  const c = drawerBuild(null);
+  assert.equal(await applyOpts(c, { closures: { 1: 'magnet' } }), 1, 'extraction is wrong: a closure change did not apply');
+  assert.equal(c.placed[0].closure, 'magnet');
+
+  const b = drawerBuild(null);
+  assert.equal(await applyOpts(b, { variants: { 1: 'gridfinity' } }), 1);
+  assert.equal(b.placed[0].variant, 'gridfinity');
+  assert.equal(await applyOpts(b, { variants: { 1: 'gridfinity' } }), 0, 'an echo regenerated');
+  assert.equal(await applyOpts(b, { variants: { 1: 'standard' } }), 1);
+  assert.ok(!('variant' in b.placed[0]), 'standard must be written as ABSENCE, never variant: "standard"');
+});
+
+test('an incoming body switch drops hostile values and non-decor units', async () => {
+  for (const v of [true, '', 'Gridfinity', 'classic', {}, 1]) {
+    const b = drawerBuild('gridfinity');
+    assert.equal(await applyOpts(b, { variants: { 1: v } }), 0, `${JSON.stringify(v)} was taken as a change`);
+    assert.equal(b.placed[0].variant, 'gridfinity', `${JSON.stringify(v)} overwrote the stored body`);
+  }
+  for (const fill of ['classic', 'shelf']) {
+    const b = drawerBuild(null, fill);
+    assert.equal(await applyOpts(b, { variants: { 1: 'gridfinity' } }), 0, `a ${fill} unit took a drawer body`);
+    assert.ok(!('variant' in b.placed[0]));
+  }
+});
+
 /* ---- cross-repo tripwire: needs the planner checkout, skips without it ----
    ⚠ This DOES skip in the viewer's CI, which checks out only this repo - so it
    is a local-dev tripwire, NOT the protection. The protection is the executable

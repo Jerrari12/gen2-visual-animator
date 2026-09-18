@@ -180,6 +180,32 @@ const UT = {
 
 const H_LABEL = { 1: '05', 2: '1', 3: '15', 4: '2', 6: '3' };
 
+/* ---- Gridfinity Decor drawers (v2609, 2026-09-18) ---------------------------
+   A per-unit VARIANT of the Decor drawer, never a fill: `u.variant ===
+   'gridfinity'` on a decor unit, and its ABSENCE is the standard drawer (never
+   write `variant: 'standard'` or `null`, or every share link that predates the
+   feature starts round-tripping a field it never carried). Only the drawer BODY
+   changes: the outer envelope is the standard Decor drawer's to 0.02 mm on all
+   sixty (vault measurements.md "Gridfinity Decor drawers (v2609)"), so placement,
+   faceplate, handle, magnet clip and stoppers are all the Decor drawer's.
+   Two differences the BOM carries:
+     - the drawer prints with a TEAR-AWAY FRONT that closes the opening. Left in
+       (Joey: "which most people will use") it does the faceplate back cover's
+       job and physically blocks one, so a Gridfinity drawer takes NO back cover;
+     - four optional 6x2 mm magnet slots per full grid cell - a note, not a row.
+   Exists for 115-270 at 1H/1.5H/2H only (no 59, 0.5H or 3H). A value on any
+   other unit is KEPT (it survives a later resize back into range, like the shelf
+   lip's "both") and simply renders the standard drawer.
+   ⚠ Mirrored by the planner (`GEN2.gridfinity` in data.js). Keep both in step. */
+export const GRIDFINITY = {
+  lengths: [115, 165, 185, 240, 270],
+  hh: [2, 3, 4],                                   // 1H, 1.5H, 2H in half-units
+  cellsDeep: { 115: 2, 165: 3, 185: 4, 240: 5, 270: 6 },
+};
+export const gridfinitySizeOk = (L, u) =>
+  !!u && u.fill === 'decor' && GRIDFINITY.lengths.includes(+L) && GRIDFINITY.hh.includes(u.hh);
+export const isGridfinity = (L, u) => gridfinitySizeOk(L, u) && u.variant === 'gridfinity';
+
 // Shared-hardware pages (same for every collection). Per-length pages live in
 // LINKS_BY_LEN below. All URLs mirror the planner's verified LINK_OVERRIDES
 // (gen2-planner-main/js/data.js is the source of truth — update both together).
@@ -390,6 +416,13 @@ const LINKS_BY_LEN = {
     240: { p: 'https://www.printables.com/model/1322479-gen2-240-decor-drawers-all', t: 'https://than.gs/m/1360074', m: 'https://makerworld.com/en/models/1516607-gen2-240-decor-drawers-all' },
     270: { p: 'https://www.printables.com/model/1062961-gen2-270-decor-drawers-all', t: 'https://than.gs/m/1171387', m: 'https://makerworld.com/en/models/1938424-gen2-270-decor-drawers-all' },
   },
+  /* Gridfinity Decor drawers - the first MODULITH-named pages (Joey 2026-09-18):
+     `MODULITH <L> Gridfinity Decor Drawers`, one per Collection. EMPTY until they
+     are published, and deliberately NO 185 fallback: absent means "not published
+     for this length", so the row reads "coming soon" instead of opening the wrong
+     download. Fill all five when the Printables URLs exist (mirror the planner's
+     LINK_OVERRIDES in the same commit). */
+  gridfinity: {},
   classic: { // Thangs pages mirrored from the planner 2026-07-12 (240 new; 59 has none yet)
     59:  { p: 'https://www.printables.com/model/234780-gen2-59-classic-drawers-all', m: 'https://makerworld.com/en/models/2364890-gen2-59-classic-drawers-all' },
     115: { p: 'https://www.printables.com/model/1143243-gen2-115-classic-drawers-all', t: 'https://thangs.com/designer/Jerrari/3d-model/GEN2%20115%20Classic%20Drawers-1069181', m: 'https://makerworld.com/en/models/755424-gen2-115-classic-drawers-all' },
@@ -632,6 +665,7 @@ export function generateManifest(build) {
     extender: LINKS_BY_LEN.extender[L] || LINKS_BY_LEN.extender[185],
     shelfInsert: LINKS_BY_LEN.shelfInsert[L] || null,   // no fallback — see the table
     decor:   LINKS_BY_LEN.decor[L] || LINKS_BY_LEN.decor[185],
+    gridfinity: LINKS_BY_LEN.gridfinity[L] || null,     // no fallback - see the table
     classic: LINKS_BY_LEN.classic[L] || LINKS_BY_LEN.classic[185],
     covers:  LINKS_BY_LEN.covers[L] || LINKS_BY_LEN.covers[185],
     fr:      LINKS_BY_LEN.fr[L] || LINKS_BY_LEN.fr[185],
@@ -1859,9 +1893,25 @@ export function generateManifest(build) {
     // (Joey-verified 2026-07-06). Other non-1H heights are still derived (warned).
     // Classic bodies are their own exports placed off their measured back — no nudge.
     const drwFwd = !isClassic && u.hh === 4 ? 2 : 0;
-    const drwNode = `${isClassic ? 'ClassicDrawer' : 'DecorDrawer'}_${L}-${u.w}W-${H}H`;
-    inst.push({ id: `drw${i}`, node: drwNode, pos: [cx + 0.16, bottom + 5.72, (isClassic ? classicZ : 5.24) + drwFwd] });
-    add(drwNode, `${isClassic ? 'Classic' : 'Decor'} Drawer ${L}-${u.w}W-${H}H`, 'Drawer', isClassic ? links.classic : links.decor);
+    // Gridfinity: same envelope as the Decor drawer it replaces (0.02 mm), so
+    // the same pos and the same 2H nudge; only the body, its row and its
+    // links change - and it takes no back cover (its tear-away front is one)
+    const grid = !isClassic && isGridfinity(L, u);
+    const hasBc = bcOn && !grid;
+    const drwNode = isClassic ? `ClassicDrawer_${L}-${u.w}W-${H}H`
+      : grid ? `GridfinityDecorDrawer_${L}-${u.w}W-${H}H` : `DecorDrawer_${L}-${u.w}W-${H}H`;
+    // `owner` names the planner unit, like the drawer's magnet clip: the identify
+    // card's Standard / Gridfinity switch finds the unit to change through it
+    inst.push({ id: `drw${i}`, node: drwNode, pos: [cx + 0.16, bottom + 5.72, (isClassic ? classicZ : 5.24) + drwFwd], owner: u.id });
+    if (grid) {
+      const across = 2 * u.w - 1, deep = GRIDFINITY.cellsDeep[L];
+      add(drwNode, `Gridfinity Decor Drawer ${L}-${u.w}W-${H}H`, 'Drawer', links.gridfinity, 1, false, false, null,
+        `${across} x ${deep} Gridfinity grid plus a half-grid channel · up to ${4 * across * deep} optional 6x2 mm magnets` +
+        ` (4 per cell) · tear-away front: leave it in and no back cover is needed.` +
+        (links.gridfinity ? '' : ' Not published yet · the model is coming soon.'));
+    } else {
+      add(drwNode, `${isClassic ? 'Classic' : 'Decor'} Drawer ${L}-${u.w}W-${H}H`, 'Drawer', isClassic ? links.classic : links.decor);
+    }
     if (hasMag) {
       // the clip + magnet are already counted once per magnet drawer in the case
       // loop (qty 2 covers this drawer-side clip and the case-back clip); no add.
@@ -1890,7 +1940,9 @@ export function generateManifest(build) {
     // drawer-body nudge (it's placed to sit flush regardless).
     const code = `${u.w}W-${H}H`;
     inst.push({ id: `fp${i}`, node: face.node(code), pos: [cx + 0.47, bottom + 3.72, face.z - dz], rides: `drw${i}` });
-    if (bcOn) {
+    // per DRAWER from here on: a Gridfinity drawer's tear-away front blocks the
+    // cover (every `bcOn` below this line in the loop is `hasBc`)
+    if (hasBc) {
       // back cover: seats in the drawer-front gap BEHIND the plate — z-center =
       // the mounting plane (fp back face, 92.57) + 0.225, bottom = fp bottom
       // + 7.22 (DERIVED from the EdgeLabel B blend @1W-1H — verify on a print;
@@ -1954,7 +2006,7 @@ export function generateManifest(build) {
       const hasAccent = face.extras && u.hh !== 1;
       const homeMove = { move: [ // everyone glides home together at the end
         { id: `drw${i}`, by: [0, 0, -40] }, ...magIds.map(m => ({ id: m.id, by: [0, 0, -40] })),
-        ...(bcOn ? [{ id: `bc${i}`, by: [0, 0, -40] }] : []),
+        ...(hasBc ? [{ id: `bc${i}`, by: [0, 0, -40] }] : []),
         { id: `fp${i}`, by: [0, 0, -40] },
         ...(hasAccent ? [{ id: `fa${i}`, by: [0, 0, -40] }] : []),
         ...(face.extras ? [{ id: `fl${i}`, by: [0, 0, -40] }] : []),
@@ -1988,7 +2040,7 @@ export function generateManifest(build) {
         ...(face.hasHandle ? [{ id: `h${i}` }, ...[0, 1].map(n => ({ id: `hs${i}_${n}` }))] : []),
         ...(hasAccent ? [{ id: `fa${i}` }] : []),
         ...(face.extras ? [{ id: `fl${i}` }] : []),
-        ...(bcOn ? [{ id: `bc${i}` }] : []),
+        ...(hasBc ? [{ id: `bc${i}` }] : []),
       ];
       fpDemo.push(
         { move: [{ id: `drw${i}`, by: [0, 0, 40] }, ...magIds.map(m => ({ id: m.id, by: [0, 0, 40] }))] },
@@ -2018,7 +2070,7 @@ export function generateManifest(build) {
         // hides their heads. One camera swing serves both (Joey 2026-07-24) —
         // the screws are the reason a bolt-on handle needs bought hardware, so
         // the step shows them rather than leaving the handle magically fixed.
-        ...(face.hasHandle || bcOn ? [{ camera: camBack }] : []),
+        ...(face.hasHandle || hasBc ? [{ camera: camBack }] : []),
         ...(face.hasHandle ? [
           // both screws drive forward 30 mm into the plate, together. `at` is
           // the same [0, HOV, 40] every other dressing piece lands on (the
@@ -2028,7 +2080,7 @@ export function generateManifest(build) {
           // reads as threading rather than sliding into place
           { enter: [0, 1].map(n => ({ id: `hs${i}_${n}`, at: [0, HOV, 40], from: [0, 0, -30], spin: 3 })), sync: true },
         ] : []),
-        ...(bcOn ? [
+        ...(hasBc ? [
           // cover arrives behind riding high, forward 20 against the plate back, down 4 onto its hooks
           { enter: [{ id: `bc${i}`, at: [0, HOV + 4, 20], from: [0, 0, -35], via: [[0, 0, 20], [0, -4, 20]] }] },
         ] : []),
@@ -2037,7 +2089,7 @@ export function generateManifest(build) {
         homeMove,
       );
     } else {
-      if (bcOn) fpFades.push({ id: `bc${i}` });
+      if (hasBc) fpFades.push({ id: `bc${i}` });
       fpFades.push({ id: `fp${i}` });
       if (face.extras && u.hh !== 1) fpFades.push({ id: `fa${i}` });
       if (face.extras) fpFades.push({ id: `fl${i}` });
@@ -2237,8 +2289,14 @@ export function generateManifest(build) {
       : face.hasHandle
         ? `hold the ${handleStyle.label} against the front and thread 2× M3×6 button head screws in from behind the plate · go gently and stop as soon as they seat, the screws bite straight into plastic and will strip if you overtighten`
         : '';
-    // on a bare plate the back cover IS the whole sub-assembly, so it leads
-    const bcClause = bcOn ? (dress ? ', then clip the back cover in from behind' : 'clip the back cover in from behind') : '';
+    // on a bare plate the back cover IS the whole sub-assembly, so it leads.
+    // Per drawer since the Gridfinity drawers: their tear-away front does the
+    // cover's job, so the clause is about the standard Decor drawers only, and
+    // a build of nothing but Gridfinity drawers never mentions the cover.
+    const anyBc = bcOn && units.some(v => v.fill === 'decor' && !isGridfinity(L, v));
+    const gridBc = bcOn && units.some(v => isGridfinity(L, v));
+    const bcClause = anyBc ? (dress ? ', then clip the back cover in from behind' : 'clip the back cover in from behind') +
+      (gridBc ? ' (not on the Gridfinity drawers - leave their tear-away front in instead)' : '') : '';
     const prep = dress || bcClause
       ? `Assemble the faceplate first: ${dress}${bcClause}. `
       : "The faceplate prints complete - its grip is part of the plate, so there's nothing to bolt on and no hardware to buy. ";
@@ -2355,6 +2413,9 @@ function imgFor(node, type) {
   if ((m = node.match(/^CaseExtender_(\d+)-(\d)W-1H$/))) return `img/parts/Case Extender ${m[1]}-${m[2]}W.png`;
   if ((m = node.match(/^(\d+)-(\d)W-(\w+)H_Case$/))) return `img/parts/Case ${m[1]}-${m[2]}W-${m[3]}H.png`;
   if ((m = node.match(/^DecorDrawer_(\d+)-(\d)W-(\w+)H$/))) return `img/parts/Decor Drawer ${m[1]}-${m[2]}W-${m[3]}H.png`;
+  // Gridfinity Decor drawers (2026-09-18 batch: each length's own Decor Drawer
+  // render scene, validated to reproduce a shipped Decor Drawer thumbnail exactly)
+  if ((m = node.match(/^GridfinityDecorDrawer_(\d+)-(\d)W-(\w+)H$/))) return `img/parts/Gridfinity Decor Drawer ${m[1]}-${m[2]}W-${m[3]}H.png`;
   // classic drawers: per-length renders for all six lengths (2026-07-11 batch)
   if ((m = node.match(/^ClassicDrawer_(\d+)-(\d)W-(\w+)H$/))) return `img/parts/Classic Drawer ${m[1]}-${m[2]}W-${m[3]}H.png`;
   // covers + foot rails (2026-07-10 batch, all six lengths): the render files

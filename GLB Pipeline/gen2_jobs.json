@@ -539,6 +539,56 @@
       "code_regex": "270-\\d+W-1H",
       "name_template": "CaseExtender_{code}",
       "depth_mode": "center"
+    },
+    {
+      "name": "115 Gridfinity Decor Drawers",
+      "_note": "Objects '<L>-<W>W-<H>H Gridfinity Decor Drawer' in collection GridfinityDecor_<L>, built from the v2609 STLs by build_gridfinity_drawer_blend.py (identity import: the STLs' low-y end is the drawer FRONT, which the glTF exporter lands at +Z like every DecorDrawer GLB; the build fails closed on span, right-side-up, channel-on-the-right and tear-away-front-at-the-front). Same outer envelope as DecorDrawer_<code> (88W-13 x L-5.7 x 50/78/106). Full detail, no decimation: 7k-89k triangles.",
+      "blend": "D:\\Code Projects\\GEN2 Visual Animator\\Blender Files\\Gridfinity Decor Drawers\\GEN2 GLB Exporter - Gridfinity Decor Drawers.blend",
+      "out": "D:\\Code Projects\\GEN2 Visual Animator\\GLB Library\\115\\Gridfinity",
+      "select": "collection:GridfinityDecor_115",
+      "code_regex": "115-\\d+W-\\d+H",
+      "name_template": "GridfinityDecorDrawer_{code}",
+      "depth_mode": "center"
+    },
+    {
+      "name": "165 Gridfinity Decor Drawers",
+      "_note": "Objects '<L>-<W>W-<H>H Gridfinity Decor Drawer' in collection GridfinityDecor_<L>, built from the v2609 STLs by build_gridfinity_drawer_blend.py (identity import: the STLs' low-y end is the drawer FRONT, which the glTF exporter lands at +Z like every DecorDrawer GLB; the build fails closed on span, right-side-up, channel-on-the-right and tear-away-front-at-the-front). Same outer envelope as DecorDrawer_<code> (88W-13 x L-5.7 x 50/78/106). Full detail, no decimation: 7k-89k triangles.",
+      "blend": "D:\\Code Projects\\GEN2 Visual Animator\\Blender Files\\Gridfinity Decor Drawers\\GEN2 GLB Exporter - Gridfinity Decor Drawers.blend",
+      "out": "D:\\Code Projects\\GEN2 Visual Animator\\GLB Library\\165\\Gridfinity",
+      "select": "collection:GridfinityDecor_165",
+      "code_regex": "165-\\d+W-\\d+H",
+      "name_template": "GridfinityDecorDrawer_{code}",
+      "depth_mode": "center"
+    },
+    {
+      "name": "185 Gridfinity Decor Drawers",
+      "_note": "Objects '<L>-<W>W-<H>H Gridfinity Decor Drawer' in collection GridfinityDecor_<L>, built from the v2609 STLs by build_gridfinity_drawer_blend.py (identity import: the STLs' low-y end is the drawer FRONT, which the glTF exporter lands at +Z like every DecorDrawer GLB; the build fails closed on span, right-side-up, channel-on-the-right and tear-away-front-at-the-front). Same outer envelope as DecorDrawer_<code> (88W-13 x L-5.7 x 50/78/106). Full detail, no decimation: 7k-89k triangles.",
+      "blend": "D:\\Code Projects\\GEN2 Visual Animator\\Blender Files\\Gridfinity Decor Drawers\\GEN2 GLB Exporter - Gridfinity Decor Drawers.blend",
+      "out": "D:\\Code Projects\\GEN2 Visual Animator\\GLB Library\\185\\Gridfinity",
+      "select": "collection:GridfinityDecor_185",
+      "code_regex": "185-\\d+W-\\d+H",
+      "name_template": "GridfinityDecorDrawer_{code}",
+      "depth_mode": "center"
+    },
+    {
+      "name": "240 Gridfinity Decor Drawers",
+      "_note": "Objects '<L>-<W>W-<H>H Gridfinity Decor Drawer' in collection GridfinityDecor_<L>, built from the v2609 STLs by build_gridfinity_drawer_blend.py (identity import: the STLs' low-y end is the drawer FRONT, which the glTF exporter lands at +Z like every DecorDrawer GLB; the build fails closed on span, right-side-up, channel-on-the-right and tear-away-front-at-the-front). Same outer envelope as DecorDrawer_<code> (88W-13 x L-5.7 x 50/78/106). Full detail, no decimation: 7k-89k triangles.",
+      "blend": "D:\\Code Projects\\GEN2 Visual Animator\\Blender Files\\Gridfinity Decor Drawers\\GEN2 GLB Exporter - Gridfinity Decor Drawers.blend",
+      "out": "D:\\Code Projects\\GEN2 Visual Animator\\GLB Library\\240\\Gridfinity",
+      "select": "collection:GridfinityDecor_240",
+      "code_regex": "240-\\d+W-\\d+H",
+      "name_template": "GridfinityDecorDrawer_{code}",
+      "depth_mode": "center"
+    },
+    {
+      "name": "270 Gridfinity Decor Drawers",
+      "_note": "Objects '<L>-<W>W-<H>H Gridfinity Decor Drawer' in collection GridfinityDecor_<L>, built from the v2609 STLs by build_gridfinity_drawer_blend.py (identity import: the STLs' low-y end is the drawer FRONT, which the glTF exporter lands at +Z like every DecorDrawer GLB; the build fails closed on span, right-side-up, channel-on-the-right and tear-away-front-at-the-front). Same outer envelope as DecorDrawer_<code> (88W-13 x L-5.7 x 50/78/106). Full detail, no decimation: 7k-89k triangles.",
+      "blend": "D:\\Code Projects\\GEN2 Visual Animator\\Blender Files\\Gridfinity Decor Drawers\\GEN2 GLB Exporter - Gridfinity Decor Drawers.blend",
+      "out": "D:\\Code Projects\\GEN2 Visual Animator\\GLB Library\\270\\Gridfinity",
+      "select": "collection:GridfinityDecor_270",
+      "code_regex": "270-\\d+W-\\d+H",
+      "name_template": "GridfinityDecorDrawer_{code}",
+      "depth_mode": "center"
     }
   ]
 }
