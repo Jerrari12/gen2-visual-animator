@@ -567,7 +567,10 @@ const QUALITY = {
 // means a device that cannot hold it steps back to High and stops there
 const QUALITY_ORDER = ['veryhigh', 'high', 'balanced', 'fast'];
 var qualityReady = false;   // hoisted (see applyStageTheme) — true once a tier has been applied
-let quality = 'high';
+/* ⚠ VERY HIGH IS THE DEFAULT since 2026-09-18 (Joey: "can we make very high default?", after the translucency live check on the
+   showcase laptop). A visitor with no explicit pick starts here; the silent auto-downgrade still steps a device that cannot hold
+   it down to High (QUALITY_ORDER), and an explicit pick is still honoured and locks that out. */
+let quality = 'veryhigh';
 let qualityLocked = false;   // an explicit user pick stops the auto-downgrade fighting them
 // ⚠ An EXPLICIT pick persists; an AUTO-downgrade does not outlive the tab.
 // It shipped persisting both, which meant one bad three-second window — a
@@ -2412,6 +2415,9 @@ function updateCavityFill() {
 
 // ---- the topbar control ----------------------------------------------------
 const btnQuality = document.getElementById('btn-quality');
+/* The docked (embed) viewer hides #topbar, which took the quality pill with it - so a planner user could not reach Very High
+   without popping the studio out (Joey 2026-09-18). In embed the pill moves onto the stage, top-right, above the Parts pill. */
+if (IS_EMBED && btnQuality) document.getElementById('stage-wrap')?.appendChild(btnQuality);
 const QUALITY_LABEL = { veryhigh: 'Very High', high: 'High', balanced: 'Balanced', fast: 'Fast' };
 function labelQualityBtn() {
   if (!btnQuality) return;

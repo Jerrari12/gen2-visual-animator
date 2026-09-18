@@ -65,7 +65,7 @@ body {
 }
 #btn-quality:hover { border-color: var(--accent); color: var(--ink); }
 /* the tier is legible at a glance without reading the word */
-#btn-quality[data-q="high"] { color: var(--accent); }
+#btn-quality[data-q="veryhigh"], #btn-quality[data-q="high"] { color: var(--accent); }
 #btn-quality[data-q="fast"] { opacity: 0.75; }
 @media (max-width: 560px) { #btn-quality { display: none; } }
 
@@ -1117,3 +1117,18 @@ body.plate-overhang-on.part-plate #part-measure { top: 78px; }
 /* the site's narrowest media column is 300px - keep the strip to one line
    there so the dropped pills never collide with a wrapped second line */
 @media (max-width: 360px) { #plate-overhang { font-size: 11px; } }
+
+/* The quality pill in the DOCKED viewer (Joey 2026-09-18): #topbar is hidden there, so main.js moves the pill onto the stage.
+   It sits top-right above the Parts pill (top 76) and wears the Parts pill's own shape. ⚠ After the dark-stage block on
+   purpose - same specificity, so the later rule wins - and it overrides the 560px hide: the dock is narrow by design. */
+body.embed #btn-quality {
+  display: block; position: absolute; top: 32px; right: 12px; z-index: 5; margin: 0; min-width: 0;
+  font-size: 12.5px; padding: 7px 14px;
+  background: var(--panel); color: var(--accent);
+  border: 1px solid var(--panel-border); border-right: 3px solid var(--accent);
+  backdrop-filter: blur(4px); box-shadow: 0 2px 10px rgba(0,0,0,.08);
+}
+body.embed #btn-quality::before { content: 'Quality: '; color: var(--ink-soft); font-weight: 600; }
+body.embed #btn-quality[data-q="balanced"] { color: var(--ink); }
+body.embed #btn-quality:hover { border-color: var(--accent); }
+body.embed.fm-open #btn-quality { display: none; }   /* the filament menu docks right, over this corner */
