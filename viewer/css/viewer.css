@@ -500,6 +500,12 @@ body.fm-open #note-panel { display: none; }
   margin-top: 9px; font-size: 10.5px; line-height: 1.4;
   color: var(--ink-soft);
 }
+/* the identify card's one commission line, right under its paid link(s)
+   (2026-09-18 - it replaced a four-line paragraph; main.js cardDisclosure) */
+.link-note {
+  margin-top: 5px; font-size: 10.5px; line-height: 1.35;
+  color: var(--ink-soft);
+}
 /* the Polymaker first-purchase deal — user benefit, so it reads a step above
    the fine print (same slot, accent ink, slightly larger) */
 .fm-deal {
@@ -818,6 +824,42 @@ body.embed-preview.embed-hint-on #embed-hint {
   background: rgba(255,255,255,.92); border: 1px solid var(--panel-border);
   border-radius: 999px; padding: 6px 14px;
   box-shadow: 0 4px 14px rgba(0,0,0,.12);
+}
+
+/* ---- the shared paid-link line (2026-09-18) ----
+   ONE line at the bottom of the stage while a paid link is on screen (main.js
+   updatePaidNote): Amazon's required sentence, verbatim, plus Polymaker's when
+   one of its links shows and nothing else names it. It is the "clearly and prominently on your Site"
+   half of the disclosure, so it is never a click away; the links carry the
+   "near the link" half themselves. pointer-events none, so it never blocks a
+   tap; whatever is anchored to the stage's bottom edge makes room for its
+   measured height (--paid-note-h, set by updatePaidNote). */
+#paid-note {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 36;
+  padding: 4px 14px 5px; text-align: center;
+  font-size: 10.5px; line-height: 1.35; color: var(--ink-soft);
+  background: var(--panel); border-top: 1px solid var(--panel-border);
+  backdrop-filter: blur(4px);
+  pointer-events: none;
+}
+@media (min-width: 561px) {
+  body.paid-note-on #identify-card,
+  body.paid-note-on #embed-begin,
+  body.paid-note-on #incomplete-status { bottom: calc(16px + var(--paid-note-h, 24px)); }
+  body.paid-note-on #tap-hint { bottom: calc(20px + var(--paid-note-h, 24px)); }
+  body.paid-note-on.embed-preview #identify-card { bottom: calc(72px + var(--paid-note-h, 24px)); }
+  /* the one-time orbit hint lasts until the first tap ON THE MODEL (or 9 s),
+     and the Parts pill is not the model - its buy chips can bring the line up
+     while the hint is still showing, and the lifted Begin pill would cover it */
+  body.paid-note-on.embed-preview.embed-hint-on #embed-hint { bottom: calc(64px + var(--paid-note-h, 24px)); }
+  body.paid-note-on.incomplete #identify-card { bottom: calc(88px + var(--paid-note-h, 24px)); }
+}
+/* phones: the card, parts list and filament picker are bottom sheets - the
+   line sits in the open sheet's own bottom padding instead of lifting it */
+@media (max-width: 560px) {
+  body.paid-note-on #identify-card,
+  body.paid-note-on #checklist-panel,
+  body.paid-note-on #filament-menu { padding-bottom: calc(16px + var(--paid-note-h, 40px)); }
 }
 
 /* Live-sync blocked veil: the planner reported an un-instruction-able layout.

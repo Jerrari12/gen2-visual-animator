@@ -146,9 +146,10 @@
              never "15% off" unqualified. Accurate for a MIXED menu: Elegoo goes
              through Amazon and Polymaker through Joey's ambassador links (both
              paid), Printed Solid stays a plain product link — individual links
-             wear their own "· paid link" marking via isPaidLink() -->
+             wear their own "· paid link" marking via isPaidLink(). The fuller
+             disclosure is the shared #paid-note line (2026-09-18), shown while
+             a paid link is on screen - it replaced a paragraph that sat here. -->
         <div class="fm-deal">🏷 15% off your first Polymaker purchase - code <b>JERRARI</b> · the Polymaker links here apply it for you</div>
-        <div class="fm-note">Some links here are paid links - I earn a commission if you buy through them, at no extra cost to you. As an Amazon Associate I earn from qualifying purchases; I&rsquo;m also a Polymaker Ambassador.</div>
       </div>
 
       <div id="outro-overlay" class="hidden">
@@ -207,6 +208,10 @@
            non-modal status over the live preview. Filled by main.js setIncomplete();
            body.incomplete hides the instruction chrome around it. -->
       <div id="incomplete-status" class="hidden" role="status"><b></b><span></span></div>
+      <!-- Paid-link disclosure: ONE shared line at the bottom of the stage, shown
+           only while a paid link is on screen (main.js updatePaidNote). Carries
+           Amazon's required sentence verbatim; the links themselves disclose too. -->
+      <div id="paid-note" class="hidden"></div>
       <div id="embed-hint"><span>🖱 Drag to orbit &middot; scroll to zoom &middot; tap parts to color them</span></div>
 
       <!-- ?part=&mode=preview only: restore the framed view + idle spin after the user orbits -->

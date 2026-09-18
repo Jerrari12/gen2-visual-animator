@@ -4451,19 +4451,127 @@ function isPaidLink(href) {
   catch (e) { return false; }
 }
 
-function linkEl(text, href, ev) {
+function linkEl(text, href, ev, mark = true) {
   const a = document.createElement('a');
   a.className = 'dl-link';
   a.href = href;
   a.target = '_blank';
   // every paid link is marked AT the link (FTC proximity) and carries
-  // rel=sponsored (the planner's buy buttons already do)
+  // rel=sponsored (the planner's buy buttons already do). mark=false is for a
+  // caller that puts its own disclosure line directly under the link instead
+  // (the identify card) - rel=sponsored stays either way, #paid-note reads it
   const paid = isPaidLink(href);
   a.rel = paid ? 'noopener sponsored' : 'noopener';
-  a.textContent = paid ? text + ' · paid link' : text;
+  a.textContent = paid && mark ? text + ' · paid link' : text;
   a.addEventListener('click', () => track(ev || 'out:' + outTarget(href)));
   return a;
 }
+/* Paid-link disclosure, consolidated 2026-09-18 (Joey: the paragraph in the
+   identify card ate the card and read as "super serious"; Astra's layout). Two
+   parts, from the sources read that day:
+   1. NEAR each paid link: the "· paid link" label linkEl adds (FTC Endorsement
+      Guides FAQ: "'Paid link' right next to an affiliate link should be an
+      adequate disclosure"; the same FAQ says a bare "affiliate link" may not be
+      understood - never swap the label for that), or, in the identify card, a
+      store-named button with one plain commission line right under it.
+   2. ON THE SITE, clearly: Amazon's own sentence (Associates Operating
+      Agreement s.5: "clearly and prominently state ... on your Site ...: 'As an
+      Amazon Associate I earn from qualifying purchases.'" - kept VERBATIM, a
+      house rule: the agreement also accepts "any substantially similar
+      statement previously allowed", but the exact words need no judgement
+      call). It lives in ONE shared line, #paid-note, at the bottom of
+      the stage while any Amazon link is on screen, instead of in every panel.
+      A visible Polymaker link adds the Ambassador sentence there, unless the
+      identify card's own line already names Polymaker.
+   Visibility is read from the DOM (a[rel~=sponsored], set by linkEl and
+   markFmBuy on every paid link), so a new surface is covered without being
+   wired in; the interval is the catch-all, schedulePaidNote the fast path.
+   ⚠ `var`, not const/let: the hooks that call schedulePaidNote can run during
+   the boot's top-level awaits, BEFORE this part of the module has evaluated -
+   a let/const read there is a TDZ ReferenceError (the qualityReady lesson). */
+var PAID_PROGRAMS = [
+  ['amazon',    /(^|\.)(amzn\.to|amazon\.[a-z.]+)$/],
+  ['polymaker', /(^|\.)shop\.polymaker\.com$/],
+];
+// the store a link lands on, for button text ("Get filament on Amazon")
+var STORE_PHRASES = [
+  [/(^|\.)(amzn\.to|amazon\.[a-z.]+)$/, 'on Amazon'],
+  [/(^|\.)shop\.polymaker\.com$/,       'from Polymaker'],
+  [/(^|\.)printedsolid\.com$/,          'from Printed Solid'],
+];
+function hostOf(href) {
+  try { return new URL(href).hostname.toLowerCase(); } catch (e) { return ''; }
+}
+function paidProgramOf(href) {
+  if (!isPaidLink(href)) return null;
+  const hit = (PAID_PROGRAMS || []).find(([, re]) => re.test(hostOf(href)));
+  return hit ? hit[0] : 'other';
+}
+function storePhrase(href) {
+  const hit = (STORE_PHRASES || []).find(([re]) => re.test(hostOf(href)));
+  return hit ? hit[1] : '';
+}
+// the identify card's one line under its paid link(s). Hardware chip labels
+// ("10×2 mm") don't name their store, so that line does; the filament button
+// already says "on Amazon" / "from Polymaker"
+function cardDisclosure(programs, chips) {
+  const poly = programs.has('polymaker'), amazon = programs.has('amazon');
+  if (poly && !amazon)
+    return 'As a Polymaker Ambassador I earn a small commission - it costs you nothing extra.';
+  // unreachable today (chips are all Amazon and a card never shows chips with a
+  // filament link), but the invariant lives in colour-locking, not here - if it
+  // ever breaks, the Polymaker link must still be disclosed where it sits
+  if (poly && amazon)
+    return 'I earn a small commission on these Amazon links and, as a Polymaker Ambassador, on Polymaker’s - at no extra cost to you.';
+  if (chips && amazon)
+    return 'Amazon links - I earn a small commission, at no extra cost to you.';
+  return 'I earn a small commission - it costs you nothing extra.';
+}
+// the shared line at the bottom of the stage. Its job is Amazon's site-level
+// sentence; Polymaker joins only when nothing on screen names it already (the
+// identify card's own line does, and saying it twice was the clutter this
+// replaced). An empty string hides the line.
+function paidNoteText(programs, polymakerNamed = false) {
+  const s = [];
+  if (programs.has('amazon')) s.push('As an Amazon Associate I earn from qualifying purchases.');
+  if (programs.has('polymaker') && !polymakerNamed)
+    s.push(programs.has('amazon') ? 'I’m also a Polymaker Ambassador.' : 'I’m a Polymaker Ambassador and earn a commission on Polymaker links.');
+  if (programs.has('other') && !s.length) s.push('I earn a commission on paid links.');
+  return s.join(' ');
+}
+function linkShown(a) {
+  return a.checkVisibility ? a.checkVisibility({ visibilityProperty: true }) : a.getClientRects().length > 0;
+}
+function updatePaidNote() {
+  const note = document.getElementById('paid-note');
+  if (!note) return;
+  const programs = new Set();
+  for (const a of document.querySelectorAll('a[rel~="sponsored"]'))
+    if (linkShown(a)) programs.add(paidProgramOf(a.href) || 'other');
+  const polymakerNamed = [...document.querySelectorAll('.link-note')]
+    .some((n) => linkShown(n) && n.textContent.includes('Polymaker'));
+  const text = paidNoteText(programs, polymakerNamed);
+  const on = text !== '';
+  if (on && note.textContent !== text) note.textContent = text;
+  note.classList.toggle('hidden', !on);
+  document.body.classList.toggle('paid-note-on', on);
+  // the stage's bottom-anchored UI makes room for the line's REAL height - one
+  // line on a desktop, two on a narrow phone. Measured only when the text or
+  // the width changes: offsetHeight forces a layout, and this runs 4x a second
+  const key = on ? text + '|' + innerWidth : '';
+  if (on && key !== paidNoteMeasured) {
+    document.body.style.setProperty('--paid-note-h', note.offsetHeight + 'px');
+    paidNoteMeasured = key;
+  }
+}
+var paidNoteMeasured = '';
+var paidNoteQueued = false;
+function schedulePaidNote() {
+  if (paidNoteQueued) return;
+  paidNoteQueued = true;
+  requestAnimationFrame(() => { paidNoteQueued = false; updatePaidNote(); });
+}
+if (!IS_PART) setInterval(updatePaidNote, 250);
 // hostname → a fixed short id, so `out:` stays a small closed vocabulary and a
 // raw url can never become an event name
 const OUT_HOSTS = [
@@ -4618,24 +4726,32 @@ function renderIdentifyLinks(info, filament = null) {
   const linksEl = $('identify-links');
   linksEl.innerHTML = '';
   appendStoreLinks(linksEl, info?.links);
+  // Paid links here drop the "· paid link" suffix: ONE plain commission line
+  // sits right under them instead, and the filament button names its store
+  // (Astra 2026-09-18; this replaced a four-line paragraph that covered both
+  // programs whatever the card showed). Amazon's own sentence is the shared
+  // #paid-note line. Judged by HOST: a Printed Solid pick is a plain link and
+  // brings no line; a Polymaker pick names only Polymaker. A card shows chips
+  // OR a filament link, never both - bought hardware is colour-locked.
+  const programs = new Set();
+  const chips = info?.links?.buy || [];
   // purchased hardware: Amazon affiliate buy options (generate.js BUY)
-  for (const b of info?.links?.buy || []) linksEl.appendChild(linkEl(b.label, b.url, buyEvent(b)));
-  if (filament) linksEl.appendChild(linkEl('Get filament', filament.url, buyFilamentEvent(filament)));
-  // The paid-link disclosure covers EVERYTHING this card rendered, so it is
-  // decided after all of it. ⚠ It used to key on links.buy alone, which left
-  // the "Get filament" link (Elegoo = Amazon) undisclosed on parts with a
-  // filament pick but no hardware rows. The filament link is judged by its
-  // HOST because Polymaker/Printed Solid picks are plain links — a disclosure
-  // under those would claim a relationship that doesn't exist.
-  if (info?.links?.buy?.length || (filament && isPaidLink(filament.url))) {
-    const aff = document.createElement('div');
-    aff.className = 'fm-note';
-    // covers BOTH programs — this card can show Amazon hardware chips OR a
-    // Polymaker "Get filament" link, and the note must be true for either
-    aff.textContent = 'Paid links - I earn a commission if you buy through them, at no extra cost to you. '
-      + 'As an Amazon Associate I earn from qualifying purchases; I’m also a Polymaker Ambassador.';
-    linksEl.appendChild(aff);
+  for (const b of chips) {
+    linksEl.appendChild(linkEl(b.label, b.url, buyEvent(b), false));
+    const p = paidProgramOf(b.url); if (p) programs.add(p);
   }
+  if (filament) {
+    const where = storePhrase(filament.url);
+    linksEl.appendChild(linkEl(where ? `Get filament ${where}` : 'Get filament', filament.url, buyFilamentEvent(filament), false));
+    const p = paidProgramOf(filament.url); if (p) programs.add(p);
+  }
+  if (programs.size) {
+    const line = document.createElement('div');
+    line.className = 'link-note';
+    line.textContent = cardDisclosure(programs, chips.length > 0);
+    linksEl.appendChild(line);
+  }
+  schedulePaidNote();
 }
 
 // ---------- build options (generated builds only; static kits skip it) ----------
@@ -4926,15 +5042,13 @@ function renderChecklist() {
     row.append(chip, mid, qty);
     rows.appendChild(row);
   }
-  // Amazon buy chips are paid links → the panel carries the disclosure right
-  // under the rows that show them (FTC: disclosure and links seen together),
-  // including Amazon's own required Associate statement
+  // The buy chips' disclosure is the page's #paid-note line (updatePaidNote),
+  // shown while they are on screen; what stays here is the shopping tip.
   if (manifest.parts.some(p => !p.styleHidden && p.links?.buy)) {
-    const aff = document.createElement('div');
-    aff.className = 'fm-note';
-    aff.textContent = 'Paid links - I earn a commission if you buy through the Amazon links here, at no extra cost to you. '
-      + 'As an Amazon Associate I earn from qualifying purchases. Any equivalent hardware from any store works.';
-    rows.appendChild(aff);
+    const tip = document.createElement('div');
+    tip.className = 'fm-note';
+    tip.textContent = 'Any equivalent hardware from any store works.';
+    rows.appendChild(tip);
   }
   $('checklist-title').textContent = build ? 'Your build' : 'Parts list';
   // "can I build this today?" rides the counter that was already here rather
@@ -4982,6 +5096,7 @@ const isMobile = () => matchMedia('(max-width: 560px)').matches;
 // BOM widget: expanded on the checklist step and the final step, minimized to
 // a side tab everywhere else — the user can toggle it on any step.
 function setChecklist(open) {
+  schedulePaidNote(); // its buy chips show or hide with it
   $('checklist-panel').classList.toggle('hidden', !open);
   $('checklist-tab').classList.toggle('hidden', open);
   document.body.classList.toggle('panel-open', open); // narrow embed: the note yields while the panel is open (CSS one-sheet rule)
@@ -5476,6 +5591,7 @@ let lipUnit = null;
 let variantUnit = null;
 function setSelected(id) {
   if (selectedId === id) return;
+  schedulePaidNote(); // the card's paid links come and go with the selection
   // "did they discover tap-to-identify at all" — once per session, because the
   // answer is a yes/no about the feature, not a per-tap volume metric
   if (id) trackOnce('identify:open');
@@ -6402,6 +6518,7 @@ function closeFilamentMenu(refresh = true) {
   $('filament-menu').classList.add('hidden');
   document.body.classList.remove('fm-open'); // note panel returns as it was
   fmType = null;
+  schedulePaidNote();
   if (refresh) { refreshSelHighlight(); syncZoneChips(); }
 }
 // the zone chips carry the "which key am I editing" ring, so they must be
@@ -6418,6 +6535,7 @@ function markFmBuy() {
   const buy = $('fm-buy');
   if (isPaidLink(buy.href)) { buy.rel = 'noopener sponsored'; buy.textContent += ' · paid link'; }
   else buy.rel = 'noopener';
+  schedulePaidNote();
 }
 function openFilamentMenu(type) {
   fmType = type;
