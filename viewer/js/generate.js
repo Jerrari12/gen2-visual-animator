@@ -2648,6 +2648,18 @@ function previewProbe(slug) {
     return { build: one(+m[1], +m[2], H_FROM_SLUG[m[3]]), pick: { type: 'Case' } };
   if ((m = s.match(new RegExp(`^(\\d+)-(classic|decor)-drawer-([1-4])w-${H}h$`))))
     return { build: one(+m[1], +m[3], H_FROM_SLUG[m[4]], m[2]), pick: { type: 'Drawer' } };
+  /* Gridfinity Decor drawers (site slugs landed 2026-09-18). Not a fill of their own: the
+     probe is a Decor unit wearing `variant: 'gridfinity'`, picked by the Decor drawer's own
+     'Drawer' type - plus a node PREFIX. ⚠ The prefix and the size check both matter: outside
+     the family (a 59, a 0.5H, a 3H) the generator KEEPS the variant and quietly renders the
+     standard drawer, so a type-only pick would put a Decor drawer on a Gridfinity page. */
+  if ((m = s.match(new RegExp(`^(\\d+)-gridfinity-decor-drawer-([1-4])w-${H}h$`)))) {
+    const L = +m[1], hh = H_FROM_SLUG[m[3]];
+    if (!GRIDFINITY.lengths.includes(L) || !GRIDFINITY.hh.includes(hh))
+      return un('Gridfinity Decor Drawers come in the 115, 165, 185, 240 and 270 Collections, at 1H, 1.5H and 2H.');
+    return { build: { mount: 'wall', length: L, gridH: hh / 2, placed: [{ ...unit(+m[2], hh, 'decor'), variant: 'gridfinity' }] },
+             pick: { type: 'Drawer', prefix: 'GridfinityDecorDrawer_' } };
+  }
   if ((m = s.match(/^(\d+)-cover-(lower|upper)-([12])w$/)))
     return { build: one(+m[1], +m[3], 2), pick: { type: m[2] === 'lower' ? 'CoverL' : 'CoverU' } };
   if ((m = s.match(/^(\d+)-foot-rail-(lower|upper)-([12])w$/))) {
@@ -2699,6 +2711,11 @@ function previewProbe(slug) {
 // guess an orientation onto a permanent product page.
 const PLATE_POSE = {
   case: [],
+  /* The Gridfinity Decor drawer rides this entry too: its body is a 'Drawer'. Its print pose
+     is the Decor drawer's - all 60 v2609 STLs are exported upright, floor on the bed (measured
+     2026-09-19: height on the up axis at 50/78/106 mm, and 9-22x more floor facing down at
+     the bottom plane than rim facing up at the top), and the listing says "Print the drawer
+     upright, as oriented". */
   drawer: [],
   'faceplate:edgelabel': [-90, 0, 0],
   'faceplate:classic': [-90, 0, 0],
@@ -2917,7 +2934,8 @@ export function resolvePartPreview(slug, opts = {}) {
     };
   }
   const rows = gen.manifest.parts.filter(p => p.type === probe.pick.type &&
-    (!probe.pick.suffix || p.node.endsWith(probe.pick.suffix)));
+    (!probe.pick.suffix || p.node.endsWith(probe.pick.suffix)) &&
+    (!probe.pick.prefix || p.node.startsWith(probe.pick.prefix)));
   // fail CLOSED on anything but exactly one match — never guess which physical
   // part a permanent product page means
   if (rows.length !== 1)

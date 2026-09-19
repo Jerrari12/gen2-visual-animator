@@ -551,6 +551,90 @@
     "label": "Decor Drawer 115-2W-3H",
     "platePreview": true
   },
+  "115-gridfinity-decor-drawer-1w-1h": {
+    "node": "GridfinityDecorDrawer_115-1W-1H",
+    "collection": "115",
+    "type": "Drawer",
+    "label": "Gridfinity Decor Drawer 115-1W-1H",
+    "platePreview": true
+  },
+  "115-gridfinity-decor-drawer-2w-1h": {
+    "node": "GridfinityDecorDrawer_115-2W-1H",
+    "collection": "115",
+    "type": "Drawer",
+    "label": "Gridfinity Decor Drawer 115-2W-1H",
+    "platePreview": true
+  },
+  "115-gridfinity-decor-drawer-3w-1h": {
+    "node": "GridfinityDecorDrawer_115-3W-1H",
+    "collection": "115",
+    "type": "Drawer",
+    "label": "Gridfinity Decor Drawer 115-3W-1H",
+    "platePreview": true
+  },
+  "115-gridfinity-decor-drawer-4w-1h": {
+    "node": "GridfinityDecorDrawer_115-4W-1H",
+    "collection": "115",
+    "type": "Drawer",
+    "label": "Gridfinity Decor Drawer 115-4W-1H",
+    "platePreview": true
+  },
+  "115-gridfinity-decor-drawer-1w-1-5h": {
+    "node": "GridfinityDecorDrawer_115-1W-15H",
+    "collection": "115",
+    "type": "Drawer",
+    "label": "Gridfinity Decor Drawer 115-1W-15H",
+    "platePreview": true
+  },
+  "115-gridfinity-decor-drawer-2w-1-5h": {
+    "node": "GridfinityDecorDrawer_115-2W-15H",
+    "collection": "115",
+    "type": "Drawer",
+    "label": "Gridfinity Decor Drawer 115-2W-15H",
+    "platePreview": true
+  },
+  "115-gridfinity-decor-drawer-3w-1-5h": {
+    "node": "GridfinityDecorDrawer_115-3W-15H",
+    "collection": "115",
+    "type": "Drawer",
+    "label": "Gridfinity Decor Drawer 115-3W-15H",
+    "platePreview": true
+  },
+  "115-gridfinity-decor-drawer-4w-1-5h": {
+    "node": "GridfinityDecorDrawer_115-4W-15H",
+    "collection": "115",
+    "type": "Drawer",
+    "label": "Gridfinity Decor Drawer 115-4W-15H",
+    "platePreview": true
+  },
+  "115-gridfinity-decor-drawer-1w-2h": {
+    "node": "GridfinityDecorDrawer_115-1W-2H",
+    "collection": "115",
+    "type": "Drawer",
+    "label": "Gridfinity Decor Drawer 115-1W-2H",
+    "platePreview": true
+  },
+  "115-gridfinity-decor-drawer-2w-2h": {
+    "node": "GridfinityDecorDrawer_115-2W-2H",
+    "collection": "115",
+    "type": "Drawer",
+    "label": "Gridfinity Decor Drawer 115-2W-2H",
+    "platePreview": true
+  },
+  "115-gridfinity-decor-drawer-3w-2h": {
+    "node": "GridfinityDecorDrawer_115-3W-2H",
+    "collection": "115",
+    "type": "Drawer",
+    "label": "Gridfinity Decor Drawer 115-3W-2H",
+    "platePreview": true
+  },
+  "115-gridfinity-decor-drawer-4w-2h": {
+    "node": "GridfinityDecorDrawer_115-4W-2H",
+    "collection": "115",
+    "type": "Drawer",
+    "label": "Gridfinity Decor Drawer 115-4W-2H",
+    "platePreview": true
+  },
   "115-shelf-insert-1w": {
     "node": "ShelfInsert_115-1W",
     "collection": "115",
@@ -1067,6 +1151,90 @@
     "collection": "165",
     "type": "Drawer",
     "label": "Decor Drawer 165-2W-3H",
+    "platePreview": true
+  },
+  "165-gridfinity-decor-drawer-1w-1h": {
+    "node": "GridfinityDecorDrawer_165-1W-1H",
+    "collection": "165",
+    "type": "Drawer",
+    "label": "Gridfinity Decor Drawer 165-1W-1H",
+    "platePreview": true
+  },
+  "165-gridfinity-decor-drawer-2w-1h": {
+    "node": "GridfinityDecorDrawer_165-2W-1H",
+    "collection": "165",
+    "type": "Drawer",
+    "label": "Gridfinity Decor Drawer 165-2W-1H",
+    "platePreview": true
+  },
+  "165-gridfinity-decor-drawer-3w-1h": {
+    "node": "GridfinityDecorDrawer_165-3W-1H",
+    "collection": "165",
+    "type": "Drawer",
+    "label": "Gridfinity Decor Drawer 165-3W-1H",
+    "platePreview": true
+  },
+  "165-gridfinity-decor-drawer-4w-1h": {
+    "node": "GridfinityDecorDrawer_165-4W-1H",
+    "collection": "165",
+    "type": "Drawer",
+    "label": "Gridfinity Decor Drawer 165-4W-1H",
+    "platePreview": true
+  },
+  "165-gridfinity-decor-drawer-1w-1-5h": {
+    "node": "GridfinityDecorDrawer_165-1W-15H",
+    "collection": "165",
+    "type": "Drawer",
+    "label": "Gridfinity Decor Drawer 165-1W-15H",
+    "platePreview": true
+  },
+  "165-gridfinity-decor-drawer-2w-1-5h": {
+    "node": "GridfinityDecorDrawer_165-2W-15H",
+    "collection": "165",
+    "type": "Drawer",
+    "label": "Gridfinity Decor Drawer 165-2W-15H",
+    "platePreview": true
+  },
+  "165-gridfinity-decor-drawer-3w-1-5h": {
+    "node": "GridfinityDecorDrawer_165-3W-15H",
+    "collection": "165",
+    "type": "Drawer",
+    "label": "Gridfinity Decor Drawer 165-3W-15H",
+    "platePreview": true
+  },
+  "165-gridfinity-decor-drawer-4w-1-5h": {
+    "node": "GridfinityDecorDrawer_165-4W-15H",
+    "collection": "165",
+    "type": "Drawer",
+    "label": "Gridfinity Decor Drawer 165-4W-15H",
+    "platePreview": true
+  },
+  "165-gridfinity-decor-drawer-1w-2h": {
+    "node": "GridfinityDecorDrawer_165-1W-2H",
+    "collection": "165",
+    "type": "Drawer",
+    "label": "Gridfinity Decor Drawer 165-1W-2H",
+    "platePreview": true
+  },
+  "165-gridfinity-decor-drawer-2w-2h": {
+    "node": "GridfinityDecorDrawer_165-2W-2H",
+    "collection": "165",
+    "type": "Drawer",
+    "label": "Gridfinity Decor Drawer 165-2W-2H",
+    "platePreview": true
+  },
+  "165-gridfinity-decor-drawer-3w-2h": {
+    "node": "GridfinityDecorDrawer_165-3W-2H",
+    "collection": "165",
+    "type": "Drawer",
+    "label": "Gridfinity Decor Drawer 165-3W-2H",
+    "platePreview": true
+  },
+  "165-gridfinity-decor-drawer-4w-2h": {
+    "node": "GridfinityDecorDrawer_165-4W-2H",
+    "collection": "165",
+    "type": "Drawer",
+    "label": "Gridfinity Decor Drawer 165-4W-2H",
     "platePreview": true
   },
   "165-shelf-insert-1w": {
@@ -1587,6 +1755,90 @@
     "label": "Decor Drawer 185-2W-3H",
     "platePreview": true
   },
+  "185-gridfinity-decor-drawer-1w-1h": {
+    "node": "GridfinityDecorDrawer_185-1W-1H",
+    "collection": "185",
+    "type": "Drawer",
+    "label": "Gridfinity Decor Drawer 185-1W-1H",
+    "platePreview": true
+  },
+  "185-gridfinity-decor-drawer-2w-1h": {
+    "node": "GridfinityDecorDrawer_185-2W-1H",
+    "collection": "185",
+    "type": "Drawer",
+    "label": "Gridfinity Decor Drawer 185-2W-1H",
+    "platePreview": true
+  },
+  "185-gridfinity-decor-drawer-3w-1h": {
+    "node": "GridfinityDecorDrawer_185-3W-1H",
+    "collection": "185",
+    "type": "Drawer",
+    "label": "Gridfinity Decor Drawer 185-3W-1H",
+    "platePreview": true
+  },
+  "185-gridfinity-decor-drawer-4w-1h": {
+    "node": "GridfinityDecorDrawer_185-4W-1H",
+    "collection": "185",
+    "type": "Drawer",
+    "label": "Gridfinity Decor Drawer 185-4W-1H",
+    "platePreview": true
+  },
+  "185-gridfinity-decor-drawer-1w-1-5h": {
+    "node": "GridfinityDecorDrawer_185-1W-15H",
+    "collection": "185",
+    "type": "Drawer",
+    "label": "Gridfinity Decor Drawer 185-1W-15H",
+    "platePreview": true
+  },
+  "185-gridfinity-decor-drawer-2w-1-5h": {
+    "node": "GridfinityDecorDrawer_185-2W-15H",
+    "collection": "185",
+    "type": "Drawer",
+    "label": "Gridfinity Decor Drawer 185-2W-15H",
+    "platePreview": true
+  },
+  "185-gridfinity-decor-drawer-3w-1-5h": {
+    "node": "GridfinityDecorDrawer_185-3W-15H",
+    "collection": "185",
+    "type": "Drawer",
+    "label": "Gridfinity Decor Drawer 185-3W-15H",
+    "platePreview": true
+  },
+  "185-gridfinity-decor-drawer-4w-1-5h": {
+    "node": "GridfinityDecorDrawer_185-4W-15H",
+    "collection": "185",
+    "type": "Drawer",
+    "label": "Gridfinity Decor Drawer 185-4W-15H",
+    "platePreview": true
+  },
+  "185-gridfinity-decor-drawer-1w-2h": {
+    "node": "GridfinityDecorDrawer_185-1W-2H",
+    "collection": "185",
+    "type": "Drawer",
+    "label": "Gridfinity Decor Drawer 185-1W-2H",
+    "platePreview": true
+  },
+  "185-gridfinity-decor-drawer-2w-2h": {
+    "node": "GridfinityDecorDrawer_185-2W-2H",
+    "collection": "185",
+    "type": "Drawer",
+    "label": "Gridfinity Decor Drawer 185-2W-2H",
+    "platePreview": true
+  },
+  "185-gridfinity-decor-drawer-3w-2h": {
+    "node": "GridfinityDecorDrawer_185-3W-2H",
+    "collection": "185",
+    "type": "Drawer",
+    "label": "Gridfinity Decor Drawer 185-3W-2H",
+    "platePreview": true
+  },
+  "185-gridfinity-decor-drawer-4w-2h": {
+    "node": "GridfinityDecorDrawer_185-4W-2H",
+    "collection": "185",
+    "type": "Drawer",
+    "label": "Gridfinity Decor Drawer 185-4W-2H",
+    "platePreview": true
+  },
   "185-shelf-insert-1w": {
     "node": "ShelfInsert_185-1W",
     "collection": "185",
@@ -2105,6 +2357,90 @@
     "label": "Decor Drawer 240-2W-3H",
     "platePreview": true
   },
+  "240-gridfinity-decor-drawer-1w-1h": {
+    "node": "GridfinityDecorDrawer_240-1W-1H",
+    "collection": "240",
+    "type": "Drawer",
+    "label": "Gridfinity Decor Drawer 240-1W-1H",
+    "platePreview": true
+  },
+  "240-gridfinity-decor-drawer-2w-1h": {
+    "node": "GridfinityDecorDrawer_240-2W-1H",
+    "collection": "240",
+    "type": "Drawer",
+    "label": "Gridfinity Decor Drawer 240-2W-1H",
+    "platePreview": true
+  },
+  "240-gridfinity-decor-drawer-3w-1h": {
+    "node": "GridfinityDecorDrawer_240-3W-1H",
+    "collection": "240",
+    "type": "Drawer",
+    "label": "Gridfinity Decor Drawer 240-3W-1H",
+    "platePreview": true
+  },
+  "240-gridfinity-decor-drawer-4w-1h": {
+    "node": "GridfinityDecorDrawer_240-4W-1H",
+    "collection": "240",
+    "type": "Drawer",
+    "label": "Gridfinity Decor Drawer 240-4W-1H",
+    "platePreview": true
+  },
+  "240-gridfinity-decor-drawer-1w-1-5h": {
+    "node": "GridfinityDecorDrawer_240-1W-15H",
+    "collection": "240",
+    "type": "Drawer",
+    "label": "Gridfinity Decor Drawer 240-1W-15H",
+    "platePreview": true
+  },
+  "240-gridfinity-decor-drawer-2w-1-5h": {
+    "node": "GridfinityDecorDrawer_240-2W-15H",
+    "collection": "240",
+    "type": "Drawer",
+    "label": "Gridfinity Decor Drawer 240-2W-15H",
+    "platePreview": true
+  },
+  "240-gridfinity-decor-drawer-3w-1-5h": {
+    "node": "GridfinityDecorDrawer_240-3W-15H",
+    "collection": "240",
+    "type": "Drawer",
+    "label": "Gridfinity Decor Drawer 240-3W-15H",
+    "platePreview": true
+  },
+  "240-gridfinity-decor-drawer-4w-1-5h": {
+    "node": "GridfinityDecorDrawer_240-4W-15H",
+    "collection": "240",
+    "type": "Drawer",
+    "label": "Gridfinity Decor Drawer 240-4W-15H",
+    "platePreview": true
+  },
+  "240-gridfinity-decor-drawer-1w-2h": {
+    "node": "GridfinityDecorDrawer_240-1W-2H",
+    "collection": "240",
+    "type": "Drawer",
+    "label": "Gridfinity Decor Drawer 240-1W-2H",
+    "platePreview": true
+  },
+  "240-gridfinity-decor-drawer-2w-2h": {
+    "node": "GridfinityDecorDrawer_240-2W-2H",
+    "collection": "240",
+    "type": "Drawer",
+    "label": "Gridfinity Decor Drawer 240-2W-2H",
+    "platePreview": true
+  },
+  "240-gridfinity-decor-drawer-3w-2h": {
+    "node": "GridfinityDecorDrawer_240-3W-2H",
+    "collection": "240",
+    "type": "Drawer",
+    "label": "Gridfinity Decor Drawer 240-3W-2H",
+    "platePreview": true
+  },
+  "240-gridfinity-decor-drawer-4w-2h": {
+    "node": "GridfinityDecorDrawer_240-4W-2H",
+    "collection": "240",
+    "type": "Drawer",
+    "label": "Gridfinity Decor Drawer 240-4W-2H",
+    "platePreview": true
+  },
   "240-shelf-insert-1w": {
     "node": "ShelfInsert_240-1W",
     "collection": "240",
@@ -2621,6 +2957,90 @@
     "collection": "270",
     "type": "Drawer",
     "label": "Decor Drawer 270-2W-3H",
+    "platePreview": true
+  },
+  "270-gridfinity-decor-drawer-1w-1h": {
+    "node": "GridfinityDecorDrawer_270-1W-1H",
+    "collection": "270",
+    "type": "Drawer",
+    "label": "Gridfinity Decor Drawer 270-1W-1H",
+    "platePreview": true
+  },
+  "270-gridfinity-decor-drawer-2w-1h": {
+    "node": "GridfinityDecorDrawer_270-2W-1H",
+    "collection": "270",
+    "type": "Drawer",
+    "label": "Gridfinity Decor Drawer 270-2W-1H",
+    "platePreview": true
+  },
+  "270-gridfinity-decor-drawer-3w-1h": {
+    "node": "GridfinityDecorDrawer_270-3W-1H",
+    "collection": "270",
+    "type": "Drawer",
+    "label": "Gridfinity Decor Drawer 270-3W-1H",
+    "platePreview": true
+  },
+  "270-gridfinity-decor-drawer-4w-1h": {
+    "node": "GridfinityDecorDrawer_270-4W-1H",
+    "collection": "270",
+    "type": "Drawer",
+    "label": "Gridfinity Decor Drawer 270-4W-1H",
+    "platePreview": true
+  },
+  "270-gridfinity-decor-drawer-1w-1-5h": {
+    "node": "GridfinityDecorDrawer_270-1W-15H",
+    "collection": "270",
+    "type": "Drawer",
+    "label": "Gridfinity Decor Drawer 270-1W-15H",
+    "platePreview": true
+  },
+  "270-gridfinity-decor-drawer-2w-1-5h": {
+    "node": "GridfinityDecorDrawer_270-2W-15H",
+    "collection": "270",
+    "type": "Drawer",
+    "label": "Gridfinity Decor Drawer 270-2W-15H",
+    "platePreview": true
+  },
+  "270-gridfinity-decor-drawer-3w-1-5h": {
+    "node": "GridfinityDecorDrawer_270-3W-15H",
+    "collection": "270",
+    "type": "Drawer",
+    "label": "Gridfinity Decor Drawer 270-3W-15H",
+    "platePreview": true
+  },
+  "270-gridfinity-decor-drawer-4w-1-5h": {
+    "node": "GridfinityDecorDrawer_270-4W-15H",
+    "collection": "270",
+    "type": "Drawer",
+    "label": "Gridfinity Decor Drawer 270-4W-15H",
+    "platePreview": true
+  },
+  "270-gridfinity-decor-drawer-1w-2h": {
+    "node": "GridfinityDecorDrawer_270-1W-2H",
+    "collection": "270",
+    "type": "Drawer",
+    "label": "Gridfinity Decor Drawer 270-1W-2H",
+    "platePreview": true
+  },
+  "270-gridfinity-decor-drawer-2w-2h": {
+    "node": "GridfinityDecorDrawer_270-2W-2H",
+    "collection": "270",
+    "type": "Drawer",
+    "label": "Gridfinity Decor Drawer 270-2W-2H",
+    "platePreview": true
+  },
+  "270-gridfinity-decor-drawer-3w-2h": {
+    "node": "GridfinityDecorDrawer_270-3W-2H",
+    "collection": "270",
+    "type": "Drawer",
+    "label": "Gridfinity Decor Drawer 270-3W-2H",
+    "platePreview": true
+  },
+  "270-gridfinity-decor-drawer-4w-2h": {
+    "node": "GridfinityDecorDrawer_270-4W-2H",
+    "collection": "270",
+    "type": "Drawer",
+    "label": "Gridfinity Decor Drawer 270-4W-2H",
     "platePreview": true
   },
   "270-shelf-insert-1w": {

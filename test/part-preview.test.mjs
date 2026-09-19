@@ -71,7 +71,9 @@ test('every production slug is accounted for — resolved or intentionally unsup
   // 2026-08-29: +22 case extenders (465 → 487); 26 → 4 unsupported
   // 2026-08-30: +22 shelf inserts +4 shelf lips (487 → 513) - the site catalog
   // gained the released shelves, and every one previews (GLBs landed 08-29)
-  assert.equal(supported, 513, 'supported preview count');
+  // 2026-09-19: +60 Gridfinity Decor drawers (513 → 573) - their GLBs shipped
+  // with the viewer's 2026-09-18 deploy, so every one previews
+  assert.equal(supported, 573, 'supported preview count');
   assert.equal(unsupported, 4, 'intentionally-unsupported (59-3W/4W extenders + 2 no-GLB hardware)');
 });
 
@@ -254,11 +256,11 @@ test('plate view: confirmed print poses only, bare primary, fail-closed elsewher
   // NEXT family ships plate-less until its own confirmation lands here.
   const caps = [...resolved.values()].filter(r => !r.fail);
   assert.equal(caps.filter(r => !r.part.platePreview).length, 0, 'no preview-capable slug left fail-closed');
-  // full census: 94 cases + 94 classic + 94 decor + 90 faceplates + 4
-  // hardware + 24 covers + 20 foot rails + 24 under-table rails + 22 case
-  // extenders + 22 shelf inserts + 4 shelf lips + 18 back covers + 3 wall
-  // brackets
-  assert.equal(caps.filter(r => r.part.platePreview).length, 513, 'plate-capable slug count');
+  // full census: 94 cases + 94 classic + 94 decor + 60 Gridfinity decor + 90
+  // faceplates + 4 hardware + 24 covers + 20 foot rails + 24 under-table rails
+  // + 22 case extenders + 22 shelf inserts + 4 shelf lips + 18 back covers + 3
+  // wall brackets
+  assert.equal(caps.filter(r => r.part.platePreview).length, 573, 'plate-capable slug count');
 
   // sweep EVERY plate-capable slug's plate boot (not just samples): the bare
   // print JOB (one body, or every member of a handed set), rotations matching
@@ -354,4 +356,36 @@ test('failure modes are typed correctly', () => {
   assert.equal(resolvePartPreview('59-foot-rail-lower-1w').fail.reason, 'unsupported');
   // case sanity: the resolver lowercases, so a shouty URL still resolves
   assert.equal(resolvePartPreview('185-CASE-2W-1H').fail, undefined);
+});
+
+test('a Gridfinity page previews the Gridfinity body - never the standard drawer it swaps for', () => {
+  // the variant's whole risk: outside the family the generator KEEPS
+  // `variant: 'gridfinity'` and renders the standard Decor drawer, so a
+  // resolver that trusted the type pick alone would show a Decor drawer on a
+  // Gridfinity page and every assertion about "resolves" would still pass
+  for (const L of [115, 165, 185, 240, 270])
+    for (const w of [1, 2, 3, 4])
+      for (const [tok, H] of [['1', '1'], ['1-5', '15'], ['2', '2']]) {
+        const s = `${L}-gridfinity-decor-drawer-${w}w-${tok}h`;
+        const r = resolved.get(s);
+        assert.ok(r && !r.fail, s + ': must resolve');
+        assert.equal(r.part.node, `GridfinityDecorDrawer_${L}-${w}W-${H}H`, s);
+        assert.equal(String(r.manifest.collection), String(L), s + ': collection');
+        assert.equal(r.part.type, 'Drawer', s + ': rides the Decor drawer type');
+        // same size, standard page: still the standard body
+        const std = resolvePartPreview(`${L}-decor-drawer-${w}w-${tok}h`);
+        assert.equal(std.part.node, `DecorDrawer_${L}-${w}W-${H}H`, s + ': the standard page is untouched');
+      }
+  // plate: the Decor drawer's pose, as authored (all 60 STLs export upright)
+  const p = resolvePartPreview('185-gridfinity-decor-drawer-2w-1-5h', { plate: true });
+  assert.equal(p.manifest.instances.length, 1);
+  assert.equal(p.manifest.instances[0].rot, undefined, 'prints upright as authored, like the Decor drawer');
+  // grammar the site could mint, sizes the family does not have: fail CLOSED
+  // with a message, before the generator can render the standard drawer
+  for (const s of ['59-gridfinity-decor-drawer-1w-1h', '185-gridfinity-decor-drawer-1w-0-5h',
+                   '185-gridfinity-decor-drawer-2w-3h']) {
+    const r = resolvePartPreview(s);
+    assert.equal(r.fail?.reason, 'unsupported', s);
+    assert.match(r.fail.message, /Gridfinity Decor Drawers come in/, s);
+  }
 });

@@ -106,7 +106,9 @@ test('semantic sanity: the snapshot itself is unrotated', () => {
     } else if ((m = node.match(/^(\d+)-(\d)W-[\d\w]+H_Case$/))) {
       if (Math.abs(spans[0] - m[2] * 88) > 2.5) bad.push(`${key}: case width(X)=${spans[0]} want ~${m[2] * 88}`);
       if (Math.abs(spans[2] - +m[1]) > 2.5) bad.push(`${key}: case depth(Z)=${spans[2]} want ~${m[1]}`);
-    } else if ((m = node.match(/^(Classic|Decor)Drawer_(\d+)-(\d)W-/))) {
+    } else if ((m = node.match(/^(Classic|Decor|GridfinityDecor)Drawer_(\d+)-(\d)W-/))) {
+      // (GridfinityDecor: the Decor drawer's envelope to 0.02 mm, so the same rule -
+      // without it the anchored pattern skipped all 60 silently)
       // drawers: width = 88w-13 (house rule). ⚠ tolerance stays SUB-0.5mm on
       // the width check's spirit but the 240-3W trap (251 vs 250) is exactly
       // why the check is against the WIDTH formula, not "which axis is bigger"
