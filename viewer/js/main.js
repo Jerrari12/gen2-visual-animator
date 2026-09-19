@@ -4472,8 +4472,10 @@ function linkEl(text, href, ev, mark = true) {
    1. NEAR each paid link: the "· paid link" label linkEl adds (FTC Endorsement
       Guides FAQ: "'Paid link' right next to an affiliate link should be an
       adequate disclosure"; the same FAQ says a bare "affiliate link" may not be
-      understood - never swap the label for that), or, in the identify card, a
-      store-named button with one plain commission line right under it.
+      understood - never swap the label for that), or, in the identify card and
+      (since 2026-09-19) the parts list, plain link labels with one plain
+      commission line right under them. The filament picker's buy link still
+      wears the label (markFmBuy).
    2. ON THE SITE, clearly: Amazon's own sentence (Associates Operating
       Agreement s.5: "clearly and prominently state ... on your Site ...: 'As an
       Amazon Associate I earn from qualifying purchases.'" - kept VERBATIM, a
@@ -5004,9 +5006,23 @@ function renderChecklist() {
     if (p.links) {
       const lnks = document.createElement('span');
       appendStoreLinks(lnks, p.links);
-      // purchased hardware: Amazon affiliate buy options (generate.js BUY)
-      for (const b of p.links.buy || []) lnks.appendChild(linkEl(b.label, b.url, buyEvent(b)));
+      // purchased hardware: Amazon affiliate buy options (generate.js BUY). As in
+      // the identify card, the chips carry their plain labels and ONE line right
+      // under them says who they go to and that I earn from them (Joey 2026-09-19:
+      // it replaced a "· paid link" suffix on every chip; the Planner's parts list
+      // reads the same). Judged by host, so a plain store link brings no line.
+      const programs = new Set();
+      for (const b of p.links.buy || []) {
+        lnks.appendChild(linkEl(b.label, b.url, buyEvent(b), false));
+        const pr = paidProgramOf(b.url); if (pr) programs.add(pr);
+      }
       mid.appendChild(lnks);
+      if (programs.size) {
+        const line = document.createElement('div');
+        line.className = 'link-note';
+        line.textContent = cardDisclosure(programs, true);
+        mid.appendChild(line);
+      }
     }
     // optional per-row note (manifest-driven, like the planner's BOM rows):
     // where a row has an alternative or a condition the label can't carry -
@@ -5042,8 +5058,9 @@ function renderChecklist() {
     row.append(chip, mid, qty);
     rows.appendChild(row);
   }
-  // The buy chips' disclosure is the page's #paid-note line (updatePaidNote),
-  // shown while they are on screen; what stays here is the shopping tip.
+  // Each hardware row carries its own commission line (above); Amazon's own
+  // sentence is the page's #paid-note line (updatePaidNote), shown while the
+  // chips are on screen. What stays here is the shopping tip.
   if (manifest.parts.some(p => !p.styleHidden && p.links?.buy)) {
     const tip = document.createElement('div');
     tip.className = 'fm-note';
