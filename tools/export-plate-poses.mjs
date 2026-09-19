@@ -136,6 +136,12 @@ function noteFor(slug, rot) {
   const R = JSON.stringify(rot);
   if (/-case-extender-/.test(slug)) return 'prints same as a case, as authored (Joey, 2026-08-31)';
   if (/-case-/.test(slug)) return 'cases always print bottom-down, as authored (Joey, 2026-08-31)';
+  // The Gridfinity Decor drawers (v2609) came after that statement. His rule for drawers
+  // covers them, and their own evidence is the pose of his exported files: all 60 STLs are
+  // upright, floor down (measured 2026-09-19, vault measurements.md). The parenthetical
+  // says so - the knowledge pack strips "(Joey ...)" and keeps the sentence before it.
+  if (/-gridfinity-decor-drawer-/.test(slug))
+    return 'drawers always print bottom-down, as authored (Joey, 2026-08-31, for drawers; the v2609 Gridfinity STLs are exported that way, measured 2026-09-19)';
   if (/-drawer-/.test(slug)) return 'drawers always print bottom-down, as authored (Joey, 2026-08-31)';
   if (/-cover-upper-/.test(slug)) return 'installed top prints against the plate (Joey, 2026-08-31)';
   if (/-cover-lower-|foot-rail/.test(slug)) return 'sits in the finished tabletop exactly as it prints, as authored (Joey, 2026-08-31)';
