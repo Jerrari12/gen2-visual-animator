@@ -1,7 +1,7 @@
 {
-  "sourceRegistryRevision": "gen2-viewer@065cee2",
-  "plateCapableInRegistry": 513,
-  "exported": 511,
+  "sourceRegistryRevision": "gen2-viewer@16e630e",
+  "plateCapableInRegistry": 573,
+  "exported": 571,
   "skippedEntirely": [
     {
       "slug": "quicklock-a-v1-11",
