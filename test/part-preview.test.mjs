@@ -73,7 +73,9 @@ test('every production slug is accounted for — resolved or intentionally unsup
   // gained the released shelves, and every one previews (GLBs landed 08-29)
   // 2026-09-19: +60 Gridfinity Decor drawers (513 → 573) - their GLBs shipped
   // with the viewer's 2026-09-18 deploy, so every one previews
-  assert.equal(supported, 573, 'supported preview count');
+  // 2026-09-19: +9 handles (573 → 582) - the nine bolt-on handle variants become
+  // nine product pages; the GLBs have shipped in every collection pool since 2026-07-20
+  assert.equal(supported, 582, 'supported preview count');
   assert.equal(unsupported, 4, 'intentionally-unsupported (59-3W/4W extenders + 2 no-GLB hardware)');
 });
 
@@ -104,20 +106,31 @@ test('preview manifests are canonical: primary at the origin, no assembly contex
         for (const k of ['stage', 'rides', 'owner', 'stopperKey', 'yaw', 'rot'])
           if (k in i) bad.push(`${s}: set body carries "${k}"`);
     } else {
-      const nExtras = r.part.extras?.length || 0;
-      if (m.parts.length !== 1 + nExtras || m.parts.some(p => !p || p.qty !== 1)) bad.push(`${s}: parts rows`);
-      if (m.instances.length !== 1 + nExtras) bad.push(`${s}: instance count`);
-      const [prim, ...extras] = m.instances;
+      // a primary can be accompanied two ways, and they are DIFFERENT CLAIMS:
+      // `extras` is dressing that ships in the same download (EdgeLabel /
+      // Classic Pro), `context` is the plate a HANDLE is shown mounted on and
+      // is not in the handle's download at all. Same geometry rules, so they
+      // are counted together and asserted apart.
+      const nExtras = r.part.extras?.length || 0, nContext = r.part.context?.length || 0;
+      const nWith = nExtras + nContext;
+      if (m.parts.length !== 1 + nWith || m.parts.some(p => !p || p.qty !== 1)) bad.push(`${s}: parts rows`);
+      if (m.instances.length !== 1 + nWith) bad.push(`${s}: instance count`);
+      const [prim, ...companions] = m.instances;
       if (prim.pos.join() !== '0,0,0') bad.push(`${s}: primary pos ${prim.pos}`);
-      // primaries are pure GLB pose; extras keep plate-relative pos and a
+      // primaries are pure GLB pose; companions keep primary-relative pos and a
       // corrective rot (the accent's flip) — but NEVER assembly bookkeeping
       for (const k of ['stage', 'rides', 'owner', 'stopperKey', 'yaw', 'rot'])
         if (k in prim) bad.push(`${s}: primary carries assembly field "${k}"`);
-      for (const x of extras)
+      for (const x of companions)
         for (const k of ['stage', 'rides', 'owner', 'stopperKey', 'yaw'])
-          if (k in x) bad.push(`${s}: extra ${x.node} carries assembly field "${k}"`);
-      // extras only ever dress faceplates, and only the two extras families
+          if (k in x) bad.push(`${s}: companion ${x.node} carries assembly field "${k}"`);
+      // extras only ever dress faceplates, and only the two extras families;
+      // context only ever mounts a handle, and never both on one part
       if (nExtras && (m.parts[0].type !== 'Faceplate')) bad.push(`${s}: extras on a non-faceplate`);
+      if (nContext && (m.parts[0].type !== 'Handle')) bad.push(`${s}: mounted context on a non-handle`);
+      if (nExtras && nContext) bad.push(`${s}: dressed AND mounted`);
+      // a focus is a framing claim and only a mounted preview has one to make
+      if ((m.previewFocus === 'p0') !== (nContext > 0)) bad.push(`${s}: previewFocus ${m.previewFocus}`);
     }
     if (m.parts.some(p => !p || p.qty !== 1)) bad.push(`${s}: parts qty`);
     if (m.mount !== 'tabletop') bad.push(`${s}: mount ${m.mount}`);
@@ -156,8 +169,10 @@ test('catalog output matches the golden snapshot (UPDATE_GOLDEN=1 to refresh)', 
           // canonical test already constrains bare previews to identity-at-
           // origin, but a generator offset change could silently move the
           // EdgeLabel/ClassicPro dressing while a membership-only golden
-          // stayed green (review catch, 2026-08-19)
-          ...(r.part.extras ? { instances: r.manifest.instances } : {}) };
+          // stayed green (review catch, 2026-08-19). A MOUNTED preview is the
+          // same exposure: the handle's plate sits at a generator-derived
+          // offset, so its seat is pinned here too.
+          ...(r.part.extras || r.part.context ? { instances: r.manifest.instances } : {}) };
   }
   if (process.env.UPDATE_GOLDEN) {
     writeFileSync(GOLDEN_PATH, JSON.stringify(now, null, 2) + '\n');
@@ -249,18 +264,23 @@ test('plate view: confirmed print poses only, bare primary, fail-closed elsewher
   assert.deepEqual(Object.fromEntries(qlPlate.manifest.instances.map(i => [i.node, i.rot])),
     { 'QuickLock-L': [0, 0, 90], 'QuickLock-R': [0, 0, -90] }, 'chiral hands wear MIRRORED print poses');
   // fail closed on anything without a confirmed pose
-  // 2026-08-31: the bracket confirmation COMPLETED the register - every
-  // preview-capable slug now carries a confirmed pose, so the fail-closed
-  // sweep has no honest subject left. The mechanism is not dead code:
-  // platePoseFor answers null for any probe type it does not name, so the
-  // NEXT family ships plate-less until its own confirmation lands here.
+  // 2026-08-31: the bracket confirmation COMPLETED the register, and for three
+  // weeks the fail-closed sweep had no honest subject. THE HANDLES GAVE IT ONE
+  // (2026-09-19): Joey confirmed the DECO handle's pose on 2026-09-14 and no
+  // other handle family's, so eight of the nine handle pages ship turntable-only
+  // - the mechanism working on live slugs, not a spare part. Named one by one
+  // rather than counted, because which slugs are plate-less is the claim.
   const caps = [...resolved.values()].filter(r => !r.fail);
-  assert.equal(caps.filter(r => !r.part.platePreview).length, 0, 'no preview-capable slug left fail-closed');
+  assert.deepEqual(
+    [...resolved].filter(([, r]) => !r.fail && !r.part.platePreview).map(([s]) => s).sort(),
+    ['blockbar-handle-a', 'blockbar-handle-b', 'blockbar-handle-c', 'blockbar-handle-d',
+     'blockbar-handle-e', 'blockbar-handle-f', 'crystal-handle-a', 'crystal-handle-b-wide'],
+    'the slugs with no confirmed print pose - only the BlockBar and Crystal handles');
   // full census: 94 cases + 94 classic + 94 decor + 60 Gridfinity decor + 90
   // faceplates + 4 hardware + 24 covers + 20 foot rails + 24 under-table rails
   // + 22 case extenders + 22 shelf inserts + 4 shelf lips + 18 back covers + 3
-  // wall brackets
-  assert.equal(caps.filter(r => r.part.platePreview).length, 573, 'plate-capable slug count');
+  // wall brackets + 1 Deco handle
+  assert.equal(caps.filter(r => r.part.platePreview).length, 574, 'plate-capable slug count');
 
   // sweep EVERY plate-capable slug's plate boot (not just samples): the bare
   // print JOB (one body, or every member of a handed set), rotations matching
@@ -275,6 +295,7 @@ test('plate view: confirmed print poses only, bare primary, fail-closed elsewher
       : /-under-table-rail-/.test(s) ? [180, 0, 0]
       : /-shelf-insert-|^shelf-lip-/.test(s) ? [180, 0, 0]
       : /^faceplate-back-cover-|^wall-mount-bracket-/.test(s) ? [-90, 0, 0]
+      : s === 'deco-handle' ? [180, 0, 0]
       : undefined;
   for (const [s, r] of resolved) {
     if (r.fail || !r.part.platePreview) continue;

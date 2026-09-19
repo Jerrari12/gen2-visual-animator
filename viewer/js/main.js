@@ -8119,6 +8119,11 @@ const PART_CAM = {
   // too grazing; the clip stands like a small plate. QuickLock + Foot keep the
   // default box angle.
   Stopper: { t: 30, p: 52 }, MagnetClip: { t: 24, p: 72 },
+  // a handle is a horizontal bar, so it takes the tile angle rather than the 3/4 box - and it
+  // previews MOUNTED, where the extra height matters twice: it is what shows the bar standing
+  // OFF its plate. Picked off rendered sheets across the four shape extremes (2026-09-19), not
+  // from the geometry: at the box angle a BlockBar A reads as a stripe painted on the plate.
+  Handle: { t: 30, p: 52 },
 };
 // lifecycle: loading → ready (posted) | failed — failed is a SINK: once set,
 // partReady can never post (context loss / mount failure must leave the site
@@ -8126,12 +8131,26 @@ const PART_CAM = {
 const partView = { interacted: false, pose: null, visible: true, posted: false, failed: false };
 function fitPartCamera() {
   const a = PART_CAM[manifest.parts[0]?.type] || { t: 33, p: 66 }; // default: 3/4 box
+  /* A MOUNTED preview frames the SUBJECT, not the pair. `previewFocus` names the instance to
+     frame - the generator sets it only where a preview carries context, which today means a
+     handle on its Essential plate. Fitting the PAIR there lets the 87 x 55 plate set the radius
+     and leaves the handle a stripe across it; MEASURED on screen 2026-09-19, which is the only
+     way this shows up. The 1.55 margin is wide enough that the plate stays in shot as a backdrop
+     and tight enough that the bar's profile and its stand-off read; 1.4 clipped the widest
+     handle, 1.75 shrank it back. With no focus - every other preview - this is byte-for-byte
+     what it was. */
+  const focus = manifest.previewFocus && instances.get(manifest.previewFocus);
+  let center = buildCenter, radius = buildRadius, margin = 1.12;
+  if (focus) {
+    const sph = new THREE.Box3().setFromObject(focus.group).getBoundingSphere(new THREE.Sphere());
+    center = sph.center; radius = sph.radius; margin = 1.55;
+  }
   camera.fov = 38;
   camera.updateProjectionMatrix();
-  const { pos, target } = camPos({ t: a.t, p: a.p, fitR: buildRadius * 1.12, fov: 38, target: buildCenter.toArray() });
+  const { pos, target } = camPos({ t: a.t, p: a.p, fitR: radius * margin, fov: 38, target: center.toArray() });
   camera.position.copy(pos);
   controls.target.copy(target);
-  controls.minDistance = buildRadius * 0.9;      // don't fly inside the part
+  controls.minDistance = radius * 0.9;           // don't fly inside the part
   controls.maxDistance = camera.position.distanceTo(target) * 4;
   controls.update();
   partView.pose = { pos: camera.position.clone(), target: controls.target.clone() };

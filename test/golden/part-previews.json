@@ -5133,5 +5133,248 @@
     "type": "Bracket",
     "label": "Wall Mount Lite 3W",
     "platePreview": true
+  },
+  "deco-handle": {
+    "node": "Handle_Deco",
+    "collection": "185",
+    "type": "Handle",
+    "label": "Deco Handle",
+    "platePreview": true,
+    "instances": [
+      {
+        "id": "p0",
+        "node": "Handle_Deco",
+        "pos": [
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "id": "p1",
+        "node": "Faceplate_Essential_1W-1H",
+        "pos": [
+          0.009999999999999953,
+          -22.5,
+          -14.5
+        ]
+      }
+    ]
+  },
+  "blockbar-handle-a": {
+    "node": "Handle_BlockBar_A",
+    "collection": "185",
+    "type": "Handle",
+    "label": "BlockBar Handle A",
+    "platePreview": false,
+    "instances": [
+      {
+        "id": "p0",
+        "node": "Handle_BlockBar_A",
+        "pos": [
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "id": "p1",
+        "node": "Faceplate_Essential_1W-1H",
+        "pos": [
+          0.009999999999999953,
+          -22.5,
+          -7
+        ]
+      }
+    ]
+  },
+  "blockbar-handle-b": {
+    "node": "Handle_BlockBar_B",
+    "collection": "185",
+    "type": "Handle",
+    "label": "BlockBar Handle B",
+    "platePreview": false,
+    "instances": [
+      {
+        "id": "p0",
+        "node": "Handle_BlockBar_B",
+        "pos": [
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "id": "p1",
+        "node": "Faceplate_Essential_1W-1H",
+        "pos": [
+          0.009999999999999953,
+          -22.5,
+          -16
+        ]
+      }
+    ]
+  },
+  "blockbar-handle-c": {
+    "node": "Handle_BlockBar_C",
+    "collection": "185",
+    "type": "Handle",
+    "label": "BlockBar Handle C",
+    "platePreview": false,
+    "instances": [
+      {
+        "id": "p0",
+        "node": "Handle_BlockBar_C",
+        "pos": [
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "id": "p1",
+        "node": "Faceplate_Essential_1W-1H",
+        "pos": [
+          0.009999999999999953,
+          -21.5,
+          -8.5
+        ]
+      }
+    ]
+  },
+  "blockbar-handle-d": {
+    "node": "Handle_BlockBar_D",
+    "collection": "185",
+    "type": "Handle",
+    "label": "BlockBar Handle D",
+    "platePreview": false,
+    "instances": [
+      {
+        "id": "p0",
+        "node": "Handle_BlockBar_D",
+        "pos": [
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "id": "p1",
+        "node": "Faceplate_Essential_1W-1H",
+        "pos": [
+          0.009999999999999953,
+          -22.5,
+          -7
+        ]
+      }
+    ]
+  },
+  "blockbar-handle-e": {
+    "node": "Handle_BlockBar_E",
+    "collection": "185",
+    "type": "Handle",
+    "label": "BlockBar Handle E",
+    "platePreview": false,
+    "instances": [
+      {
+        "id": "p0",
+        "node": "Handle_BlockBar_E",
+        "pos": [
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "id": "p1",
+        "node": "Faceplate_Essential_1W-1H",
+        "pos": [
+          0.009999999999999953,
+          -22,
+          -14.5
+        ]
+      }
+    ]
+  },
+  "blockbar-handle-f": {
+    "node": "Handle_BlockBar_F",
+    "collection": "185",
+    "type": "Handle",
+    "label": "BlockBar Handle F",
+    "platePreview": false,
+    "instances": [
+      {
+        "id": "p0",
+        "node": "Handle_BlockBar_F",
+        "pos": [
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "id": "p1",
+        "node": "Faceplate_Essential_1W-1H",
+        "pos": [
+          0.009999999999999953,
+          -22.5,
+          -14.5
+        ]
+      }
+    ]
+  },
+  "crystal-handle-a": {
+    "node": "Handle_Crystal_A",
+    "collection": "185",
+    "type": "Handle",
+    "label": "Crystal Handle A",
+    "platePreview": false,
+    "instances": [
+      {
+        "id": "p0",
+        "node": "Handle_Crystal_A",
+        "pos": [
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "id": "p1",
+        "node": "Faceplate_Essential_1W-1H",
+        "pos": [
+          0.009999999999999953,
+          -21.11,
+          -12.034999999999997
+        ]
+      }
+    ]
+  },
+  "crystal-handle-b-wide": {
+    "node": "Handle_Crystal_B",
+    "collection": "185",
+    "type": "Handle",
+    "label": "Crystal Handle B Wide",
+    "platePreview": false,
+    "instances": [
+      {
+        "id": "p0",
+        "node": "Handle_Crystal_B",
+        "pos": [
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "id": "p1",
+        "node": "Faceplate_Essential_1W-1H",
+        "pos": [
+          0.009999999999999953,
+          -21.11,
+          -12.034999999999997
+        ]
+      }
+    ]
   }
 }

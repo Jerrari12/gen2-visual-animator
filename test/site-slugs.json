@@ -1,6 +1,6 @@
 {
  "_meta": {
-  "source": "MODULITH repo dist/search-index.json - a LOCAL site build of 2026-09-18 that adds the 60 Gridfinity Decor Drawer pages (not deployed yet); every other slug is the production catalog",
+  "source": "MODULITH repo dist/search-index.json - a LOCAL site build of 2026-09-18 that adds the 60 Gridfinity Decor Drawer pages (not deployed yet); every other slug is the production catalog. PLUS the nine handle slugs appended at the end 2026-09-19: those pages do not exist on the site in ANY build yet - they are the site session's minted list (D:/Claude - Output/modulith-handles-as-parts-2026-09-19/handle-site-slugs.json), vendored here first because the site will not create the pages until this viewer's support manifest carries the slugs. RE-VENDOR from a real site build once it does.",
   "release": "v2608",
   "extracted": "2026-09-19",
   "note": "Frozen by the site URL-permanence law. Re-vendor when the site catalog grows; part-preview.test.mjs sweeps every entry."
@@ -582,6 +582,15 @@
   "tpu-foot",
   "wall-mount-bracket-1w",
   "wall-mount-bracket-2w",
-  "wall-mount-bracket-3w"
+  "wall-mount-bracket-3w",
+  "deco-handle",
+  "blockbar-handle-a",
+  "blockbar-handle-b",
+  "blockbar-handle-c",
+  "blockbar-handle-d",
+  "blockbar-handle-e",
+  "blockbar-handle-f",
+  "crystal-handle-a",
+  "crystal-handle-b-wide"
  ]
 }

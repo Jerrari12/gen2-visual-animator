@@ -232,6 +232,33 @@ const LINKS = {
 // centre-relative height offset into the bottom-anchored `pos.y`.
 const SCREW_M3 = { node: 'ButtonHeadScrew_M3-6', label: 'M3×6mm Button Head Screw', h: 5.08 };
 
+/* The nine modelled handle variants, keyed by their GLB node - the same list the Build Studio
+   cycles with the identify card's arrows (viewer/js/main.js HANDLE_STYLES, which owns the
+   swap; this is the generator's copy of the same nine facts). `h` and `d` are PLACEMENT dims,
+   the handle's height and how far it stands off the plate, and they differ per variant.
+
+   ⚠ A BUILD NEVER NAMES ONE OF THESE. The Planner picks a FAMILY - deco / blockbar /
+   crystal - and a build gets that family's first variant, which is what HANDLE_STYLES inside
+   generateManifest still does. `build.handleVariant` is PREVIEW-ONLY: resolvePartPreview sets
+   it so a per-variant product page can show its own handle, nothing serializes it, no share
+   link carries it, and with it unset every manifest is byte-identical to before this table
+   existed (test/handle-preview.test.mjs pins that).
+
+   ⚠ EXPORTED ONLY SO THAT GATE CAN REACH IT - it measures all nine GLBs and checks `h` and
+   `d` against these rows, because a mistyped depth would seat a handle off its plate in a
+   preview and nothing in the app would notice. Nothing in the app imports it. */
+export const HANDLE_VARIANTS = {
+  Handle_Deco:       { family: 'deco',     label: 'Deco Handle',           h: 9,     d: 24 },
+  Handle_BlockBar_A: { family: 'blockbar', label: 'BlockBar Handle A',     h: 9,     d: 9 },
+  Handle_BlockBar_B: { family: 'blockbar', label: 'BlockBar Handle B',     h: 9,     d: 27 },
+  Handle_BlockBar_C: { family: 'blockbar', label: 'BlockBar Handle C',     h: 11,    d: 12 },
+  Handle_BlockBar_D: { family: 'blockbar', label: 'BlockBar Handle D',     h: 9,     d: 9 },
+  Handle_BlockBar_E: { family: 'blockbar', label: 'BlockBar Handle E',     h: 10,    d: 24 },
+  Handle_BlockBar_F: { family: 'blockbar', label: 'BlockBar Handle F',     h: 9,     d: 24 },
+  Handle_Crystal_A:  { family: 'crystal',  label: 'Crystal Handle A',      h: 11.78, d: 19.07 },
+  Handle_Crystal_B:  { family: 'crystal',  label: 'Crystal Handle B Wide', h: 11.78, d: 19.07 },
+};
+
 /* ---- Shelf inserts + shelf lips (2026-08-28) ------------------------------
    MEASURED, not derived from a scaling rule: computed off Joey's own
    case-and-insert render scene (`D:\Render Projects\GEN2 Thumbnail Renderer -
@@ -805,9 +832,24 @@ export function generateManifest(build) {
     blockbar: { node: 'Handle_BlockBar_A', label: 'BlockBar Handle', h: 9,     d: 9,     links: links.hb },
     crystal:  { node: 'Handle_Crystal_A',  label: 'Crystal Handle',  h: 11.78, d: 19.07, links: links.hc },
   };
-  const handleStyle = HANDLE_STYLES[build.handleStyle] || HANDLE_STYLES.deco;
+  const handleFamily = HANDLE_STYLES[build.handleStyle] || HANDLE_STYLES.deco;
   if (build.handleStyle && !HANDLE_STYLES[build.handleStyle])
-    warnings.push(`"${build.handleStyle}" handles aren't modeled yet · showing ${handleStyle.label.replace(' Handle', '')} (swap styles by tapping a handle).`);
+    warnings.push(`"${build.handleStyle}" handles aren't modeled yet · showing ${handleFamily.label.replace(' Handle', '')} (swap styles by tapping a handle).`);
+  /* A PREVIEW may name ONE VARIANT of a family (HANDLE_VARIANTS, module scope): the site sells
+     the nine handles as nine products, so /parts/blockbar-handle-b/ must show a BlockBar B and
+     not the family's A. The variant brings its own label and placement dims and keeps its
+     family's store links - one Printables page carries all six BlockBars. Unset - which is
+     every planner build and every share link - leaves handleStyle exactly what it was.
+     ⚠ An unknown variant is an ERROR, not a fallback: it can only come from a slug table
+     naming a node the library does not have, and silently previewing a DIFFERENT handle on a
+     permanent product page is the failure this whole resolver is built to refuse. */
+  const handleVariant = build.handleVariant ? HANDLE_VARIANTS[build.handleVariant] : null;
+  if (build.handleVariant && !handleVariant)
+    errors.push(`"${build.handleVariant}" isn't a handle this viewer models.`);
+  const handleStyle = handleVariant
+    ? { node: build.handleVariant, label: handleVariant.label, h: handleVariant.h, d: handleVariant.d,
+        links: HANDLE_STYLES[handleVariant.family].links }
+    : handleFamily;
 
   // ---- per-unit validation -------------------------------------------------
   /* ⚠ THE LEGAL HEIGHTS ARE PER FILL, and the two domains barely overlap.
@@ -2510,6 +2552,23 @@ function camUp(tx, ty, totalW, gridBottom) {
 // extenders (no GLBs exist) and the 6 hardware slugs (pair-vs-single product
 // composition needs Joey's call — 'unsupported' keeps the site on its poster).
 const H_FROM_SLUG = { '0-5': 1, '1': 2, '1-5': 3, '2': 4, '3': 6 }; // site h token → planner hh
+
+/* The site's nine handle product pages (slugs minted 2026-09-19 by the site session, permanent
+   once published). An EXPLICIT table rather than a grammar, for two reasons: the names do not
+   follow one - `deco-handle` carries no letter and `crystal-handle-b-wide` carries the "Wide"
+   the site and the print-cost tables both use - and a published slug can never be corrected,
+   so the mapping is worth reading rather than deriving. */
+const HANDLE_SLUGS = {
+  'deco-handle':           'Handle_Deco',
+  'blockbar-handle-a':     'Handle_BlockBar_A',
+  'blockbar-handle-b':     'Handle_BlockBar_B',
+  'blockbar-handle-c':     'Handle_BlockBar_C',
+  'blockbar-handle-d':     'Handle_BlockBar_D',
+  'blockbar-handle-e':     'Handle_BlockBar_E',
+  'blockbar-handle-f':     'Handle_BlockBar_F',
+  'crystal-handle-a':      'Handle_Crystal_A',
+  'crystal-handle-b-wide': 'Handle_Crystal_B',
+};
 // Collection colors for collection-scoped parts — the site's poster renders are
 // tinted per collection (planner lineup palette; siblings: main.js
 // SHOT_LEN_COLORS, planner data.js GEN2.lengths), and the poster→3D swap must
@@ -2534,6 +2593,10 @@ function previewColors(L) {
     // hardware wears the poster orange too (the site's card art) — the K'nex
     // identification palette is an instructions affordance, not a product shot
     QuickLock: '#ff6f1b', Stopper: '#ff6f1b', MagnetClip: '#ff6f1b', Foot: '#ff6f1b',
+    // the handle is the SUBJECT of its own product page and previews mounted on a plate, so it
+    // takes the poster orange and leaves the Faceplate above in its dark hue: the eye finds the
+    // part being sold without a caption. In a build it stays identification yellow.
+    Handle: '#ff6f1b',
   };
 }
 // Hardware previews (Joey's composition decision 2026-08-20): a handed pair is
@@ -2687,6 +2750,20 @@ function previewProbe(slug) {
     return { build: one(185, +m[2], H_FROM_SLUG[m[3]], 'decor', { faceStyle: m[1] }), pick: { type: 'Faceplate' } };
   if ((m = s.match(new RegExp(`^faceplate-back-cover-([1-4])w-${H}h$`))))
     return { build: one(185, +m[1], H_FROM_SLUG[m[2]], 'decor', { backCover: true }), pick: { type: 'BackCover' } };
+  /* The nine bolt-on handles. A handle is not a Planner BOM row of its own - the Planner picks
+     a FAMILY for the whole build and the Build Studio cycles the variants - so the probe names
+     the variant through the preview-only `handleVariant` field, and the pick then DEMANDS that
+     exact node back. That round trip is the guard: a build that ignored the variant would bill
+     the family's first handle and a type-only pick would happily preview it on the wrong
+     product page, which is what a Gridfinity drawer outside its family does silently.
+     The probe is an ESSENTIAL 1W-1H unit - Essential and Chevron are the families that take a
+     bolt-on handle, and the Essential plate is also the mounted context the preview shows. */
+  if (HANDLE_SLUGS[s]) {
+    const node = HANDLE_SLUGS[s];
+    return { build: one(185, 1, 2, 'decor',
+               { faceStyle: 'essential', handleStyle: HANDLE_VARIANTS[node].family, handleVariant: node }),
+             pick: { type: 'Handle', node } };
+  }
   // shelf lips are universal like the faceplates (no length in the name), so
   // they probe on the calibrated 185: a 1H shelf with lip:'front' bills the
   // ShelfLip_<w>W node exactly once (the mid slot stays empty - 'both' would
@@ -2770,7 +2847,8 @@ const PLATE_POSE = {
      up, so it takes the Cover Upper's swing - the installed top onto the plate - and that top face
      carries the plate's finish. KEYED BY HANDLE FAMILY, like the faceplates: the handle material is
      one TYPE shared by every style, and BlockBar and Crystal have no confirmed pose, so they stay
-     plain. ⚠ NO SITE SLUG POSES A HANDLE, so, like the accent, only the renderer's axis reads it. */
+     plain - on the renderer AND, since the nine handle product pages landed (2026-09-19), on the
+     plate view: `deco-handle` is plate-capable and the eight BlockBar/Crystal pages fail closed. */
   'handle:deco': [180, 0, 0],
 };
 /* Every hardware entry, reachable by the TYPE it poses. Built once from the same table
@@ -2876,7 +2954,11 @@ function platePoseFor(probe) {
   // hardware poses live on the entry ([] = as authored); the probe already found it, and
   // plateRotForType would find the same one by type.
   if (probe.hw) return probe.hw.plateRot;
-  return plateRotForType(probe.pick.type, probe.build.faceStyle);
+  // the handle FAMILY matters as much as the faceplate family does: only Deco has a confirmed
+  // print pose, so the eight BlockBar and Crystal pages ship turntable-only and fail closed on
+  // ?plate= - and without this argument even Deco would, which is what it did until handles
+  // had product pages to reach it.
+  return plateRotForType(probe.pick.type, probe.build.faceStyle, probe.build.handleStyle);
 }
 
 export function resolvePartPreview(slug, opts = {}) {
@@ -2934,6 +3016,7 @@ export function resolvePartPreview(slug, opts = {}) {
     };
   }
   const rows = gen.manifest.parts.filter(p => p.type === probe.pick.type &&
+    (!probe.pick.node || p.node === probe.pick.node) &&
     (!probe.pick.suffix || p.node.endsWith(probe.pick.suffix)) &&
     (!probe.pick.prefix || p.node.startsWith(probe.pick.prefix)));
   // fail CLOSED on anything but exactly one match — never guess which physical
@@ -2958,11 +3041,25 @@ export function resolvePartPreview(slug, opts = {}) {
     ? gen.manifest.instances.filter(i => i.rides === primary.rides &&
         (typeOf[i.node] === 'Accent' || typeOf[i.node] === 'Label'))
     : [];
+  /* A HANDLE previews MOUNTED on the Essential 1W-1H plate it was probed against: a 75 mm bar
+     alone on a transparent stage reads as nothing, which is what the site's old handle
+     thumbnails looked like. That is a DIFFERENT claim from the dressed faceplate above and is
+     reported under its own key: the plate is CONTEXT, it is NOT in the handle's download, and
+     nothing else is carried over - the two M3 screws that fasten it are purchased hardware and
+     would be hidden behind the plate anyway. The handle wears the poster orange against the
+     plate's dark poster hue (previewColors), so the subject reads with no caption; `context`
+     is there for the site to caption it anyway. */
+  const context = row.type === 'Handle' && !opts.plate
+    ? gen.manifest.instances.filter(i => i.rides === primary.rides && typeOf[i.node] === 'Faceplate')
+    : [];
+  // one list for the geometry - only one of the two is ever non-empty - two keys for the claim
+  const withPart = [...extras, ...context];
   const L = gen.manifest.collection;
   return {
     part: { node: row.node, label: row.label, type: row.type,
             platePreview: !!platePose,
-            ...(extras.length ? { extras: extras.map(x => x.node) } : {}) },
+            ...(extras.length ? { extras: extras.map(x => x.node) } : {}),
+            ...(context.length ? { context: context.map(x => x.node) } : {}) },
     manifest: {
       title: row.label,
       collection: L,
@@ -2973,7 +3070,7 @@ export function resolvePartPreview(slug, opts = {}) {
       mount: 'tabletop',
       pitch: { x: PITCH_X, y: 56 },
       colors: previewColors(L),
-      parts: [{ ...row, qty: 1 }, ...extras.map(x => ({ ...gen.manifest.parts.find(p => p.node === x.node), qty: 1 }))],
+      parts: [{ ...row, qty: 1 }, ...withPart.map(x => ({ ...gen.manifest.parts.find(p => p.node === x.node), qty: 1 }))],
       // canonical pose: the primary sits identity at the origin (parts are
       // bottom-anchored, X/Z-centered). Assembly context — pos, stage, rides,
       // owner, yaw — is deliberately NOT inherited; every previewable family's
@@ -2982,17 +3079,21 @@ export function resolvePartPreview(slug, opts = {}) {
       // boot instead applies the confirmed PRINT pose to the bare primary;
       // main.js seats the rotated part on the plate (bbox lift + recenter).
       ...(opts.plate ? { platePose: true } : {}),
+      // a MOUNTED preview frames its subject, not the pair - see fitPartCamera. Only set where
+      // there IS context to be out-framed by; a dressed faceplate's extras sit inside the plate's
+      // own bounds, so naming a focus there would change nothing and claim something.
+      ...(context.length ? { previewFocus: 'p0' } : {}),
       instances: [
         { id: 'p0', node: row.node, pos: [0, 0, 0],
           ...(opts.plate && platePose.length ? { rot: platePose } : {}) },
-        ...extras.map((x, n) => ({ id: 'p' + (n + 1), node: x.node,
+        ...withPart.map((x, n) => ({ id: 'p' + (n + 1), node: x.node,
           pos: [x.pos[0] - primary.pos[0], x.pos[1] - primary.pos[1], x.pos[2] - primary.pos[2]],
           ...(x.rot ? { rot: x.rot } : {}) })),
       ],
       stages: {},
       steps: [{ title: row.label, note: '', camera: { t: 32, p: 64, r: 600, target: [0, 0, 0] },
                 phases: [{ enter: [{ id: 'p0', from: [0, 0, 0] },
-                                   ...extras.map((x, n) => ({ id: 'p' + (n + 1), from: [0, 0, 0] }))] }] }],
+                                   ...withPart.map((x, n) => ({ id: 'p' + (n + 1), from: [0, 0, 0] }))] }] }],
     },
   };
 }

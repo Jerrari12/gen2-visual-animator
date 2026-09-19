@@ -2309,6 +2309,42 @@
     "wall-mount-bracket-3w": {
       "preview": true,
       "platePreview": true
+    },
+    "deco-handle": {
+      "preview": true,
+      "platePreview": true
+    },
+    "blockbar-handle-a": {
+      "preview": true,
+      "platePreview": false
+    },
+    "blockbar-handle-b": {
+      "preview": true,
+      "platePreview": false
+    },
+    "blockbar-handle-c": {
+      "preview": true,
+      "platePreview": false
+    },
+    "blockbar-handle-d": {
+      "preview": true,
+      "platePreview": false
+    },
+    "blockbar-handle-e": {
+      "preview": true,
+      "platePreview": false
+    },
+    "blockbar-handle-f": {
+      "preview": true,
+      "platePreview": false
+    },
+    "crystal-handle-a": {
+      "preview": true,
+      "platePreview": false
+    },
+    "crystal-handle-b-wide": {
+      "preview": true,
+      "platePreview": false
     }
   }
 }
