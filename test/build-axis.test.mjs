@@ -170,3 +170,17 @@ test('and the check has teeth: the plausible wrong axis puts the plate HEIGHT th
     `declaring +Y for a ${b.family} faceplate puts ${along.toFixed(2)} where ${want} is expected, `
     + 'and that still satisfies the family tolerance — the check above cannot discriminate');
 });
+
+test('the EdgeLabel label prints on its back; the Classic Pro label has no confirmed pose', () => {
+  /* Joey, 2026-09-21: EdgeLabel labels "are printed with their backside facing down". The label is a
+     57 x 27 x 4.5 mm tile standing in the plate's window, so printed on its back it grows through its
+     THIN axis - which is also what makes this check able to fail: the other two axes are 57 and 27. */
+  const axis = buildAxisForType('Label', 'edgelabel');
+  assert.deepEqual(axis, [0, 0, 1], 'the label grows toward its front, back face on the plate');
+  const along = spanAlong(worldSpans(join(root, 'viewer', 'parts', '185', 'Label_EdgeLabel.lib.glb')), axis);
+  assert.ok(Math.abs(along - 4.5) < 0.5, `the label's span along its build axis is ${along}, not its 4.5 mm thickness`);
+  /* the 'Label' material type is SHARED by both label families, so the pose is keyed by family: the
+     tilted Classic Pro label must not inherit the EdgeLabel's */
+  assert.equal(plateRotForType('Label', 'classicpro'), null);
+  assert.equal(buildAxisForType('Label', 'classicpro'), null);
+});

@@ -2842,6 +2842,13 @@ const PLATE_POSE = {
      ⚠ NO SITE SLUG POSES AN ACCENT, so this entry reaches no plate preview and
      no exported registry row - only the renderer's build axis. */
   accent: [90, 0, 0],
+  /* Joey, 2026-09-21, of the EdgeLabel label: "they are printed with their backside facing down" - the back
+     face (the one that sits into the plate's label window, -Z as authored) on the plate, so the visible front
+     is the last layer, not the plate-textured face. The faceplate's own back-down swing. KEYED BY FAMILY like
+     the faceplates and handles, because the 'Label' material type is shared: the Classic Pro label (tilted as
+     installed) has no confirmed pose and stays plain. No site slug poses a label, so like the accent this
+     reaches only the renderer's build axis. */
+  'label:edgelabel': [-90, 0, 0],
   /* Joey, 2026-09-14, of the Deco handle: "The way they are right now in the viewer, the side
      facing up, that side prints face-down on the build plate." Installed, the handle's top faces
      up, so it takes the Cover Upper's swing - the installed top onto the plate - and that top face
@@ -2882,6 +2889,7 @@ export function plateRotForType(type, faceStyle, handleStyle) {
     : type === 'BackCover' ? 'backCover'
     : type === 'Bracket' ? 'bracket'
     : type === 'Accent' ? 'accent'
+    : type === 'Label' ? 'label:' + faceStyle
     : null;
   return k != null && k in PLATE_POSE ? PLATE_POSE[k] : null;
 }

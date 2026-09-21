@@ -477,17 +477,18 @@ test('the EdgeLabel accent prints face-down: axis -Z, and along it the accent me
   }
 });
 
-test('on the starter kit dressed as EdgeLabel, only QuickLock, Magnet and Label stay plain', () => {
+test('on the starter kit dressed as EdgeLabel, only QuickLock and Magnet stay plain', () => {
   const kit = JSON.parse(readFileSync(join(root, 'viewer', 'builds', '185-tabletop-2w2h.json'), 'utf8'));
   const gen = generateManifest({ ...kit.build, faceStyle: 'edgelabel', backCover: true });
   assert.ok(gen.manifest, (gen.errors || []).join('; '));
   const types = [...new Set(gen.manifest.parts.map((p) => p.type))].sort();
   const plain = types.filter((t) => !buildAxisForType(t, 'edgelabel'));
   /* the lab's finding on the same build (2026-09-14): QuickLock is a chiral pair, and Magnet and
-     Label have no confirmed print pose. A new type landing in either list is a decision to make,
-     not a number to update. */
-  assert.deepEqual(plain, ['Label', 'Magnet', 'QuickLock']);
-  for (const t of ['Accent', 'BackCover', 'Case', 'CoverL', 'CoverU', 'Drawer', 'Faceplate']) {
+     Label had no confirmed print pose. Joey confirmed the EdgeLabel label on 2026-09-21 ("printed with
+     their backside facing down"), so it left this list by decision. A new type landing in either list is a
+     decision to make, not a number to update. */
+  assert.deepEqual(plain, ['Magnet', 'QuickLock']);
+  for (const t of ['Accent', 'BackCover', 'Case', 'CoverL', 'CoverU', 'Drawer', 'Faceplate', 'Label']) {
     assert.ok(types.includes(t) && buildAxisForType(t, 'edgelabel'), `${t} is not finished on this build`);
   }
 });
