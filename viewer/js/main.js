@@ -16,7 +16,7 @@ import { PLATE_FINISHES, PLATE_LABELS, HOLO_OPACITY, plateFinishOf, createBedFin
 import { createDimCoverTest } from './dim-cover.js';
 import { benchBuild, createOrbitBench } from './orbit-bench.js';
 import { createSettleBench } from './settle-bench.js';
-import { parseSeeInto, parseSeeIntoSkip, createSeeInto } from './see-into.js';
+import { parseSeeInto, parseSeeIntoSkip, parseSeeIntoLattice, createSeeInto } from './see-into.js';
 
 /* Every entry-routing boolean below is derived by resolveEntry() in entry.js -
    a pure function of (search, hash) with no DOM or network - so the boot
@@ -53,12 +53,13 @@ const IS_BENCH = ENTRY.isBench;
 var orbitBench = null, settleBench = null, benchHold = false;
 /* The see-into translucent filament (see-into.js). ON BY DEFAULT since 2026-09-18 (Joey, after his live check on the showcase
    laptop: "those all are running extremely well", "yeah they look good") for the SUPPORTED components only - a translucent
-   filament picked on a grip, Essential's face or Chevron's faces (SEE_INTO_COMPONENTS_BY_FAMILY). Nothing is patched and no
+   filament picked on any faceplate-assembly part (SEE_INTO_TYPES). Nothing is patched and no
    pass runs until such a pick exists (`wanted` below). ⚠ The frosted BACK COVER is a PRESET, not a filament pick, so it stays
    behind `?seeinto=<preset>` (SEE_INTO_COVERS): turning it on by default would change every build's covers whatever the user
    picked. Null only in part-preview mode. `var`: newPartMaterial and the render loop read it, and both can run before a
    `let` line would have. */
 var seeInto = null;
+const SEE_OWN = 0.40, SEE_OWN_TEXTURED = 0.52;   // see ownSee in createSeeInto's call below
 const SEE_INTO_COVERS = parseSeeInto(location.search);   // null = back covers stay ordinary opaque parts
 // ?part=<slug>&mode=preview — the MODULITH product-page embed (2026-08-19): a
 // TRANSPARENT iframe showing one part, poster-fast, slow idle spin until
@@ -1202,6 +1203,16 @@ function ensureAO() {
   ao.rtN = new THREE.WebGLRenderTarget(w, h);
   ao.rtN.depthTexture = new THREE.DepthTexture(w, h);
   ao.rtN.depthTexture.type = THREE.UnsignedIntType;
+  /* ⚠ THE JITTERED PASSES GET THEIR OWN TARGET, so rtN always holds an UNSHIFTED depth (2026-09-21, Joey: "the AO shadow
+     around the handle seems to flicker"). The see-into's AO weighting compares a translucent part's own depth (pass A,
+     unjittered) against this depth with an EXACT compare (sceneDepth in createSeeInto; a tolerance left a band, 2a4e14c).
+     With every settle pass rendering rtN at its own +-0.375-texel shift, that compare flipped across the whole face from
+     frame to frame: full and reduced occlusion alternating around the handle for the length of every AO burst (filmed,
+     results/p70). Pass 0 - every motion frame, and the first of a burst - and the final centred re-render still write rtN;
+     passes 1..15 write rtNJ. The SSAO and the bilateral read whichever the pass wrote, so the AO image is unchanged. */
+  ao.rtNJ = new THREE.WebGLRenderTarget(w, h);
+  ao.rtNJ.depthTexture = new THREE.DepthTexture(w, h);
+  ao.rtNJ.depthTexture.type = THREE.UnsignedIntType;
   // The accumulation target must be float-renderable: a running mean in 8 bits
   // quantizes late passes to nothing. EXT_color_buffer_float guarantees
   // RGBA16F renderability (and 16F blending); the completeness probe below
@@ -1358,6 +1369,8 @@ function aoResize() {
   if (ao.rtN.width === w && ao.rtN.height === h) return;
   ao.rtN.setSize(w, h);
   ao.rtN.depthTexture.image.width = w; ao.rtN.depthTexture.image.height = h;
+  ao.rtNJ.setSize(w, h);
+  ao.rtNJ.depthTexture.image.width = w; ao.rtNJ.depthTexture.image.height = h;
   ao.rtAO.setSize(w, h);
   ao.rtBlur.setSize(w, h);
   ao.aoMat.uniforms.uRes.value.set(w, h);
@@ -1428,6 +1441,9 @@ function updateAO(force = false) {
     // is a supersampled image on the base grid. The camera's own matrices are
     // restored immediately: aoCamMoved() compares the REAL projection.
     const off = AO_JITTER[ao.passes % AO_ACCUM];
+    const rtD = off.x || off.y ? ao.rtNJ : ao.rtN;   // see ensureAO: rtN keeps an unshifted depth for the see-into
+    ao.aoMat.uniforms.tNormal.value = rtD.texture; ao.aoMat.uniforms.tDepth.value = rtD.depthTexture;
+    ao.blurMat.uniforms.tCDepth.value = rtD.depthTexture;
     _aoProj.copy(camera.projectionMatrix);
     _aoProj.elements[8] += off.x * 2 / ao.rtN.width;
     _aoProj.elements[9] += off.y * 2 / ao.rtN.height;
@@ -1446,7 +1462,7 @@ function updateAO(force = false) {
       const savedProj = camera.projectionMatrix, savedInv = camera.projectionMatrixInverse;
       camera.projectionMatrix = _aoProj; camera.projectionMatrixInverse = _aoProjInv;
       try {
-        renderer.setRenderTarget(ao.rtN);
+        renderer.setRenderTarget(rtD);
         renderer.clear();
         renderer.render(scene, camera);
       } finally {
@@ -1512,6 +1528,7 @@ function updateAO(force = false) {
       renderer.render(scene, camera);
       scene.overrideMaterial = prevOv; scene.background = prevBg;
       while (hidden.length) hidden.pop().visible = true;
+      ao.blurMat.uniforms.tCDepth.value = ao.rtN.depthTexture;   // the centred re-render is what the bilateral reads now
       ao.quad.material = ao.blurMat;
       renderer.setRenderTarget(ao.rtBlur);
       renderer.autoClear = false;
@@ -1665,9 +1682,11 @@ function seeIntoCoversVisible() {
      drawers; a faceplate grip faces the room on the front of the build, so whenever one is wearing translucent
      filament and its plate is on screen's page at all, the passes run. Astra 2026-09-17: "The closed-drawer skip
      won't hide these surfaces, so report their actual cost rather than relying on the cover benchmark." */
-  if (seeIntoDriven.size) {
+  /* ...but a filament-driven BACK COVER is enclosed exactly like the reference one, so it alone leaves the rule below to decide */
+  if ([...seeIntoDriven].some(k => k.split(':')[0] !== 'BackCover')) {
     for (const inst of instances.values()) {
-      if (inst.group && inst.group.visible && typeByNode[inst.cfg.node] === 'Faceplate') return true;
+      const t = typeByNode[inst.cfg.node];
+      if (inst.group && inst.group.visible && t !== 'BackCover' && SEE_INTO_TYPES.has(t)) return true;
     }
   }
   if (tweens.size) return true;                                   // anything moving: the enclosure may be opening
@@ -1695,6 +1714,13 @@ if (!ENTRY.isPart) seeInto = createSeeInto({
   /* the preset's constants drive the filament-driven components too (they keep their own colour through `own`); 'frosted'
      is the one every grip/face measurement and Joey's live check ran on */
   THREE, renderer, scene, camera, presetKey: SEE_INTO_COVERS || 'frosted',
+  lattice: parseSeeIntoLattice(location.search),   // the buried-lattice TRIAL (2026-09-21), ?silattice=on only
+  /* A FILAMENT-DRIVEN part's see-through (Joey 2026-09-21: "maybe overall for the polymaker translucent if it could be slightly
+     more see-through", and "when the texture build plate is selected it's not nearly as transparent as the real thing").
+     The preset's 0.20 stays the reference cover's accepted look; a picked translucent filament now shows 0.40 of what is
+     behind it, and 0.52 when its VISIBLE FRONT printed on the textured (Powder) sheet - the face-down Essential and Chevron
+     families - where the grain otherwise reads as extra frost. ARTISTIC values from Joey's look, not measured optics. */
+  ownSee: () => (PLATE_FAMILIES.has(currentFaceplateStyle()?.key) && plateFinishOf(build) === 'powder') ? SEE_OWN_TEXTURED : SEE_OWN,
   // every back cover (only behind the switch), one part per instance (hidden meshes draw nothing in the passes)
   parts: () => {
     const out = [];
@@ -1708,10 +1734,11 @@ if (!ENTRY.isPart) seeInto = createSeeInto({
       }
       /* A supported component is a ZONE of a bigger part, so only its own primitives go in - the plate body and face
          beside it stay opaque and must keep occluding, which is exactly what leaving them out of pass A does. */
-      if (seeIntoDriven.size && typeByNode[inst.cfg.node] === 'Faceplate') {
+      const siType = typeByNode[inst.cfg.node];
+      if (seeIntoDriven.size && SEE_INTO_TYPES.has(siType)) {
         const meshes = [];
         inst.group.traverse((o) => {
-          if (o.isMesh && seeIntoDriven.has(zoneKey('Faceplate', o.userData.zone || ''))) meshes.push(o);
+          if (o.isMesh && seeIntoDriven.has(zoneKey(siType, o.userData.zone || ''))) meshes.push(o);
         });
         if (meshes.length) out.push({ partId: inst.cfg.id + ':zone', meshes });
       }
@@ -3007,17 +3034,34 @@ function ensureMaterials() { // one shared material per type/zone key (idempoten
    families with a grip keep the grip. A flat set could not express that: `Faceplate` is also the BODY key behind
    everything on EdgeLabel and Classic, and `Faceplate:FACE` also exists on Classic - neither of which Joey asked for,
    and neither of which is in Astra's scope for this release. */
-const SEE_INTO_COMPONENTS_BY_FAMILY = {
-  essential: ['Faceplate'],            // one zone: the whole plate, printed face-down
-  chevron: ['Faceplate:FACE'],         // the chevron strips, merged into one FACE zone
-  edgelabel: ['Faceplate:GRIP'],
-  classic: ['Faceplate:GRIP'],
-  classicpro: ['Faceplate:GRIP'],
-};
-/* The keys supported RIGHT NOW - the active family's, or the grip alone before a family is known (boot order). */
+/* ⚠ WIDENED 2026-09-21 (Joey, after seeing the grip and faces live: "can we also add translucent material to the accent
+   pieces and the classic and classic pro face pieces"). Joey's go outranks Astra's 2026-09-18 scope freeze ("no further
+   family expansion, no accents"), which was a release-candidate freeze. Classic's face is its 2 mm FACE layer; Classic
+   Pro has no FACE zone - its visible front IS the plate body, so its `Faceplate` key joins (and, as everywhere, zones
+   with no pick of their own inherit it). The Accent is its own part (type Accent), shared by EdgeLabel and Classic Pro;
+   Classic, Essential and Chevron carry none. */
+/* ⚠⚠ AND THEN WIDENED TO THE WHOLE FACEPLATE ASSEMBLY, the same day (Joey: "we limited it to grips mostly because we
+   knew there was a limit, but realistically most people will build small builds ... it make sense to take the majority
+   of faceplate parts utilize it"). The per-family table is gone: every zone of every part of these TYPES renders a
+   translucent pick as translucent - the plate body and each of its zones, the accent, the label, the back cover and the
+   handle. The limit that motivated the narrow scope is SEE_INTO_DETAIL_LIMIT below, and it still decides, per build and
+   per pick, whether the see-through runs at all. ⚠ A zone with no pick of its own inherits the body's (activeLabel), so
+   a translucent BODY makes every unpicked zone translucent too - which is what a plate printed in it looks like.
+   ⚠ Two translucent parts one behind the other each show what is behind BOTH (the interior pass leaves out every driven
+   part), so a translucent face over a translucent body sees the drawer, not the body - an approximation, not optics. */
+const SEE_INTO_TYPES = new Set(['Faceplate', 'Accent', 'Label', 'BackCover', 'Handle']);
+/* The keys that exist in the build RIGHT NOW: every (type, zone) a mounted part of those types draws. Asked at a pick, a
+   mount or a material build - never per frame. Empty before the first mount (boot order). */
 function seeIntoComponentKeys() {
-  const fam = typeof currentFaceplateStyle === 'function' ? currentFaceplateStyle() : null;
-  return SEE_INTO_COMPONENTS_BY_FAMILY[fam && fam.key] || [];
+  const keys = new Set();
+  try {
+    for (const inst of instances.values()) {
+      const t = typeByNode[inst.cfg.node];
+      if (!inst.group || !SEE_INTO_TYPES.has(t)) continue;
+      inst.group.traverse(o => { if (o.isMesh) keys.add(zoneKey(t, o.userData.zone || '')); });
+    }
+  } catch { return []; }   // called before `instances` exists: nothing is mounted, so nothing is supported
+  return [...keys];
 }
 const TRANSLUCENT_BY_LABEL = new Map(FILAMENT_DB.flatMap(
   b => b.colors.filter(c => c.translucent).map(c => [c.label, c.translucent])));
@@ -3113,10 +3157,10 @@ function syncSeeIntoComponents() {
      build past the limit in the planner would leave the old note on screen until something else re-rendered it.
      renderOptions is declared below (hoisted) and returns early with no box and on a static kit. */
   if (noteChanged) renderOptions();
-  dropFaceplateMaterials();
+  dropFaceplateMaterials(SEE_INTO_TYPES);   // the Accent is its own part type, so it is named here too
   ensureMaterials();
   for (const inst of instances.values()) {
-    if (!inst.group || typeByNode[inst.cfg.node] !== 'Faceplate') continue;
+    if (!inst.group || !SEE_INTO_TYPES.has(typeByNode[inst.cfg.node])) continue;
     inst.group.traverse(o => { if (o.isMesh) o.material = materialFor(inst, inst.cfg.id === selectedId, o.userData.zone); });
   }
   seeInto.invalidate();                // the interior was rendered for a scene that shaded differently
@@ -3125,7 +3169,7 @@ function syncSeeIntoComponents() {
 }
 function seeIntoPatched(key, m) {
   if (!seeInto) return m;
-  if (key === 'BackCover') { if (SEE_INTO_COVERS) seeInto.patch(m, buildAxisForKey(key)); }   // the reference piece: preset look, switch only
+  if (key === 'BackCover' && SEE_INTO_COVERS) seeInto.patch(m, buildAxisForKey(key));   // the reference piece: preset look, switch only
   else if (seeIntoDrivenKey(key)) seeInto.patch(m, buildAxisForKey(key), { own: true }); // filament-driven: its own colour
   return m;
 }
@@ -3328,10 +3372,11 @@ function buildAxisForKey(key) {
 /* One author for "the faceplate materials are no longer valid", because there are two reasons and
    they used to know about only one. The build PLATE decides the impression on a face-down plate;
    the FAMILY decides which way the plate prints at all, and therefore which way its layers run. */
-function dropFaceplateMaterials() {
-  for (const k of Object.keys(materials)) if (k.split(':')[0] === 'Faceplate') delete materials[k];
-  for (const k of Object.keys(highlightMats)) if (k.split(':')[0] === 'Faceplate') delete highlightMats[k];
-  for (const k of [...layerHandles.keys()]) if (k.split(':')[0] === 'Faceplate') layerHandles.delete(k);
+function dropFaceplateMaterials(types = ['Faceplate']) {
+  const drop = new Set(types);   // the see-into rebuild also names 'Accent', a part of its own that a pick can make translucent
+  for (const k of Object.keys(materials)) if (drop.has(k.split(':')[0])) delete materials[k];
+  for (const k of Object.keys(highlightMats)) if (drop.has(k.split(':')[0])) delete highlightMats[k];
+  for (const k of [...layerHandles.keys()]) if (drop.has(k.split(':')[0])) layerHandles.delete(k);
 }
 
 /**

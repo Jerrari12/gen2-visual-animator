@@ -53,6 +53,35 @@ export const SEE_INTO_PRESETS = Object.freeze({
   }),
 });
 
+/* THE BURIED LATTICE (trial, 2026-09-21 - Joey: "i thought we had a way to fake it with parallax?"). The lab's rounds 5-33
+   drew the part's own infill UNDER its skin, and it never came across with the see-through (Astra had deferred the infill
+   question "until buried-structure testing"). This is its SINGLE-MATERIAL form (the lab's uBacking 0): the walls and infill
+   are the same filament as the skin, so they cannot show as a colour - they show as LESS of what is behind, because light
+   crossing a line meets more plastic. The see-through is scaled by 1 - occlude * density, which inverts correctly between
+   a dark and a light background.
+   From the EdgeLabel 3MF (lab round 5): grid infill at 45 degrees, 15 % (a ~6 mm line pitch at 0.45 mm width), the grid in
+   the LAYER plane - perpendicular to the part's print axis - so it rides with the part. depthMm / soft are the lab's round
+   31-33 art values (0.8 mm of plastic over the structure, blur 0.35 mm per mm of skin), occlude 0.75 its round-27 default.
+   THE LAB'S FULL MODEL, ported after Joey's first look (the grid alone ran down the grip's slopes, "where infill would never
+   be"): (1) the structure shows only through faces that point ALONG the print axis - the top skin printed over the infill;
+   walls and slopes are solid perimeter plastic (the lab's faceGate, 0.72-0.93); (2) TWO 0.45 mm perimeter walls follow the
+   part's REAL layer outline - a cross-section cut just above its base along the print axis, turned into a distance field
+   (bakeOutline below) - and the grid stops at the inner wall (3MF: perimeters 2 x 0.45). The distance fields share one
+   atlas texture and every vertex carries its own atlas coordinate (aSIMask), because the patched material is shared by
+   every plate size and cannot hold a per-size texture.
+   ⚠ ONE CUT IS NOT ENOUGH (found on the Classic grip, 2026-09-21): a wedge's section changes with height, and a single cut
+   just above its base was a sliver there, so almost no face showed structure. The bake therefore cuts a SLICE every
+   sliceMm up the part - a stack of layer outlines - and each face reads the slice just INSIDE its skin: depthMm below a
+   face that looks along +axis (the top skin, printed over the infill), depthMm above one that looks along -axis (the
+   first layers, printed on the plate, with the infill growing above them). ⚠ Artistic values, not measured optics. */
+export const SEE_INTO_LATTICE = Object.freeze({ pitchMm: 6.0, lineMm: 0.45, depthMm: 0.8, softPerMm: 0.35, occlude: 0.75,
+  perimMm: 0.9, bakePxPerMm: 5, sliceMm: 1.0, maxSlices: 32 });
+
+/** `?silattice=on|off`: the trial switch. Off unless asked for, so the shipped look is untouched. */
+export function parseSeeIntoLattice(search) {
+  return new URLSearchParams(search || '').get('silattice') === 'on';
+}
+
 /** The preset the URL asks for, or null. Unknown values are null: an experiment never turns on by accident. */
 export function parseSeeInto(search) {
   const v = new URLSearchParams(search || '').get('seeinto');
@@ -98,8 +127,21 @@ export const WRAP_TO = 'reflectedLight.directDiffuse += mix( dotNL, saturate( ( 
 
 export const FRAG_HEAD = [
   'varying vec3 vSIObjNrm;',
+  'varying vec3 vSIMm;',                         // object position, rotated + scaled to world millimetres, NOT translated
+  'varying vec3 vSIAxW;',                        // the print axis in that same frame
+  'uniform float uSILattice, uSILatPitch, uSILatLine, uSILatSoft, uSILatOcc, uSILatPerim;',
+  'uniform sampler2D uSIMask;',                  // the outline atlas: mm to the layer outline, 25 steps per mm, 8 bit
+  'uniform float uSILatDepth;',                  // mm of skin over the structure
+  'varying vec4 vSIMask;',                       // slice 0's atlas uv (xy) and one tile's size in uv (zw)
+  'varying vec4 vSIMask2;',                      // tiles per row, this point's height along the axis (mm), slice step, slices
+  'float siOutline( float k ) {',
+  '  vec2 t = vec2( mod( k, vSIMask2.x ), floor( k / max( vSIMask2.x, 1.0 ) ) );',
+  '  return texture2D( uSIMask, vSIMask.xy + t * vSIMask.zw ).r * ( 255.0 / 25.0 );',
+  '}',
+  'float gSIDens = 0.0;',                        // how much infill line this fragment looks through
   'uniform float uSIActive, uSIRough, uSISee, uSIBlurPx, uSIWallOpaque, uSIGraze, uSIWrap;',
   'uniform float uSIOwn;',                       // per-material: 1 = keep this part's own colour and roughness
+  'uniform float uSIOwnSee;',                    // shared: a filament-driven part's see-through, as a multiple of the preset's
   'uniform vec3 uSIAxisM;',                      // per-material: the direction this part printed in
   'uniform vec3 uSIColor, uSITint;',
   'uniform sampler2D uSIBehind;',
@@ -140,6 +182,43 @@ export const FRAG_SURFACE = [
   '  } else {',
   '    gSISee = 1.0;',                          // translucent throughout: every face shows what is behind it,
   '    gSIWrapK = 1.0;',                        // and light wraps on every face, because it is one material
+  /* the buried lattice (SEE_INTO_LATTICE): a 45-degree grid in the layer plane, distance to the NEAREST line (not the cell
+     centre - the lab's round-5 mistake), softened by the plastic over it and its darkness spread, not created */
+  '    if ( uSILattice > 0.5 ) {',
+  /* only the printed FACE looks into the part (lab faceGate): a wall or slope shows its perimeter plastic, not the lattice */
+  '      float faceGate = smoothstep( 0.72, 0.93, abs( dot( normalize( vSIObjNrm ), normalize( uSIAxisM ) ) ) );',
+  '      vec3 ax = normalize( vSIAxW );',
+  '      vec3 t1 = normalize( abs( ax.y ) < 0.9 ? cross( ax, vec3( 0.0, 1.0, 0.0 ) ) : cross( ax, vec3( 1.0, 0.0, 0.0 ) ) );',
+  '      vec3 t2 = cross( ax, t1 );',
+  '      vec2 q = vec2( dot( vSIMm, t1 ), dot( vSIMm, t2 ) );',
+  '      vec2 luv = vec2( q.x - q.y, q.x + q.y ) * 0.70710678 / max( uSILatPitch, 0.01 );',
+  '      vec2 dl = 0.5 - abs( fract( luv ) - 0.5 );',
+  '      float dLine = min( dl.x, dl.y );',
+  '      float hw = uSILatLine / max( uSILatPitch, 0.01 ) * 0.5;',
+  '      float aa = max( fwidth( dLine ), 1e-4 );',
+  '      float soft = uSILatSoft / max( uSILatPitch, 0.01 );',
+  '      float line = ( 1.0 - smoothstep( hw - aa - soft, hw + aa + soft, dLine ) ) * hw / ( hw + soft );',
+  /* the walls: mm to the layer outline of the slice just inside this face's skin (see SEE_INTO_LATTICE), blended between
+     the two nearest slices; 0 = outside the part at that height, or not baked - no structure there */
+  '      float nA = dot( normalize( vSIObjNrm ), normalize( uSIAxisM ) );',
+  '      float hs = vSIMask2.y - ( nA >= 0.0 ? 1.0 : -1.0 ) * uSILatDepth;',
+  '      float kMax = max( vSIMask2.w - 1.0, 0.0 );',
+  '      float kf = clamp( hs / max( vSIMask2.z, 0.01 ), 0.0, kMax );',
+  '      float k0 = floor( kf );',
+  '      float dOut = mix( siOutline( k0 ), siOutline( min( k0 + 1.0, kMax ) ), kf - k0 );',
+  '      if ( vSIMask2.w < 0.5 || hs < 0.0 || hs > vSIMask2.z * vSIMask2.w ) dOut = 0.0;',
+  '      float aaD = max( fwidth( dOut ), 1e-4 );',
+  '      float inside = smoothstep( 0.0, 0.06, dOut );',
+  '      float sparse = smoothstep( uSILatPerim - aaD, uSILatPerim + aaD, dOut );',
+  /* two 0.45 mm paths centred 0.225 and 0.675 mm in from the outline, a hair narrower than their pitch, softened by the
+     skin like the grid */
+  '      float pw = uSILatLine * 0.5 - 0.03;',
+  '      float c1 = uSILatLine * 0.5, c2 = uSILatLine * 1.5;',
+  '      float kD = pw / ( pw + uSILatSoft );',
+  '      float per = clamp( ( 1.0 - smoothstep( pw - aaD - uSILatSoft, pw + aaD + uSILatSoft, abs( dOut - c1 ) ) ) * kD',
+  '                       + ( 1.0 - smoothstep( pw - aaD - uSILatSoft, pw + aaD + uSILatSoft, abs( dOut - c2 ) ) ) * kD, 0.0, 1.0 ) * inside;',
+  '      gSIDens = faceGate * clamp( per + line * sparse * inside, 0.0, 1.0 );',
+  '    }',
   '  }',
   '}',
 ].join('\n');
@@ -156,6 +235,8 @@ export const FRAG_COMPOSITE = [
   '  float nvS = clamp( dot( geometryNormal, geometryViewDir ), 0.0, 1.0 );',
   '  float Fg = 0.04 + 0.96 * pow( 1.0 - nvS, 5.0 );',
   '  kSee *= mix( 1.0, 1.0 - Fg, uSIGraze );',
+  '  kSee *= 1.0 - uSILatOcc * gSIDens;',       // 0 unless the lattice is on for a filament-driven part
+  '  if ( uSIOwn > 0.5 ) kSee = clamp( kSee * uSIOwnSee, 0.0, 1.0 );',
   '  totalDiffuse = mix( totalDiffuse, seeC, kSee );',
   '}',
 ].join('\n');
@@ -183,8 +264,12 @@ export function patchSeeIntoMaterial(material, uniforms, lightsParsChunk, own = 
   material.onBeforeCompile = (shader, renderer) => {
     if (prior) prior.call(material, shader, renderer);
     Object.assign(shader.uniforms, uniforms, own || {});
-    shader.vertexShader = replaceOnce(shader.vertexShader, '#include <common>', '#include <common>\nvarying vec3 vSIObjNrm;', 'vertex common');
-    shader.vertexShader = replaceOnce(shader.vertexShader, '#include <begin_vertex>', '#include <begin_vertex>\nvSIObjNrm = objectNormal;', 'begin_vertex');
+    shader.vertexShader = replaceOnce(shader.vertexShader, '#include <common>',
+      '#include <common>\nvarying vec3 vSIObjNrm;\nvarying vec3 vSIMm;\nvarying vec3 vSIAxW;\nuniform vec3 uSIAxisM;\nattribute vec4 aSIMask;\nattribute vec4 aSIMask2;\nvarying vec4 vSIMask;\nvarying vec4 vSIMask2;', 'vertex common');
+    /* the lattice lives in millimetres and rides with the part: the model matrix's rotation and scale (the mesh node carries
+       the meshopt quantisation scale), never its translation, so a sliding drawer does not drag the pattern */
+    shader.vertexShader = replaceOnce(shader.vertexShader, '#include <begin_vertex>',
+      '#include <begin_vertex>\nvSIObjNrm = objectNormal;\nvSIMm = mat3( modelMatrix ) * transformed;\nvSIAxW = mat3( modelMatrix ) * uSIAxisM;\nvSIMask = aSIMask;\nvSIMask2 = aSIMask2;', 'begin_vertex');
     shader.fragmentShader = replaceOnce(shader.fragmentShader, '#include <common>', '#include <common>\n' + FRAG_HEAD, 'fragment common');
     shader.fragmentShader = replaceOnce(shader.fragmentShader, '#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n' + FRAG_SURFACE, 'roughnessmap_fragment');
     shader.fragmentShader = replaceOnce(shader.fragmentShader, '#include <transmission_fragment>', FRAG_COMPOSITE + '\n#include <transmission_fragment>', 'transmission_fragment');
@@ -230,10 +315,153 @@ export function createSeeInto(o) {
     uSIWrap: { value: P.wrap },
     uSIBehind: { value: null },
     uSIRes: { value: new T.Vector2(1, 1) },
+    uSILattice: { value: o.lattice ? 1 : 0 },
+    uSILatPitch: { value: SEE_INTO_LATTICE.pitchMm },
+    uSILatLine: { value: SEE_INTO_LATTICE.lineMm },
+    uSILatSoft: { value: SEE_INTO_LATTICE.softPerMm * SEE_INTO_LATTICE.depthMm },
+    uSILatOcc: { value: SEE_INTO_LATTICE.occlude },
+    uSILatPerim: { value: SEE_INTO_LATTICE.perimMm },
+    uSIMask: { value: null },   // the outline atlas (bakeOutline); the placeholder until the first bake
+    uSILatDepth: { value: SEE_INTO_LATTICE.depthMm },
+    uSIOwnSee: { value: 1 },   // set every prepare() from o.ownSee() - the reference cover never reads it
   };
   const stats = { passRuns: 0, passRunsStill: 0, skippedHidden: 0, lastMs: 0, lastMsA: 0, lastMsMask: 0, lastMsB: 0, active: false, parts: 0, lastReason: '' };
   const placeholder = (() => { const t = new T.DataTexture(new Uint8Array([0, 0, 0, 255]), 1, 1); t.needsUpdate = true; return t; })();
   uniforms.uSIBehind.value = placeholder;
+  uniforms.uSIMask.value = placeholder;   // distance 0 everywhere = no structure until a part's outline is baked
+
+  /* ---- the buried lattice's LAYER-OUTLINE BAKE (the lab's __maskFor, generalised; see SEE_INTO_LATTICE).
+     For one part geometry: cut it 0.1 mm above its lowest point along its print axis, look straight down that axis with
+     everything above the cut clipped away - a point inside the solid then sees the INSIDE of the part (a back face) first -
+     and turn that mask into millimetres to the outline with an exact Euclidean distance transform. The result goes into ONE
+     shared atlas texture, and the geometry gains a per-vertex attribute (aSIMask) holding each vertex's place in it. That
+     mapping is affine (an orthographic view), so interpolating it across a triangle is exact, and because it is derived
+     from the vertex's OBJECT position it is right for every instance of that geometry wherever it sits or slides.
+     Once per geometry, when the lattice is on and a filament-driven part first needs it - never per frame. */
+  const ATLAS_W = 4096, ATLAS_H = 4096;
+  const atlas = { data: null, tex: null, x: 0, y: 0, rowH: 0, full: false };
+  const outlined = new WeakSet();
+  function atlasPeek(w, h) {
+    const x = atlas.x + w > ATLAS_W ? 0 : atlas.x, y = atlas.x + w > ATLAS_W ? atlas.y + atlas.rowH + 1 : atlas.y;
+    return w <= ATLAS_W && y + h <= ATLAS_H;
+  }
+  function atlasAlloc(w, h) {
+    if (atlas.x + w > ATLAS_W) { atlas.x = 0; atlas.y += atlas.rowH + 1; atlas.rowH = 0; }
+    if (atlas.y + h > ATLAS_H || w > ATLAS_W) { atlas.full = true; return null; }
+    const at = { x: atlas.x, y: atlas.y };
+    atlas.x += w + 1; atlas.rowH = Math.max(atlas.rowH, h);
+    return at;
+  }
+  function bakeOutline(mesh, axisObj) {
+    const g = mesh.geometry;
+    if (!g || !g.attributes.position) return false;
+    mesh.updateMatrixWorld(true);
+    const MW = mesh.matrixWorld;
+    const a = new T.Vector3(...axisObj).transformDirection(MW);
+    const u = new T.Vector3().crossVectors(a, Math.abs(a.y) < 0.9 ? new T.Vector3(0, 1, 0) : new T.Vector3(1, 0, 0)).normalize();
+    const v = new T.Vector3().crossVectors(a, u);
+    if (!g.boundingBox) g.computeBoundingBox();
+    const bb = g.boundingBox;
+    let lo = Infinity, hi = -Infinity, u0 = Infinity, u1 = -Infinity, v0 = Infinity, v1 = -Infinity;
+    const c = new T.Vector3();
+    for (const x of [bb.min.x, bb.max.x]) for (const y of [bb.min.y, bb.max.y]) for (const z of [bb.min.z, bb.max.z]) {
+      c.set(x, y, z).applyMatrix4(MW);
+      lo = Math.min(lo, c.dot(a)); hi = Math.max(hi, c.dot(a));
+      u0 = Math.min(u0, c.dot(u)); u1 = Math.max(u1, c.dot(u)); v0 = Math.min(v0, c.dot(v)); v1 = Math.max(v1, c.dot(v));
+    }
+    u0 -= 1; u1 += 1; v0 -= 1; v1 += 1;                       // a millimetre of margin, so the outline never touches the edge
+    const L = SEE_INTO_LATTICE;
+    // slices from 0 to the top; the step grows if the part is taller than maxSlices allow
+    const step = Math.max(L.sliceMm, (hi - lo) / L.maxSlices), K = Math.max(1, Math.min(L.maxSlices, Math.ceil((hi - lo) / step)));
+    // pixel density: the configured one, lowered until this part's whole stack fits in what is left of the atlas
+    let PX = L.bakePxPerMm, w, h, cols, rows, at = null;
+    for (let tries = 0; tries < 12 && !at; tries++, PX *= 0.8) {
+      w = Math.max(2, Math.ceil((u1 - u0) * PX)); h = Math.max(2, Math.ceil((v1 - v0) * PX));
+      cols = Math.max(1, Math.min(K, Math.floor(ATLAS_W / (w + 1)))); rows = Math.ceil(K / cols);
+      if (cols * (w + 1) > ATLAS_W) continue;
+      const room = atlasPeek(cols * (w + 1), rows * (h + 1));
+      if (room) at = atlasAlloc(cols * (w + 1), rows * (h + 1));
+    }
+    if (!at) { atlas.full = true; return false; }            // atlas full: this part simply shows no structure
+    // the camera's x/y ARE u/v: its basis is (u, v, a), placed above the part and looking back down -a
+    const cam = new T.OrthographicCamera(u0, u1, v1, v0, 0.5, hi - lo + 20);
+    cam.matrixAutoUpdate = false;
+    cam.matrixWorld.makeBasis(u, v, a).setPosition(a.clone().multiplyScalar(hi + 10));
+    cam.matrixWorldInverse.copy(cam.matrixWorld).invert();
+    cam.updateProjectionMatrix();
+    const plane = new T.Plane(a.clone().negate(), 0);
+    const mat = new T.MeshBasicMaterial({ side: T.DoubleSide, clippingPlanes: [plane] });
+    mat.onBeforeCompile = (sh) => { sh.fragmentShader = sh.fragmentShader.replace('vec4 diffuseColor = vec4( diffuse, opacity );',
+      'vec4 diffuseColor = vec4( gl_FrontFacing ? vec3( 0.0 ) : vec3( 1.0 ), 1.0 );'); };
+    const sc = new T.Scene();
+    const mm = new T.Mesh(g, mat); mm.matrixAutoUpdate = false; mm.matrix.copy(MW); mm.matrixWorld.copy(MW); sc.add(mm);
+    const rt = new T.WebGLRenderTarget(w, h), buf = new Uint8Array(w * h * 4);
+    const INF = 1e20, N = Math.max(w, h), fb = new Float64Array(N), db = new Float64Array(N),
+      vb = new Int32Array(N), zb = new Float64Array(N + 1), D = new Float64Array(w * h);
+    const dt = (n) => { let k = 0; vb[0] = 0; zb[0] = -INF; zb[1] = INF;
+      for (let q = 1; q < n; q++) {
+        let sv = ((fb[q] + q * q) - (fb[vb[k]] + vb[k] * vb[k])) / (2 * q - 2 * vb[k]);
+        while (sv <= zb[k]) { k--; sv = ((fb[q] + q * q) - (fb[vb[k]] + vb[k] * vb[k])) / (2 * q - 2 * vb[k]); }
+        k++; vb[k] = q; zb[k] = sv; zb[k + 1] = INF; }
+      k = 0; for (let q = 0; q < n; q++) { while (zb[k + 1] < q) k++; db[q] = (q - vb[k]) * (q - vb[k]) + fb[vb[k]]; } };
+    if (!atlas.data) atlas.data = new Uint8Array(ATLAS_W * ATLAS_H);
+    const prev = { clip: R.localClippingEnabled, rt: R.getRenderTarget(), auto: R.autoClear,
+      cc: R.getClearColor(new T.Color()), ca: R.getClearAlpha(), sh: R.shadowMap.needsUpdate };
+    if (o.pauseShadowWatch) o.pauseShadowWatch(true);
+    let insideAll = 0;
+    try {
+      R.localClippingEnabled = true; R.setRenderTarget(rt); R.setClearColor(0x000000, 1); R.autoClear = true;
+      for (let k = 0; k < K; k++) {
+        plane.constant = lo + (k + 0.5) * step;              // the layer at the middle of this slice; above it is cut away
+        R.clear(); R.render(sc, cam); R.readRenderTargetPixels(rt, 0, 0, w, h, buf);
+        // exact squared EDT (Felzenszwalb), as the lab: 0 outside the section, INF inside
+        for (let i = 0; i < w * h; i++) { const on = buf[i * 4] > 127; D[i] = on ? INF : 0; insideAll += on; }
+        for (let x = 0; x < w; x++) { for (let y = 0; y < h; y++) fb[y] = D[y * w + x]; dt(h); for (let y = 0; y < h; y++) D[y * w + x] = db[y]; }
+        for (let y = 0; y < h; y++) { for (let x = 0; x < w; x++) fb[x] = D[y * w + x]; dt(w); for (let x = 0; x < w; x++) D[y * w + x] = db[x]; }
+        const ox = at.x + (k % cols) * (w + 1), oy = at.y + Math.floor(k / cols) * (h + 1);
+        for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+          const d = D[y * w + x];
+          atlas.data[(oy + y) * ATLAS_W + ox + x] = d ? Math.min(255, Math.round(Math.max(Math.sqrt(d) - 0.5, 0) / PX * 25)) : 0;
+        }
+      }
+    } finally {
+      R.localClippingEnabled = prev.clip; R.setRenderTarget(prev.rt); R.autoClear = prev.auto;
+      R.setClearColor(prev.cc, prev.ca); R.shadowMap.needsUpdate = prev.sh; rt.dispose(); mat.dispose();
+      if (o.pauseShadowWatch) o.pauseShadowWatch(false);
+    }
+    if (!atlas.tex) {
+      atlas.tex = new T.DataTexture(atlas.data, ATLAS_W, ATLAS_H, T.RedFormat, T.UnsignedByteType);
+      atlas.tex.minFilter = atlas.tex.magFilter = T.LinearFilter;
+      uniforms.uSIMask.value = atlas.tex;
+    }
+    atlas.tex.needsUpdate = true;
+    /* per vertex: slice 0's atlas uv + one tile's size (aSIMask), and the tile layout + this vertex's height above the
+       part's lowest point along the axis (aSIMask2). All affine in the vertex position, so interpolation is exact. */
+    const pos = g.attributes.position, n = pos.count, m1 = new Float32Array(n * 4), m2 = new Float32Array(n * 4), p = new T.Vector3();
+    const tu = (w + 1) / ATLAS_W, tv = (h + 1) / ATLAS_H;
+    for (let i = 0; i < n; i++) {
+      p.fromBufferAttribute(pos, i).applyMatrix4(MW);
+      m1[i * 4] = (at.x + (p.dot(u) - u0) / (u1 - u0) * w) / ATLAS_W;
+      m1[i * 4 + 1] = (at.y + (p.dot(v) - v0) / (v1 - v0) * h) / ATLAS_H;
+      m1[i * 4 + 2] = tu; m1[i * 4 + 3] = tv;
+      m2[i * 4] = cols; m2[i * 4 + 1] = p.dot(a) - lo; m2[i * 4 + 2] = step; m2[i * 4 + 3] = K;
+    }
+    g.setAttribute('aSIMask', new T.BufferAttribute(m1, 4));
+    g.setAttribute('aSIMask2', new T.BufferAttribute(m2, 4));
+    stats.outlines = (stats.outlines || 0) + 1;
+    stats.lastOutline = { w, h, slices: K, stepMm: +step.toFixed(2), px: +PX.toFixed(2), insideFrac: +(insideAll / (w * h * K)).toFixed(3) };
+    return true;
+  }
+  /** Bake every filament-driven part that the lattice needs and has not got yet. Cheap when there is nothing to do. */
+  function ensureOutlines() {
+    if (!uniforms.uSILattice.value || atlas.full) return;
+    for (const part of o.parts()) for (const mesh of part.meshes) {
+      const si = mesh.material && mesh.material.userData && mesh.material.userData.seeInto;
+      if (!si || !si.own || !mesh.geometry || outlined.has(mesh.geometry)) continue;
+      outlined.add(mesh.geometry);
+      bakeOutline(mesh, si.axis);
+    }
+  }
 
   // ---- AO composite weight (the lab's __patchAOComposite, against the shipping composite's exact lines)
   let comp = null;
@@ -403,9 +631,13 @@ export function createSeeInto(o) {
   function prepare({ moving }) {
     const on = !!o.wanted();
     stats.active = on;
+    /* a filament-driven part's see-through strength, re-read every frame because the build plate that decides it is a
+       uniform-only switch elsewhere (Powder <-> Smooth rebuilds no material) */
+    uniforms.uSIOwnSee.value = o.ownSee ? o.ownSee() / P.see : 1;
     uniforms.uSIActive.value = on ? 1 : 0;
     if (comp) comp.uniforms.uSIAOWeight.value = on ? P.aoWeight : 1;
     if (!on) { hasRef = false; lastMoving = false; uniforms.uSISee.value = P.see; return false; }
+    ensureOutlines();
     /* ⚠ NO COVER IN ANY VIEW, NO RENDERS (Astra 2026-09-17, option 1). The see-through goes to 0 rather than keeping the
        last interior: a skipped frame must never sample a stale image, and a part that leaks a few pixels through a slot
        then renders as plain frost instead of wrongly. hasRef is dropped, so the frame a cover becomes visible again -

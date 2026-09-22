@@ -91,7 +91,8 @@ test('the viewer wires it by default (covers only behind the switch), at the two
   assert.match(main, /const SEE_INTO_COVERS = parseSeeInto\(location\.search\);/);
   // the back-cover preset stays behind the switch at BOTH places it enters: the pass list and the material patch
   assert.match(main, /if \(SEE_INTO_COVERS && \/\^BackCover\/\.test\(inst\.cfg\.node\)\)/);
-  assert.match(main, /if \(key === 'BackCover'\) \{ if \(SEE_INTO_COVERS\) seeInto\.patch\(/);
+  assert.match(main, /if \(key === 'BackCover' && SEE_INTO_COVERS\) seeInto\.patch\(/);
+  /* since 2026-09-21 a back cover wearing translucent FILAMENT is patched too, as its own colour - the switch still owns the preset look */
   // no translucent part, no passes: `wanted` is gated on there being something to draw
   assert.match(main, /wanted: \(\) => \(!!SEE_INTO_COVERS \|\| seeIntoDriven\.size > 0\)/);
   const loop = main.slice(main.indexOf('function renderLoop(now) {'));
@@ -171,7 +172,7 @@ function fnAt(src, needle) {
   assert.fail(`unterminated function for "${needle}"`);
 }
 const coversVisibleWith = new Function('THREE', 'manifest', 'PAGES', 'cur', 'instances', 'tweens', 'fpFocus', 'dFocus', 'assembledBox', 'camera', 'seeIntoDriven', 'typeByNode',
-  `${fnAt(mainSrc, 'function basePos(')}\n${fnAt(mainSrc, 'function seeIntoCoversVisible(')}\nreturn seeIntoCoversVisible();`);
+  `${mainSrc.match(/const SEE_INTO_TYPES = .*;/)[0]}\n${fnAt(mainSrc, 'function basePos(')}\n${fnAt(mainSrc, 'function seeIntoCoversVisible(')}\nreturn seeIntoCoversVisible();`);
 
 function scene(over = {}) {
   const inst = (id, node, rides, pos) => ({ cfg: { id, node, rides, pos }, staged: false,
@@ -297,9 +298,14 @@ test('translucency is a property of the material, not of a face direction', () =
      faces are made of translucent material." So the filament-driven branch must not consult the print axis at all, and
      the reference cover must keep the axis-weighted behaviour it was accepted with. */
   const surface = SI.FRAG_SURFACE;
-  const own = surface.slice(surface.indexOf('} else {'));
+  /* ⚠ THE BURIED LATTICE IS CUT OFF FIRST, deliberately: it reads the print axis to decide where the PRINTED STRUCTURE shows
+     (only through the top skin that grew over the infill), which is exactly the "printed surface detail" Astra left to the
+     print direction. What this test guards is the translucency itself - gSISee and gSIWrapK - which must not read it. */
+  const ownAll = surface.slice(surface.indexOf('} else {'));
+  const own = ownAll.includes('if ( uSILattice > 0.5 )') ? ownAll.slice(0, ownAll.indexOf('if ( uSILattice > 0.5 )')) : ownAll;
   const preset = surface.slice(surface.indexOf('if ( uSIOwn < 0.5 )'), surface.indexOf('} else {'));
-  assert.ok(!own.includes('uSIAxisM'), 'a filament-driven part reads no print axis in this shader');
+  assert.ok(!own.includes('uSIAxisM'), 'a filament-driven part reads no print axis for its translucency in this shader');
+  assert.ok(!/gSISee|gSIWrapK/.test(ownAll.slice(own.length)), 'and the lattice block leaves both translucency weights alone');
   assert.match(own, /gSISee = 1\.0;/, 'it shows what is behind it on every face');
   assert.match(own, /gSIWrapK = 1\.0;/, 'and the scatter wrap is on every face, because it is one material');
   assert.match(preset, /gSISee = siAxis;/, 'the reference cover keeps its axis-weighted see-through');
@@ -330,24 +336,21 @@ const detailWith = (mode, drawsPerPart, parts) => new Function('instances', 'loc
     group: { visible: true, traverse(f) { f(this); for (let m = 0; m < drawsPerPart; m++) f({ isMesh: true, visible: true }); } },
   }])), { search: mode }, 250);
 
-test('the supported keys are per faceplate family, because one key means different geometry in each', () => {
-  /* Joey 2026-09-18: "On the essential, allow the face, and on the Chevron faceplate allow the faces". Essential is a
-     single-zone plate, so its face IS the plain Faceplate key; Chevron's chevrons are one FACE zone; the grip families
-     keep the grip. A flat set cannot express that - `Faceplate` is ALSO the body key behind everything on EdgeLabel and
-     Classic, and `Faceplate:FACE` also exists on Classic, and neither was asked for. */
-  const keysFor = (famKey) => new Function('currentFaceplateStyle',
-    `${fnAt(mainSrc, 'const SEE_INTO_COMPONENTS_BY_FAMILY =').replace(/^const/, 'const')}
+test('the supported keys are every zone of every faceplate-assembly part in the build', () => {
+  /* Joey 2026-09-21: "it make sense to take the majority of faceplate parts utilize it". The keys come from what is
+     MOUNTED, so a family's own zones appear without a table, and structural parts never do. */
+  const mesh = (zone) => ({ isMesh: true, userData: { zone } });
+  const inst = (node, zones) => ({ cfg: { node }, group: { traverse(f) { for (const z of zones) f(mesh(z)); } } });
+  const keysWith = (list, typeByNode) => new Function('instances', 'typeByNode', 'zoneKey',
+    `${mainSrc.match(/const SEE_INTO_TYPES = .*;/)[0]}
      ${fnAt(mainSrc, 'function seeIntoComponentKeys(')}
-     return seeIntoComponentKeys();`)(() => (famKey ? { key: famKey } : null));
-  assert.deepEqual(keysFor('essential'), ['Faceplate'], 'the single-zone plate: its face is the plate key');
-  assert.deepEqual(keysFor('chevron'), ['Faceplate:FACE'], 'the chevron strips, as one FACE zone');
-  assert.deepEqual(keysFor('edgelabel'), ['Faceplate:GRIP']);
-  assert.deepEqual(keysFor('classic'), ['Faceplate:GRIP'], 'Classic HAS a FACE zone, and it is deliberately not in scope');
-  assert.deepEqual(keysFor('classicpro'), ['Faceplate:GRIP']);
-  assert.deepEqual(keysFor(null), [], 'before a family is known, nothing is supported');
-  assert.deepEqual(keysFor('nosuchfamily'), [], 'and an unknown family adds nothing');
-  /* the body key must NOT be supported on a family whose body sits behind other zones */
-  for (const fam of ['edgelabel', 'classic', 'classicpro']) assert.ok(!keysFor(fam).includes('Faceplate'), fam);
+     return seeIntoComponentKeys();`)(new Map(list.map((x, i) => [i, x])), typeByNode, (t, z) => (z ? `${t}:${z}` : t));
+  const T = { FP: 'Faceplate', AC: 'Accent', LB: 'Label', BC: 'BackCover', HD: 'Handle', CS: 'Case', DR: 'Drawer' };
+  const keys = keysWith([inst('FP', ['', 'FACE', 'GRIP', 'GRIP ACCENT']), inst('AC', ['']), inst('LB', ['']),
+    inst('BC', ['']), inst('HD', ['']), inst('CS', ['']), inst('DR', [''])], T).sort();
+  assert.deepEqual(keys, ['Accent', 'BackCover', 'Faceplate', 'Faceplate:FACE', 'Faceplate:GRIP', 'Faceplate:GRIP ACCENT', 'Handle', 'Label']);
+  assert.ok(!keys.includes('Case') && !keys.includes('Drawer'), 'structural parts stay out of scope');
+  assert.deepEqual(keysWith([], T), [], 'nothing mounted, nothing supported');
 });
 
 test('the fallback is decided by the scene DRAW count, so a zoned plate is charged per zone', () => {
