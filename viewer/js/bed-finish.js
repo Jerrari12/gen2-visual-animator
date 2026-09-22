@@ -107,7 +107,8 @@ export const CONTACT_BAND_MM = Object.freeze([0.03, 0.08]);
  *   CSS px between lines, cross-faded between k and k + 1. Every line of one octave is also a line
  *   of the next finer one, so zooming in fades the in-between lines in and nothing jumps.
  * - CAPPED AT maxMm. Joey 2026-09-14, after the prototype page: "anything above 0.8mm looks kind of
- *   too big and crazy". Past the cap the lines only get finer on screen, and the band limit fades
+ *   too big and crazy"; 2026-09-21, on the live build: "these layer lines are just too huge" - the cap
+ *   dropped one octave to 0.4 mm. Past the cap the lines only get finer on screen, and the band limit fades
  *   them out before they alias. ⚠ SO THEY ARE A CLOSE-RANGE DETAIL ON A DPR-1 SCREEN. MEASURED
  *   2026-09-14 (185 starter, 1600x900): at the mid and whole-build views 0.8 mm is 1.7 / 1.5 device
  *   px, past the sampling limit, so no anti-alias-safe band limit can keep it and the settled frame
@@ -131,7 +132,7 @@ export const CONTACT_BAND_MM = Object.freeze([0.03, 0.08]);
  * are the prototype page's defaults ("Normal", 6 px gap) that Joey was shown.
  */
 export const LAYER_LINES = Object.freeze({
-  pitchMm: 0.2, maxMm: 0.8, minPx: 6, dark: 0.12, tiltDeg: 22, width: 0.35,
+  pitchMm: 0.2, maxMm: 0.4, minPx: 6, dark: 0.12, tiltDeg: 22, width: 0.35,
   handoffPx: Object.freeze([4, 12]),
   /* cycles per DEVICE px over which each harmonic of a drawn octave fades out - aliasing is a fact
      about the sampling grid, so this one is not CSS. Wider than a single frame could take (the

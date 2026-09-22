@@ -106,11 +106,11 @@ test('the settle switch turns the detail grain AND the layer lines on together, 
   }
 });
 
-test('the layer lines: Joey\'s 0.8 mm cap, and the numbers that must move with the relief', () => {
+test('the layer lines: Joey\'s 0.4 mm cap, and the numbers that must move with the relief', () => {
   /* Joey 2026-09-14, after the prototype page: "anything above 0.8mm looks kind of too big and crazy" */
-  assert.equal(BF.LAYER_LINES.maxMm, 0.8);
+  assert.equal(BF.LAYER_LINES.maxMm, 0.4);   // 0.8 until 2026-09-21: "these layer lines are just too huge"
   const u = BF.createBedFinishUniforms();
-  assert.equal(u.uLLMaxMm.value, 0.8);
+  assert.equal(u.uLLMaxMm.value, 0.4);
   /* the cap is a whole number of octaves above the pitch, so the shader's round-down is exact */
   assert.equal(Math.log2(BF.LAYER_LINES.maxMm / BF.LAYER_LINES.pitchMm) % 1, 0);
   /* the finest drawn spacing IS the relief's pitch - main.js passes it to the relief by name */
