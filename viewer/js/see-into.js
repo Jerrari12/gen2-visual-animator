@@ -85,7 +85,9 @@ export const SEE_INTO_LATTICE = Object.freeze({ pitchMm: 6.0, lineMm: 0.45, dept
   fillMm: 1.4,         // a grid needs this much room BEYOND the perimeters; narrower is all perimeter
   layerMm: 0.2,        // the layer height the crosshatch alternates at
   densityCap: 0.7,     // the most of the see-through the structure may take, so a part stays translucent
-  clearMm: 9.0 });     // mm of solid plastic that leaves about a third of the light: the transmission fall-off (artistic)
+  clearMm: 9.0,
+  budget: 1 / 10,      // the share of the outline atlas ONE geometry's slice stack may take
+  minPx: 2.5 });       // the outline may blur down to this before the SLICES are thinned (see bakeOutline)     // mm of solid plastic that leaves about a third of the light: the transmission fall-off (artistic)
 
 /** `?silattice=on|flat`: the trial switch - 'on' with parallax, 'flat' the pre-parallax surface pattern for comparison.
     Off (false) unless asked for, so the shipped look is untouched. */
@@ -498,7 +500,7 @@ export function createSeeInto(o) {
     atlas.x += w + 1; atlas.rowH = Math.max(atlas.rowH, h);
     return at;
   }
-  function bakeOutline(mesh, axisObj) {
+  function bakeOutline(mesh, axisObj, label) {
     const g = mesh.geometry;
     if (!g || !g.attributes.position) return false;
     mesh.updateMatrixWorld(true);
@@ -517,18 +519,36 @@ export function createSeeInto(o) {
     }
     u0 -= 1; u1 += 1; v0 -= 1; v1 += 1;                       // a millimetre of margin, so the outline never touches the edge
     const L = SEE_INTO_LATTICE;
-    // slices from 0 to the top; the step grows if the part is taller than maxSlices allow
-    const step = Math.max(L.sliceMm, (hi - lo) / L.maxSlices), K = Math.max(1, Math.min(L.maxSlices, Math.ceil((hi - lo) / step)));
-    // pixel density: the configured one, lowered until this part's whole stack fits in what is left of the atlas
-    let PX = L.bakePxPerMm, w, h, cols, rows, at = null;
-    for (let tries = 0; tries < 12 && !at; tries++, PX *= 0.8) {
+    /* ⚠⚠ EVERY GEOMETRY GETS A BUDGET, because the atlas is SHARED and first come first served
+       (found 2026-09-22 from Joey's "the 2W-1H faceplate is missing the infill pattern ... yet it's
+       showing for the 1W-1H"). MEASURED before the budget: ONE Classic Pro pair - the 1W and 2W
+       plates with their zones, accents, covers and label - took 11.7 Mpx of the 16.8 the atlas
+       holds, 70%, the 2W grip alone 3.65. A third plate size would not have fitted, and a part that
+       does not fit bakes NOTHING: no shells, no grid, silently, on that size alone.
+       So a stack is trimmed to L.budget of the atlas before it is placed - and ⚠ PIXELS FIRST, down
+       to L.minPx, SLICES only after. Trimming slices first was tried on 2026-09-22 and Joey caught it
+       within the hour ("there's this weird striped appearance on the classic handle"): the Classic Pro
+       grip is a SCOOP, its cross-section changes with height, and at 7 slices over 25 mm the outline
+       stepped in 3.6 mm jumps that read as bands across it. A coarser outline blurs; a coarser stack
+       STAIRCASES, and a slope is where it shows. A part still shows nothing if even the trimmed stack
+       will not fit, and stats.bakes records that rather than leaving it to be noticed. */
+    const BUDGET = ATLAS_W * ATLAS_H * L.budget;
+    const span = hi - lo;
+    let step = Math.max(L.sliceMm, span / L.maxSlices);
+    let PX = L.bakePxPerMm, w, h, cols, rows, K = 1, at = null;
+    const trim = () => { if (PX > L.minPx) PX = Math.max(L.minPx, PX * 0.8); else step *= 1.4; };
+    for (let tries = 0; tries < 24 && !at; tries++) {
+      K = Math.max(1, Math.min(L.maxSlices, Math.ceil(span / step)));
       w = Math.max(2, Math.ceil((u1 - u0) * PX)); h = Math.max(2, Math.ceil((v1 - v0) * PX));
       cols = Math.max(1, Math.min(K, Math.floor(ATLAS_W / (w + 1)))); rows = Math.ceil(K / cols);
-      if (cols * (w + 1) > ATLAS_W) continue;
-      const room = atlasPeek(cols * (w + 1), rows * (h + 1));
-      if (room) at = atlasAlloc(cols * (w + 1), rows * (h + 1));
+      const area = cols * (w + 1) * rows * (h + 1);
+      if (area > BUDGET || cols * (w + 1) > ATLAS_W) { trim(); continue; }
+      if (atlasPeek(cols * (w + 1), rows * (h + 1))) at = atlasAlloc(cols * (w + 1), rows * (h + 1));
+      else trim();                                            // the atlas is filling: trim and try again
     }
-    if (!at) { atlas.full = true; return false; }            // atlas full: this part simply shows no structure
+    if (!at) { atlas.full = true;                            // atlas full: this part simply shows no structure
+      (stats.bakes = stats.bakes || []).push({ label: label || '?', skipped: 'atlas full' });
+      return false; }
     // the camera's x/y ARE u/v: its basis is (u, v, a), placed above the part and looking back down -a
     const cam = new T.OrthographicCamera(u0, u1, v1, v0, 0.5, hi - lo + 20);
     cam.matrixAutoUpdate = false;
@@ -598,6 +618,9 @@ export function createSeeInto(o) {
     g.setAttribute('aSIMask3', new T.BufferAttribute(m3, 4));
     stats.outlines = (stats.outlines || 0) + 1;
     stats.lastOutline = { w, h, slices: K, stepMm: +step.toFixed(2), px: +PX.toFixed(2), insideFrac: +(insideAll / (w * h * K)).toFixed(3) };
+    /* one row per baked geometry, so a part that came out coarse - or did not fit the atlas at all - can be read back
+       rather than guessed at (the 2026-09-22 "the 2W plate has no infill" report) */
+    (stats.bakes = stats.bakes || []).push({ label: label || '?', ...stats.lastOutline, atlasFull: atlas.full });
     return true;
   }
   /** Bake every filament-driven part that the lattice needs and has not got yet. Cheap when there is nothing to do. */
@@ -607,7 +630,7 @@ export function createSeeInto(o) {
       const si = mesh.material && mesh.material.userData && mesh.material.userData.seeInto;
       if (!si || !si.own || !mesh.geometry || outlined.has(mesh.geometry)) continue;
       outlined.add(mesh.geometry);
-      bakeOutline(mesh, si.axis);
+      bakeOutline(mesh, si.axis, `${part.partId} ${mesh.userData.zone || '-'}`);
     }
   }
 
