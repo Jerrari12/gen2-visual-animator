@@ -85,9 +85,9 @@ export const SEE_INTO_LATTICE = Object.freeze({ pitchMm: 6.0, lineMm: 0.45, dept
   fillMm: 1.4,         // a grid needs this much room BEYOND the perimeters; narrower is all perimeter
   layerMm: 0.2,        // the layer height the crosshatch alternates at
   densityCap: 0.7,     // the most of the see-through the structure may take, so a part stays translucent
-  clearMm: 9.0,
+  clearMm: 18.0,       // mm of solid plastic that leaves about a third of the light: the transmission fall-off (artistic)
   budget: 1 / 10,      // the share of the outline atlas ONE geometry's slice stack may take
-  minPx: 2.5 });       // the outline may blur down to this before the SLICES are thinned (see bakeOutline)     // mm of solid plastic that leaves about a third of the light: the transmission fall-off (artistic)
+  minPx: 2.5 });       // the outline may blur down to this before the SLICES are thinned (see bakeOutline)
 
 /** `?silattice=on|flat`: the trial switch - 'on' with parallax, 'flat' the pre-parallax surface pattern for comparison.
     Off (false) unless asked for, so the shipped look is untouched. */
