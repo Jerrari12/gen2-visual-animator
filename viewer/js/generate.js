@@ -720,7 +720,7 @@ export function generateManifest(build) {
   // same world spot for every height, top FLUSH with the plate top — and
   // horizontally centered (−0.08 = the label mesh's own bbox skew).
   const FACE_FAMILIES = {
-    essential: { key: 'essential', node: c => `Faceplate_Essential_${c}`, z: 95.07, hasHandle: true,
+    essential: { key: 'essential', node: c => `Faceplate_Essential_${c}`, z: 95.07, depth: 5.0, hasHandle: true,
                  label: c => `Faceplate Essential ${c}`, extras: false, links: links.fp },
     // z = mounting plane 92.57 + 29.2/2 (canonical center-mode depth from the
     // ClassicDecor parts_index). NB the node prefix is ClassicDecor_ (the
@@ -747,7 +747,7 @@ export function generateManifest(build) {
     // at plate-center ±22 — Joey's 2026-08-08 page retired the knob version).
     // The face strips ship as ONE `FACE` material zone (many print bodies, one
     // recolorable zone) — renderZoneChips gives Body/Face swatches for free.
-    chevron:   { key: 'chevron', node: c => `Faceplate_Chevron_${c}`, z: 95.67, hasHandle: true,
+    chevron:   { key: 'chevron', node: c => `Faceplate_Chevron_${c}`, z: 95.67, depth: 6.2, hasHandle: true,
                  label: c => `Chevron Faceplate ${c}`, extras: false, links: links.fpch },
     classicpro: { key: 'classicpro', node: c => `Faceplate_ClassicPro_${c}`, z: 107.32, hasHandle: false,
                  label: c => `Classic Pro Faceplate ${c}`, extras: true, links: links.fpc, // club family — Classic Pro Series pages
@@ -2020,7 +2020,12 @@ export function generateManifest(build) {
       // the plate — the mounting rule that holds for every style (from the Deco
       // ground truth: bottom = fp + 22.49, z-center 109.57 for h9 × d24).
       // EdgeLabel prints its grip into the plate — no bolt-on handle at all.
-      inst.push({ id: `h${i}`, node: handleStyle.node, pos: [cx + 0.46, bottom + 3.72 + (fpH - handleStyle.h) / 2 - 0.5, 97.57 - dz + handleStyle.d / 2], rides: `drw${i}` });
+      /* ⚠ THE FRONT FACE IS THE FAMILY'S OWN (Joey 2026-09-22: "the deco handles are sunk into the chevron faceplate
+         there, maybe a mm or so"). It used to be the Essential plate's 97.57 for every family, and Chevron's plate is
+         6.2 mm deep against Essential's 5 - so its front sits 1.2 further out and every handle sank by exactly that.
+         front = the family's z-centre + half its depth, which IS 97.57 on Essential, so that family is unchanged. */
+      const fpFront = face.z + face.depth / 2;
+      inst.push({ id: `h${i}`, node: handleStyle.node, pos: [cx + 0.46, bottom + 3.72 + (fpH - handleStyle.h) / 2 - 0.5, fpFront - dz + handleStyle.d / 2], rides: `drw${i}` });
       // 2× M3-6 button head, driven in from BEHIND the plate to fasten the
       // handle. Offsets are faceplate-CENTRE-relative, DERIVED from the posed
       // Essential 1W-1H reference (2026-07-24 handoff): ±22 mm apart (the
