@@ -75,11 +75,23 @@ export const SEE_INTO_PRESETS = Object.freeze({
    face that looks along +axis (the top skin, printed over the infill), depthMm above one that looks along -axis (the
    first layers, printed on the plate, with the infill growing above them). ⚠ Artistic values, not measured optics. */
 export const SEE_INTO_LATTICE = Object.freeze({ pitchMm: 6.0, lineMm: 0.45, depthMm: 0.8, softPerMm: 0.35, occlude: 0.75,
-  perimMm: 0.9, bakePxPerMm: 5, sliceMm: 1.0, maxSlices: 32 });
+  perimMm: 0.9, bakePxPerMm: 5, sliceMm: 1.0, maxSlices: 32,
+  reachMm: 12.0,       // how far below the skin the parallax walks the walls (mm); the part's own thickness caps it
+  fadeMm: 4.0,         // depth fade: a wall's contribution falls to 1/e this far below the skin (artistic, Joey 2026-09-22)
+  skin: 0.5,           // the skin crosshatch's strength (0 = off)
+  lensPx: 3.5,         // how far a skin bead bends the view behind it, drawing-buffer px (artistic)
+  shell: 0.5,          // how strongly a seam between two perimeter beads reads (artistic)
+  specTilt: 0.07,      // how far the skin beads tilt the shading normal: the glint along the lines (artistic)
+  fillMm: 1.4,         // a grid needs this much room BEYOND the perimeters; narrower is all perimeter
+  layerMm: 0.2,        // the layer height the crosshatch alternates at
+  densityCap: 0.7,     // the most of the see-through the structure may take, so a part stays translucent
+  clearMm: 9.0 });     // mm of solid plastic that leaves about a third of the light: the transmission fall-off (artistic)
 
-/** `?silattice=on|off`: the trial switch. Off unless asked for, so the shipped look is untouched. */
+/** `?silattice=on|flat`: the trial switch - 'on' with parallax, 'flat' the pre-parallax surface pattern for comparison.
+    Off (false) unless asked for, so the shipped look is untouched. */
 export function parseSeeIntoLattice(search) {
-  return new URLSearchParams(search || '').get('silattice') === 'on';
+  const v = new URLSearchParams(search || '').get('silattice');
+  return v === 'on' || v === 'flat' ? v : false;
 }
 
 /** The preset the URL asks for, or null. Unknown values are null: an experiment never turns on by accident. */
@@ -132,13 +144,25 @@ export const FRAG_HEAD = [
   'uniform float uSILattice, uSILatPitch, uSILatLine, uSILatSoft, uSILatOcc, uSILatPerim;',
   'uniform sampler2D uSIMask;',                  // the outline atlas: mm to the layer outline, 25 steps per mm, 8 bit
   'uniform float uSILatDepth;',                  // mm of skin over the structure
+  'uniform float uSILatSoftK, uSILatReach, uSILatPar, uSILatFade, uSILatSkin, uSILatBead, uSILatLayer;',   // blur per mm of depth, how deep the walls are walked, parallax on
+  'varying vec3 vSINrmW;',                       // the geometric normal, world-rotated (the refraction needs it)
+  'varying vec3 vSIWPos;',                       // world position, for the view direction
+  'varying vec4 vSIMask3;',                      // this part's tile in the atlas: origin uv (xy) and content size (zw)
   'varying vec4 vSIMask;',                       // slice 0's atlas uv (xy) and one tile's size in uv (zw)
   'varying vec4 vSIMask2;',                      // tiles per row, this point's height along the axis (mm), slice step, slices
-  'float siOutline( float k ) {',
+  'float siOutlineAt( vec2 off, float k ) {',     // slice k, at this point's uv moved by `off` (clamped to the tile)
   '  vec2 t = vec2( mod( k, vSIMask2.x ), floor( k / max( vSIMask2.x, 1.0 ) ) );',
-  '  return texture2D( uSIMask, vSIMask.xy + t * vSIMask.zw ).r * ( 255.0 / 25.0 );',
+  '  vec2 uv0 = vSIMask3.w > 0.0 ? clamp( vSIMask.xy + off, vSIMask3.xy, vSIMask3.xy + vSIMask3.zw ) : vSIMask.xy + off;',
+  '  return texture2D( uSIMask, uv0 + t * vSIMask.zw ).r * ( 255.0 / 25.0 );',
   '}',
   'float gSIDens = 0.0;',                        // how much infill line this fragment looks through
+  'float gSIPath = 0.0;',                        // mm of plastic this fragment's view ray crosses (0 = not measured)
+  'uniform float uSIClearMm;',                   // how far light gets through this filament before it is gone
+  'vec3 gSISpecW = vec3( 0.0 );',                 // the skin beads' slope, in the part's own world-rotated frame
+  'uniform float uSISpecTilt, uSILatFill, uSILatCap;',
+  'vec2 gSILens = vec2( 0.0 );',                  // the skin beads' bend of the see-through, drawing-buffer px
+  'float gSIDiff = 0.0;',                         // and the extra blur they add
+  'uniform float uSILensPx, uSILatShell;',
   'uniform float uSIActive, uSIRough, uSISee, uSIBlurPx, uSIWallOpaque, uSIGraze, uSIWrap;',
   'uniform float uSIOwn;',                       // per-material: 1 = keep this part's own colour and roughness
   'uniform float uSIOwnSee;',                    // shared: a filament-driven part's see-through, as a multiple of the preset's
@@ -190,45 +214,150 @@ export const FRAG_SURFACE = [
   '      vec3 ax = normalize( vSIAxW );',
   '      vec3 t1 = normalize( abs( ax.y ) < 0.9 ? cross( ax, vec3( 0.0, 1.0, 0.0 ) ) : cross( ax, vec3( 1.0, 0.0, 0.0 ) ) );',
   '      vec3 t2 = cross( ax, t1 );',
-  '      vec2 q = vec2( dot( vSIMm, t1 ), dot( vSIMm, t2 ) );',
-  '      vec2 luv = vec2( q.x - q.y, q.x + q.y ) * 0.70710678 / max( uSILatPitch, 0.01 );',
-  '      vec2 dl = 0.5 - abs( fract( luv ) - 0.5 );',
-  '      float dLine = min( dl.x, dl.y );',
-  '      float hw = uSILatLine / max( uSILatPitch, 0.01 ) * 0.5;',
-  '      float aa = max( fwidth( dLine ), 1e-4 );',
-  '      float soft = uSILatSoft / max( uSILatPitch, 0.01 );',
-  '      float line = ( 1.0 - smoothstep( hw - aa - soft, hw + aa + soft, dLine ) ) * hw / ( hw + soft );',
-  /* the walls: mm to the layer outline of the slice just inside this face's skin (see SEE_INTO_LATTICE), blended between
-     the two nearest slices; 0 = outside the part at that height, or not baked - no structure there */
+  '      float pitch = max( uSILatPitch, 0.01 );',
+  '      float hw = uSILatLine / pitch * 0.5;',
   '      float nA = dot( normalize( vSIObjNrm ), normalize( uSIAxisM ) );',
-  '      float hs = vSIMask2.y - ( nA >= 0.0 ? 1.0 : -1.0 ) * uSILatDepth;',
+  '      float sgn = nA >= 0.0 ? 1.0 : -1.0;',
   '      float kMax = max( vSIMask2.w - 1.0, 0.0 );',
-  '      float kf = clamp( hs / max( vSIMask2.z, 0.01 ), 0.0, kMax );',
-  '      float k0 = floor( kf );',
-  '      float dOut = mix( siOutline( k0 ), siOutline( min( k0 + 1.0, kMax ) ), kf - k0 );',
-  '      if ( vSIMask2.w < 0.5 || hs < 0.0 || hs > vSIMask2.z * vSIMask2.w ) dOut = 0.0;',
-  '      float aaD = max( fwidth( dOut ), 1e-4 );',
-  '      float inside = smoothstep( 0.0, 0.06, dOut );',
-  '      float sparse = smoothstep( uSILatPerim - aaD, uSILatPerim + aaD, dOut );',
-  /* two 0.45 mm paths centred 0.225 and 0.675 mm in from the outline, a hair narrower than their pitch, softened by the
-     skin like the grid */
-  '      float pw = uSILatLine * 0.5 - 0.03;',
-  '      float c1 = uSILatLine * 0.5, c2 = uSILatLine * 1.5;',
-  '      float kD = pw / ( pw + uSILatSoft );',
-  '      float per = clamp( ( 1.0 - smoothstep( pw - aaD - uSILatSoft, pw + aaD + uSILatSoft, abs( dOut - c1 ) ) ) * kD',
-  '                       + ( 1.0 - smoothstep( pw - aaD - uSILatSoft, pw + aaD + uSILatSoft, abs( dOut - c2 ) ) ) * kD, 0.0, 1.0 ) * inside;',
-  '      gSIDens = faceGate * clamp( per + line * sparse * inside, 0.0, 1.0 );',
+  '      float Htot = vSIMask2.z * vSIMask2.w;',
+  /* the grid's screen-space line width, taken ONCE at the surface: derivatives inside the loop would be of a moving point */
+  '      vec2 q0 = vec2( dot( vSIMm, t1 ), dot( vSIMm, t2 ) );',
+  '      vec2 luv0 = vec2( q0.x - q0.y, q0.x + q0.y ) * 0.70710678 / pitch;',
+  '      float aa = max( length( fwidth( luv0 ) ) * 0.5, 1e-4 );',
+  /* PARALLAX (2026-09-21, Joey: "is it possible to do parallax?"). The walls and the infill are VERTICAL: every line of the
+     grid is a wall standing from the skin down through the part, and the air between them is what scatters. So a view ray
+     is refracted into the plastic (PLA ~1.5) and walked from under the skin to the far side; at each depth the grid and the
+     outline are sampled where the RAY is, not where the surface is. Face-on the ray runs down one wall and nothing moves;
+     at an angle the lines slide under the surface as the view turns, widen into walls and blur with depth. */
+  '      vec3 nW = normalize( vSINrmW );',
+  '      vec3 Vw = normalize( cameraPosition - vSIWPos );',
+  '      if ( dot( nW, Vw ) < 0.0 ) nW = -nW;',
+  '      vec3 Tr = uSILatPar > 0.5 ? refract( -Vw, nW, 0.6667 ) : -nW;',
+  '      float cosT = max( dot( Tr, -nW ), 0.2 );',
+  '      float room = sgn > 0.0 ? vSIMask2.y - uSILatDepth : Htot - vSIMask2.y - uSILatDepth;',
+  /* a top or bottom skin looks down the build axis, through uSILatDepth of solid skin, and the part's own height caps how
+     far there is to go; a wall looks straight into the perimeters from the surface, and the outline itself says where the
+     part ends (a sample outside reads dOut 0). The face gate blends the two. */
+  '      float z0 = uSILatDepth * faceGate;',
+  '      float reach = uSILatPar > 0.5 ? mix( uSILatReach, clamp( room, 0.0, uSILatReach ), faceGate ) : 0.0;',
+  /* the atlas is affine in the layer plane: solve the surface's own screen-space basis once, then any in-plane offset is a
+     uv offset. Clamped to this part's tile, whose margin is outside the part, so running off the edge reads as "no wall". */
+  '      vec3 Px = dFdx( vSIMm ), Py = dFdy( vSIMm );',
+  '      vec2 Ux = dFdx( vSIMask.xy ), Uy = dFdy( vSIMask.xy );',
+  '      float g11 = dot( Px, Px ), g12 = dot( Px, Py ), g22 = dot( Py, Py ), det = g11 * g22 - g12 * g12;',
+  '      float nShell = uSILatPerim / max( uSILatLine, 0.01 );',   // perimeter beads before the infill starts
+  '      float occS = 0.0, occW = 0.0, occM = 0.0, dOut0 = 0.0, plastic = 0.0;',
+  '      float stepLen = ( reach / 12.0 ) / cosT;',   // how far the refracted ray travels between two samples
+  '      for ( int k = 0; k < 12; k ++ ) {',
+  '        float z = z0 + reach * float( k ) / 12.0;',     // the first sample is right under the skin (or at a wall's surface)
+  '        vec3 o = Tr * ( z / cosT );',
+  '        vec3 p = vSIMm + o;',
+  '        vec2 q = vec2( dot( p, t1 ), dot( p, t2 ) );',
+  '        vec2 luv = vec2( q.x - q.y, q.x + q.y ) * 0.70710678 / pitch;',
+  '        vec2 dl = 0.5 - abs( fract( luv ) - 0.5 );',
+  '        float dLine = min( dl.x, dl.y );',
+  '        float sM = uSILatSoftK * ( uSILatDepth + 0.1 * z );',   // mm of blur: the skin's, and a little more with depth
+  '        float softZ = sM / pitch;',
+  '        float line = ( 1.0 - smoothstep( hw - aa - softZ, hw + aa + softZ, dLine ) ) * hw / ( hw + softZ );',
+  '        vec3 oP = o - ax * dot( o, ax );',
+  '        vec2 uvOff = abs( det ) > 1e-12 ? ( ( g22 * dot( oP, Px ) - g12 * dot( oP, Py ) ) * Ux + ( g11 * dot( oP, Py ) - g12 * dot( oP, Px ) ) * Uy ) / det : vec2( 0.0 );',
+  '        float hs = vSIMask2.y + dot( o, ax );',          // this sample's own height along the build axis: its layer
+  '        float kf = clamp( hs / max( vSIMask2.z, 0.01 ), 0.0, kMax );',
+  '        float k0 = floor( kf );',
+  '        float dOut = mix( siOutlineAt( uvOff, k0 ), siOutlineAt( uvOff, min( k0 + 1.0, kMax ) ), kf - k0 );',
+  '        if ( vSIMask2.w < 0.5 || hs < 0.0 || hs > Htot ) dOut = 0.0;',
+  '        float aaD = max( aa * pitch, 0.02 );',
+  '        float inside = smoothstep( 0.0, 0.06, dOut );',
+  /* ⚠ A GRID NEEDS A POCKET (Joey 2026-09-22: "these grips are way to thin to be able to have the large infill pattern in
+     them, it would be made entirely from perimeters alone"). Past the last perimeter a slicer only starts a grid where the
+     space left is worth filling; anything narrower is more perimeter and gap fill. So the infill starts uSILatFill BEYOND
+     the perimeters, and a thin feature - a grip strip, a rib, a handle - never gets one. */
+  '        float sparse = smoothstep( uSILatPerim + uSILatFill - aaD, uSILatPerim + uSILatFill + aaD, dOut );',
+  /* THE PERIMETERS ARE SHELLS (Joey 2026-09-22: handles are "mostly perimeters, so not really cross hatching but concentric
+     lines"). Every perimeter is a bead following the layer's outline, so the seams between them sit at whole multiples of
+     a bead in from it - the outline's distance field says exactly where. The outer surface itself is not a seam; the last
+     one is where the perimeters meet the infill. A ray through a wall crosses the shells; on a slope or a curve each layer's
+     shells shift, which is what draws the nested contours. */
+  '        float sh = dOut / max( uSILatLine, 0.01 );',
+  '        float sdS = abs( fract( sh ) - 0.5 ) * 2.0;',
+  '        float bS = ( aaD + sM ) / max( uSILatLine, 0.01 );',
+  '        float shell = pow( smoothstep( 0.0, 1.0 + bS, sdS ), 1.6 ) * smoothstep( 0.5, 0.7, sh ) * ( 1.0 - smoothstep( nShell + 0.3, nShell + 0.5, sh ) );',
+  /* HOW MUCH PLASTIC THIS RAY CROSSES (Joey 2026-09-22: at a grazing angle "we would be looking through multiple
+     overlapping sections of the grip which should make it basically impossible to see through to the other side"). A
+     sample inside the perimeters is solid; one out in the infill is mostly air, so it counts for a quarter. The sum is a
+     real distance in mm, and the composite turns it into transmission - so a thin face stays clear and a long slanted
+     path through a grip closes up, which is what the filament does. */
+  '        plastic += inside * mix( 1.0, 0.25, sparse ) * stepLen;',
+  '        if ( k == 0 ) dOut0 = dOut;',                  // the surface layer's own outline distance, for the skin below
+  '        float occ = clamp( uSILatShell * shell * inside + line * sparse * inside, 0.0, 1.0 );',
+  '        float wz = exp( -( z - z0 ) / uSILatFade );',   // light that went deeper scattered more: deep walls fade
+  '        occS += occ * wz; occW += wz; occM = max( occM, occ * wz );',
+  '      }',
+  /* face-on every sample agrees; at an angle a crossed wall still reads nearly full. No face gate here any more: a wall
+     looks into its perimeters too, and the outline decides whether there is any infill behind them. */
+  '      gSIPath = plastic + z0 / cosT;',   // plus the skin the ray came through before the first sample
+  '      gSIDens = min( mix( occS / max( occW, 1e-4 ), occM, 0.75 ), uSILatCap );',   // never enough to close the part up
+  /* THE SKIN'S OWN LINES (Joey 2026-09-22: "3d prints are made of criss crossing layers ... at or below the surface"). The
+     solid skin over the infill is uSILatSkinN layers of 0.45 mm beads laid at 45 degrees, each layer turned 90 from the one
+     under it. Seen through clear plastic the seams between beads read as a fine crosshatch just below the surface, the
+     nearest layer strongest. Same refracted ray as the walls, so it slides with the view too. Band-limited: a bead pitch
+     under ~2.5 px fades out rather than crawling (Very High's settle samples then average what is left). */
+  '      if ( uSILatSkin > 0.0 ) {',
+  '        float fwC = length( fwidth( luv0 ) ) * pitch / uSILatBead;',   // bead cycles per pixel
+  '        float band = 1.0 - smoothstep( 0.2, 0.4, fwC );',
+  '        float skin = 0.0;',
+  /* ⚠ A SKIN IS LAID INSIDE ITS PERIMETERS (Joey 2026-09-22: "the crosshatch goes right to the edge but realistically there
+     are perimeter lines"). The beads start one perimeter band in from the layer's outline; the ring outside them is the
+     perimeters themselves, which the shells above already draw. */
+  '        float skinIn = smoothstep( uSILatPerim - 0.15, uSILatPerim + 0.15, dOut0 );',
+  /* THE BEADS ARE LENSES (Joey 2026-09-22: "more of an appearance closer to what you'd find on a light diffuser ... a surface
+     diffused by this crosshatch of overlapping layers"). Each bead is a rounded rod; light through it is bent across the
+     bead, by an amount that swings from one side to the other over its width. The two outermost layers do most of it, at
+     90 degrees to each other: resolved, the view behind ripples in a crosshatch; too fine to resolve, the same swings
+     average into blur - so a skin is always a diffuser, never a window. Directions are the beads' own screen gradients. */
+  '        float cA = ( q0.x + q0.y ) * 0.70710678 / uSILatBead, cB = ( q0.x - q0.y ) * 0.70710678 / uSILatBead;',
+  '        vec2 gA = vec2( dFdx( cA ), dFdy( cA ) ), gB = vec2( dFdx( cB ), dFdy( cB ) );',
+  '        vec2 dA = gA / max( length( gA ), 1e-6 ), dB = gB / max( length( gB ), 1e-6 );',
+  '        gSILens = faceGate * skinIn * uSILensPx * band * ( dA * sin( 6.2831853 * cA ) * 0.8 + dB * sin( 6.2831853 * cB ) * 0.55 );',
+  /* and the same two layers leave the skin faintly rippled, so the lines REFLECT as well as block (Joey 2026-09-22: "is it
+     possible to have specular reflection on the theoretical reflections of the layer lines?"). A slope in the beads' own
+     plane, handed to the normal after three has built it (SPEC_BLOCK) - so it lights through the ordinary specular path and
+     the glints travel with the view and the light, instead of being painted on. */
+  '        vec3 wA = normalize( t1 + t2 ), wB = normalize( t1 - t2 );',
+  '        gSISpecW = uSISpecTilt * band * faceGate * skinIn * ( wA * sin( 6.2831853 * cA ) * 0.8 + wB * sin( 6.2831853 * cB ) * 0.55 );',
+  '        gSIDiff = faceGate * uSILensPx * ( 0.35 + 0.5 * ( 1.0 - band ) );',
+  '        for ( int j = 0; j < 4; j ++ ) {',
+  '          float zj = uSILatLayer * ( float( j ) + 0.5 );',
+  '          if ( zj > uSILatDepth ) break;',
+  '          vec3 pj = vSIMm + Tr * ( zj / cosT );',
+  '          vec2 qj = vec2( dot( pj, t1 ), dot( pj, t2 ) );',
+  '          float c = ( mod( float( j ), 2.0 ) < 0.5 ? qj.x + qj.y : qj.x - qj.y ) * 0.70710678 / uSILatBead;',
+  '          float sd = abs( fract( c ) - 0.5 ) * 2.0;',                 // 0 at a bead centre, 1 on the seam between two
+  /* a rounded rod across its whole width: clearest through the crown, most scattering toward the two edges */
+  '          float seam = pow( smoothstep( 0.0, 1.0 + fwC, sd ), 1.6 );',
+  '          skin += seam * exp( -zj / 0.35 );',
+  '        }',
+  '        gSIDens = clamp( gSIDens + faceGate * band * skinIn * uSILatSkin * skin, 0.0, 1.0 );',
+  '      }',
   '    }',
   '  }',
   '}',
 ].join('\n');
 
+/** The skin beads' ripple, handed to the shading normal. Zero unless a filament-driven part is drawing its lattice. */
+export const SPEC_BLOCK = [
+  'if ( dot( gSISpecW, gSISpecW ) > 0.0 ) {',
+  '  vec3 svS = mat3( viewMatrix ) * gSISpecW;',
+  '  normal = normalize( normal - svS );',
+  '}',
+].join('\n');
+
 export const FRAG_COMPOSITE = [
   'if ( uSIActive > 0.5 && uSISee > 0.0 ) {',
-  '  vec2 suv = gl_FragCoord.xy / uSIRes;',
+  '  vec2 suv = ( gl_FragCoord.xy + gSILens ) / uSIRes;',   // gSILens / gSIDiff are 0 unless the skin lenses are on
   '  vec3 siAcc = texture2D( uSIBehind, suv ).rgb; float siW = 1.0;',
   '  for ( int i = 0; i < 12; i++ ) { float ga = float( i ) * 2.39996;',
-  '    float gr = uSIBlurPx * sqrt( ( float( i ) + 0.5 ) / 12.0 );',
+  '    float gr = ( uSIBlurPx + gSIDiff ) * sqrt( ( float( i ) + 0.5 ) / 12.0 );',
   '    siAcc += texture2D( uSIBehind, suv + vec2( cos( ga ), sin( ga ) ) * gr / uSIRes ).rgb; siW += 1.0; }',
   '  vec3 seeC = ( siAcc / siW ) * uSITint;',
   '  float kSee = uSISee * mix( 1.0, gSISee, clamp( uSIWallOpaque, 0.0, 1.0 ) );',
@@ -237,6 +366,7 @@ export const FRAG_COMPOSITE = [
   '  kSee *= mix( 1.0, 1.0 - Fg, uSIGraze );',
   '  kSee *= 1.0 - uSILatOcc * gSIDens;',       // 0 unless the lattice is on for a filament-driven part
   '  if ( uSIOwn > 0.5 ) kSee = clamp( kSee * uSIOwnSee, 0.0, 1.0 );',
+  '  if ( gSIPath > 0.0 ) kSee *= exp( -gSIPath / max( uSIClearMm, 0.1 ) );',   // thick, or a long slanted path: it closes up
   '  totalDiffuse = mix( totalDiffuse, seeC, kSee );',
   '}',
 ].join('\n');
@@ -265,13 +395,16 @@ export function patchSeeIntoMaterial(material, uniforms, lightsParsChunk, own = 
     if (prior) prior.call(material, shader, renderer);
     Object.assign(shader.uniforms, uniforms, own || {});
     shader.vertexShader = replaceOnce(shader.vertexShader, '#include <common>',
-      '#include <common>\nvarying vec3 vSIObjNrm;\nvarying vec3 vSIMm;\nvarying vec3 vSIAxW;\nuniform vec3 uSIAxisM;\nattribute vec4 aSIMask;\nattribute vec4 aSIMask2;\nvarying vec4 vSIMask;\nvarying vec4 vSIMask2;', 'vertex common');
+      '#include <common>\nvarying vec3 vSIObjNrm;\nvarying vec3 vSIMm;\nvarying vec3 vSIAxW;\nuniform vec3 uSIAxisM;\nattribute vec4 aSIMask;\nattribute vec4 aSIMask2;\nattribute vec4 aSIMask3;\nvarying vec4 vSIMask;\nvarying vec4 vSIMask2;\nvarying vec4 vSIMask3;\nvarying vec3 vSINrmW;\nvarying vec3 vSIWPos;', 'vertex common');
     /* the lattice lives in millimetres and rides with the part: the model matrix's rotation and scale (the mesh node carries
        the meshopt quantisation scale), never its translation, so a sliding drawer does not drag the pattern */
     shader.vertexShader = replaceOnce(shader.vertexShader, '#include <begin_vertex>',
-      '#include <begin_vertex>\nvSIObjNrm = objectNormal;\nvSIMm = mat3( modelMatrix ) * transformed;\nvSIAxW = mat3( modelMatrix ) * uSIAxisM;\nvSIMask = aSIMask;\nvSIMask2 = aSIMask2;', 'begin_vertex');
+      '#include <begin_vertex>\nvSIObjNrm = objectNormal;\nvSIMm = mat3( modelMatrix ) * transformed;\nvSIAxW = mat3( modelMatrix ) * uSIAxisM;\nvSIMask = aSIMask;\nvSIMask2 = aSIMask2;\nvSIMask3 = aSIMask3;\nvSINrmW = mat3( modelMatrix ) * objectNormal;\nvSIWPos = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz;', 'begin_vertex');
     shader.fragmentShader = replaceOnce(shader.fragmentShader, '#include <common>', '#include <common>\n' + FRAG_HEAD, 'fragment common');
     shader.fragmentShader = replaceOnce(shader.fragmentShader, '#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n' + FRAG_SURFACE, 'roughnessmap_fragment');
+    /* the bead ripple reaches the normal AFTER three has built it (normal_fragment_maps runs before this anchor), and
+       before any lighting - so it is ordinary specular, not an overlay. bed-finish.js patches the same anchor; both chain. */
+    shader.fragmentShader = replaceOnce(shader.fragmentShader, '#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n' + SPEC_BLOCK, 'emissivemap_fragment');
     shader.fragmentShader = replaceOnce(shader.fragmentShader, '#include <transmission_fragment>', FRAG_COMPOSITE + '\n#include <transmission_fragment>', 'transmission_fragment');
     // includes are resolved AFTER onBeforeCompile, so the lights chunk is expanded here to edit one line of it
     shader.fragmentShader = replaceOnce(shader.fragmentShader, '#include <lights_physical_pars_fragment>',
@@ -323,6 +456,19 @@ export function createSeeInto(o) {
     uSILatPerim: { value: SEE_INTO_LATTICE.perimMm },
     uSIMask: { value: null },   // the outline atlas (bakeOutline); the placeholder until the first bake
     uSILatDepth: { value: SEE_INTO_LATTICE.depthMm },
+    uSILatSoftK: { value: SEE_INTO_LATTICE.softPerMm },
+    uSILatReach: { value: SEE_INTO_LATTICE.reachMm },
+    uSILatFade: { value: SEE_INTO_LATTICE.fadeMm },
+    uSILatSkin: { value: SEE_INTO_LATTICE.skin },
+    uSILensPx: { value: SEE_INTO_LATTICE.lensPx },
+    uSISpecTilt: { value: SEE_INTO_LATTICE.specTilt },
+    uSILatFill: { value: SEE_INTO_LATTICE.fillMm },
+    uSILatCap: { value: SEE_INTO_LATTICE.densityCap },
+    uSIClearMm: { value: SEE_INTO_LATTICE.clearMm },
+    uSILatShell: { value: SEE_INTO_LATTICE.shell },
+    uSILatBead: { value: SEE_INTO_LATTICE.lineMm },
+    uSILatLayer: { value: SEE_INTO_LATTICE.layerMm },
+    uSILatPar: { value: o.lattice === 'flat' ? 0 : 1 },   // ?silattice=flat keeps the pre-parallax look, for comparison
     uSIOwnSee: { value: 1 },   // set every prepare() from o.ownSee() - the reference cover never reads it
   };
   const stats = { passRuns: 0, passRunsStill: 0, skippedHidden: 0, lastMs: 0, lastMsA: 0, lastMsMask: 0, lastMsB: 0, active: false, parts: 0, lastReason: '' };
@@ -437,7 +583,7 @@ export function createSeeInto(o) {
     atlas.tex.needsUpdate = true;
     /* per vertex: slice 0's atlas uv + one tile's size (aSIMask), and the tile layout + this vertex's height above the
        part's lowest point along the axis (aSIMask2). All affine in the vertex position, so interpolation is exact. */
-    const pos = g.attributes.position, n = pos.count, m1 = new Float32Array(n * 4), m2 = new Float32Array(n * 4), p = new T.Vector3();
+    const pos = g.attributes.position, n = pos.count, m1 = new Float32Array(n * 4), m2 = new Float32Array(n * 4), m3 = new Float32Array(n * 4), p = new T.Vector3();
     const tu = (w + 1) / ATLAS_W, tv = (h + 1) / ATLAS_H;
     for (let i = 0; i < n; i++) {
       p.fromBufferAttribute(pos, i).applyMatrix4(MW);
@@ -445,9 +591,11 @@ export function createSeeInto(o) {
       m1[i * 4 + 1] = (at.y + (p.dot(v) - v0) / (v1 - v0) * h) / ATLAS_H;
       m1[i * 4 + 2] = tu; m1[i * 4 + 3] = tv;
       m2[i * 4] = cols; m2[i * 4 + 1] = p.dot(a) - lo; m2[i * 4 + 2] = step; m2[i * 4 + 3] = K;
+      m3[i * 4] = at.x / ATLAS_W; m3[i * 4 + 1] = at.y / ATLAS_H; m3[i * 4 + 2] = (w - 1) / ATLAS_W; m3[i * 4 + 3] = (h - 1) / ATLAS_H;
     }
     g.setAttribute('aSIMask', new T.BufferAttribute(m1, 4));
     g.setAttribute('aSIMask2', new T.BufferAttribute(m2, 4));
+    g.setAttribute('aSIMask3', new T.BufferAttribute(m3, 4));
     stats.outlines = (stats.outlines || 0) + 1;
     stats.lastOutline = { w, h, slices: K, stepMm: +step.toFixed(2), px: +PX.toFixed(2), insideFrac: +(insideAll / (w * h * K)).toFixed(3) };
     return true;

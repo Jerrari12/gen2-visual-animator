@@ -3203,6 +3203,8 @@ const plateProfile = () => PLATE_PROFILES.find(p => p.key === plateFinishOf(buil
 /* One set of finish uniforms for every part material that carries the finish, so Powder <-> Smooth
    is a uniform write and every clone of every material follows it. */
 const bedFinishU = createBedFinishUniforms();
+/* the skin's extrusion lines, a trial (2026-09-22): ?skinlines=on draws them in Very High's settle samples */
+if (new URLSearchParams(location.search).get('skinlines') === 'on') bedFinishU.uSKOn.value = 1;
 const plateSupported = () => !!build && PLATE_FAMILIES.has(currentFaceplateStyle()?.key);
 const plateActive = () => plateSupported() && plateProfile().holo > 0;
 // which key carries the CONTACT face: Chevron's raised strips are its FACE zone

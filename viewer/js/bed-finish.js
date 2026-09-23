@@ -141,6 +141,10 @@ export const LAYER_LINES = Object.freeze({
   bandCycles: Object.freeze([0.25, 0.45]),
 });
 
+/** The skin's extrusion lines (the trial behind ?skinlines=on): bead width, how far a top bead's crown tilts the normal,
+    the gentler first layer on a Smooth sheet, and the first layer's seam darkening. Artistic values (Joey 2026-09-22). */
+export const SKIN_LINES = Object.freeze({ beadMm: 0.45, topTiltDeg: 8, firstTiltDeg: 3, firstDark: 0.04 });
+
 /** The holographic transfer's intensity - the same constant the faceplate path has used since 2026-08-10. */
 export const HOLO_OPACITY = 0.07;
 
@@ -167,6 +171,9 @@ export function createBedFinishUniforms() {
     uLLHandLo: { value: LAYER_LINES.handoffPx[0] }, uLLHandHi: { value: LAYER_LINES.handoffPx[1] },
     uLLBandLo: { value: LAYER_LINES.bandCycles[0] }, uLLBandHi: { value: LAYER_LINES.bandCycles[1] },
     uLLPxRatio: { value: 1 },                               // device px per CSS px, set with uLLOn
+    /* the skin's extrusion lines (SKIN_LINES) - a trial, off unless the page turns it on */
+    uSKOn: { value: 0 }, uSKBead: { value: SKIN_LINES.beadMm }, uSKTopTilt: { value: SKIN_LINES.topTiltDeg },
+    uSKFirstTilt: { value: SKIN_LINES.firstTiltDeg }, uSKFirstDark: { value: SKIN_LINES.firstDark },
   };
 }
 
@@ -273,6 +280,8 @@ const FRAG_COMMON = [
   'uniform float uLLOn, uLLPitch, uLLMaxMm, uLLMinPx, uLLDark, uLLTilt, uLLWidth, uLLHandLo, uLLHandHi, uLLBandLo, uLLBandHi, uLLPxRatio;',
   'float gBFContact = 0.0;',
   'float gBFAxial = 1.0;',                 // |geometric normal . axis|: 0 on a wall, 1 on a skin
+  'float gBFTop = 0.0;',                   // 1 on a face that looks ALONG the build axis: the last layer, a top skin
+  'uniform float uSKOn, uSKBead, uSKTopTilt, uSKFirstTilt, uSKFirstDark;',
   'float gLLW = 0.0; float gLLNear = 0.0;', // the layer lines' weight and hand-off factor, for DEBUG_BLOCK
   'vec3 gBFPlainN = vec3( 0.0, 0.0, 1.0 );',
   'vec2 pcHash2( vec2 p ) { vec2 h = vec2( dot( p, vec2( 127.1, 311.7 ) ), dot( p, vec2( 269.5, 183.3 ) ) ); return fract( sin( h ) * 43758.5453 ); }',
@@ -300,6 +309,7 @@ const CONTACT_BLOCK = [
   '  vec3 axBF = normalize( uAxis );',
   '  gBFContact = smoothstep( 0.82, 0.94, -dot( nBF, axBF ) ) * ( 1.0 - smoothstep( uBFPlaneLo, uBFPlaneHi, dot( vObjPos, axBF ) ) );',
   '  gBFAxial = abs( dot( nBF, axBF ) );',
+  '  gBFTop = smoothstep( 0.82, 0.94, dot( nBF, axBF ) );',
   PLAIN('gBFContact'),
   '}',
 ].join('\n');
@@ -430,6 +440,44 @@ const LINES_BLOCK = [
   '}',
 ].join('\n');
 
+/* ---- the skin's extrusion lines (SKIN_LINES) - settle samples only, trial behind ?skinlines=on ----
+   Joey 2026-09-22: "3d prints are made of criss crossing layers". A solid skin is laid as parallel beads
+   uSKBead wide at 45 degrees. On a TOP face (the last layer, facing along the build axis) the beads leave
+   a fine ridged crown - which is what makes a print's top face flash in bands as it turns. On the BED face
+   printed on a Smooth sheet, the squashed first layer leaves a fainter version of the same, at 90 degrees
+   to the top one. Powder and Holographic keep their own contact finish. Band-limited like the layer lines:
+   a bead under ~2.5 px fades into roughness instead of crawling. */
+const SKIN_BLOCK = (holo) => [
+  'if ( uLLOn > 0.5 && uSKOn > 0.5 ) {',
+  '  vec3 axSK = normalize( uAxis );',
+  '  vec3 pSK = ( vObjPos - dot( vObjPos, axSK ) * axSK ) * uScale;',
+  '  vec3 s1 = normalize( abs( axSK.y ) < 0.9 ? cross( axSK, vec3( 0.0, 1.0, 0.0 ) ) : cross( axSK, vec3( 1.0, 0.0, 0.0 ) ) );',
+  '  vec3 s2 = cross( axSK, s1 );',
+  '  vec2 qSK = vec2( dot( pSK, s1 ), dot( pSK, s2 ) );',
+  '  float cT = ( qSK.x + qSK.y ) * 0.70710678 / uSKBead;',
+  '  float cB = ( qSK.x - qSK.y ) * 0.70710678 / uSKBead;',
+  /* derivatives before the per-fragment weights - uSKOn and uLLOn are uniforms, so this branch is safe */
+  '  float fT = max( length( vec2( dFdx( cT ), dFdy( cT ) ) ), 1e-6 );',   // bead cycles per device px
+  '  float fB = max( length( vec2( dFdx( cB ), dFdy( cB ) ) ), 1e-6 );',
+  '  float aT = 1.0 - smoothstep( uLLBandLo, uLLBandHi, fT );',
+  '  float aB = 1.0 - smoothstep( uLLBandLo, uLLBandHi, fB );',
+  '  float wTop = gBFTop * ( 1.0 - gBFContact );',
+  `  float wFirst = gBFContact * ( 1.0 - clamp( uPC, 0.0, 1.0 ) ) * ${holo ? '0.0' : '1.0'};`,
+  '  if ( wTop + wFirst > 0.0 ) {',
+  '    float tT = tan( radians( uSKTopTilt ) ) * wTop, tB = tan( radians( uSKFirstTilt ) ) * wFirst;',
+  /* the across-bead directions in view space: the grain tangents are this frame's s1 and s2 */
+  '    vec3 dT = normalize( normalize( vPCT1 ) + normalize( vPCT2 ) );',
+  '    vec3 dB = normalize( normalize( vPCT1 ) - normalize( vPCT2 ) );',
+  '    normal = normalize( normal - dT * sin( 6.2831853 * cT ) * tT * aT - dB * sin( 6.2831853 * cB ) * tB * aB );',
+  /* what the band limit took off the normal goes into roughness, as the grain folds its lost slope */
+  '    float lostSK = 0.5 * ( tT * tT * ( 1.0 - aT * aT ) + tB * tB * ( 1.0 - aB * aB ) );',
+  '    float r2SK = roughnessFactor * roughnessFactor;',
+  '    roughnessFactor = clamp( sqrt( sqrt( r2SK * r2SK + lostSK ) ), 0.0, 1.0 );',
+  '    diffuseColor.rgb *= 1.0 - uSKFirstDark * cos( 6.2831853 * cB ) * aB * wFirst;',   // averages to zero
+  '  }',
+  '}',
+].join('\n');
+
 /* uBFDbg 1: the bed-face mask. 2 (measurement): R = roughnessFactor after every patch, G = the
    roughness GGX is given, B = the contact weight - raw, so a read-back pixel / 255 is the value.
    3 (measurement): the final normal's deviation from the plain interpolated normal,
@@ -502,7 +550,7 @@ export function applyBedFinish(material, { axis, uniforms, holo = null }) {
     shader.fragmentShader = after(shader.fragmentShader, '#include <common>',
       FRAG_COMMON + (holo ? '\n' + HOLO_FRAG_COMMON : ''), 'fragment common');
     shader.fragmentShader = after(shader.fragmentShader, '#include <emissivemap_fragment>',
-      CONTACT_BLOCK + '\n' + GRAIN_BLOCK + (holo ? '\n' + HOLO_BLOCK : '') + '\n' + LINES_BLOCK,
+      CONTACT_BLOCK + '\n' + GRAIN_BLOCK + (holo ? '\n' + HOLO_BLOCK : '') + '\n' + LINES_BLOCK + '\n' + SKIN_BLOCK(!!holo),
       'emissivemap_fragment');
     if (holo) shader.fragmentShader = after(shader.fragmentShader, '#include <lights_physical_fragment>',
       HOLO_CLEARCOAT, 'lights_physical_fragment');
