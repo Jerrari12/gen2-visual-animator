@@ -348,6 +348,18 @@ const lipEnter = (id, base = [0, 0, 0]) => ({
   from: [0, LIP_FIT.lift, 0],
 });
 const lipSlide = (id) => ({ id, by: [0, 0, LIP_FIT.slide], hold: LIP_FIT.hold, ease: 'detent' });
+/* THE SHELF INSERT: IN FROM THE FRONT, THEN DOWN (Joey 2026-09-21: "the shelf would be slid in from the front and then
+   down into place"; 2026-09-19: it "slides in from the front ... flat surface facing up"). Until then it was LOWERED
+   straight in from above, on the reasoning that a tab cannot enter a floor slot sideways. Both are true: it travels in
+   from the front held `rise` above the floor, so its built-in stoppers clear, and only then drops into the floor slots.
+   Same two-phase shape as the lip, for the same reason - the stop between the slide and the drop IS the point. */
+const SHELF_FIT = { slide: 120, rise: 10, hold: 350 };
+const shelfEnter = (id, base = [0, 0, 0]) => ({
+  id,
+  at: [base[0], base[1] + SHELF_FIT.rise, base[2]],
+  from: [0, 0, SHELF_FIT.slide],
+});
+const shelfDrop = (id) => ({ id, by: [0, -SHELF_FIT.rise, 0], hold: SHELF_FIT.hold, ease: 'detent' });
 
 // Amazon affiliate buy links for purchased hardware (Joey's, 2026-07-12) —
 // rendered as extra chips after Printables/Thangs in the BOM checklist +
@@ -1147,11 +1159,12 @@ export function generateManifest(build) {
 
   // cases + per-case hardware
   let firstClipDemo = null, firstDrawerDemo = null, firstShelfDemo = null;
-  /* The shelf install is a straight DROP: the insert's integrated stoppers pass
-     down through slots in the case floor, and a tab cannot enter a floor slot
-     sideways — so it is lowered in, never slid in from the front. It therefore
-     has to happen while the case's top is still open, i.e. BEFORE the unit
-     above exists. Every mount already stages its case somewhere that is true:
+  /* The shelf install is IN FROM THE FRONT, THEN DOWN (Joey 2026-09-21, see
+     SHELF_FIT): the insert's integrated stoppers pass down through slots in the
+     case floor, and a tab cannot enter a floor slot sideways, so it travels in
+     raised and drops at the end. Until 2026-09-21 this said it was lowered
+     straight in from above. It is still SHOWN while the case's top is open,
+     i.e. BEFORE the unit above exists, because that is when it can be seen. Every mount already stages its case somewhere that is true:
      tabletop cases are dressed at the bench then settle from behind, wall top
      cases are assembled at a forward bench, and the under-table demo case is
      built out front. Wall lower rows and the remaining under-table cases arrive
@@ -1160,7 +1173,7 @@ export function generateManifest(build) {
      with them (it is in `members`). Only the first shelf spells the mechanism
      out; the rest just say the shelf is already in. */
   const shelfWhy = 'Its built-in drawer stoppers drop through the slots in the case floor and snap it home.';
-  const shelfText = 'Lower the shelf insert straight down into the open case · ' + shelfWhy.charAt(0).toLowerCase() + shelfWhy.slice(1);
+  const shelfText = 'Slide the shelf insert in from the front, flat side up, then press it down into place · ' + shelfWhy.charAt(0).toLowerCase() + shelfWhy.slice(1);
   /* The lip's tabs drop through slots in the deck, so "onto the front edge" is
      wrong however natural it sounds - MEASURED, see the LIP block. */
   /* The lips are DOVETAILED in, so the note has to name both halves of the
@@ -1333,9 +1346,9 @@ export function generateManifest(build) {
        ⚠ THE TOP RING KEEPS THE BARE `ql<i>L/R` IDS. Every dip/pop site names
        them — `qlsUnder`, the wall and under-table slides, the cover benches —
        and the pair those mean is the one a unit or cover slides OVER, which is
-       always the topmost. Lower rings get `_<k>` ids and take no dip: an
-       extender DROPS straight on, so its tab passes through the keyhole's round
-       end rather than being covered by channel the way a slide covers it. */
+       always the topmost. Lower rings get `_<k>` ids. Since 2026-09-21 they DO take a dip: an
+       extender slides on like a case (see shelfFit), so the pair beneath it is
+       pressed down and pops exactly as the top pair does under a cover. */
     const qlId = (k, hand) => `ql${i}${hand}` + (k === rings - 1 ? '' : `_${k}`);
     const qlIds = [];
     for (let k = 0; k < rings; k++) {
@@ -1493,20 +1506,32 @@ export function generateManifest(build) {
       const out = [], off = at ? { at } : {};
       if (shId) {
         out.push({ camera: shelfCam(zBase) });
-        out.push({ enter: [{ id: shId, ...off, from: [0, 50, 0] }] });
+        out.push({ enter: [shelfEnter(shId, at || [0, 0, 0])] });
+        out.push({ move: [shelfDrop(shId)] });
         if (lipIds.length) {
           out.push({ enter: lipIds.map(id => lipEnter(id, at || [0, 0, 0])) });
           out.push({ move: lipIds.map(id => lipSlide(id)) });
         }
         if (restore) out.push({ camera: restore });
       }
-      /* Then the rings, each DROPPED straight on and immediately given its own
-         QuickLock pair — every seam locks (Joey 2026-08-29), so the pair that
-         belongs to ring k is fitted while ring k is still the open top. Doing
-         all the rings first and all the pairs after would show a pair being
-         dropped into a channel already capped by the ring above it. */
+      /* Then the rings. ⚠ AN EXTENDER GOES ON EXACTLY AS A CASE DOES (Joey
+         2026-09-21: "it should be exactly the same animation as a case ...
+         sliding forward onto the case back to front"; "extenders follow the
+         same rules as a case, it's no different than stacking a case on top of
+         a case other than the bottom lattice structure is removed"). Until
+         then each ring DROPPED straight on, which no dovetail allows. So it
+         slides on from behind over the pair already seated in the ring below,
+         pressing those tabs down (dip) and letting them spring into its
+         keyholes at full seat (pop) - the cover's bench slide, same distance.
+         Each ring is then given its own QuickLock pair — every seam locks
+         (Joey 2026-08-29), so the pair that belongs to ring k is fitted while
+         ring k is still the open top. Doing all the rings first and all the
+         pairs after would show a pair being dropped into a channel already
+         capped by the ring above it. `drop` still sets how far the PAIRS fall. */
       extIds.forEach((id, n) => {
-        out.push({ enter: [{ id, ...off, from: [0, drop, 0] }] });
+        const below = [qlId(n, 'L'), qlId(n, 'R')];
+        out.push({ enter: [{ id, ...off, from: [0, 0, -WALL.coverSlide] }], dip: dipItems(below, WALL.coverSlide) });
+        out.push({ pop: popItems(below) });
         out.push({ enter: [
           { id: qlId(n + 1, 'L'), ...off, from: [0, drop, 0] },
           { id: qlId(n + 1, 'R'), ...off, from: [0, drop, 0] },
@@ -1518,9 +1543,9 @@ export function generateManifest(build) {
     /* ⚠ Says "its own QuickLocks" because EVERY ring locks (Joey 2026-08-29):
        a 3H shelf takes three pairs, one per ring, not one for the unit. */
     const extText = extIds.length
-      ? ` Then stack ${extIds.length === 1 ? 'the case extender'
+      ? ` Then slide ${extIds.length === 1 ? 'the case extender'
           : extIds.length === 2 ? 'both case extenders'
-          : `all ${extIds.length} case extenders`} on top to bring the shelf up to ${rings}H — each ring gets its own QuickLock pair before the next one goes on.`
+          : `all ${extIds.length} case extenders`} on from the back, just as a case goes on, to bring the shelf up to ${rings}H · each ring gets its own QuickLock pair before the next one goes on.`
       : '';
     const step = {
       title: isBase ? `Bench: bottom case · ${u.w}W-${H}H` : `Case ${i + 1} · ${u.w}W-${H}H`,
@@ -1741,7 +1766,7 @@ export function generateManifest(build) {
         // missed while the shot is still travelling
         step.phases.push(...shelfFit({ drop: 55, restore: step.camera }));
         step.note = (step.note ? step.note + ' ' : '')
-          + (firstShelfDemo === null ? shelfText : 'Drop this case\'s shelf insert in the same way.')
+          + (firstShelfDemo === null ? shelfText : 'Fit this case\'s shelf insert in the same way.')
           + lipText(lipIds.length) + extText;
         if (firstShelfDemo === null) firstShelfDemo = i;
       }

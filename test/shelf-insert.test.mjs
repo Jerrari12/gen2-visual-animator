@@ -191,18 +191,23 @@ test('a shelf unit never bills stoppers of its own', () => {
 /* ---- 4. the install animation ------------------------------------------- */
 
 test('the shelf is installed while the case top is still open, never after', () => {
-  /* The insert is LOWERED in - its integrated stoppers pass down through slots
-     in the case floor, and a tab cannot enter a floor slot sideways. So on
-     every mount that shows the install, the insert's enter must come from
-     ABOVE (+Y), and on a wall top case it must precede the Cover Lower, which
-     caps the case. */
+  /* The insert goes IN FROM THE FRONT, THEN DOWN (Joey 2026-09-21: "slid in from the front and then down into place").
+     Its integrated stoppers pass down through slots in the case floor and a tab cannot enter a floor slot sideways, so
+     it travels in RAISED (enter from +Z, landing above the seat) and a separate move drops it by exactly that rise.
+     Until 2026-09-21 this pinned a straight drop from +Y. On a wall top case it must still precede the Cover Lower. */
   const m = ok(build(185, { placed: [shelf(1, { lip: 'front' })] }), '185 tabletop shelf');
   const step = m.steps.find((s) => (s.phases || []).some(
     (p) => (p.enter || []).some((e) => /^sh\d/.test(e.id))));
   assert.ok(step, 'the shelf must be installed in some step');
   const ent = step.phases.flatMap((p) => p.enter || []).find((e) => /^sh\d/.test(e.id));
-  assert.ok(ent.from[1] > 0 && ent.from[0] === 0 && ent.from[2] === 0,
-    `the insert must drop straight down, got from=[${ent.from}]`);
+  assert.ok(ent.from[2] > 0 && ent.from[0] === 0 && ent.from[1] === 0,
+    `the insert must come in from the FRONT, level, got from=[${ent.from}]`);
+  const rise = ent.at[1];
+  assert.ok(rise > 0, 'it travels in raised, so the stoppers clear the floor');
+  const at = step.phases.findIndex((p) => (p.enter || []).includes(ent));
+  const drop = (step.phases[at + 1].move || []).find((x) => x.id === ent.id);
+  assert.ok(drop, 'the very next phase moves the insert');
+  assert.deepEqual(drop.by, [0, -rise, 0], 'and it drops by exactly the rise, so it ends on its seat');
 
   const wall = ok(build(185, { mount: 'wall', placed: [shelf(1)] }), '185 wall shelf');
   const wstep = wall.steps.find((s) => (s.phases || []).some(
@@ -403,6 +408,30 @@ test('cabinets are still refused - and no longer blame the extenders', () => {
   assert.match(why, /door/i, 'the reason names what is actually missing');
   assert.doesNotMatch(why, /extenders? (models )?(are |is )?not/i,
     'the extenders shipped 2026-08-29 - the old reason is now false');
+});
+
+test('an extender slides on from behind exactly as a case does, never drops (Joey 2026-09-21)', () => {
+  /* Until 2026-09-21 every ring entered from [0, drop, 0] - straight down - which no dovetail allows. Joey: "it should be
+     exactly the same animation as a case ... sliding forward onto the case back to front". So each ring enters from
+     BEHIND (-z) with no vertical approach, the pair in the ring below dips under it, and that pair pops right after. */
+  for (const [mount, wallStagger] of [['tabletop', false], ['wall', false], ['wall', true], ['under-table', false]]) {
+    const tag = `${mount}${wallStagger ? ' staggered' : ''}`;
+    const m = ok({
+      ...build(185), mount, wallStagger, gridW: 1, gridH: 3, nextId: 2,
+      placed: [{ id: 'u0', x: 0, y: 0, w: 1, hh: 6, fill: 'shelf', lip: 'front' }],
+    }, tag);
+    const phases = m.steps.flatMap((s) => s.phases || []);
+    const rings = phases.map((p, n) => ({ p, n })).filter(({ p }) => (p.enter || []).some((e) => /^ext0_/.test(e.id)));
+    assert.equal(rings.length, 2, `${tag}: a 3H shelf slides on two extenders, each in its own phase`);
+    rings.forEach(({ p, n }, k) => {
+      const e = p.enter.find((x) => /^ext0_/.test(x.id));
+      assert.equal(e.from[1], 0, `${tag} ring ${k + 1}: no vertical approach - it does not drop`);
+      assert.ok(e.from[2] < 0, `${tag} ring ${k + 1}: it comes on from BEHIND, got from=[${e.from}]`);
+      const below = k === 0 ? ['ql0L_0', 'ql0R_0'] : [`ql0L_${k}`, `ql0R_${k}`];
+      assert.deepEqual((p.dip || []).map((d) => d.id).sort(), [...below].sort(), `${tag} ring ${k + 1}: the pair beneath it dips`);
+      assert.deepEqual((phases[n + 1].pop || []).map((d) => d.id).sort(), [...below].sort(), `${tag} ring ${k + 1}: and pops at full seat`);
+    });
+  }
 });
 
 test('every extender is entered by a phase, on every mount', () => {
