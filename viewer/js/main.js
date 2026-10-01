@@ -17,6 +17,7 @@ import { createDimCoverTest } from './dim-cover.js';
 import { benchBuild, createOrbitBench } from './orbit-bench.js';
 import { createSettleBench } from './settle-bench.js';
 import { parseSeeInto, parseSeeIntoSkip, parseSeeIntoLattice, createSeeInto } from './see-into.js';
+import { LABEL_TEXT_DEFAULTS, LABEL_TEXT_NODES, labelFontReady, loadLabelFont, labelTextGeometry } from './label-text.js';
 
 /* Every entry-routing boolean below is derived by resolveEntry() in entry.js -
    a pure function of (search, hash) with no DOM or network - so the boot
@@ -3839,6 +3840,50 @@ function buildInstances() {
       if (alt) group.traverse(o => { if (o.isMesh) o.material = altMatFor(type); });
     }
     instances.set(cfg.id, { cfg, group, staged: !!cfg.stage, alt });
+  }
+}
+/* ---- label text (PROTOTYPE, 2026-10-01) ----------------------------------------------------------------------
+   Each EdgeLabel label shows the words its drawer is named in the planner, laid out exactly as the label generator lays
+   them out (label-text.js). The words are the planner unit's `label`; a label instance rides its drawer (`rides`), and the
+   drawer body carries the unit's id (`owner`), so the chain needs nothing new from the generator. The text is a child of
+   the label's INNER child, so it rides the drawer, the removal ritual and every fade with the label, and it is its own
+   colour zone (TEXT): applyState and every fade paint it through materialFor like any zoned part, and the identify card
+   offers Body and Text chips for free. Static kits (no `build`) and the ?part= previews show none. */
+const LABEL_TEXT_ZONE = 'TEXT';
+let labelTextTok = 0;
+function labelTextFor(inst) {
+  if (!build || !Array.isArray(build.placed)) return '';
+  const owner = instances.get(inst.cfg.rides)?.cfg.owner;
+  const u = owner == null ? null : build.placed.find((p) => p.id === owner);
+  return (u && typeof u.label === 'string') ? u.label.trim() : '';
+}
+function attachLabelTexts() {
+  const tok = ++labelTextTok;   // a later mount supersedes a font load still in flight for this one
+  if (IS_PART || !build) return;
+  const list = [...instances.values()].filter((i) => LABEL_TEXT_NODES.has(i.cfg.node) && labelTextFor(i));
+  if (!list.length) return;
+  if (labelFontReady()) { placeLabelTexts(list); return; }
+  loadLabelFont().then(() => {
+    if (tok !== labelTextTok) return;
+    placeLabelTexts(list);
+    // the parts were already on screen: shade, shadow and settle again with the text in place
+    ao.rev++; markShadowDirty(); invalidateFrame();
+  }).catch((e) => console.warn(`[label text] ${(e && e.message) || e} - labels left blank`));
+}
+function placeLabelTexts(list) {
+  for (const inst of list) {
+    const t = labelTextGeometry(labelTextFor(inst));
+    if (!t) continue;
+    const inner = inst.group.children[0];
+    const mesh = new THREE.Mesh(t.geo, materialFor(inst, false, LABEL_TEXT_ZONE));
+    mesh.name = 'LabelText';
+    mesh.userData.zone = LABEL_TEXT_ZONE;
+    mesh.userData.labelText = t.shown;
+    if (!t.fits) console.warn(`[label text] "${t.shown}" overflows the label even at the 3 mm floor (the generator warns too)`);
+    // shadows follow the label's own meshes (the tier decides those flags; this copies them)
+    let cast = false; inner.traverse((o) => { if (o.isMesh && o.castShadow) cast = true; });
+    mesh.castShadow = cast; mesh.receiveShadow = cast;
+    inner.add(mesh);
   }
 }
 function basePos(inst, staged) {
@@ -8071,6 +8116,11 @@ addEventListener('message', async (e) => {
 async function mountManifest(m) {
   manifest = m;
   ao.rev++;   // the parts are about to be rebuilt - never accumulate over stale normals
+  // a label's raised text is its own colour zone (label-text.js), dark like the generator's until a filament is picked
+  // for it. Set before any material is built, so the zone's first material is already the right colour.
+  if (m.instances.some((c) => LABEL_TEXT_NODES.has(c.node)) && !m.colors[zoneKey('Label', LABEL_TEXT_ZONE)]) {
+    m.colors[zoneKey('Label', LABEL_TEXT_ZONE)] = LABEL_TEXT_DEFAULTS.hex;
+  }
 
   if (OFFICIAL) {
     // official kits carry their real name — replace the generator's random fun
@@ -8094,6 +8144,7 @@ async function mountManifest(m) {
   await loadTemplates();
   if (plateActive()) ensurePlateUVs();   // plate GLBs ship position+normal only
   buildInstances();
+  attachLabelTexts();
   buildGhosts();
   setIncomplete(!!m.incomplete);
   computeBounds();

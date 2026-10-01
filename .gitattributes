@@ -26,3 +26,6 @@ requirement-scope.js text eol=lf
 # vendored copy here) - same trap, same fix: fixed LF so the pin survives a
 # fresh Windows clone (caught by the fresh-clone deploy gate 2026-08-23).
 tabletop-completion.js text eol=lf
+*.ttf binary
+# the label generators' own opentype.js, kept byte-identical to their vendor/ copy
+viewer/vendor/opentype/** -text
