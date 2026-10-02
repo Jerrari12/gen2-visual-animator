@@ -17,7 +17,7 @@ import { createDimCoverTest } from './dim-cover.js';
 import { benchBuild, createOrbitBench } from './orbit-bench.js';
 import { createSettleBench } from './settle-bench.js';
 import { parseSeeInto, parseSeeIntoSkip, parseSeeIntoLattice, createSeeInto } from './see-into.js';
-import { LABEL_TEXT_DEFAULTS, LABEL_TEXT_NODES, labelFontReady, loadLabelFont, labelTextGeometry } from './label-text.js';
+import { LABEL_TEXT_DEFAULTS, LABEL_TEXT_NODES, labelFontReady, loadLabelFont, labelGeometry } from './label-text.js';
 
 /* Every entry-routing boolean below is derived by resolveEntry() in entry.js -
    a pure function of (search, hash) with no DOM or network - so the boot
@@ -3843,8 +3843,9 @@ function buildInstances() {
   }
 }
 /* ---- label text (PROTOTYPE, 2026-10-01) ----------------------------------------------------------------------
-   Each EdgeLabel label shows the words its drawer is named in the planner, laid out exactly as the label generator lays
-   them out (label-text.js). The words are the planner unit's `label`; a label instance rides its drawer (`rides`), and the
+   Each EdgeLabel label shows the words its drawer is named in the planner, built by the label generator's own code
+   (label-text.js -> js/vendor/edgelabel-core.js), icon included. The words are the planner unit's `label`; a label
+   instance rides its drawer (`rides`), and the
    drawer body carries the unit's id (`owner`), so the chain needs nothing new from the generator. The text is a child of
    the label's INNER child, so it rides the drawer, the removal ritual and every fade with the label, and it is its own
    colour zone (TEXT): applyState and every fade paint it through materialFor like any zoned part, and the identify card
@@ -3872,18 +3873,22 @@ function attachLabelTexts() {
 }
 function placeLabelTexts(list) {
   for (const inst of list) {
-    const t = labelTextGeometry(labelTextFor(inst));
+    const t = labelGeometry(labelTextFor(inst));
     if (!t) continue;
     const inner = inst.group.children[0];
-    const mesh = new THREE.Mesh(t.geo, materialFor(inst, false, LABEL_TEXT_ZONE));
-    mesh.name = 'LabelText';
-    mesh.userData.zone = LABEL_TEXT_ZONE;
-    mesh.userData.labelText = t.shown;
     if (!t.fits) console.warn(`[label text] "${t.shown}" overflows the label even at the 3 mm floor (the generator warns too)`);
     // shadows follow the label's own meshes (the tier decides those flags; this copies them)
     let cast = false; inner.traverse((o) => { if (o.isMesh && o.castShadow) cast = true; });
-    mesh.castShadow = cast; mesh.receiveShadow = cast;
-    inner.add(mesh);
+    // the text and the badge print in the same second filament (the generator's 3MF puts both on extruder 2): one zone
+    for (const p of t.parts) {
+      const mesh = new THREE.Mesh(p.geo, materialFor(inst, false, LABEL_TEXT_ZONE));
+      mesh.name = p.part === 'badge' ? 'LabelBadge' : 'LabelText';
+      mesh.userData.zone = LABEL_TEXT_ZONE;
+      mesh.userData.labelText = t.shown;
+      if (p.part === 'badge') mesh.userData.labelBadge = t.badge;
+      mesh.castShadow = cast; mesh.receiveShadow = cast;
+      inner.add(mesh);
+    }
   }
 }
 function basePos(inst, staged) {
