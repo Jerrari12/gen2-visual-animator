@@ -167,6 +167,31 @@ test('layoutKey DISTINGUISHES a drawer-body-only change', () => {
   assert.notEqual(std, grid, 'layoutKey ignores `variant` - a planner layout that only switches a drawer body is dropped as an echo');
 });
 
+/* Drawer labels (2026-10-02): a unit's `labelBadge` and the build's `labelStyle` change what every label in this page
+   looks like, so a planner layout carrying ONLY one of them must not be read as an echo - the lip bug, in a new field. */
+const labelBuild = (badge, style) => ({
+  mount: 'tabletop', length: 185, gridW: 4, gridH: 4,
+  placed: [{ id: 1, x: 0, y: 2, w: 1, hh: 2, fill: 'decor', shelves: 0, label: 'Torx Bits', ...(badge ? { labelBadge: badge } : {}) }],
+  ...(style ? { labelStyle: style } : {}),
+});
+
+test('layoutKey DISTINGUISHES a label-badge-only change', () => {
+  const auto = layoutKey(labelBuild(null));
+  const torx = layoutKey(labelBuild({ type: 'icon', value: 'screw-torx-head' }));
+  const none = layoutKey(labelBuild({ type: 'none' }));
+  assert.equal(layoutKey(labelBuild({ type: 'icon', value: 'screw-torx-head' })), torx, 'layoutKey is not deterministic');
+  assert.equal(new Set([auto, torx, none]).size, 3,
+    'layoutKey collapses badge states - an icon picked in the planner would be dropped here as an echo');
+});
+
+test('layoutKey DISTINGUISHES a label-style-only change', () => {
+  const defaults = layoutKey(labelBuild(null));
+  const bigger = layoutKey(labelBuild(null, { capMm: 6 }));
+  const lower = layoutKey(labelBuild(null, { allCaps: false }));
+  assert.equal(new Set([defaults, bigger, lower]).size, 3,
+    'layoutKey ignores labelStyle - a style change made in the planner would never reach the 3D labels');
+});
+
 test('currentOpts relays a body per DECOR drawer, right after lips', () => {
   assert.equal(currentOpts(drawerBuild(null)).variants[1], 'standard', 'absence must relay as standard');
   assert.equal(currentOpts(drawerBuild('gridfinity')).variants[1], 'gridfinity');

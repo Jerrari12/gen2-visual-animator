@@ -7,9 +7,10 @@
    the slanted right edge, the auto-shrink to the 3 mm floor, the left badge (icon or letter) and the 2 mm it pushes the text
    over by, the icon library and the keyword -> icon prediction are the generator's, not a port of them.
 
-   The only things decided HERE: which badge a label gets (none is stored by the planner yet, so the generator's default
-   applies - "Predict icons from text" is on, the same thing it does to names the planner sends it, so "Torx Bits" gets the
-   Torx head), and where the generator's flat label sits on the viewer's upright Label_EdgeLabel model (below).
+   What a label is built FROM is the planner's: the unit's words (stored as typed), its `labelBadge` (absent = the
+   generator's own icon prediction, which is on by default - "Torx Bits" gets the Torx head) and the build's `labelStyle`
+   (null = the generator's defaults), each checked by label-spec.js first. The only thing decided HERE is where the
+   generator's flat label sits on the viewer's upright Label_EdgeLabel model (below).
 
    ⚠ THE FRAME WAS MEASURED, NOT ASSUMED. The generator builds a label lying flat: X 57 mm long, Y 27 mm wide, Z 0..4.5 up,
    text on Z = 4.5. The viewer's Label_EdgeLabel model stands upright: X 57, Y 0..27 (bottom-anchored), Z -2.25..2.25 with the
@@ -18,6 +19,7 @@
    So the generator's geometry needs a shift and no rotation: LABEL_FRAME_OFFSET. */
 import * as THREE from 'three';
 import { SVGLoader } from 'three/addons/loaders/SVGLoader.js';
+import { cleanLabelBadge, cleanLabelStyle } from './label-spec.js';
 
 /* The generator's text colour. Only this one value is needed before the core has loaded (main.js seeds the TEXT zone's
    colour when a build mounts); test/edgelabel-core-vendor.test.mjs pins it to the core's own DEFAULTS.colorText. */
@@ -63,27 +65,27 @@ export function loadLabelFont() {
   return loading;
 }
 
-/* The badge a label wears when nobody has picked one: the generator's own prediction, under its own default switch. */
-function defaultBadge(text) {
-  const id = core.DEFAULTS.predictIcons ? core.guessIconId(text) : null;
+/* The badge a label wears when nobody has picked one: the generator's own prediction, under the style's switch. */
+function defaultBadge(text, S) {
+  const id = S.predictIcons ? core.guessIconId(text) : null;
   return id ? { type: 'icon', value: id } : { type: 'none' };
 }
 
-/* One label as geometry in the Label_EdgeLabel model's own frame, built by the generator's buildLabelMeshes with the
-   generator's defaults. `badge` is { type: 'none' | 'icon' | 'char', value?, svg? } when one has been chosen; leave it out
-   for the generator's default (predicted). Returns null when there is nothing to print. `fits` is the generator's own
-   verdict: false means even the 3 mm floor overflows the label, exactly where the generator warns. */
+/* One label as geometry in the Label_EdgeLabel model's own frame, built by the generator's buildLabelMeshes. `badge` is
+   the unit's labelBadge (absent or invalid = the generator's prediction), `style` the build's labelStyle (absent or invalid
+   values = the generator's defaults). Returns null when there is nothing to print. `fits` is the generator's own verdict:
+   false means even the 3 mm floor overflows the label, exactly where the generator warns. */
 const cache = new Map();
-export function labelGeometry(text, badge) {
+export function labelGeometry(text, badge, style) {
   if (!core) throw new Error('label core not loaded');
-  const D = core.DEFAULTS;
+  const S = { ...core.DEFAULTS, ...(cleanLabelStyle(style) || {}) };
   const raw = String(text || '');
-  const chosen = badge || defaultBadge(raw);
-  const data = core.prepareLabel(raw, chosen, D.allCaps);
+  const chosen = cleanLabelBadge(badge) || defaultBadge(raw, S);
+  const data = core.prepareLabel(raw, chosen, S.allCaps);
   if (!data) return null;
-  const key = JSON.stringify([data.text, data.badge]);
+  const key = JSON.stringify([data.text, data.badge, S.capMm, S.depth, S.badgeSize, S.bold]);
   if (cache.has(key)) return cache.get(key);
-  const m = core.buildLabelMeshes(data, D.capMm, D.depth, D.badgeSize, D.bold);
+  const m = core.buildLabelMeshes(data, S.capMm, S.depth, S.badgeSize, S.bold);
   const parts = [];
   if (m.textGeo) parts.push({ part: 'text', geo: m.textGeo });
   if (m.badgeGeo) parts.push({ part: 'badge', geo: m.badgeGeo });

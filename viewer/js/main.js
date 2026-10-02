@@ -3852,10 +3852,14 @@ function buildInstances() {
    offers Body and Text chips for free. Static kits (no `build`) and the ?part= previews show none. */
 const LABEL_TEXT_ZONE = 'TEXT';
 let labelTextTok = 0;
-function labelTextFor(inst) {
-  if (!build || !Array.isArray(build.placed)) return '';
+// the planner unit a label instance belongs to: label -> rides -> drawer -> owner -> build.placed
+function labelUnitFor(inst) {
+  if (!build || !Array.isArray(build.placed)) return null;
   const owner = instances.get(inst.cfg.rides)?.cfg.owner;
-  const u = owner == null ? null : build.placed.find((p) => p.id === owner);
+  return owner == null ? null : (build.placed.find((p) => p.id === owner) || null);
+}
+function labelTextFor(inst) {
+  const u = labelUnitFor(inst);
   return (u && typeof u.label === 'string') ? u.label.trim() : '';
 }
 function attachLabelTexts() {
@@ -3873,7 +3877,8 @@ function attachLabelTexts() {
 }
 function placeLabelTexts(list) {
   for (const inst of list) {
-    const t = labelGeometry(labelTextFor(inst));
+    // the words as typed, the unit's icon (absent = predicted) and the build's style - label-spec.js checks both
+    const t = labelGeometry(labelTextFor(inst), labelUnitFor(inst)?.labelBadge, build.labelStyle);
     if (!t) continue;
     const inner = inst.group.children[0];
     if (!t.fits) console.warn(`[label text] "${t.shown}" overflows the label even at the 3 mm floor (the generator warns too)`);
@@ -8024,7 +8029,9 @@ const hideBlocked = () => $('blocked-overlay').classList.add('hidden');
    half-broken channel (exactly how `lip` shipped: the planner posted the
    change, this key ignored it, the toggle did nothing). */
 const layoutKey = b => JSON.stringify([b.mount, +b.length, (b.placed || []).map(u =>
-  [u.id, u.x, u.y, u.w, u.hh, u.fill, u.shelves || 0, u.label || '', u.closure || '', u.lip || '', u.variant || '', JSON.stringify(u.interior ?? null)])]);
+  [u.id, u.x, u.y, u.w, u.hh, u.fill, u.shelves || 0, u.label || '', JSON.stringify(u.labelBadge ?? null), u.closure || '', u.lip || '', u.variant || '', JSON.stringify(u.interior ?? null)]),
+  // the build's label style re-renders every label (the planner's layoutSig carries it as `ls`)
+  JSON.stringify(b.labelStyle ?? null)]);
 async function applyRemoteLayout(nb) {
   if (!booted || !nb || !Array.isArray(nb.placed) || !nb.placed.length) return;
   if (regenBusy) { // mid-regenerate from an earlier message — retry, never drop the newest state
