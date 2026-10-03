@@ -4983,7 +4983,10 @@ function renderLabelStyleRows(box) {
     box.appendChild(optSeg(label, onOff, S[key], v => { if (styleEdit(build, key, v)) { afterStyle(key); renderChecklist(); } }));
   }
   const note = document.createElement('div'); note.className = 'opt-note'; note.id = 'label-style-note';
-  note.textContent = 'The label generator\'s own settings - they print exactly like this.';
+  /* ⚠ The VERIFIED claim only (Astra, release check 2026-10-03): the settings and limits are the generator's, and the preview
+     is laid out by its own vendored label-core.js. Nothing made from these settings has been exported, sliced or printed yet -
+     the send-back to the generator is step 3 - so the note must not promise what prints. */
+  note.textContent = 'The label generator\'s own settings and limits - the preview uses its layout code.';
   note.dataset.base = note.textContent;
   box.appendChild(note);
 }
@@ -7394,7 +7397,7 @@ function commitLabelEdit(patch, event, { undo = false } = {}) {
   if (event === 'label:edit') { if (!labelEdit.tracked) { labelEdit.tracked = true; track(event); } } else if (event) track(event);
   if (!undo) lastLabelEdit = { unitId: unit.id, prev, after: labelSnap(unit), buildId: build.buildId || '' };
   lastLabelPost = { buildId: build.buildId || '', words: cleanLabelText(unit.label) };
-  if ($('label-edit-status').textContent === LABEL_REJECTED_STATUS) setLabelStatus('');
+  if ($('label-edit-status').textContent.startsWith('Not saved')) setLabelStatus('');   // the rejected note's pointer, or what ✕ left
   refreshLabelText(inst);
   renderLabelEditorState();
   renderOptions();          // the Labels block appears with the first label (and its rows read the style)
@@ -7523,12 +7526,16 @@ function noteRelayRejected(d) {
 // away when there are no words to keep)
 function syncRelayRejected() {
   if (!relayRejected || !build || build.buildId === relayRejected.buildId) return;
-  if (labelEdit && $('label-edit-status').textContent === LABEL_REJECTED_STATUS) setLabelStatus('');
+  if (labelEdit && $('label-edit-status').textContent.startsWith('Not saved')) setLabelStatus('');
   if (!relayRejected.words) { closeRelayRejected(); return; }
   $('relay-rejected-text').textContent = 'This window now shows the planner\'s current build. Your change was not saved.';
   $('relay-rejected-load').classList.add('hidden');
 }
-function closeRelayRejected() { relayRejected = null; $('relay-rejected').classList.add('hidden'); }
+function closeRelayRejected() {
+  relayRejected = null; $('relay-rejected').classList.add('hidden');
+  // the card must not keep pointing at a note that is gone - it still was not saved
+  if (labelEdit && $('label-edit-status').textContent === LABEL_REJECTED_STATUS) setLabelStatus('Not saved');
+}
 $('relay-rejected-load').onclick = () => {
   const w = plannerWin();
   if (!w || w.closed) { $('relay-rejected-text').textContent = 'The planner window is closed - open the 3D view from the planner again.'; $('relay-rejected-load').classList.add('hidden'); return; }

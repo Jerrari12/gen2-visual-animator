@@ -709,6 +709,19 @@ test('stale pop-out: the planner\'s refusal shows "Not saved", drops the Undo, q
   assert.equal(k.$('relay-rejected').classList.contains('hidden'), true);
 });
 
+test('stale pop-out: closing the note leaves the card saying "Not saved" - never pointing at a note that is gone (release verify 2026-10-03, cosmetic a)', () => {
+  const b = labelledBuild(), h = cardHarness(b);
+  h.open(3); h.commitLabelEdit({ label: 'Stale Edit' }, 'label:edit');
+  h.noteRelayRejected({ gen2: 'buildRejected', buildId: ID });
+  assert.equal(h.$('label-edit-status').textContent, h.LABEL_REJECTED_STATUS, 'the control: the card points at the note');
+  h.closeRelayRejected();
+  assert.equal(h.$('relay-rejected').classList.contains('hidden'), true, 'the note did not close');
+  assert.equal(h.$('label-edit-status').textContent, 'Not saved', 'after the note closed the card still points at it (or claims nothing)');
+  assert.equal(h.$('label-edit-undo').classList.contains('hidden'), true, 'closing the note brought the Undo back');
+  h.commitLabelEdit({ label: 'Saved Later' }, 'label:edit');
+  assert.equal(h.$('label-edit-status').textContent, '', 'a later commit left "Not saved" on the card');
+});
+
 test('rejectionIsMine: only an answer naming this page\'s own id (a page with no id is never told it was refused)', () => {
   assert.equal(rejectionIsMine({ buildId: ID }, { buildId: ID }), true);
   assert.equal(rejectionIsMine({ buildId: ID }, { buildId: 'zzzzzzzzzzzz' }), false);
