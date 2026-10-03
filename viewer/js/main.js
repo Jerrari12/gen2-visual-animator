@@ -20,7 +20,7 @@ import { parseSeeInto, parseSeeIntoSkip, parseSeeIntoLattice, createSeeInto } fr
 import { LABEL_TEXT_DEFAULTS, LABEL_TEXT_NODES, labelFontReady, loadLabelFont, labelGeometry, labelCore } from './label-text.js';
 import { LABEL_SPEC, LABEL_TEXT_MAX, cleanLabelText, cleanLabelBadge, cleanLabelStyle } from './label-spec.js';
 import { LABEL_STYLE_ROWS, labelOrder, effectiveStyle, labelOptsOf, labelOptsChanges, applyLabelOpts, labelOnlyDiff, copyLabelFields,
-  editCommit, styleEdit, iconChoices, badgeStateText, shownBadge, historyKeyOf } from './label-panel.js';
+  editCommit, styleEdit, iconChoices, badgeStateText, shownBadge, historyKeyOf, labelSnap, labelUndoPatch, rejectionIsMine } from './label-panel.js';
 
 /* Every entry-routing boolean below is derived by resolveEntry() in entry.js -
    a pure function of (search, hash) with no DOM or network - so the boot
@@ -5825,8 +5825,12 @@ let variantUnit = null;
    NOT yet written into `build`; the unit's stored words are the committed value, and only a commit (Enter / blur / a badge
    pick) writes them and posts to the planner. Declared up here for the same TDZ reason as lipUnit. */
 let labelEdit = null;
-/* The card's single-slot Undo: the previous { label, labelBadge } of the last committed edit, offered for ~6 s. */
-let lastLabelEdit = null;
+/* The card's single-slot Undo: { unitId, prev, after, buildId } of the last committed edit, offered for ~6 s - `prev` the words
+   and badge before it, `after` the unit's labelSnap right after it (label-panel.js labelUndoPatch only runs while they still
+   hold). `lastLabelPost` = the words of the latest label commit and its build, quoted if the planner refuses the post. */
+let lastLabelEdit = null, lastLabelPost = null;
+let relayRejected = null;   // { buildId, words } while the "not saved" note is up (noteRelayRejected)
+const LABEL_REJECTED_STATUS = 'Not saved - see the note at the top';
 let labelPreviewTimer = 0, labelStatusTimer = 0, labelUndoTimer = 0, labelMismatchWarned = false;
 const LABEL_PREVIEW_MS = 350;   // the draft preview's debounce - see the label-edit-text `input` handler for the measurement
 function setSelected(id) {
@@ -7313,6 +7317,7 @@ function renderLabelEditor(inst, selType) {
   if (!editInst) { labelEdit = null; box.classList.add('hidden'); document.body.classList.remove('label-edit-open'); return; }
   if (!labelEdit || labelEdit.inst !== editInst) {
     labelEdit = { inst: editInst, unit: labelUnitFor(editInst), draft: null, tracked: false, picker: false };
+    if (!lastLabelEdit || lastLabelEdit.unitId !== labelEdit.unit.id) $('label-edit-undo').classList.add('hidden');
     $('label-edit-text').value = labelEdit.unit.label || '';
     $('label-edit-picker').classList.add('hidden');
     $('label-edit-badge').setAttribute('aria-expanded', 'false');
@@ -7387,7 +7392,9 @@ function commitLabelEdit(patch, event, { undo = false } = {}) {
   labelEdit.draft = null;
   if (JSON.stringify([unit.label ?? '', unit.labelBadge ?? null]) === before) { renderLabelEditorState(); return; }
   if (event === 'label:edit') { if (!labelEdit.tracked) { labelEdit.tracked = true; track(event); } } else if (event) track(event);
-  if (!undo) lastLabelEdit = { unitId: unit.id, prev };
+  if (!undo) lastLabelEdit = { unitId: unit.id, prev, after: labelSnap(unit), buildId: build.buildId || '' };
+  lastLabelPost = { buildId: build.buildId || '', words: cleanLabelText(unit.label) };
+  if ($('label-edit-status').textContent === LABEL_REJECTED_STATUS) setLabelStatus('');
   refreshLabelText(inst);
   renderLabelEditorState();
   renderOptions();          // the Labels block appears with the first label (and its rows read the style)
@@ -7400,16 +7407,19 @@ function offerLabelUndo() {
   clearTimeout(labelUndoTimer);
   labelUndoTimer = setTimeout(() => el.classList.add('hidden'), 6000);
 }
-$('label-edit-undo').onclick = () => {
+/* The Undo button. labelUndoPatch decides (release check 2026-10-03, Astra item 4): only the words + badge, only on the drawer
+   and build the slot came from, and only while the unit still holds exactly what that commit left - a planner edit, a planner
+   undo/redo, a Reset or any later edit since means it would write over a newer change, so it does nothing and says so. The
+   patch goes through the same commit path, so it relays like any edit - the words AND the badge in ONE commit, one post (Sol
+   01a0fffd, 3), which the planner stores as one edit and one step of its own history. */
+function undoLastLabelEdit() {
   $('label-edit-undo').classList.add('hidden');
-  if (!lastLabelEdit || !labelEdit || labelEdit.unit.id !== lastLabelEdit.unitId) return;
-  const { prev } = lastLabelEdit; lastLabelEdit = null;
-  // through the same commit path, so it relays like any edit - the words AND the badge they carried in ONE commit (editCommit
-  // applies the words first, then the badge on a unit that has words; `null` = the badge was absent = back to Auto), so the
-  // planner sees one post with the restored pair, never an intermediate "old words, new badge" state (Sol 01a0fffd, 3)
-  commitLabelEdit({ label: prev.label ?? '', labelBadge: prev.labelBadge === undefined ? null : prev.labelBadge }, 'label:undo', { undo: true });
-  $('label-edit-undo').classList.add('hidden');
-};
+  const slot = lastLabelEdit; lastLabelEdit = null;
+  const patch = labelUndoPatch(slot, build, labelEdit && labelEdit.unit.id);
+  if (!patch) { if (slot && labelEdit) setLabelStatus(plannerWin() ? 'Changed since - use the planner\'s Undo' : 'Changed since - nothing to undo', 2000); return; }
+  commitLabelEdit(patch, 'label:undo', { undo: true });
+}
+$('label-edit-undo').onclick = undoLastLabelEdit;
 // typing: the draft shows on the 3D label ~350 ms after the last keystroke; the unit is untouched until commit. 350, not
 // the design's guessed 120: one cache-miss rebuild MEASURED 65-101 ms with no icon, 86-153 ms with a predicted icon and
 // 127-263 ms with a letter badge on the main thread (e2e 1d, 3 runs x 9 strings, laptop, 2026-10-03) - a rebuild in every mid-word pause
@@ -7491,6 +7501,40 @@ const useLetter = () => { const v = $('label-pick-char').value; if (cleanLabelBa
 $('label-pick-use').onclick = useLetter;
 $('label-pick-char').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); useLetter(); } });
 $('label-edit-picker').addEventListener('keydown', e => { if (e.key === 'Escape') { e.stopPropagation(); toggleIconPicker(false); $('label-edit-badge').focus(); } });
+/* The planner REFUSED this page's last post: it names a build the planner has left (a popped-out window still on build A after
+   the planner tab moved to build B - review D5, release check 2026-10-03, Astra item 2). Nothing was saved, so nothing may look
+   saved: the card drops its Undo and says "Not saved", and a note at the top of the stage says why, quotes the words that did not
+   reach the planner (they stay on the 3D label and in the field too), and offers "Load the planner's build" - the viewerReady
+   handshake, which makes the planner send its current build here. */
+function noteRelayRejected(d) {
+  if (!rejectionIsMine(build, d)) return;
+  trackOnce('relay:rejected');
+  const words = lastLabelPost && lastLabelPost.buildId === d.buildId ? lastLabelPost.words : '';
+  relayRejected = { buildId: d.buildId, words };
+  lastLabelEdit = null; clearTimeout(labelUndoTimer); $('label-edit-undo').classList.add('hidden');
+  if (labelEdit) setLabelStatus(LABEL_REJECTED_STATUS);
+  $('relay-rejected-text').textContent = 'This window shows an older build than the planner, so the planner did not save your last change.';
+  $('relay-rejected-words').textContent = words ? `Your words: \u201c${words}\u201d` : '';
+  $('relay-rejected-words').classList.toggle('hidden', !words);
+  $('relay-rejected-load').classList.remove('hidden');
+  $('relay-rejected').classList.remove('hidden');
+}
+// after a layout lands: once this page holds another build than the refused one, the note stops offering a reload (and goes
+// away when there are no words to keep)
+function syncRelayRejected() {
+  if (!relayRejected || !build || build.buildId === relayRejected.buildId) return;
+  if (labelEdit && $('label-edit-status').textContent === LABEL_REJECTED_STATUS) setLabelStatus('');
+  if (!relayRejected.words) { closeRelayRejected(); return; }
+  $('relay-rejected-text').textContent = 'This window now shows the planner\'s current build. Your change was not saved.';
+  $('relay-rejected-load').classList.add('hidden');
+}
+function closeRelayRejected() { relayRejected = null; $('relay-rejected').classList.add('hidden'); }
+$('relay-rejected-load').onclick = () => {
+  const w = plannerWin();
+  if (!w || w.closed) { $('relay-rejected-text').textContent = 'The planner window is closed - open the 3D view from the planner again.'; $('relay-rejected-load').classList.add('hidden'); return; }
+  try { w.postMessage({ gen2: 'viewerReady' }, '*'); } catch (e) { /* opener gone */ }
+};
+$('relay-rejected-close').onclick = closeRelayRejected;
 // a build id that names another build: drop the message whole, say so once in the console, count it once
 function noteBuildMismatch(o) {
   if (!labelMismatchWarned) { labelMismatchWarned = true; console.warn(`[relay] buildOptions for build ${o.buildId} ignored - this page shows ${build.buildId}`); }
@@ -8439,7 +8483,8 @@ addEventListener('message', async (e) => {
   const d = e.data;
   if (!d || !build) return;
   if (d.gen2 === 'layoutBlocked' && typeof d.reason === 'string') { showBlocked(d.reason); return; }
-  if (d.gen2 === 'layout' && d.build) { await applyRemoteLayout(d.build); return; }
+  if (d.gen2 === 'layout' && d.build) { await applyRemoteLayout(d.build); syncRelayRejected(); return; }
+  if (d.gen2 === 'buildRejected') { noteRelayRejected(d); return; }
   if (d.gen2 === 'colors') { applyRemoteColors(d); return; }
   if (d.gen2 === 'store') { applyRemoteStore(d); return; }
   if (d.gen2 === 'theme') { // the planner's dark-mode switch, relayed like the palette

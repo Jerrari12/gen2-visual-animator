@@ -153,6 +153,31 @@ export function editCommit(build, unitId, patch) {
   return prev;
 }
 
+/* A unit's two label fields as one comparable value - what the card's Undo slot remembers and checks. */
+export const labelSnap = (u) => JSON.stringify([(u && u.label) ?? '', (u && u.labelBadge) ?? null]);
+
+/* The card's 6-s Undo (release check 2026-10-03, Astra item 4). `slot` = { unitId, prev, after, buildId } recorded by a commit:
+   `prev` is editCommit's return, `after` the unit's labelSnap right after the commit. Returns the patch that puts back ONLY the
+   words and the badge (editCommit's two fields - nothing else on the unit or the build), or null when the Undo must not run:
+     - the card is open on another drawer, or the slot is from another build (unit ids restart at 1 on every build);
+     - the unit's words or badge are no longer what this commit left (a planner edit, a planner undo/redo, a Reset, a second
+       edit by any path) - compare-and-swap, so the Undo can never write over a later change, whoever made it.
+   The patch then goes through the ordinary commit path (one post, buildId first), so the planner stores it as one edit
+   and one entry in its own history. */
+export function labelUndoPatch(slot, build, openUnitId) {
+  if (!slot || !build || slot.unitId !== openUnitId || slot.buildId !== (build.buildId || '')) return null;
+  const u = (build.placed || []).find((p) => p.id === slot.unitId);
+  if (!isLabelUnit(u) || labelSnap(u) !== slot.after) return null;
+  const prev = slot.prev || {};
+  return { label: prev.label ?? '', labelBadge: prev.labelBadge === undefined ? null : prev.labelBadge };
+}
+
+/* The planner answers a post naming another build with { gen2: 'buildRejected', buildId } (the stale pop-out, release check
+   2026-10-03, Astra item 2). It concerns this page only when that id is this page's own: a late answer to a post made before
+   a reconnect names the build this page has since left, and must not raise a "not saved" over a page that is in step. */
+export const rejectionIsMine = (build, d) =>
+  !!(build && d && typeof build.buildId === 'string' && build.buildId && d.buildId === build.buildId);
+
 /* One Build-options row: store `value` under `key` in the build's style IF it survives cleanLabelStyle, else store nothing
    and report false (the row snaps back). Nothing is ever clamped. A value equal to the generator's default is still stored
    - the generator stores what its inputs hold, and null-vs-{capMm:5} would flip the echo guards for no visible change. */

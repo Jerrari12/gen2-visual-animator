@@ -537,3 +537,197 @@ test('incoming layout, label-only: a NEW build id drops the open draft even when
   assert.deepEqual(r2.order[0], { remote: [2] });
   assert.equal(card2.draft && card2.draft.text, 'Still mine');
 });
+/* ---- release checks 2026-10-03 (Astra): the card's 6-s Undo (item 4) and the stale pop-out's refused edit (item 2) ----
+   The REAL main.js functions - commitLabelEdit, undoLastLabelEdit, setLabelStatus, noteRelayRejected, syncRelayRejected,
+   closeRelayRejected - run together in one scope over a DOM stub, with the real label-panel / label-spec helpers, and the
+   planner post each commit makes is the REAL currentOpts of the build at that moment. Planner-side changes arrive through the
+   real incoming paths extracted above (applyRemoteLayout, the buildOptions block). */
+const { cleanLabelText } = await import(new URL('../viewer/js/label-spec.js', import.meta.url).href);
+const { labelSnap, labelUndoPatch, rejectionIsMine, editCommit } = await import(new URL('../viewer/js/label-panel.js', import.meta.url).href);
+// a top-level function in main.js: from its declaration to the first closing brace at column 0 (CRLF-safe)
+const topFn = (needle) => {
+  const a = viewerSrc.indexOf(needle);
+  assert.ok(a >= 0, `could not find "${needle}" in main.js - if it was renamed, update this test rather than deleting it`);
+  const b = viewerSrc.indexOf('\n}', a);
+  return viewerSrc.slice(a, b + 2);
+};
+const fakeDom = () => {
+  const els = new Map();
+  const el = (id) => {
+    if (!els.has(id)) {
+      const cls = new Set(['hidden']);
+      els.set(id, { id, textContent: '', onclick: null, classList: { add: (c) => cls.add(c), remove: (c) => cls.delete(c), contains: (c) => cls.has(c),
+        toggle: (c, on) => { const v = on === undefined ? !cls.has(c) : !!on; if (v) cls.add(c); else cls.delete(c); return v; } } });
+    }
+    return els.get(id);
+  };
+  return el;
+};
+const cardHarness = (b0, { planner = true } = {}) => {
+  const src = ['function setLabelStatus(', 'function commitLabelEdit(', 'function undoLastLabelEdit(', 'function noteRelayRejected(',
+    'function syncRelayRejected(', 'function closeRelayRejected('].map(topFn).join('\n');
+  const $ = fakeDom();
+  const posts = [], tracked = [];
+  const fn = new Function('env', `
+    let { build, $, plannerWin, syncBuildToPlanner, track, trackOnce, editCommit, labelSnap, labelUndoPatch, rejectionIsMine, cleanLabelText } = env;
+    let labelEdit = null, lastLabelEdit = null, lastLabelPost = null, relayRejected = null;
+    let labelPreviewTimer = 0, labelStatusTimer = 0, labelUndoTimer = 0;
+    ${declAt(viewerSrc, 'const LABEL_REJECTED_STATUS =')}
+    const refreshLabelText = () => {}, renderLabelEditorState = () => {}, renderOptions = () => {};
+    const offerLabelUndo = () => { $('label-edit-undo').classList.remove('hidden'); };
+    ${src}
+    return { commitLabelEdit, undoLastLabelEdit, noteRelayRejected, syncRelayRejected, closeRelayRejected,
+      open: (id) => { labelEdit = id == null ? null : { unit: build.placed.find((u) => u.id === id), inst: {}, draft: null, tracked: true }; },
+      get slot() { return lastLabelEdit; }, get rejected() { return relayRejected; }, LABEL_REJECTED_STATUS };`);
+  const h = fn({ build: b0, $, plannerWin: () => (planner ? {} : null), syncBuildToPlanner: () => posts.push(currentOpts(b0)),
+    track: (e) => tracked.push(e), trackOnce: (e) => tracked.push(e), editCommit, labelSnap, labelUndoPatch, rejectionIsMine, cleanLabelText });
+  h.$ = $; h.posts = posts; h.build = b0;
+  return h;
+};
+const unitOf = (b, id) => b.placed.find((u) => u.id === id);
+const restOf = (b) => JSON.stringify({ ...b, placed: b.placed.map((u) => { const c = { ...u }; delete c.label; delete c.labelBadge; return c; }) });
+
+test('6-s Undo: puts back ONLY the words and the badge, in ONE post through the ordinary commit path (buildId first)', () => {
+  const b = labelledBuild(); b.placed[0].closure = 'magnet'; b.placed[0].variant = 'gridfinity'; b.labelStyle = { capMm: 4 };
+  const h = cardHarness(b);
+  h.open(1);
+  h.commitLabelEdit({ labelBadge: { type: 'char', value: 'T' } }, 'label:badge:char');
+  h.commitLabelEdit({ label: 'Hex Keys' }, 'label:edit');
+  const rest = restOf(b), others = JSON.stringify(b.placed.slice(1));
+  assert.equal(h.posts.length, 2, 'the control: each commit is one post');
+  assert.equal(h.$('label-edit-undo').classList.contains('hidden'), false, 'the commit did not offer the Undo');
+  h.undoLastLabelEdit();
+  assert.equal(h.posts.length, 3, 'the Undo did not post exactly once');
+  const post = h.posts[2];
+  assert.equal(Object.keys(post)[0], 'buildId'); assert.equal(post.buildId, ID, 'the Undo\'s post does not carry the build id first');
+  assert.equal(post.labels[1], 'Torx Bits'); assert.deepEqual(post.labelBadges[1], { type: 'char', value: 'T' });
+  assert.equal(unitOf(b, 1).label, 'Torx Bits'); assert.deepEqual(unitOf(b, 1).labelBadge, { type: 'char', value: 'T' }, 'the badge from before the undone edit was not kept');
+  assert.equal(restOf(b), rest, 'the Undo touched something besides the words and the badge (closure, body, style...)');
+  assert.equal(JSON.stringify(b.placed.slice(1)), others, 'the Undo touched another drawer');
+  assert.equal(h.slot, null, 'an undo of an undo is not offered');
+  h.undoLastLabelEdit();
+  assert.equal(h.posts.length, 3, 'a second press posted again');
+});
+
+test('6-s Undo: a later PLANNER edit to the same drawer (words, or only its badge) blocks it - it never writes over the newer change', async () => {
+  // words, through the real incoming LAYOUT path
+  const b = labelledBuild(), h = cardHarness(b);
+  h.open(3); h.commitLabelEdit({ label: 'Bolts' }, 'label:edit');
+  const nb = labelledBuild(); nb.placed[2].label = 'Planner bolts';
+  assert.equal((await applyLayout(b, nb, null)).regens, 0, 'the control: a words-only layout takes the label-only path');
+  h.undoLastLabelEdit();
+  assert.equal(h.posts.length, 1, 'the Undo posted over the planner\'s newer words');
+  assert.equal(unitOf(b, 3).label, 'Planner bolts');
+  assert.match(h.$('label-edit-status').textContent, /Changed since/, 'the refused Undo said nothing');
+  // only the BADGE, through the real incoming OPTIONS path (a badge-only change names no drawer to the card, so the old
+  // remote-list clearing never saw it)
+  const c = labelledBuild(), k = cardHarness(c);
+  k.open(1); k.commitLabelEdit({ label: 'Torx Drivers' }, 'label:edit');
+  await applyOpts(c, { buildId: ID, labelBadges: { 1: { type: 'icon', value: 'nut' } } });
+  assert.deepEqual(unitOf(c, 1).labelBadge, { type: 'icon', value: 'nut' }, 'the control: the planner badge landed');
+  k.undoLastLabelEdit();
+  assert.equal(k.posts.length, 1, 'the Undo posted over the planner\'s newer badge');
+  assert.equal(unitOf(c, 1).label, 'Torx Drivers'); assert.deepEqual(unitOf(c, 1).labelBadge, { type: 'icon', value: 'nut' });
+});
+
+test('6-s Undo: a later VIEWER edit - to the same drawer, to another drawer, or a Reset - never lets it write over that edit', async () => {
+  // the same drawer twice: the slot is the LAST edit's, so the Undo goes back one edit, never two
+  const b = labelledBuild(), h = cardHarness(b);
+  h.open(3); h.commitLabelEdit({ label: 'Bolts' }, 'label:edit'); h.commitLabelEdit({ label: 'Bolts M4' }, 'label:edit');
+  h.undoLastLabelEdit();
+  assert.equal(unitOf(b, 3).label, 'Bolts', 'the Undo did not stop at the first edit');
+  // another drawer edited after: the slot moved to it, and drawer 1's card cannot reach drawer 3's undo - nor 3's card 1's
+  const c = labelledBuild(), k = cardHarness(c);
+  k.open(1); k.commitLabelEdit({ label: 'Torx Drivers' }, 'label:edit');
+  k.open(3); k.commitLabelEdit({ label: 'Bolts' }, 'label:edit');
+  k.open(1); k.undoLastLabelEdit();
+  assert.equal(k.posts.length, 2, 'drawer 1\'s card ran an Undo');
+  assert.equal(unitOf(c, 1).label, 'Torx Drivers'); assert.equal(unitOf(c, 3).label, 'Bolts', 'drawer 3\'s edit was undone from drawer 1\'s card');
+  // a Reset (or any other path that rewrites the words) after the edit
+  const d = labelledBuild(), m = cardHarness(d);
+  m.open(3); m.commitLabelEdit({ label: 'Bolts' }, 'label:edit');
+  editCommit(d, 3, { label: 'Reset words' });   // any later write to the same fields, not through this slot
+  m.undoLastLabelEdit();
+  assert.equal(m.posts.length, 1, 'the Undo wrote over a later edit made by another path');
+  assert.equal(unitOf(d, 3).label, 'Reset words');
+});
+
+test('6-s Undo: a new build id (unit ids restart at 1) blocks it, even when the drawer holds the very same words', async () => {
+  const b = labelledBuild(), h = cardHarness(b);
+  h.open(3); h.commitLabelEdit({ label: 'Bolts' }, 'label:edit');
+  const nb = labelledBuild({ buildId: 'dddddddddddd' }); nb.placed[2].label = 'Bolts';
+  await applyLayout(b, nb, null);
+  assert.equal(b.buildId, 'dddddddddddd', 'the control: the new build arrived');
+  h.undoLastLabelEdit();
+  assert.equal(h.posts.length, 1, 'the Undo wrote build A\'s old words into build B');
+  assert.equal(unitOf(b, 3).label, 'Bolts');
+});
+
+test('labelUndoPatch: exactly the two fields; null for no slot, another drawer, another build, or changed fields', () => {
+  const b = labelledBuild();
+  const prev = editCommit(b, 2, { label: 'Hex Nuts' });
+  const slot = { unitId: 2, prev, after: labelSnap(unitOf(b, 2)), buildId: ID };
+  assert.deepEqual(labelUndoPatch(slot, b, 2), { label: 'Nuts', labelBadge: { type: 'icon', value: 'nut' } });
+  assert.deepEqual(Object.keys(labelUndoPatch(slot, b, 2)), ['label', 'labelBadge']);
+  assert.equal(labelUndoPatch(null, b, 2), null);
+  assert.equal(labelUndoPatch(slot, b, 1), null, 'another drawer\'s card');
+  assert.equal(labelUndoPatch(slot, { ...b, buildId: 'dddddddddddd' }, 2), null, 'another build');
+  unitOf(b, 2).labelBadge = { type: 'none' };
+  assert.equal(labelUndoPatch(slot, b, 2), null, 'a changed badge');
+  // a label with no badge before: the Undo asks for Auto (null), never leaves the new badge on
+  const c = labelledBuild(), p2 = editCommit(c, 1, { labelBadge: { type: 'char', value: 'T' } });
+  assert.deepEqual(labelUndoPatch({ unitId: 1, prev: p2, after: labelSnap(unitOf(c, 1)), buildId: ID }, c, 1), { label: 'Torx Bits', labelBadge: null });
+});
+
+test('stale pop-out: the planner\'s refusal shows "Not saved", drops the Undo, quotes the words, offers a reload - and never for another build', () => {
+  const b = labelledBuild(), h = cardHarness(b);
+  h.open(3); h.commitLabelEdit({ label: 'Stale Edit' }, 'label:edit');
+  assert.equal(h.$('label-edit-undo').classList.contains('hidden'), false, 'the control: the commit offered its Undo');
+  // a late answer naming a build this page is not on: nothing happens
+  h.noteRelayRejected({ gen2: 'buildRejected', buildId: 'zzzzzzzzzzzz' });
+  assert.equal(h.$('relay-rejected').classList.contains('hidden'), true, 'a refusal for another build raised the note');
+  assert.equal(h.$('label-edit-undo').classList.contains('hidden'), false);
+  h.noteRelayRejected({ gen2: 'buildRejected', buildId: ID });
+  assert.equal(h.$('relay-rejected').classList.contains('hidden'), false, 'the refusal raised no note');
+  assert.equal(h.$('label-edit-undo').classList.contains('hidden'), true, 'the card still offers Undo for an edit that was never saved');
+  assert.equal(h.slot, null);
+  assert.equal(h.$('label-edit-status').textContent, h.LABEL_REJECTED_STATUS, 'the card does not say "Not saved"');
+  assert.match(h.$('relay-rejected-words').textContent, /Stale Edit/, 'the refused words are not kept on screen');
+  assert.equal(h.$('relay-rejected-load').classList.contains('hidden'), false, 'no way to reload the planner\'s build');
+  assert.equal(unitOf(b, 3).label, 'Stale Edit', 'the typed words were thrown away on this page');
+  // the planner's build arrives (the reload, or its next change): the note stops offering a reload and keeps the words
+  b.buildId = 'dddddddddddd';
+  h.syncRelayRejected();
+  assert.equal(h.$('relay-rejected-load').classList.contains('hidden'), true, 'still offering a reload once in step');
+  assert.match(h.$('relay-rejected-words').textContent, /Stale Edit/);
+  assert.notEqual(h.$('label-edit-status').textContent, h.LABEL_REJECTED_STATUS, '"Not saved" stuck on the card of the new build');
+  // a refused NON-label post quotes no words, and the note goes away by itself once in step
+  const c = labelledBuild(), k = cardHarness(c);
+  k.noteRelayRejected({ gen2: 'buildRejected', buildId: ID });
+  assert.equal(k.$('relay-rejected-words').classList.contains('hidden'), true);
+  c.buildId = 'dddddddddddd'; k.syncRelayRejected();
+  assert.equal(k.$('relay-rejected').classList.contains('hidden'), true);
+});
+
+test('rejectionIsMine: only an answer naming this page\'s own id (a page with no id is never told it was refused)', () => {
+  assert.equal(rejectionIsMine({ buildId: ID }, { buildId: ID }), true);
+  assert.equal(rejectionIsMine({ buildId: ID }, { buildId: 'zzzzzzzzzzzz' }), false);
+  assert.equal(rejectionIsMine({}, { buildId: undefined }), false);
+  assert.equal(rejectionIsMine({ buildId: '' }, { buildId: '' }), false);
+  assert.equal(rejectionIsMine(null, { buildId: ID }), false);
+});
+
+test('the message listener routes buildRejected to noteRelayRejected, and re-checks the note after every layout', async () => {
+  const a = viewerSrc.indexOf("addEventListener('message', async (e) => {");
+  assert.ok(a >= 0, 'the incoming message listener was not found');
+  const body = viewerSrc.slice(a, viewerSrc.indexOf('\n});', a) + 4);
+  const calls = [];
+  const fn = new AsyncFunction('build', 'noteRelayRejected', 'syncRelayRejected', 'applyRemoteLayout', 'applyRemoteColors',
+    `let handler; const addEventListener = (t, f) => { handler = f; }; const IS_PART = false; ${body} return handler;`);
+  const handler = await fn(labelledBuild(), (d) => calls.push(['rejected', d.buildId]), () => calls.push(['sync']),
+    async () => calls.push(['layout']), () => calls.push(['colors']));
+  await handler({ data: { gen2: 'buildRejected', buildId: ID } });
+  await handler({ data: { gen2: 'layout', build: { placed: [] } } });
+  await handler({ data: { gen2: 'colors' } });
+  assert.deepEqual(calls, [['rejected', ID], ['layout'], ['sync'], ['colors']]);
+});

@@ -258,6 +258,17 @@
           <p class="blocked-hint">This 3D guide pauses while the layout has a problem · it catches up automatically the moment the planner board is fixed.</p>
         </div>
       </div>
+      <!-- The planner refused this window's last change (it names a build the planner has left - a stale pop-out). Filled by
+           main.js noteRelayRejected; non-modal, the scene stays usable. -->
+      <div id="relay-rejected" class="hidden" role="alert">
+        <b>Not saved</b>
+        <span id="relay-rejected-text"></span>
+        <span id="relay-rejected-words" class="hidden"></span>
+        <span class="rr-actions">
+          <button id="relay-rejected-load" type="button">Load the planner's build</button>
+          <button id="relay-rejected-close" type="button" aria-label="Dismiss" title="Dismiss">&#10005;</button>
+        </span>
+      </div>
     </div>
 
     <footer id="controls">
