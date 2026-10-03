@@ -829,6 +829,10 @@ body.embed #note-panel .note-body { overflow-y: auto; max-height: calc(34vh - 20
    OPEN parts panel owns the pane — the note returns when it closes (✕, or
    tapping a part folds the panel) */
 body.embed.panel-open #note-panel { display: none; }
+/* ...and the identify card too (review D1, 2026-10-03): opened OVER an open label card, the panel's left column - the Labels
+   rows and their snap-back note - sat under the card. Tapping a part already folds the panel (setSelected); this is the other
+   order. The selection stays, so the card comes back when the panel closes (updatePointerLine drops the line meanwhile). */
+body.embed.panel-open #identify-card { display: none; }
 /* embed-only: the way back to the preview landing. Needs the double-id
    specificity — a bare #btn-preview{display:none} LOSES to the
    `#ctl-tools button{display:flex}` base rule, which shipped the Preview
@@ -1037,6 +1041,10 @@ body.embed-preview.embed-hint-on #embed-hint {
   #label-edit-badge { width: 44px; height: 44px; }
   #label-edit-badge svg { width: 24px; height: 24px; }
   #label-pick-icons { grid-template-columns: repeat(5, 44px); }
+  /* the open label editor is the one sheet on a phone (review D4): the step note and the card met, and with the icon picker
+     open none of the model - the label being changed - was left on screen. The note returns when the editor closes, like
+     body.fm-open's rule. */
+  body.label-edit-open #note-panel { display: none; }
   .le-icon { width: 44px; height: 44px; }
   .le-pick-row button { padding: 10px 12px; }
 

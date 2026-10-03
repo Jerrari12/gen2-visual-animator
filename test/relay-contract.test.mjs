@@ -222,8 +222,11 @@ const applyOpts = (() => {
     `let applyingRemote = false; let optsRetryTimer = 0; ${viewerSrc.slice(a, b + endMark.length)}`);
   const run = async (b0, opts, busy = false) => {
     const n = { regens: 0, refreshes: 0, mismatches: 0, retried: [] };
+    // the ORDER the card and the meshes were told in (non-enumerable, so the deepEqual counts above are unchanged)
+    const order = []; Object.defineProperty(n, 'order', { value: order, enumerable: false });
     await fn({ gen2: 'buildOptions', opts }, b0, async () => { n.regens++; }, new Set(LIP_MODES), new Set(VARIANT_MODES),
-      PLATE_FINISHES, plateFinishOf, labelOptsChanges, applyLabelOpts, () => { n.refreshes++; }, () => {}, () => {}, () => { n.mismatches++; },
+      PLATE_FINISHES, plateFinishOf, labelOptsChanges, applyLabelOpts, () => { n.refreshes++; order.push('refresh'); },
+      (o) => { order.push({ remote: (o && o.remote) || [] }); }, () => {}, () => { n.mismatches++; },
       busy, (ev) => { n.retried.push(ev.data); }, (f) => { f(); return 1; }, () => {}, globalThis.MessageEvent);
     if (!busy) delete n.retried;
     return n;
@@ -464,4 +467,73 @@ test('layoutKey and layoutSig both carry the build-level label fields (style + i
   const key = declAt(viewerSrc, 'const layoutKey =');
   for (const [src, what, fields] of [[sig, "the planner's layoutSig", ['state.labelStyle', 'state.buildId']], [key, "the viewer's layoutKey", ['b.labelStyle', 'b.buildId']]])
     for (const f of fields) assert.ok(src.includes(f), `${what} does not read ${f} - a layout differing only in it would be half-broken`);
+});
+
+/* ---- review round 2026-10-03: the card is told about a planner change BEFORE the label meshes rebuild ----
+   renderLabelEditorState({ remote }) is what drops a draft open on a drawer the planner just changed. Both incoming paths used to
+   refresh the meshes first, so the abandoned draft was rebuilt onto the 3D label (review D3); the options path - the planner's
+   Undo / Redo - never named the changed drawers at all, so its draft stayed and no "Changed in the planner" showed; and a new
+   build id with the same words left a draft typed under the OLD build to be saved into the new one on the next blur (review D6). */
+test('incoming options: the drawers whose WORDS changed are named to the card, BEFORE the meshes refresh (a badge-only change names none)', async () => {
+  const b = labelledBuild();
+  const n = await applyOpts.full(b, { buildId: ID, labels: { 1: 'Torx Bits', 2: 'Bolts', 3: '' } });
+  assert.deepEqual(n, { regens: 0, refreshes: 1, mismatches: 0 });
+  assert.deepEqual(n.order, [{ remote: [2] }, 'refresh'], `the card must hear [2] before the refresh: ${JSON.stringify(n.order)}`);
+  const m = await applyOpts.full(b, { buildId: ID, labelBadges: { 1: { type: 'char', value: 'T' } } });
+  assert.deepEqual(m.order, [{ remote: [] }, 'refresh'], 'a badge-only change must keep a draft (Sol 4): it names no drawer');
+});
+
+/* applyRemoteLayout, executed: the real function with the real layoutKey / labelOnlyDiff / copyLabelFields, and a card stub that
+   behaves like renderLabelEditorState on `remote` (it drops the open unit's draft); refreshLabelTexts records the draft it would
+   rebuild the open label with. */
+const funcAt = (src, needle) => {
+  const start = src.indexOf(needle);
+  assert.ok(start >= 0, `could not find "${needle}" in main.js`);
+  let depth = 0, opened = false;
+  for (let i = src.indexOf('{', start); i < src.length; i++) {
+    if (src[i] === '{') { depth++; opened = true; } else if (src[i] === '}') { depth--; if (opened && depth === 0) return src.slice(start, i + 1); }
+  }
+  assert.fail('unterminated ' + needle);
+};
+const applyLayout = (() => {
+  const body = funcAt(viewerSrc, 'async function applyRemoteLayout(nb)');
+  const fn = new AsyncFunction('b0', 'nb', 'labelEdit', 'layoutKey', 'labelOnlyDiff', 'copyLabelFields', 'refreshLabelTexts', 'renderLabelEditorState',
+    'renderOptions', 'regenerate', 'generateManifest', 'showBlocked', 'hideBlocked',
+    `let build = b0, originalBuild = null, applyingRemote = false, layoutRetryTimer = 0; const booted = true, regenBusy = false;
+     ${body} await applyRemoteLayout(nb); return build;`);
+  return async (b0, nb, labelEdit) => {
+    const order = [], n = { regens: 0 };
+    const out = await fn(b0, nb, labelEdit, layoutKey, labelOnlyDiff, copyLabelFields,
+      () => order.push({ refreshWithDraft: labelEdit && labelEdit.draft ? labelEdit.draft.text : null }),
+      (o) => { const r = (o && o.remote) || []; if (labelEdit && r.includes(labelEdit.unit.id)) labelEdit.draft = null; order.push({ remote: r }); },
+      () => {}, async () => { n.regens++; }, () => ({ manifest: {} }), () => {}, () => {});
+    return { order, regens: n.regens, build: out };
+  };
+})();
+const openCard = (b, id, draft) => ({ unit: b.placed.find((u) => u.id === id), draft: draft ? { text: draft } : null });
+
+test('incoming layout, label-only: a planner change to the drawer under an open draft drops the draft BEFORE the refresh (review D3)', async () => {
+  const b = labelledBuild(), card = openCard(b, 1, 'Draft words');
+  const nb = labelledBuild(); nb.placed[0].label = 'Planner words';
+  const r = await applyLayout(b, nb, card);
+  assert.equal(r.regens, 0, 'the control: a words-only layout must take the label-only path');
+  assert.equal(b.placed[0].label, 'Planner words');
+  assert.deepEqual(r.order[0], { remote: [1] }, `the card was not told first: ${JSON.stringify(r.order)}`);
+  assert.deepEqual(r.order.find((x) => 'refreshWithDraft' in x), { refreshWithDraft: null }, 'the meshes were rebuilt with the abandoned draft');
+});
+
+test('incoming layout, label-only: a NEW build id drops the open draft even when the words are the same (review D6); a change to ANOTHER drawer keeps it', async () => {
+  const b = labelledBuild(), card = openCard(b, 1, 'Draft for A');
+  const nb = labelledBuild({ buildId: 'dddddddddddd' });
+  const r = await applyLayout(b, nb, card);
+  assert.equal(r.regens, 0, 'the control: an id-only layout must take the label-only path');
+  assert.equal(b.buildId, 'dddddddddddd');
+  assert.ok(r.order[0].remote.includes(1), `a draft typed under build ${ID} survived the switch to dddddddddddd: ${JSON.stringify(r.order)}`);
+  assert.equal(card.draft, null);
+  // the same id, ANOTHER drawer's words: the draft on drawer 1 stays (it is still this build's, and nobody changed its drawer)
+  const c = labelledBuild(), card2 = openCard(c, 1, 'Still mine');
+  const nc = labelledBuild(); nc.placed[1].label = 'Bolts';
+  const r2 = await applyLayout(c, nc, card2);
+  assert.deepEqual(r2.order[0], { remote: [2] });
+  assert.equal(card2.draft && card2.draft.text, 'Still mine');
 });

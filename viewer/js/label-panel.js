@@ -200,3 +200,17 @@ export function shownBadge(text, badge, style, core) {
   const id = S.predictIcons && core ? core.guessIconId(cleanLabelText(text)) : null;
   return id ? { type: 'icon', value: id, predicted: true } : { type: 'none', predicted: true };
 }
+
+/* ---- the keyboard ---------------------------------------------------------------------------------------------- */
+
+/* Which history command a keydown is: 'undo' (Ctrl/Cmd+Z), 'redo' (Ctrl/Cmd+Y, Ctrl/Cmd+Shift+Z) or null. main.js keeps the
+   browser's own text-undo away from saved label words with it (review D2, 2026-10-03). `code` covers layouts whose Z/Y key
+   reports another `key` (the browser's own undo binding follows the physical key there too); Alt+ combos are left alone. */
+export function historyKeyOf(e) {
+  if (!e || !(e.ctrlKey || e.metaKey) || e.altKey) return null;
+  const k = typeof e.key === 'string' && e.key.length === 1 && /[a-z]/i.test(e.key) ? e.key.toLowerCase()
+    : (e.code === 'KeyZ' ? 'z' : e.code === 'KeyY' ? 'y' : '');
+  if (k === 'z') return e.shiftKey ? 'redo' : 'undo';
+  if (k === 'y' && !e.shiftKey) return 'redo';
+  return null;
+}

@@ -20,7 +20,7 @@ import { parseSeeInto, parseSeeIntoSkip, parseSeeIntoLattice, createSeeInto } fr
 import { LABEL_TEXT_DEFAULTS, LABEL_TEXT_NODES, labelFontReady, loadLabelFont, labelGeometry, labelCore } from './label-text.js';
 import { LABEL_SPEC, LABEL_TEXT_MAX, cleanLabelText, cleanLabelBadge, cleanLabelStyle } from './label-spec.js';
 import { LABEL_STYLE_ROWS, labelOrder, effectiveStyle, labelOptsOf, labelOptsChanges, applyLabelOpts, labelOnlyDiff, copyLabelFields,
-  editCommit, styleEdit, iconChoices, badgeStateText, shownBadge } from './label-panel.js';
+  editCommit, styleEdit, iconChoices, badgeStateText, shownBadge, historyKeyOf } from './label-panel.js';
 
 /* Every entry-routing boolean below is derived by resolveEntry() in entry.js -
    a pure function of (search, hash) with no DOM or network - so the boot
@@ -7335,7 +7335,11 @@ function renderLabelEditorState(opts = {}) {
   // the field shows the committed words unless a draft is being typed; a planner change replaces even a focused field
   // (the planner is the source of truth) and says so for a second
   const remote = Array.isArray(opts.remote) && opts.remote.includes(unit.id);
-  if (remote) { labelEdit.draft = null; field.value = unit.label || ''; setLabelStatus('Changed in the planner', 1200); }
+  if (remote) {
+    labelEdit.draft = null; clearTimeout(labelPreviewTimer); field.value = unit.label || ''; setLabelStatus('Changed in the planner', 1200);
+    // the card's Undo would now restore words from BEFORE the planner's change, as a new edit - the planner's history owns it
+    if (lastLabelEdit && lastLabelEdit.unitId === unit.id) { lastLabelEdit = null; clearTimeout(labelUndoTimer); $('label-edit-undo').classList.add('hidden'); }
+  }
   else if (!labelEdit.draft && document.activeElement !== field) field.value = unit.label || '';
   field.classList.toggle('caps', labelCapsOn());
   const text = labelEdit.draft ? cleanLabelText(labelEdit.draft.text) : committed;
@@ -7360,6 +7364,8 @@ function renderLabelEditorState(opts = {}) {
   fitEl.classList.toggle('hidden', fits);
   $('label-edit-note').classList.toggle('hidden', !!plannerWin());
   for (const b of $('label-pick-icons').children) b.classList.toggle('on', worn.type === 'icon' && b.dataset.icon === worn.value && !worn.predicted);
+  // no words, no icon (a badge dies with its label): the picker closes with the words instead of offering clicks that do nothing
+  if (!committed && labelEdit.picker) toggleIconPicker(false);
   if (labelEdit.picker) renderIconPicker();
 }
 function setLabelStatus(text, ms) {
@@ -7415,13 +7421,40 @@ $('label-edit-text').addEventListener('input', e => {
   labelPreviewTimer = setTimeout(() => { if (labelEdit) { refreshLabelText(labelEdit.inst, labelEdit.draft); renderLabelEditorState(); } }, LABEL_PREVIEW_MS);
 });
 $('label-edit-text').addEventListener('change', e => commitLabelEdit({ label: e.target.value }, 'label:edit'));
+// drop the draft: the field AND the 3D label go back to the committed words (a later blur's `change` then finds nothing to commit)
+function revertLabelDraft() {
+  if (!labelEdit) return;
+  $('label-edit-text').value = labelEdit.unit.label || ''; labelEdit.draft = null; clearTimeout(labelPreviewTimer);
+  refreshLabelText(labelEdit.inst); renderLabelEditorState();
+}
 $('label-edit-text').addEventListener('keydown', e => {
   if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); }
-  if (e.key === 'Escape' && labelEdit) {
-    // drop the draft: the field AND the 3D label go back to the committed words (the blur's `change` then finds nothing to commit)
-    e.target.value = labelEdit.unit.label || ''; labelEdit.draft = null; clearTimeout(labelPreviewTimer);
-    refreshLabelText(labelEdit.inst); renderLabelEditorState(); e.target.blur();
-  }
+  if (e.key === 'Escape' && labelEdit) { revertLabelDraft(); e.target.blur(); }
+});
+/* Ctrl+Z / Ctrl+Y (review D2, 2026-10-03). The browser keeps ONE text-undo history per page and it outlives a commit: Ctrl+Z
+   after saving a label - with the focus on the page or still in the field - put the OLD words back into the field as a fresh
+   draft, and the next blur (a click on the planner's own Undo, say) saved them to the planner as a NEW edit, so that Undo then
+   seemed to do nothing. Saved label edits are undone by the planner's Undo (or the card's Undo button); in this page Ctrl+Z
+   only throws away typing that is not saved yet, and never reaches words from before the last save. Other fields (the
+   filament search, a style number being typed) keep the browser's own undo. */
+function labelHistoryGuard(e, kind, inField) {
+  e.preventDefault();
+  if (!labelEdit) return;
+  if (kind === 'undo' && labelEdit.draft && inField) { revertLabelDraft(); return; }
+  if (plannerWin()) setLabelStatus('Saved edits undo in the planner', 1600);
+}
+addEventListener('keydown', e => {
+  const kind = historyKeyOf(e);
+  if (!kind || IS_PART) return;
+  const t = e.target, tag = t && t.tagName ? t.tagName.toLowerCase() : '';
+  const editable = tag === 'input' || tag === 'textarea' || tag === 'select' || !!(t && t.isContentEditable);
+  if (editable && t.id !== 'label-edit-text') return;
+  labelHistoryGuard(e, kind, t && t.id === 'label-edit-text');
+}, true);
+// the same history reached another way (the context menu's Undo, or Ctrl+Z in another field whose undo step is this one's)
+$('label-edit-text').addEventListener('beforeinput', e => {
+  if (e.inputType !== 'historyUndo' && e.inputType !== 'historyRedo') return;
+  labelHistoryGuard(e, e.inputType === 'historyUndo' ? 'undo' : 'redo', document.activeElement === e.target);
 });
 // the icon picker: a collapsible section INSIDE the card (never a popover - the generator's positions against a desktop
 // column); Auto / No icon / a letter / the core's icon grid
@@ -8216,6 +8249,8 @@ function updatePointerLine() {
   if (p.z > 1 || !inst.group.visible) { svg.classList.add('hidden'); return; }
   const wrap = document.getElementById('stage-wrap').getBoundingClientRect();
   const card = $('identify-card').getBoundingClientRect();
+  // the card can be selected yet not shown (the dock's open parts panel hides it - one sheet at a time): no line from nowhere
+  if (!card.width) { svg.classList.add('hidden'); return; }
   const line = svg.querySelector('line');
   line.setAttribute('x1', card.left - wrap.left + card.width / 2);
   line.setAttribute('y1', card.top - wrap.top);
@@ -8368,10 +8403,14 @@ async function applyRemoteLayout(nb) {
   if (labelOnlyDiff(nb, build, layoutKey)) {
     applyingRemote = true;
     try {
+      const idMoved = !!nb.buildId && nb.buildId !== build.buildId;
       const changedUnits = copyLabelFields(nb, build);
       originalBuild = structuredClone(nb); // the Reset-to-original baseline follows the planner, as on the full path
+      // the card is told FIRST: a draft open on a drawer the planner just changed is dropped before the meshes rebuild (refreshing
+      // first rebuilt the abandoned draft onto the 3D label - review D3); and a draft typed under another build id belongs to that
+      // build, so a new id drops it too - it used to be saved into the new build on the next blur (review D6)
+      renderLabelEditorState({ remote: idMoved && labelEdit ? [...changedUnits, labelEdit.unit.id] : changedUnits });
       refreshLabelTexts();
-      renderLabelEditorState({ remote: changedUnits });
       renderOptions();   // the Labels block mirrors labelStyle
     } finally { applyingRemote = false; }
     return;
@@ -8471,9 +8510,15 @@ addEventListener('message', async (e) => {
       if (u.fill !== 'decor' || !VARIANT_MODES.has(o.variants[u.id])) continue;
       if (o.variants[u.id] === 'gridfinity') u.variant = 'gridfinity'; else delete u.variant;   // absence IS standard
     }
+    const wordsBefore = labelChanged ? new Map(build.placed.map((u) => [u.id, u.label || ''])) : null;
     if (labelChanged) applyLabelOpts(build, o);
     if (changed) await regenerate();                                    // attachLabelTexts runs on the mount, labels included
-    else { refreshLabelTexts(); renderLabelEditorState(); renderOptions(); }
+    else {
+      // the drawers whose WORDS the planner changed (its Undo / Redo arrive here): the card first, as on the layout path, so an
+      // open draft on one of them is dropped before the meshes rebuild and the card says "Changed in the planner"
+      const remote = wordsBefore ? build.placed.filter((u) => (u.label || '') !== wordsBefore.get(u.id)).map((u) => u.id) : [];
+      renderLabelEditorState({ remote }); refreshLabelTexts(); renderOptions();
+    }
   } finally { applyingRemote = false; }
 });
 
@@ -9154,7 +9199,7 @@ if (new URLSearchParams(location.search).get('debug')) {
     get build() { return build; }, regenerate, setSelected, get selectedId() { return selectedId; },
     // the label editor (step 2): its state, the in-place refresh and the relay payload, so an end-to-end check can read what
     // the card holds and what would be posted without guessing
-    get labelEdit() { return labelEdit; }, refreshLabelTexts, currentOpts, labelFontReady, loadLabelFont, labelCore, labelGeometry,
+    get labelEdit() { return labelEdit; }, get regenBusy() { return regenBusy; }, refreshLabelTexts, currentOpts, labelFontReady, loadLabelFont, labelCore, labelGeometry,
     // part-preview internals (2026-08-19) — the mode flag, the view state and
     // the resolver, so an embed question is answerable by reading state
     IS_PART, partView, resolvePartPreview, fitPartCamera, PART_PLATE, plateStage,

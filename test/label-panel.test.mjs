@@ -10,7 +10,7 @@ import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { LABEL_STYLE_FALLBACK, LABEL_STYLE_ROWS, isLabelUnit, labelOrder, effectiveStyle, labelOptsOf, labelOptsChanges, applyLabelOpts,
-  labelOnlyDiff, copyLabelFields, editCommit, styleEdit, iconChoices, badgeStateText, shownBadge } from '../viewer/js/label-panel.js';
+  labelOnlyDiff, copyLabelFields, editCommit, styleEdit, iconChoices, badgeStateText, shownBadge, historyKeyOf } from '../viewer/js/label-panel.js';
 import { LABEL_SPEC } from '../viewer/js/label-spec.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -128,6 +128,26 @@ test('labelOptsChanges / applyLabelOpts: the three booleans, the mismatch, the p
   assert.deepEqual(b.placed[2].labelBadge, { type: 'char', value: 'B' });
   assert.equal(labelOptsChanges(b, { labels: { 4: 'Shims' } }).text, false, 'a classic unit is never the relay\'s');
   assert.equal(labelOptsChanges(null, {}).mismatch, false);
+  // a HOSTILE badge is no change: applyLabelOpts leaves the stored badge alone, so counting it would rebuild the label for
+  // nothing (65-263 ms of main thread per label - review X5, 2026-10-03)
+  const c = build();
+  for (const bad of [{ type: 'svg', value: '<svg/>' }, { type: 'icon', value: 'Not An Id!' }, { type: 'char', value: 'ABCDE' }, 'nut', 7, {}])
+    assert.equal(labelOptsChanges(c, { labelBadges: { 2: bad } }).badge, false, `${JSON.stringify(bad)} counted as a badge change`);
+  assert.equal(labelOptsChanges(c, { labelBadges: { 2: { type: 'icon', value: 'bolt' } } }).badge, true, 'the control: a real badge change counts');
+});
+
+test('historyKeyOf: Ctrl/Cmd+Z is undo, Ctrl/Cmd+Y and Ctrl/Cmd+Shift+Z are redo, nothing else (review D2)', () => {
+  const k = (key, m = {}) => historyKeyOf({ key, code: m.code || '', ctrlKey: !!m.ctrl, metaKey: !!m.meta, shiftKey: !!m.shift, altKey: !!m.alt });
+  assert.equal(k('z', { ctrl: true }), 'undo');
+  assert.equal(k('Z', { ctrl: true, shift: true }), 'redo');
+  assert.equal(k('z', { meta: true }), 'undo');
+  assert.equal(k('y', { ctrl: true }), 'redo');
+  assert.equal(k('y', { ctrl: true, shift: true }), null);
+  assert.equal(k('z'), null, 'a plain z is typing');
+  assert.equal(k('z', { ctrl: true, alt: true }), null, 'AltGr / Ctrl+Alt is a character on some layouts');
+  assert.equal(k('a', { ctrl: true }), null);
+  assert.equal(k('Dead', { ctrl: true, code: 'KeyZ' }), 'undo', 'a layout whose Z key reports another key still undoes');
+  assert.equal(historyKeyOf(null), null);
 });
 
 test('labelOnlyDiff and copyLabelFields with a stand-in key: nothing but label fields and the id may differ', () => {
