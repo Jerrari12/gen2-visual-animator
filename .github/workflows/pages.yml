@@ -125,6 +125,8 @@ jobs:
           sed -i "s|js/vendor/tabletop-completion.js|js/vendor/tabletop-completion.js?v=$V|" viewer/index.html
           sed -i "s|'./generate.js'|'./generate.js?v=$V'|" viewer/js/main.js
           sed -i "s|'./entry.js'|'./entry.js?v=$V'|" viewer/js/main.js
+          # relay authentication (2026-10-03): who may drive the viewer, and the planner origin its posts target
+          sed -i "s|'./relay-auth.js'|'./relay-auth.js?v=$V'|" viewer/js/main.js
           # ⚠ THE TWO CROSS-REPO MODULES. Both landed 2026-09-05 as new imports in main.js and
           # neither got a line here, so the guard below has been failing the deploy ever since -
           # exactly the forgotten-line case the comment above warns about, on the first two files

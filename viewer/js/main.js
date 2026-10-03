@@ -8,6 +8,7 @@ import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { generateManifest, migrateOfficialBuild, resolvePartPreview, REQUIREMENT as REQ,
   shelfLipModes, SHELF_LIP_LABEL, buildAxisForType, gridfinitySizeOk } from './generate.js';
 import { resolveEntry } from './entry.js';
+import { createPlannerRelay } from './relay-auth.js';
 import { FILAMENT_DB } from './filament-db.js';
 import { partMaterialSpec } from './part-material.js';
 import { applyLayerDetail } from './vendor/layer-detail.js';
@@ -7539,7 +7540,7 @@ function closeRelayRejected() {
 $('relay-rejected-load').onclick = () => {
   const w = plannerWin();
   if (!w || w.closed) { $('relay-rejected-text').textContent = 'The planner window is closed - open the 3D view from the planner again.'; $('relay-rejected-load').classList.add('hidden'); return; }
-  try { w.postMessage({ gen2: 'viewerReady' }, '*'); } catch (e) { /* opener gone */ }
+  plannerRelay.post({ gen2: 'viewerReady' });
 };
 $('relay-rejected-close').onclick = closeRelayRejected;
 // a build id that names another build: drop the message whole, say so once in the console, count it once
@@ -8346,6 +8347,9 @@ function currentOpts() {
 // The planner window, wherever we live: a popped-out tab talks to its opener,
 // the docked split-view iframe talks to its parent.
 const plannerWin = () => window.opener || (window.parent !== window ? window.parent : null);
+// ⚠ RELAY AUTHENTICATION (2026-10-03): every post to the planner goes through plannerRelay.post (a real target origin, never
+// "*"), and the message listener acts only on plannerRelay.trusted(e) - THE planner window, from an allowed origin. See relay-auth.js.
+const plannerRelay = createPlannerRelay({ selfLoc: location, referrer: document.referrer, plannerWin });
 
 // ---- palette relay (2026-07-19) ----
 // Filament colors persist in VIEWER localStorage, which browsers PARTITION
@@ -8359,7 +8363,7 @@ let applyingRemoteColors = false;
 function postColorsToPlanner() {
   const pw = plannerWin();
   if (applyingRemoteColors || !build || !pw) return;
-  try { pw.postMessage({ gen2: 'colors', t: colorsT, colors: customColors, on: useCustom, user: userPalette }, '*'); } catch (e) { /* planner gone */ }
+  plannerRelay.post({ gen2: 'colors', t: colorsT, colors: customColors, on: useCustom, user: userPalette });
 }
 // keep only well-formed entries — hex must be a color, urls must be http(s)
 // (palette values end up in material colors and identify-card link hrefs)
@@ -8397,7 +8401,7 @@ let applyingRemoteStore = false;
 function postStorePrefToPlanner() {
   const pw = plannerWin();
   if (applyingRemoteStore || !pw) return;
-  try { pw.postMessage({ gen2: 'store', t: storePrefT, store: storePref }, '*'); } catch (e) { /* planner gone */ }
+  plannerRelay.post({ gen2: 'store', t: storePrefT, store: storePref });
 }
 function applyRemoteStore(d) {
   if (typeof d.t !== 'number' || !STORE_BY_ID[d.store]) return;
@@ -8412,7 +8416,7 @@ function applyRemoteStore(d) {
 let syncBuildToPlanner = () => {
   const pw = plannerWin();
   if (applyingRemote || !build || !pw) return;
-  try { pw.postMessage({ gen2: 'buildOptions', opts: currentOpts() }, '*'); } catch (e) { /* cross-origin opener gone */ }
+  plannerRelay.post({ gen2: 'buildOptions', opts: currentOpts() });
 };
 // ---- live layout sync (planner → viewer, 2026-07-19) ----
 // The planner posts its FULL serialized build (same shape as the #build= hash)
@@ -8482,12 +8486,17 @@ async function applyRemoteLayout(nb) {
     await regenerate();
   } finally { applyingRemote = false; }
 }
-addEventListener('message', async (e) => {
+addEventListener('message', (e) => {
   // part-preview accepts NO incoming messages (v1 protocol is outbound-only) —
   // explicit, not just the !build guard below: this mode lives inside a page we
   // don't control, and the planner relay handlers must be unreachable from it
   if (IS_PART) return;
-  const d = e.data;
+  // relay authentication: only THE planner window (opener / dock parent) on an allowed origin - anyone else is ignored whole
+  if (!plannerRelay.trusted(e)) return;
+  onPlannerMessage(e.data);
+});
+// the relay's handler, reached ONLY through the trust gate above (or its own retry below, with data that already passed it)
+async function onPlannerMessage(d) {
   if (!d || !build) return;
   if (d.gen2 === 'layoutBlocked' && typeof d.reason === 'string') { showBlocked(d.reason); return; }
   if (d.gen2 === 'layout' && d.build) { await applyRemoteLayout(d.build); syncRelayRejected(); return; }
@@ -8510,7 +8519,8 @@ addEventListener('message', async (e) => {
     // was lost for good - the layout that follows does not carry those in its key, so it was dropped as an echo (Sol 01a0fffd, 1).
     // Newest wins: a later message replaces a pending retry, exactly like layoutRetryTimer.
     clearTimeout(optsRetryTimer);
-    optsRetryTimer = setTimeout(() => dispatchEvent(new MessageEvent('message', { data: d })), 250);
+    // ⚠ retried by CALLING the handler: a re-dispatched MessageEvent has no origin/source, so the trust gate would drop it
+    optsRetryTimer = setTimeout(() => onPlannerMessage(d), 250);
     return;
   }
   const o = d.opts;
@@ -8572,7 +8582,7 @@ addEventListener('message', async (e) => {
       renderLabelEditorState({ remote }); refreshLabelTexts(); renderOptions();
     }
   } finally { applyingRemote = false; }
-});
+}
 
 // ---------- (re)mount a manifest ----------
 // Builds (or rebuilds) all manifest-derived scene state. Called once at boot and
@@ -9114,7 +9124,7 @@ if (new URLSearchParams(location.search).get('shot')) {
 // from any gen2 message) — the planner replies with the current layout,
 // which no-ops if unchanged.
 if (build && plannerWin()) {
-  try { plannerWin().postMessage({ gen2: 'viewerReady' }, '*'); } catch (e) { /* opener gone */ }
+  plannerRelay.post({ gen2: 'viewerReady' });
   // …and teach the planner's palette cache our local colors (it keeps the
   // newest; its viewerReady reply may in turn carry something newer for us)
   if (colorsT) postColorsToPlanner();
@@ -9130,7 +9140,7 @@ if (IS_EMBED && build) setTimeout(() => {
     const dt = performance.now() - t0;
     if (dt < 4000) { requestAnimationFrame(tick); return; }
     const fps = frames / (dt / 1000);
-    if (fps < 20 && plannerWin()) { try { plannerWin().postMessage({ gen2: 'perfSlow' }, '*'); } catch (e) { /* gone */ } }
+    if (fps < 20) plannerRelay.post({ gen2: 'perfSlow' });
   };
   requestAnimationFrame(tick);
 }, 2000);

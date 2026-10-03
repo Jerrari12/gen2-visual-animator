@@ -218,16 +218,19 @@ const applyOpts = (() => {
   // mid-regenerate branch can be driven too: `busy` runs the block with regenBusy true and records what it re-dispatches
   const fn = new AsyncFunction('d', 'build', 'regenerate', 'LIP_MODES', 'VARIANT_MODES', 'PLATE_FINISHES', 'plateFinishOf',
     'labelOptsChanges', 'applyLabelOpts', 'refreshLabelTexts', 'renderLabelEditorState', 'renderOptions', 'noteBuildMismatch',
-    'regenBusy', 'dispatchEvent', 'setTimeout', 'clearTimeout', 'MessageEvent',
+    'regenBusy', 'dispatchEvent', 'setTimeout', 'clearTimeout', 'MessageEvent', 'onPlannerMessage',
     `let applyingRemote = false; let optsRetryTimer = 0; ${viewerSrc.slice(a, b + endMark.length)}`);
   const run = async (b0, opts, busy = false) => {
     const n = { regens: 0, refreshes: 0, mismatches: 0, retried: [] };
+    Object.defineProperty(n, 'redispatched', { value: [], enumerable: false });
     // the ORDER the card and the meshes were told in (non-enumerable, so the deepEqual counts above are unchanged)
     const order = []; Object.defineProperty(n, 'order', { value: order, enumerable: false });
     await fn({ gen2: 'buildOptions', opts }, b0, async () => { n.regens++; }, new Set(LIP_MODES), new Set(VARIANT_MODES),
       PLATE_FINISHES, plateFinishOf, labelOptsChanges, applyLabelOpts, () => { n.refreshes++; order.push('refresh'); },
       (o) => { order.push({ remote: (o && o.remote) || [] }); }, () => {}, () => { n.mismatches++; },
-      busy, (ev) => { n.retried.push(ev.data); }, (f) => { f(); return 1; }, () => {}, globalThis.MessageEvent);
+      busy, (ev) => { n.redispatched.push(ev.data); }, (f) => { f(); return 1; }, () => {}, globalThis.MessageEvent,
+      (data) => { n.retried.push(data); });
+    if (n.redispatched.length) n.retried.push(...n.redispatched.map(() => 'RE-DISPATCHED (no origin/source: the trust gate drops it)'));
     if (!busy) delete n.retried;
     return n;
   };
@@ -730,17 +733,109 @@ test('rejectionIsMine: only an answer naming this page\'s own id (a page with no
   assert.equal(rejectionIsMine(null, { buildId: ID }), false);
 });
 
-test('the message listener routes buildRejected to noteRelayRejected, and re-checks the note after every layout', async () => {
-  const a = viewerSrc.indexOf("addEventListener('message', async (e) => {");
+/* The incoming listener AND its handler, extracted together and run with the REAL relay gate (relay-auth.js): the listener
+   is the trust gate, onPlannerMessage the routing. `from` defaults to THE planner window on the production planner origin. */
+const relayAuth = await import(new URL('../viewer/js/relay-auth.js', import.meta.url).href);
+async function listenerWith(stubs = {}) {
+  const a = viewerSrc.indexOf("addEventListener('message', (e) => {");
   assert.ok(a >= 0, 'the incoming message listener was not found');
-  const body = viewerSrc.slice(a, viewerSrc.indexOf('\n});', a) + 4);
+  const h = viewerSrc.indexOf('async function onPlannerMessage(d) {', a);
+  assert.ok(h > a, 'the relay handler onPlannerMessage was not found right after the listener');
+  const end = viewerSrc.slice(h).search(/\n\}\r?\n/);
+  const body = viewerSrc.slice(a, h + end + 2);
   const calls = [];
-  const fn = new AsyncFunction('build', 'noteRelayRejected', 'syncRelayRejected', 'applyRemoteLayout', 'applyRemoteColors',
-    `let handler; const addEventListener = (t, f) => { handler = f; }; const IS_PART = false; ${body} return handler;`);
-  const handler = await fn(labelledBuild(), (d) => calls.push(['rejected', d.buildId]), () => calls.push(['sync']),
-    async () => calls.push(['layout']), () => calls.push(['colors']));
-  await handler({ data: { gen2: 'buildRejected', buildId: ID } });
-  await handler({ data: { gen2: 'layout', build: { placed: [] } } });
-  await handler({ data: { gen2: 'colors' } });
+  const planner = { name: 'the planner window', postMessage() {} };
+  const plannerRelay = relayAuth.createPlannerRelay({ selfLoc: { protocol: 'https:', hostname: 'gen2build.jerrari3d.com' }, referrer: '', plannerWin: () => planner });
+  const fn = new AsyncFunction('build', 'noteRelayRejected', 'syncRelayRejected', 'applyRemoteLayout', 'applyRemoteColors', 'plannerRelay',
+    `let handler; const addEventListener = (t, f) => { handler = f; }; const IS_PART = ${stubs.isPart ? 'true' : 'false'}; ${body} return handler;`);
+  const listener = await fn(labelledBuild(), (d) => calls.push(['rejected', d.buildId]), () => calls.push(['sync']),
+    async () => calls.push(['layout']), () => calls.push(['colors']), plannerRelay);
+  // the listener does not await its handler (a message event has no one to await it): let the handler's own awaits drain
+  const send = async (data, from = { source: planner, origin: relayAuth.PLANNER_ORIGIN }) => {
+    listener({ data, ...from }); for (let i = 0; i < 5; i++) await null;
+  };
+  return { send, calls, planner, plannerRelay };
+}
+
+test('the message listener routes buildRejected to noteRelayRejected, and re-checks the note after every layout', async () => {
+  const { send, calls } = await listenerWith();
+  await send({ gen2: 'buildRejected', buildId: ID });
+  await send({ gen2: 'layout', build: { placed: [] } });
+  await send({ gen2: 'colors' });
   assert.deepEqual(calls, [['rejected', ID], ['layout'], ['sync'], ['colors']]);
+});
+
+/* ---- RELAY AUTHENTICATION (2026-10-03, STEP3-DESIGN R14 / STEP3-CRITIQUE B14) ----
+   The viewer acted on a gen2 message from ANY sender and posted every label, option and palette to its opener/parent with
+   target "*": a page that opened or framed the viewer read the build, and any page holding a reference to it could replace
+   its layout. */
+
+test('relay auth: the listener ignores a foreign origin, a wrong window and a null source - only THE planner window counts', async () => {
+  const { send, calls, planner } = await listenerWith();
+  const other = { name: 'another window', postMessage() {} };
+  await send({ gen2: 'layout', build: { placed: [] } }, { source: planner, origin: 'https://evil.example' });
+  await send({ gen2: 'layout', build: { placed: [] } }, { source: other, origin: relayAuth.PLANNER_ORIGIN });   // allowed origin, wrong window
+  await send({ gen2: 'layout', build: { placed: [] } }, { source: null, origin: relayAuth.PLANNER_ORIGIN });
+  await send({ gen2: 'colors' }, { source: planner, origin: 'null' });
+  await send({ gen2: 'colors' }, { source: planner, origin: 'http://localhost:8124' });   // loopback: production viewer refuses
+  assert.deepEqual(calls, [], `an unauthenticated message reached the handler: ${JSON.stringify(calls)}`);
+  await send({ gen2: 'colors' });   // the control
+  assert.deepEqual(calls, [['colors']], 'the control failed: the real planner was refused');
+});
+
+test('relay auth: part-preview mode still takes NO message, even from an allowed sender', async () => {
+  const { send, calls } = await listenerWith({ isPart: true });
+  await send({ gen2: 'colors' });
+  assert.deepEqual(calls, []);
+});
+
+test('relay-auth.js: origins, window binding and the reply target', () => {
+  const { createPlannerRelay, plannerOriginAllowed, PLANNER_ORIGIN, DEV_PLANNER_ORIGIN } = relayAuth;
+  const prod = { protocol: 'https:', hostname: 'gen2build.jerrari3d.com' }, dev = { protocol: 'http:', hostname: 'localhost' };
+  assert.equal(plannerOriginAllowed(PLANNER_ORIGIN, prod), true);
+  for (const o of ['https://evil.example', 'http://localhost:8124', 'null', '', undefined, 'https://gen2planner.jerrari3d.com.evil.example', 'http://gen2planner.jerrari3d.com'])
+    assert.equal(plannerOriginAllowed(o, prod), false, `production accepted ${o}`);
+  for (const o of ['http://localhost:8124', 'http://127.0.0.1:9000', 'http://localhost', PLANNER_ORIGIN]) assert.equal(plannerOriginAllowed(o, dev), true, `dev refused ${o}`);
+  for (const o of ['https://localhost:8124', 'http://localhost.evil.example', 'http://10.0.0.5:8124', 'null']) assert.equal(plannerOriginAllowed(o, dev), false, `dev accepted ${o}`);
+
+  const sent = [];
+  let win = { postMessage: (m, o) => sent.push([m.gen2, o]) };
+  const r = createPlannerRelay({ selfLoc: prod, referrer: 'https://evil.example/', plannerWin: () => win });
+  assert.equal(r.target(), PLANNER_ORIGIN, 'a production viewer must never take its target from the referrer');
+  r.post({ gen2: 'viewerReady' });
+  assert.deepEqual(sent, [['viewerReady', PLANNER_ORIGIN]]);
+  assert.equal(r.trusted({ source: { postMessage() {} }, origin: PLANNER_ORIGIN }), false, 'a window other than plannerWin() was trusted');
+  win = null;
+  assert.equal(r.post({ gen2: 'perfSlow' }), false, 'posted with no planner window');
+
+  // dev: the referrer's loopback origin, else the dev planner's default port, and whatever origin the planner last spoke from
+  const w2 = { postMessage: (m, o) => sent.push([m.gen2, o]) };
+  const d1 = createPlannerRelay({ selfLoc: dev, referrer: 'http://localhost:8642/index.html', plannerWin: () => w2 });
+  assert.equal(d1.target(), 'http://localhost:8642');
+  assert.equal(createPlannerRelay({ selfLoc: dev, referrer: '', plannerWin: () => w2 }).target(), DEV_PLANNER_ORIGIN);
+  assert.equal(createPlannerRelay({ selfLoc: dev, referrer: 'https://evil.example/', plannerWin: () => w2 }).target(), DEV_PLANNER_ORIGIN);
+  assert.equal(d1.trusted({ source: w2, origin: 'http://127.0.0.1:8124' }), true);
+  assert.equal(d1.target(), 'http://127.0.0.1:8124', 'the dev viewer did not answer on the origin the planner spoke from');
+  assert.equal(d1.trusted({ source: w2, origin: 'https://evil.example' }), false);
+  assert.equal(d1.target(), 'http://127.0.0.1:8124', 'a refused message moved the reply target');
+});
+
+test('relay auth: every outgoing relay post (options, palette, store preference) names the planner origin, never "*"', () => {
+  const sent = [];
+  const planner = { closed: false, postMessage: (m, o) => sent.push([m.gen2, o]) };
+  const plannerWin = () => planner;
+  const plannerRelay = relayAuth.createPlannerRelay({ selfLoc: { protocol: 'https:', hostname: 'gen2build.jerrari3d.com' }, referrer: '', plannerWin });
+  const sync = new Function('plannerWin', 'plannerRelay', 'applyingRemote', 'build', 'currentOpts',
+    `${declAt(viewerSrc, 'let syncBuildToPlanner =')} return syncBuildToPlanner;`)(plannerWin, plannerRelay, false, labelledBuild(), () => ({ buildId: ID }));
+  const colors = new Function('plannerWin', 'plannerRelay', 'applyingRemoteColors', 'build', 'colorsT', 'customColors', 'useCustom', 'userPalette',
+    `${viewerSrc.slice(viewerSrc.indexOf('function postColorsToPlanner()'), viewerSrc.indexOf('\n}', viewerSrc.indexOf('function postColorsToPlanner()')) + 2)} return postColorsToPlanner;`)(plannerWin, plannerRelay, false, labelledBuild(), 5, {}, false, {});
+  const store = new Function('plannerWin', 'plannerRelay', 'applyingRemoteStore', 'storePrefT', 'storePref',
+    `${viewerSrc.slice(viewerSrc.indexOf('function postStorePrefToPlanner()'), viewerSrc.indexOf('\n}', viewerSrc.indexOf('function postStorePrefToPlanner()')) + 2)} return postStorePrefToPlanner;`)(plannerWin, plannerRelay, false, 7, 'printables');
+  sync(); colors(); store();
+  assert.deepEqual(sent, [['buildOptions', relayAuth.PLANNER_ORIGIN], ['colors', relayAuth.PLANNER_ORIGIN], ['store', relayAuth.PLANNER_ORIGIN]]);
+  /* and nothing in main.js posts around the relay: the ONLY postMessage call left is the part-preview embedder's (public part
+     slug + readiness, to a site the viewer cannot name - outside this relay). A tripwire beside the executed checks above. */
+  const posts = [...viewerSrc.matchAll(/\.postMessage\(/g)].map((m) => viewerSrc.slice(viewerSrc.lastIndexOf('\n', m.index) + 1, viewerSrc.indexOf('\n', m.index)).trim());
+  assert.deepEqual(posts, ["window.parent.postMessage({ ...msg, part: PART_SLUG, ...(PART_RID ? { rid: PART_RID } : {}), v: 1 }, '*');"],
+    `a postMessage outside plannerRelay.post: ${JSON.stringify(posts)}`);
 });
