@@ -102,6 +102,32 @@
           <div id="identify-zones" class="hidden"></div>
           <div id="identify-debug" class="hidden"></div>
           <div id="identify-links"></div>
+          <!-- the label editor (label plan step 2): the words + icon of the selected EdgeLabel label. The set-wide style
+               (size / depth / bold / caps / icon size) lives in Build options - the generator's own split. -->
+          <div id="identify-label-edit" class="hidden">
+            <label class="le-row"><span>Label</span>
+              <input id="label-edit-text" type="text" maxlength="40" autocomplete="off" placeholder="What's in this drawer? (e.g. M3 screws)"></label>
+            <div class="le-row le-badge-row">
+              <button id="label-edit-badge" type="button" title="Icon or letter for this label" aria-expanded="false" aria-controls="label-edit-picker">+</button>
+              <span id="label-edit-badge-state"></span>
+            </div>
+            <div id="label-edit-picker" class="hidden">
+              <div class="le-pick-row">
+                <button id="label-pick-auto" type="button" title="Let the generator predict an icon from the words">Auto</button>
+                <button id="label-pick-none" type="button" title="No icon on this label">No icon</button>
+                <input id="label-pick-char" type="text" maxlength="4" autocomplete="off" placeholder="A-Z" aria-label="Letter badge, up to 4 characters">
+                <button id="label-pick-use" type="button" title="Use these letters as the badge">Use</button>
+              </div>
+              <div id="label-pick-icons" role="group" aria-label="Icons"></div>
+            </div>
+            <div id="label-edit-fit" class="le-fit hidden" role="status"></div>
+            <div class="le-row le-status-row">
+              <span id="label-edit-status" class="hidden" role="status"></span>
+              <button id="label-edit-undo" type="button" class="hidden" title="Put back the words and icon this label had before the last change">Undo</button>
+            </div>
+            <div id="label-edit-note" class="hidden">Edits stay in this page - open it from the planner to keep them.</div>
+          </div>
+          <button id="identify-label-go" class="hidden" type="button" title="Edit this drawer's label"></button>
           <a id="identify-label-gen" class="hidden" href="#" target="_blank" rel="noopener"></a>
           <div id="identify-style" class="hidden">
             <button id="style-prev" title="Previous style">&#9664;</button>

@@ -68,8 +68,11 @@ const layoutKey = new Function(`${declAt(viewerSrc, 'const layoutKey =')} return
 // the real currentOpts - it reads the module-level `build`, and the build plate through the
 // resolver main.js imports, which is handed in here as the same real function
 const { plateFinishOf, PLATE_FINISHES } = await import(new URL('../viewer/js/bed-finish.js', import.meta.url).href);
-const currentOptsWith = new Function('build', 'plateFinishOf', `${declAt(viewerSrc, 'function currentOpts()')} return currentOpts();`);
-const currentOpts = (b) => currentOptsWith(b, plateFinishOf);
+// the label half of the post (label plan step 2) lives in label-panel.js, which node imports directly; main.js's
+// currentOpts calls it by name, so the extracted function is handed the same real export
+const { labelOptsOf, labelOptsChanges, applyLabelOpts, labelOnlyDiff, copyLabelFields } = await import(new URL('../viewer/js/label-panel.js', import.meta.url).href);
+const currentOptsWith = new Function('build', 'plateFinishOf', 'labelOptsOf', `${declAt(viewerSrc, 'function currentOpts()')} return currentOpts();`);
+const currentOpts = (b) => currentOptsWith(b, plateFinishOf, labelOptsOf);
 
 const buildWith = (lip) => ({
   mount: 'tabletop', length: 185, gridW: 4, gridH: 4,
@@ -211,15 +214,55 @@ const applyOpts = (() => {
   const endMark = '} finally { applyingRemote = false; }';
   const b = viewerSrc.indexOf(endMark, a);
   assert.ok(a >= 0 && b > a, 'the incoming buildOptions block was not found in main.js');
+  // `regenBusy` and the retry plumbing (dispatchEvent / setTimeout / clearTimeout / MessageEvent) are handed in, so the
+  // mid-regenerate branch can be driven too: `busy` runs the block with regenBusy true and records what it re-dispatches
   const fn = new AsyncFunction('d', 'build', 'regenerate', 'LIP_MODES', 'VARIANT_MODES', 'PLATE_FINISHES', 'plateFinishOf',
-    `let applyingRemote = false; const regenBusy = false; ${viewerSrc.slice(a, b + endMark.length)}`);
-  return async (b0, opts) => {
-    let regens = 0;
-    await fn({ gen2: 'buildOptions', opts }, b0, async () => { regens++; }, new Set(LIP_MODES), new Set(VARIANT_MODES),
-      PLATE_FINISHES, plateFinishOf);
-    return regens;
+    'labelOptsChanges', 'applyLabelOpts', 'refreshLabelTexts', 'renderLabelEditorState', 'renderOptions', 'noteBuildMismatch',
+    'regenBusy', 'dispatchEvent', 'setTimeout', 'clearTimeout', 'MessageEvent',
+    `let applyingRemote = false; let optsRetryTimer = 0; ${viewerSrc.slice(a, b + endMark.length)}`);
+  const run = async (b0, opts, busy = false) => {
+    const n = { regens: 0, refreshes: 0, mismatches: 0, retried: [] };
+    await fn({ gen2: 'buildOptions', opts }, b0, async () => { n.regens++; }, new Set(LIP_MODES), new Set(VARIANT_MODES),
+      PLATE_FINISHES, plateFinishOf, labelOptsChanges, applyLabelOpts, () => { n.refreshes++; }, () => {}, () => {}, () => { n.mismatches++; },
+      busy, (ev) => { n.retried.push(ev.data); }, (f) => { f(); return 1; }, () => {}, globalThis.MessageEvent);
+    if (!busy) delete n.retried;
+    return n;
   };
+  const regensOnly = async (b0, opts) => (await run(b0, opts)).regens;
+  regensOnly.full = run;
+  regensOnly.busy = (b0, opts) => run(b0, opts, true);
+  return regensOnly;
 })();
+
+test('incoming: the planner\'s resolved "none" closure is stored as ABSENCE (its own rule), so its next layout still reads as an echo', async () => {
+  /* The planner deletes `closure` for "none" and its layouts never carry it; the viewer used to store the resolved "none"
+     from an options post, so layoutKey read 'none' against the planner's '' for ever after - the next layout was never an
+     echo, never label-only, and ONE planner keystroke regenerated the build and closed the card (e2e, 2026-10-03). */
+  const b = labelledBuild();
+  const n = await applyOpts.full(b, { buildId: ID, closures: { 1: 'none', 2: 'none', 3: 'none', 4: 'none' }, labels: { 3: 'Bolts' } });
+  assert.deepEqual(n, { regens: 0, refreshes: 1, mismatches: 0 }, 'resolved "none" closures beside a label change must still be label-only');
+  for (const u of b.placed) assert.ok(!('closure' in u), `unit ${u.id} stored closure "none"`);
+  const nb = labelledBuild(); nb.placed[2].label = 'Bolts';
+  assert.equal(layoutKey(b), layoutKey(nb), 'after the apply the planner\'s bounce of the same build would not read as an echo');
+  await applyOpts(b, { buildId: ID, closures: { 1: 'magnet' } }); assert.equal(b.placed[0].closure, 'magnet', 'a real closure still lands');
+  await applyOpts(b, { buildId: ID, closures: { 1: 'none' } }); assert.ok(!('closure' in b.placed[0]), 'and leaves again as absence');
+});
+
+test('incoming: a buildOptions message arriving MID-REGENERATE is retried, never dropped (newest wins)', async () => {
+  /* Until 2026-10-03 the handler returned while regenBusy. A planner change to a build-level option (handle style, back
+     cover, plate...) made in that window was lost for good: the layout that follows does not carry those fields in
+     layoutKey, so it was dropped as an echo, and the planner's lastSentOpts kept it from re-posting (Sol 01a0fffd, 1). */
+  const b = labelledBuild();
+  const n = await applyOpts.busy(b, { buildId: ID, handleStyle: 'crystal', labels: { 3: 'Bolts' } });
+  assert.deepEqual({ regens: n.regens, refreshes: n.refreshes, mismatches: n.mismatches }, { regens: 0, refreshes: 0, mismatches: 0 }, 'nothing may apply mid-regenerate');
+  assert.ok(!('label' in b.placed[2]) && !('handleStyle' in b), 'the message was applied while regenerating');
+  assert.equal(n.retried.length, 1, 'the message was not re-dispatched for after the regenerate');
+  assert.equal(n.retried[0].gen2, 'buildOptions'); assert.equal(n.retried[0].opts.handleStyle, 'crystal'); assert.equal(n.retried[0].opts.labels[3], 'Bolts');
+  // the control: the same message, not busy, applies (a handle style regenerates; the label rides along)
+  const c = labelledBuild({ handleStyle: 'deco' });
+  const m = await applyOpts.full(c, { buildId: ID, handleStyle: 'crystal', labels: { 3: 'Bolts' } });
+  assert.equal(m.regens, 1); assert.equal(c.handleStyle, 'crystal'); assert.equal(c.placed[2].label, 'Bolts');
+});
 
 test('an incoming body switch is applied, and absence is written for standard', async () => {
   // the control: the extracted block really is the handler (a closure change applies)
@@ -273,4 +316,152 @@ test('layoutKey and the planner\'s layoutSig carry the same per-unit fields', { 
   assert.deepEqual([...viewer].sort(), [...planner].sort(),
     'a per-unit field is missing from one side of the layout channel');
   assert.ok(viewer.includes('lip') && viewer.length >= 10, 'extracted field list looks wrong - check the regexes');
+});
+
+/* ---- drawer labels on the relay (label plan step 2, 2026-10-02) ----
+   Three new keys ride buildOptions in BOTH directions - `labels` (every decor unit, "" = none), `labelBadges` (the
+   labelled units, null = absent = the generator predicts) and `labelStyle` (cleaned, or null) - plus `buildId` FIRST, the
+   build both ends believe they are editing. A message naming another build is dropped WHOLE. A message whose only
+   differences are label fields refreshes the label meshes in place and never regenerates (regenerate() deselects, which
+   would close the card under the user). The planner's echo guard compares JSON strings, so key ORDER is part of the
+   contract: buildId first, the three label keys right after variants, buildPlate still last. */
+const ID = 'k7m2p9q4x1z8';
+const labelledBuild = (extra = {}) => ({
+  mount: 'tabletop', length: 185, gridW: 4, gridH: 4, buildId: ID,
+  placed: [
+    { id: 1, x: 0, y: 2, w: 1, hh: 2, fill: 'decor', shelves: 0, label: 'Torx Bits' },
+    { id: 2, x: 1, y: 2, w: 1, hh: 2, fill: 'decor', shelves: 0, label: 'Nuts', labelBadge: { type: 'icon', value: 'nut' } },
+    { id: 3, x: 2, y: 2, w: 1, hh: 2, fill: 'decor', shelves: 0 },
+    { id: 4, x: 3, y: 2, w: 1, hh: 2, fill: 'classic', shelves: 0, label: 'Washers' },
+    { id: 5, x: 0, y: 0, w: 1, hh: 4, fill: 'shelf', shelves: 0 },
+  ],
+  ...extra,
+});
+
+test('currentOpts: buildId FIRST, the three label keys right after variants, buildPlate still LAST', () => {
+  const o = currentOpts(labelledBuild());
+  const keys = Object.keys(o);
+  assert.equal(keys[0], 'buildId', `buildId is not the first key: ${keys.join(', ')}`);
+  assert.equal(o.buildId, ID);
+  assert.deepEqual(keys.slice(keys.indexOf('variants'), keys.indexOf('variants') + 4), ['variants', 'labels', 'labelBadges', 'labelStyle'],
+    `the label keys are not right after variants: ${keys.join(', ')}`);
+  assert.equal(keys.at(-1), 'buildPlate', 'buildPlate is no longer the last key');
+  // a build with no id, or a malformed one, sends NO key (the planner reads absence as legacy and accepts)
+  assert.ok(!('buildId' in currentOpts(labelledBuild({ buildId: undefined }))), 'a build with no id relayed a buildId key');
+  assert.ok(!('buildId' in currentOpts(labelledBuild({ buildId: '../../x' }))), 'a malformed id was relayed');
+  assert.equal(Object.keys(currentOpts(labelledBuild({ buildId: undefined })))[0], 'closures');
+});
+
+test('currentOpts: labels for every DECOR unit, badges only for the labelled ones, nothing for classic or shelf units', () => {
+  const o = currentOpts(labelledBuild());
+  assert.deepEqual(o.labels, { 1: 'Torx Bits', 2: 'Nuts', 3: '' }, 'labels must name every decor unit, "" for none');
+  assert.ok(!(4 in o.labels), 'a classic unit got a labels entry - its name is the planner\'s, the viewer shows no faceplate label for it');
+  assert.ok(!(5 in o.labels), 'a shelf got a labels entry');
+  assert.deepEqual(o.labelBadges, { 1: null, 2: { type: 'icon', value: 'nut' } }, 'labelBadges: labelled units only, null = absent');
+  assert.ok(!(3 in o.labelBadges), 'an unlabelled unit got a labelBadges entry');
+  assert.equal(o.labelStyle, null, 'a build with no style relays null');
+  assert.deepEqual(currentOpts(labelledBuild({ labelStyle: { capMm: 4, bold: true, colorText: '#f00' } })).labelStyle, { capMm: 4, bold: true },
+    'labelStyle must go out CLEANED');
+});
+
+test('currentOpts CLEANS what it relays: a hash-made 60-character label goes out at 40, trimmed; a bad badge as null', () => {
+  const b = labelledBuild();
+  b.placed[0].label = '   ' + 'x'.repeat(60);
+  b.placed[1].labelBadge = { type: 'svg', value: '<svg/>' };
+  const o = currentOpts(b);
+  assert.equal(o.labels[1], 'x'.repeat(40), 'the label was relayed raw - the planner stores 40 and the two ends would disagree for ever');
+  assert.equal(o.labelBadges[2], null, 'a badge the planner would drop was relayed as if stored');
+});
+
+test('layoutKey DISTINGUISHES a buildId-only change (how an official-kit viewer learns the id the planner minted)', () => {
+  const a = layoutKey(labelledBuild()), b = layoutKey(labelledBuild({ buildId: 'zzzzzzzzzzzz' })), c = layoutKey(labelledBuild({ buildId: undefined }));
+  assert.equal(layoutKey(labelledBuild()), a, 'layoutKey is not deterministic');
+  assert.equal(new Set([a, b, c]).size, 3, 'layoutKey ignores buildId - a layout differing only in the id is dropped as an echo');
+});
+
+test('labelOnlyDiff, against the REAL layoutKey: label words / badge / style / buildId alone are label-only, anything else is not', () => {
+  const cur = labelledBuild();
+  const only = (mut) => { const nb = labelledBuild(); mut(nb); return labelOnlyDiff(nb, cur, layoutKey); };
+  assert.equal(labelOnlyDiff(labelledBuild(), cur, layoutKey), false, 'an identical layout is not a diff at all');
+  assert.equal(only((nb) => { nb.placed[2].label = 'Bolts'; }), true, 'a words-only change');
+  assert.equal(only((nb) => { delete nb.placed[1].labelBadge; }), true, 'a badge-only change');
+  assert.equal(only((nb) => { nb.labelStyle = { allCaps: false }; }), true, 'a style-only change');
+  assert.equal(only((nb) => { nb.buildId = 'zzzzzzzzzzzz'; }), true, 'a buildId-only change (the one-off that hands a kit its id) must not regenerate');
+  assert.equal(only((nb) => { nb.placed[0].w = 2; }), false, 'a width change took the cheap path');
+  assert.equal(only((nb) => { nb.placed[0].label = 'Bolts'; nb.placed[1].closure = 'magnet'; }), false, 'a label + a closure took the cheap path');
+  assert.equal(only((nb) => { nb.placed.pop(); }), false, 'a removed unit took the cheap path');
+  // and the copy leaves the two keys EQUAL, so the planner's bounce of the same layout is then dropped as an echo
+  const nb = labelledBuild({ buildId: 'zzzzzzzzzzzz', labelStyle: { capMm: 4 } }); nb.placed[2].label = 'Bolts'; nb.placed[0].labelBadge = { type: 'none' };
+  const b2 = labelledBuild();
+  assert.deepEqual(copyLabelFields(nb, b2), [3], 'copyLabelFields must name exactly the units whose WORDS changed');
+  assert.equal(layoutKey(b2), layoutKey(nb), 'after copyLabelFields the keys still differ - the next echo would not be dropped');
+});
+
+test('incoming: a buildId that names ANOTHER build drops the message WHOLE (a closure in the same message is not applied)', async () => {
+  const b = labelledBuild();
+  const n = await applyOpts.full(b, { buildId: 'zzzzzzzzzzzz', closures: { 1: 'magnet' }, labels: { 1: 'HACK' } });
+  assert.deepEqual(n, { regens: 0, refreshes: 0, mismatches: 1 });
+  assert.ok(!('closure' in b.placed[0]), 'the mismatched message\'s closure was applied');
+  assert.equal(b.placed[0].label, 'Torx Bits', 'the mismatched message\'s label was applied');
+  // the control: the same message with the RIGHT id applies both
+  const c = labelledBuild();
+  const m = await applyOpts.full(c, { buildId: ID, closures: { 1: 'magnet' }, labels: { 1: 'HACK' } });
+  assert.deepEqual(m, { regens: 1, refreshes: 0, mismatches: 0 }, 'a closure change still regenerates (and the mount re-attaches the labels)');
+  assert.equal(c.placed[0].closure, 'magnet'); assert.equal(c.placed[0].label, 'HACK');
+  // no id on either side = legacy = accepted
+  const d = labelledBuild({ buildId: undefined });
+  assert.equal((await applyOpts.full(d, { buildId: ID, labels: { 1: 'Bolts' } })).mismatches, 0, 'a viewer with no id refused the planner');
+  assert.equal(d.placed[0].label, 'Bolts');
+  const e = labelledBuild();
+  assert.equal((await applyOpts.full(e, { labels: { 1: 'Bolts' } })).mismatches, 0, 'a message with no id was refused');
+});
+
+test('incoming: a label-only message refreshes the labels in place and NEVER regenerates; an echo does nothing', async () => {
+  const b = labelledBuild();
+  assert.deepEqual(await applyOpts.full(b, { buildId: ID, labels: { 1: 'Torx Bits', 2: 'Nuts', 3: 'Bolts' } }), { regens: 0, refreshes: 1, mismatches: 0 });
+  assert.equal(b.placed[2].label, 'Bolts');
+  assert.deepEqual(await applyOpts.full(b, { buildId: ID, labels: { 1: 'Torx Bits', 2: 'Nuts', 3: 'Bolts' } }), { regens: 0, refreshes: 0, mismatches: 0 }, 'an echo was taken as a change');
+  assert.deepEqual(await applyOpts.full(b, { buildId: ID, labelBadges: { 1: { type: 'char', value: 'T' } } }), { regens: 0, refreshes: 1, mismatches: 0 });
+  assert.deepEqual(b.placed[0].labelBadge, { type: 'char', value: 'T' });
+  assert.deepEqual(await applyOpts.full(b, { buildId: ID, labelStyle: { capMm: 4, bold: true } }), { regens: 0, refreshes: 1, mismatches: 0 });
+  assert.deepEqual(b.labelStyle, { capMm: 4, bold: true });
+  // a classic unit's name is not the viewer's to change
+  assert.deepEqual(await applyOpts.full(b, { buildId: ID, labels: { 4: 'Shims' } }), { regens: 0, refreshes: 0, mismatches: 0 });
+  assert.equal(b.placed[3].label, 'Washers');
+});
+
+test('incoming: clearing the words deletes the badge; a hostile badge leaves the stored one alone; a badge needs words', async () => {
+  const b = labelledBuild();
+  await applyOpts(b, { buildId: ID, labels: { 2: '' } });
+  assert.ok(!('label' in b.placed[1]) && !('labelBadge' in b.placed[1]), 'the badge survived its words being cleared (it would reappear on the next name)');
+  const c = labelledBuild();
+  for (const bad of [{ type: 'svg', value: '<svg/>' }, { type: 'icon', value: 'Not An Id!' }, { type: 'char', value: 'ABCDE' }, 'nut', 7]) {
+    assert.equal(await applyOpts(c, { buildId: ID, labelBadges: { 2: bad } }), 0);
+    assert.deepEqual(c.placed[1].labelBadge, { type: 'icon', value: 'nut' }, `${JSON.stringify(bad)} overwrote the badge`);
+  }
+  await applyOpts(c, { buildId: ID, labelBadges: { 3: { type: 'icon', value: 'nut' } } });
+  assert.ok(!('labelBadge' in c.placed[2]), 'an unlabelled unit took a badge');
+  await applyOpts(c, { buildId: ID, labelBadges: { 2: null } });
+  assert.ok(!('labelBadge' in c.placed[1]), 'null (Auto) did not delete the badge');
+});
+
+test('incoming: a style outside the generator\'s limits is DROPPED, never clamped; incoming words are cut to 40', async () => {
+  const b = labelledBuild({ labelStyle: { capMm: 4 } });
+  const n = await applyOpts.full(b, { buildId: ID, labelStyle: { capMm: 7 } });
+  assert.deepEqual(b.labelStyle, null, 'capMm 7 was clamped or kept - cleanLabelStyle drops it, leaving nothing');
+  assert.equal(n.refreshes, 1, 'the (now default) style is a change and refreshes');
+  const c = labelledBuild({ labelStyle: { capMm: 4 } });
+  assert.equal(await applyOpts(c, { buildId: ID, labelStyle: { capMm: 4, depth: 9 } }), 0, 'an out-of-range depth beside an unchanged capMm was taken as a change');
+  assert.deepEqual(c.labelStyle, { capMm: 4 });
+  const d = labelledBuild();
+  await applyOpts(d, { buildId: ID, labels: { 3: '  ' + 'y'.repeat(41) } });
+  assert.equal(d.placed[2].label, 'y'.repeat(40), 'incoming words were not trimmed and cut to 40');
+});
+
+test('layoutKey and layoutSig both carry the build-level label fields (style + id)', { skip: !havePlanner && 'planner checkout not present' }, () => {
+  const plannerSrc = readFileSync(join(PLANNER, 'js', 'app.js'), 'utf8');
+  const sig = plannerSrc.slice(plannerSrc.indexOf('const layoutSig = () => JSON.stringify({'), plannerSrc.indexOf('function postLayoutNow()'));
+  const key = declAt(viewerSrc, 'const layoutKey =');
+  for (const [src, what, fields] of [[sig, "the planner's layoutSig", ['state.labelStyle', 'state.buildId']], [key, "the viewer's layoutKey", ['b.labelStyle', 'b.buildId']]])
+    for (const f of fields) assert.ok(src.includes(f), `${what} does not read ${f} - a layout differing only in it would be half-broken`);
 });

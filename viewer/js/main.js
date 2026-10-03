@@ -17,7 +17,10 @@ import { createDimCoverTest } from './dim-cover.js';
 import { benchBuild, createOrbitBench } from './orbit-bench.js';
 import { createSettleBench } from './settle-bench.js';
 import { parseSeeInto, parseSeeIntoSkip, parseSeeIntoLattice, createSeeInto } from './see-into.js';
-import { LABEL_TEXT_DEFAULTS, LABEL_TEXT_NODES, labelFontReady, loadLabelFont, labelGeometry } from './label-text.js';
+import { LABEL_TEXT_DEFAULTS, LABEL_TEXT_NODES, labelFontReady, loadLabelFont, labelGeometry, labelCore } from './label-text.js';
+import { LABEL_SPEC, LABEL_TEXT_MAX, cleanLabelText, cleanLabelBadge, cleanLabelStyle } from './label-spec.js';
+import { LABEL_STYLE_ROWS, labelOrder, effectiveStyle, labelOptsOf, labelOptsChanges, applyLabelOpts, labelOnlyDiff, copyLabelFields,
+  editCommit, styleEdit, iconChoices, badgeStateText, shownBadge } from './label-panel.js';
 
 /* Every entry-routing boolean below is derived by resolveEntry() in entry.js -
    a pure function of (search, hash) with no DOM or network - so the boot
@@ -2718,6 +2721,13 @@ function updateViewInset() {
         const mb = fm.getBoundingClientRect();
         bottom = Math.max(0, Math.min(cb.bottom - mb.top, cb.height * 0.5));
       }
+      // the identify card grows into a tall sheet while its label editor is open (text field, badge row, the icon picker)
+      // - it covers the model the way the filament sheet does, so it pans the camera the same way, re-measured every frame
+      const ic = $('identify-card');
+      if (document.body.classList.contains('label-edit-open') && ic && !ic.classList.contains('hidden')) {
+        const r = ic.getBoundingClientRect();
+        bottom = Math.max(bottom, Math.max(0, Math.min(cb.bottom - r.top, cb.height * 0.5)));
+      }
       ty = (bottom - top) / 2;
     } else if (document.body.classList.contains('fm-open') && !assembledBox.isEmpty()) {
       const fm = $('filament-menu');
@@ -3876,24 +3886,72 @@ function attachLabelTexts() {
   }).catch((e) => console.warn(`[label text] ${(e && e.message) || e} - labels left blank`));
 }
 function placeLabelTexts(list) {
-  for (const inst of list) {
-    // the words as typed, the unit's icon (absent = predicted) and the build's style - label-spec.js checks both
-    const t = labelGeometry(labelTextFor(inst), labelUnitFor(inst)?.labelBadge, build.labelStyle);
-    if (!t) continue;
-    const inner = inst.group.children[0];
-    if (!t.fits) console.warn(`[label text] "${t.shown}" overflows the label even at the 3 mm floor (the generator warns too)`);
-    // shadows follow the label's own meshes (the tier decides those flags; this copies them)
-    let cast = false; inner.traverse((o) => { if (o.isMesh && o.castShadow) cast = true; });
-    // the text and the badge print in the same second filament (the generator's 3MF puts both on extruder 2): one zone
-    for (const p of t.parts) {
-      const mesh = new THREE.Mesh(p.geo, materialFor(inst, false, LABEL_TEXT_ZONE));
-      mesh.name = p.part === 'badge' ? 'LabelBadge' : 'LabelText';
-      mesh.userData.zone = LABEL_TEXT_ZONE;
-      mesh.userData.labelText = t.shown;
-      if (p.part === 'badge') mesh.userData.labelBadge = t.badge;
-      mesh.castShadow = cast; mesh.receiveShadow = cast;
-      inner.add(mesh);
-    }
+  for (const inst of list) placeLabelText(inst, labelTextFor(inst), labelUnitFor(inst)?.labelBadge);
+}
+/* One label's text + badge meshes from its words, its badge (absent = predicted) and the build's style - label-spec.js checks
+   both. Returns labelGeometry's result (its `fits` is the generator's own verdict) or null when there is nothing to print. */
+function placeLabelText(inst, text, badge) {
+  if (!text) return null;
+  const t = labelGeometry(text, badge, build.labelStyle);
+  if (!t) return null;
+  const inner = inst.group.children[0];
+  if (!t.fits) console.warn(`[label text] "${t.shown}" overflows the label even at the 3 mm floor (the generator warns too)`);
+  // shadows follow the label's own meshes (the tier decides those flags; this copies them)
+  let cast = false; inner.traverse((o) => { if (o.isMesh && o.castShadow) cast = true; });
+  // the text and the badge print in the same second filament (the generator's 3MF puts both on extruder 2): one zone
+  for (const p of t.parts) {
+    const mesh = new THREE.Mesh(p.geo, materialFor(inst, false, LABEL_TEXT_ZONE));
+    mesh.name = p.part === 'badge' ? 'LabelBadge' : 'LabelText';
+    mesh.userData.zone = LABEL_TEXT_ZONE;
+    mesh.userData.labelText = t.shown;
+    if (p.part === 'badge') mesh.userData.labelBadge = t.badge;
+    mesh.castShadow = cast; mesh.receiveShadow = cast;
+    inner.add(mesh);
+  }
+  return t;
+}
+/* Take a label's text meshes off. ⚠ Their geometries are NOT disposed: labelGeometry caches them by key and two drawers
+   named the same share one BufferGeometry - disposing it here would free the other label's buffers (and the cache's) for
+   three to re-upload on the next draw. The cache owns the geometries; this only owns the meshes. */
+function clearLabelText(inst) {
+  const inner = inst.group.children[0];
+  if (!inner) return;
+  for (const o of [...inner.children]) if (o.name === 'LabelText' || o.name === 'LabelBadge') inner.remove(o);
+}
+/* Rebuild ONE label's text in place - a keystroke in the card, a badge pick, a relayed edit. `draft` ({ text, badge }) shows
+   words the card is still typing without writing them into `build` (that happens at commit); without it the unit's stored
+   words are shown. No regenerate(): the manifest does not depend on label text, and regenerate() deselects, which would
+   close the card under the user's cursor. The selected label keeps its glow (the new meshes come out of materialFor plain,
+   refreshSelHighlight re-applies the highlight to the whole group). Returns labelGeometry's result, or null. */
+function refreshLabelText(inst, draft) {
+  if (IS_PART || !build || !instances.has(inst.cfg.id) || !LABEL_TEXT_NODES.has(inst.cfg.node)) return null;
+  const text = draft ? cleanLabelText(draft.text) : labelTextFor(inst);
+  // the badge is ALWAYS the unit's live one - a draft carries only the words, so a badge the planner changes while the
+  // user is mid-word shows at once under the draft instead of the badge the draft was started with (Sol 01a0fffd, 4)
+  const badge = labelUnitFor(inst)?.labelBadge;
+  if (text && !labelFontReady()) {
+    // first label on this page: load the core + font once, then come back here (with the card's draft if it still has one)
+    const tok = ++labelTextTok;
+    loadLabelFont().then(() => {
+      if (tok !== labelTextTok || !instances.has(inst.cfg.id)) return;
+      refreshLabelText(inst, labelEdit && labelEdit.inst === inst ? labelEdit.draft : undefined);
+      renderLabelEditorState();
+    }).catch((e) => console.warn(`[label text] ${(e && e.message) || e} - labels left blank`));
+    return null;
+  }
+  clearLabelText(inst);
+  const t = text ? placeLabelText(inst, text, badge) : null;
+  if (selectedId === inst.cfg.id) refreshSelHighlight();
+  ao.rev++; markShadowDirty(); invalidateFrame();
+  return t;
+}
+/* Every label at once - a set-wide style change, or a relayed layout that changed only labels. The card's draft (if any)
+   stays on screen: its label is refreshed WITH the draft, the others from `build`. */
+function refreshLabelTexts() {
+  if (IS_PART || !build) return;
+  for (const inst of instances.values()) {
+    if (!LABEL_TEXT_NODES.has(inst.cfg.node)) continue;
+    refreshLabelText(inst, labelEdit && labelEdit.inst === inst ? labelEdit.draft : undefined);
   }
 }
 function basePos(inst, staged) {
@@ -4877,7 +4935,8 @@ function optSeg(label, options, activeVal, onPick) {
 }
 // These three are wired ONLY to the Build options panel — the planner's remote
 // sync mutates `build` directly — so tracking here counts local decisions only.
-async function setAllClosure(val) { track('opt:closure:' + val); drawersInBuild().forEach(u => u.closure = val); await regenerate(); }
+// "none" = the field deleted, as the planner stores it (see the incoming buildOptions handler)
+async function setAllClosure(val) { track('opt:closure:' + val); drawersInBuild().forEach(u => { if (val === 'none') delete u.closure; else u.closure = val; }); await regenerate(); }
 async function setAllStoppers(on) { track('opt:stoppers:' + (on ? 'all' : 'none')); build.removedStoppers = on ? [] : allStopperKeys(); await regenerate(); }
 // the Decor drawers that have a Gridfinity version; absence of `variant` is the standard drawer
 const gridfinityDrawers = () => drawersInBuild().filter(u => gridfinitySizeOk(+build.length, u));
@@ -4887,6 +4946,54 @@ async function setAllVariant(v) {
   await regenerate();
 }
 async function resetBuild() { track('opt:reset'); build = structuredClone(originalBuild); activeHandleStyle = null; activeFaceplateStyle = null; await regenerate(); }
+/* The Labels block (label plan step 2): the EdgeLabel generator's own SET-WIDE settings - text size / depth / icon size as
+   number inputs with the generator's min/max/step, Bold / All caps / Predict icons as Off/On rows - stored in build.labelStyle
+   and relayed to the planner. The per-label part (words + icon) lives on the label's identify card. Shown only while the
+   build has EdgeLabel plates on Decor drawers, i.e. labels this page can show text on. Validation is cleanLabelStyle: a
+   value the generator's inputs would not take (7 mm, blank) is DROPPED and the field snaps back - nothing is clamped. A
+   change refreshes every label in place; nothing here regenerates. */
+const labelStyleShown = () => !!build && currentFaceplateStyle()?.key === 'edgelabel' && build.placed.some(u => u.fill === 'decor');
+function renderLabelStyleRows(box) {
+  if (!labelStyleShown()) return;
+  const head = document.createElement('div'); head.className = 'section-head opt-labels-head'; head.textContent = 'Labels';
+  box.appendChild(head);
+  const S = effectiveStyle(build, labelCore()?.DEFAULTS);
+  const afterStyle = (key) => { track('label:style:' + key); refreshLabelTexts(); renderLabelEditorState(); syncBuildToPlanner(); };
+  for (const r of LABEL_STYLE_ROWS) {
+    const [lo, hi] = LABEL_SPEC.limits[r.key];
+    const row = document.createElement('div'); row.className = 'opt-row opt-num';
+    const lab = document.createElement('label'); lab.className = 'opt-label'; lab.textContent = r.label; lab.htmlFor = 'label-style-' + r.key;
+    const wrap = document.createElement('span'); wrap.className = 'opt-num-wrap';
+    const input = document.createElement('input');
+    input.type = 'number'; input.id = 'label-style-' + r.key; input.min = lo; input.max = hi; input.step = r.step; input.value = S[r.key];
+    input.setAttribute('aria-describedby', 'label-style-note');
+    const unit = document.createElement('span'); unit.className = 'opt-unit'; unit.textContent = r.unit;
+    const commit = () => {
+      const v = input.value === '' ? NaN : +input.value;
+      if (styleEdit(build, r.key, v)) { afterStyle(r.key); return; }
+      input.value = effectiveStyle(build, labelCore()?.DEFAULTS)[r.key];   // dropped, never clamped: the field snaps back
+      flashOptNote('label-style-note', `${r.label}: ${lo} to ${hi} ${r.unit}, in steps of ${r.step}.`);
+    };
+    input.addEventListener('change', commit);
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); input.blur(); } });
+    wrap.append(input, unit); row.append(lab, wrap); box.appendChild(row);
+  }
+  const onOff = [{ label: 'Off', val: false }, { label: 'On', val: true }];
+  for (const [key, label] of [['bold', 'Bold'], ['allCaps', 'All caps'], ['predictIcons', 'Predict icons']]) {
+    box.appendChild(optSeg(label, onOff, S[key], v => { if (styleEdit(build, key, v)) { afterStyle(key); renderChecklist(); } }));
+  }
+  const note = document.createElement('div'); note.className = 'opt-note'; note.id = 'label-style-note';
+  note.textContent = 'The label generator\'s own settings - they print exactly like this.';
+  note.dataset.base = note.textContent;
+  box.appendChild(note);
+}
+let optNoteTimer = 0;
+function flashOptNote(id, text) {
+  const n = $(id); if (!n) return;
+  n.textContent = text; n.classList.add('opt-note-warn');
+  clearTimeout(optNoteTimer);
+  optNoteTimer = setTimeout(() => { const m = $(id); if (m) { m.textContent = m.dataset.base || ''; m.classList.remove('opt-note-warn'); } }, 1600);
+}
 function renderOptions() {
   const box = $('build-options');
   if (!box) return;
@@ -4989,6 +5096,7 @@ function renderOptions() {
     box.appendChild(optSeg('Top cover', [{ label: 'Per-column', val: false }, { label: 'Staggered', val: true }], !!build.wallStagger,
       async v => { track('opt:topcover:' + (v ? 'staggered' : 'per-column')); build.wallStagger = v; await regenerate(); }));
   }
+  renderLabelStyleRows(box);
   // Build plate - the sheet the whole build printed on. Every part with a
   // confirmed print pose takes its finish on the face that lay on the plate, so
   // the row shows on every generated build and sits last, apart from the
@@ -5525,6 +5633,10 @@ controls.addEventListener('start', dismissTapHint);
 addEventListener('keydown', e => {
   if (IS_PART) return; // the preview has no pages — arrows must not walk into the step machinery
   if (IS_BENCH) return; // nor the benchmark: one stray arrow mid-run would page to the outro and time a different workload
+  // a caret moving inside a field (the label editor, a Build-options number) is not a page turn - goTo would deselect
+  // and close the card mid-word (the planner's own arrow handler has the same guard)
+  const tag = e.target && e.target.tagName ? e.target.tagName.toLowerCase() : '';
+  if (tag === 'input' || tag === 'select' || tag === 'textarea') return;
   if (e.key === 'ArrowRight') goTo(cur + 1);
   if (e.key === 'ArrowLeft') goTo(cur - 1, { animate: false });
 });
@@ -5708,6 +5820,15 @@ let lipUnit = null;
    switching (null otherwise). Assigned in setSelected, read by cycleVariant.
    Declared up here for the same TDZ reason as lipUnit. */
 let variantUnit = null;
+/* The label the identify card is EDITING (label plan step 2): { inst, unit, draft: { text, badge } | null, tracked } -
+   null when the selection is anything else. `draft` is what the text field holds while typing, shown on the 3D label but
+   NOT yet written into `build`; the unit's stored words are the committed value, and only a commit (Enter / blur / a badge
+   pick) writes them and posts to the planner. Declared up here for the same TDZ reason as lipUnit. */
+let labelEdit = null;
+/* The card's single-slot Undo: the previous { label, labelBadge } of the last committed edit, offered for ~6 s. */
+let lastLabelEdit = null;
+let labelPreviewTimer = 0, labelStatusTimer = 0, labelUndoTimer = 0, labelMismatchWarned = false;
+const LABEL_PREVIEW_MS = 350;   // the draft preview's debounce - see the label-edit-text `input` handler for the measurement
 function setSelected(id) {
   if (selectedId === id) return;
   schedulePaidNote(); // the card's paid links come and go with the selection
@@ -5726,7 +5847,7 @@ function setSelected(id) {
     slideRitual(ritualInst, false); // label/accent/cover reseats in reverse on deselect/switch
     ritualInst = null;
   }
-  if (!id) { if (prevOpen) slideDrawer(prevOpen, false); exitFaceplateFocus(); exitDrawerFocus(); card.classList.add('hidden'); $('pointer-line').classList.add('hidden'); return; }
+  if (!id) { if (prevOpen) slideDrawer(prevOpen, false); exitFaceplateFocus(); exitDrawerFocus(); renderLabelEditor(null); card.classList.add('hidden'); $('pointer-line').classList.add('hidden'); return; }
   if (isMobile() || IS_EMBED) setChecklist(false); // mobile + narrow dock: parts list & identify card are mutually exclusive
   const inst = instances.get(id);
   inst.group.traverse(o => { if (o.isMesh) o.material = materialFor(inst, selGlow(inst), o.userData.zone); });
@@ -5814,6 +5935,7 @@ function setSelected(id) {
     ? build.placed.find(p => p.id === inst.cfg.owner && gridfinitySizeOk(+build.length, p)) || null : null;
   $('identify-variant').classList.toggle('hidden', !variantUnit);
   if (variantUnit) $('variant-name').textContent = variantUnit.variant === 'gridfinity' ? 'Gridfinity drawer' : 'Standard drawer';
+  renderLabelEditor(inst, selType);   // the label's words + icon editor, or the ✎ hand-off from its drawer / faceplate
   card.classList.remove('hidden');
   // drawer-open interaction (assembled scenes only — the drawer must be resting
   // in its FINAL seat, not staged or mid-step). Selecting the drawer BODY pulls
@@ -6912,7 +7034,9 @@ $('fm-buy').addEventListener('click', () => track(buyFilamentEvent(customColors[
 function labelGenInfo() {
   const url = LABEL_GEN_URLS[currentFaceplateStyle()?.key];
   if (!url) return null;
-  const labels = build ? build.placed.filter(p => p.fill === 'decor' && p.label).map(p => p.label) : [];
+  // as typed, in the ONE drawer order every label list uses (the planner's labelOrder: top row first, left to right) - this
+  // used to send them in placement order, so the generator's plate came out in that order (Sol 01a0fd07, point 9)
+  const labels = build ? labelOrder(build.placed.filter(p => p.fill === 'decor' && cleanLabelText(p.label))).map(p => cleanLabelText(p.label)) : [];
   return { href: url + (labels.length ? '#labels=' + btoa(unescape(encodeURIComponent(JSON.stringify(labels)))) : ''), count: labels.length };
 }
 const currentFaceplateStyle = () => {
@@ -7131,7 +7255,7 @@ $('identify-remove').onclick = async () => {
   } else if ((type === 'MagnetClip' || type === 'Magnet') && inst.cfg.owner != null) {
     track('opt:remove-magnet');
     const d = build.placed.find(u => u.id === inst.cfg.owner);
-    if (d) d.closure = 'none'; else return;
+    if (d) delete d.closure; else return;   // "none" = absence, the planner's rule (the generator reads only === 'magnet')
   } else return;
   setSelected(null);
   await regenerate();
@@ -7150,6 +7274,195 @@ $('identify-open-drawer').onclick = () => {
 };
 // the obvious way OUT of an open drawer (an empty tap still works too)
 $('identify-close-drawer').onclick = () => setSelected(null);
+
+/* ---- the label editor on the identify card (label plan step 2, Joey 2026-10-02: "the viewer label panel (name + icon per
+   label; size/depth/bold/caps/icon size once per build - the generator's own split)") ------------------------------------
+   Anchor: a selected EdgeLabel label (LABEL_TEXT_NODES) that belongs to a planner unit, on a generated build. Classic Pro
+   labels show no text yet, so they get no editor (open question 1). The DRAWER BODY and FACEPLATE cards get one line,
+   "✎ Label: TORX BITS ▸", that re-selects that drawer's label - the thing people actually tap.
+   Preview = a DRAFT: typing rebuilds that one label's meshes from the field's text without touching `build`; Enter / blur
+   commits (the planner's own field commits the same way), a badge pick commits at once. A commit writes `build` through
+   editCommit (label-spec's cleaners), refreshes the label in place and posts currentOpts to the planner, which stores it,
+   re-renders its board and answers with a layout the echo guard drops. Nothing here regenerates. */
+const labelInstOfDrawer = (drawerId) => [...instances.values()].find(i => i.cfg.rides === drawerId && LABEL_TEXT_NODES.has(i.cfg.node)) || null;
+function renderLabelEditor(inst, selType) {
+  const box = $('identify-label-edit'), go = $('identify-label-go');
+  let editInst = null, goInst = null;
+  if (inst && build) {
+    if (selType === 'Label' && LABEL_TEXT_NODES.has(inst.cfg.node) && labelUnitFor(inst)) editInst = inst;
+    else if (selType === 'Drawer') goInst = labelInstOfDrawer(inst.cfg.id);
+    else if (selType === 'Faceplate') { const c = drawerCarrier(inst); goInst = c ? labelInstOfDrawer(c.cfg.id) : null; }
+  }
+  if (goInst && !labelUnitFor(goInst)) goInst = null;
+  if (labelEdit && labelEdit.inst !== editInst) {
+    // leaving the editor with a draft on screen: the label goes back to its committed words
+    clearTimeout(labelPreviewTimer);
+    const leaving = labelEdit; labelEdit = null;
+    if (leaving.draft && instances.has(leaving.inst.cfg.id)) refreshLabelText(leaving.inst);
+  }
+  go.classList.toggle('hidden', !goInst);
+  if (goInst) {
+    const words = cleanLabelText(labelUnitFor(goInst).label);
+    go.textContent = words ? `✎ Label: ${labelCapsOn() ? words.toUpperCase() : words} ▸` : '✎ Add a label ▸';
+    go.onclick = () => {
+      // like "Open the drawer": the pre-isolation view transfers so the final deselect still returns to where the user started
+      if (fpFocus.saved && !dFocus.saved) { dFocus.saved = fpFocus.saved; fpFocus.saved = null; }
+      setSelected(goInst.cfg.id);
+    };
+  }
+  if (!editInst) { labelEdit = null; box.classList.add('hidden'); document.body.classList.remove('label-edit-open'); return; }
+  if (!labelEdit || labelEdit.inst !== editInst) {
+    labelEdit = { inst: editInst, unit: labelUnitFor(editInst), draft: null, tracked: false, picker: false };
+    $('label-edit-text').value = labelEdit.unit.label || '';
+    $('label-edit-picker').classList.add('hidden');
+    $('label-edit-badge').setAttribute('aria-expanded', 'false');
+    setLabelStatus('');
+  }
+  box.classList.remove('hidden');
+  document.body.classList.add('label-edit-open');
+  if (!labelFontReady()) loadLabelFont().then(() => { if (labelEdit) { renderLabelEditorState(); renderIconPicker(); } }).catch(() => {});
+  renderLabelEditorState();
+}
+const labelCapsOn = () => effectiveStyle(build, labelCore()?.DEFAULTS).allCaps;
+/* Everything on the card that reads from state: the field's caps display, the badge button + its state words, the fit verdict,
+   the standalone note. Called after every commit, style change and relayed change; `opts.remote` names units the PLANNER
+   just changed, so the card can say so when it is one of them. */
+function renderLabelEditorState(opts = {}) {
+  if (!labelEdit) return;
+  const { unit, inst } = labelEdit;
+  const field = $('label-edit-text');
+  const committed = cleanLabelText(unit.label);
+  // the field shows the committed words unless a draft is being typed; a planner change replaces even a focused field
+  // (the planner is the source of truth) and says so for a second
+  const remote = Array.isArray(opts.remote) && opts.remote.includes(unit.id);
+  if (remote) { labelEdit.draft = null; field.value = unit.label || ''; setLabelStatus('Changed in the planner', 1200); }
+  else if (!labelEdit.draft && document.activeElement !== field) field.value = unit.label || '';
+  field.classList.toggle('caps', labelCapsOn());
+  const text = labelEdit.draft ? cleanLabelText(labelEdit.draft.text) : committed;
+  const badge = unit.labelBadge;   // live, never snapshotted into the draft (see refreshLabelText)
+  const core = labelCore();
+  const btn = $('label-edit-badge');
+  const worn = shownBadge(text, badge, build.labelStyle, core);
+  btn.classList.toggle('predicted', !!worn.predicted);
+  btn.classList.toggle('set', !worn.predicted && worn.type !== 'none');
+  btn.disabled = !committed;
+  btn.title = committed ? 'Icon or letter for this label' : 'Type a label first';
+  if (worn.type === 'icon') { const it = core && core.ICON_LIBRARY.find(i => i.id === worn.value); btn.innerHTML = it ? it.svg : '+'; }   // sha-pinned vendored core, not data
+  else if (worn.type === 'char') btn.textContent = labelCapsOn() ? worn.value.toUpperCase() : worn.value;
+  else btn.textContent = '+';
+  // the words beside the button name the state for the words on screen - a draft included, so typing shows what Auto would pick
+  $('label-edit-badge-state').textContent = text ? badgeStateText(text, badge, build.labelStyle, core) : '';
+  // the generator's own verdict, read off the meshes it built for THIS label
+  let fits = true;
+  if (text && labelFontReady()) { const t = labelGeometry(text, badge, build.labelStyle); if (t && t.fits === false) fits = false; }
+  const fitEl = $('label-edit-fit');
+  fitEl.textContent = fits ? '' : 'Won\'t fit, even at the 3 mm minimum';
+  fitEl.classList.toggle('hidden', fits);
+  $('label-edit-note').classList.toggle('hidden', !!plannerWin());
+  for (const b of $('label-pick-icons').children) b.classList.toggle('on', worn.type === 'icon' && b.dataset.icon === worn.value && !worn.predicted);
+  if (labelEdit.picker) renderIconPicker();
+}
+function setLabelStatus(text, ms) {
+  const el = $('label-edit-status');
+  clearTimeout(labelStatusTimer);
+  el.textContent = text;
+  el.classList.toggle('hidden', !text);
+  if (text && ms) labelStatusTimer = setTimeout(() => { if (el.textContent === text) { el.textContent = ''; el.classList.add('hidden'); } }, ms);
+}
+/* A commit: write the unit through editCommit, show it, relay it, offer Undo. `patch` is editCommit's. ONE commit = ONE
+   post to the planner; `undo: true` marks the Undo button's own commit, which must not refill the slot it just used (an undo
+   of an undo is not offered - the planner's history is the real undo). */
+function commitLabelEdit(patch, event, { undo = false } = {}) {
+  if (!labelEdit || !build) return;
+  const { unit, inst } = labelEdit;
+  const before = JSON.stringify([unit.label ?? '', unit.labelBadge ?? null]);
+  const prev = editCommit(build, unit.id, patch);
+  clearTimeout(labelPreviewTimer);
+  labelEdit.draft = null;
+  if (JSON.stringify([unit.label ?? '', unit.labelBadge ?? null]) === before) { renderLabelEditorState(); return; }
+  if (event === 'label:edit') { if (!labelEdit.tracked) { labelEdit.tracked = true; track(event); } } else if (event) track(event);
+  if (!undo) lastLabelEdit = { unitId: unit.id, prev };
+  refreshLabelText(inst);
+  renderLabelEditorState();
+  renderOptions();          // the Labels block appears with the first label (and its rows read the style)
+  if (!undo) offerLabelUndo();
+  syncBuildToPlanner();
+}
+function offerLabelUndo() {
+  const el = $('label-edit-undo');
+  el.classList.remove('hidden');
+  clearTimeout(labelUndoTimer);
+  labelUndoTimer = setTimeout(() => el.classList.add('hidden'), 6000);
+}
+$('label-edit-undo').onclick = () => {
+  $('label-edit-undo').classList.add('hidden');
+  if (!lastLabelEdit || !labelEdit || labelEdit.unit.id !== lastLabelEdit.unitId) return;
+  const { prev } = lastLabelEdit; lastLabelEdit = null;
+  // through the same commit path, so it relays like any edit - the words AND the badge they carried in ONE commit (editCommit
+  // applies the words first, then the badge on a unit that has words; `null` = the badge was absent = back to Auto), so the
+  // planner sees one post with the restored pair, never an intermediate "old words, new badge" state (Sol 01a0fffd, 3)
+  commitLabelEdit({ label: prev.label ?? '', labelBadge: prev.labelBadge === undefined ? null : prev.labelBadge }, 'label:undo', { undo: true });
+  $('label-edit-undo').classList.add('hidden');
+};
+// typing: the draft shows on the 3D label ~350 ms after the last keystroke; the unit is untouched until commit. 350, not
+// the design's guessed 120: one cache-miss rebuild MEASURED 65-101 ms with no icon, 86-153 ms with a predicted icon and
+// 127-263 ms with a letter badge on the main thread (e2e 1d, 3 runs x 9 strings, laptop, 2026-10-03) - a rebuild in every mid-word pause
+// would stall the next keystrokes, so it waits for a real pause (typical key gaps are well under 350 ms)
+$('label-edit-text').addEventListener('input', e => {
+  if (!labelEdit) return;
+  labelEdit.draft = { text: e.target.value };   // the words only - the badge stays the unit's live one
+  clearTimeout(labelPreviewTimer);
+  labelPreviewTimer = setTimeout(() => { if (labelEdit) { refreshLabelText(labelEdit.inst, labelEdit.draft); renderLabelEditorState(); } }, LABEL_PREVIEW_MS);
+});
+$('label-edit-text').addEventListener('change', e => commitLabelEdit({ label: e.target.value }, 'label:edit'));
+$('label-edit-text').addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); }
+  if (e.key === 'Escape' && labelEdit) {
+    // drop the draft: the field AND the 3D label go back to the committed words (the blur's `change` then finds nothing to commit)
+    e.target.value = labelEdit.unit.label || ''; labelEdit.draft = null; clearTimeout(labelPreviewTimer);
+    refreshLabelText(labelEdit.inst); renderLabelEditorState(); e.target.blur();
+  }
+});
+// the icon picker: a collapsible section INSIDE the card (never a popover - the generator's positions against a desktop
+// column); Auto / No icon / a letter / the core's icon grid
+function renderIconPicker() {
+  const grid = $('label-pick-icons');
+  const choices = iconChoices(labelCore());
+  if (!choices) { grid.innerHTML = ''; grid.textContent = 'Loading icons…'; return; }
+  if (grid.childElementCount !== choices.length) {
+    grid.textContent = '';
+    for (const c of choices) {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'le-icon'; b.dataset.icon = c.id; b.title = c.name; b.setAttribute('aria-label', c.name);
+      b.innerHTML = c.svg;   // the vendored core's own SVG strings (sha-pinned code, not user data)
+      b.onclick = () => { commitLabelEdit({ labelBadge: { type: 'icon', value: c.id } }, 'label:badge:icon'); };
+      grid.appendChild(b);
+    }
+  }
+  const worn = labelEdit ? shownBadge(cleanLabelText(labelEdit.unit.label), labelEdit.unit.labelBadge, build.labelStyle, labelCore()) : null;
+  for (const b of grid.children) b.classList.toggle('on', !!worn && worn.type === 'icon' && b.dataset.icon === worn.value && !worn.predicted);
+  const ch = $('label-pick-char');
+  if (document.activeElement !== ch) ch.value = labelEdit && cleanLabelBadge(labelEdit.unit.labelBadge)?.type === 'char' ? labelEdit.unit.labelBadge.value : '';
+}
+function toggleIconPicker(open) {
+  if (!labelEdit) return;
+  labelEdit.picker = open ?? !labelEdit.picker;
+  $('label-edit-picker').classList.toggle('hidden', !labelEdit.picker);
+  $('label-edit-badge').setAttribute('aria-expanded', String(labelEdit.picker));
+  if (labelEdit.picker) renderIconPicker();
+}
+$('label-edit-badge').onclick = () => toggleIconPicker();
+$('label-pick-auto').onclick = () => commitLabelEdit({ labelBadge: null }, 'label:badge:auto');
+$('label-pick-none').onclick = () => commitLabelEdit({ labelBadge: { type: 'none' } }, 'label:badge:none');
+const useLetter = () => { const v = $('label-pick-char').value; if (cleanLabelBadge({ type: 'char', value: v })) commitLabelEdit({ labelBadge: { type: 'char', value: v } }, 'label:badge:char'); };
+$('label-pick-use').onclick = useLetter;
+$('label-pick-char').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); useLetter(); } });
+$('label-edit-picker').addEventListener('keydown', e => { if (e.key === 'Escape') { e.stopPropagation(); toggleIconPicker(false); $('label-edit-badge').focus(); } });
+// a build id that names another build: drop the message whole, say so once in the console, count it once
+function noteBuildMismatch(o) {
+  if (!labelMismatchWarned) { labelMismatchWarned = true; console.warn(`[relay] buildOptions for build ${o.buildId} ignored - this page shows ${build.buildId}`); }
+  trackOnce('relay:build-mismatch');
+}
 
 canvas.addEventListener('pointerdown', e => { downXY = [e.clientX, e.clientY]; });
 canvas.addEventListener('pointerup', e => {
@@ -7935,9 +8248,14 @@ function currentOpts() {
   // generator keeps a variant on a size without one and renders the standard body
   const variants = {};
   for (const u of build.placed) if (u.fill === 'decor') variants[u.id] = u.variant === 'gridfinity' ? 'gridfinity' : 'standard';
+  // the labels (label plan step 2): `labels` for every DECOR unit ("" = none), `labelBadges` for the labelled ones (null =
+  // absent = the generator predicts), the cleaned `labelStyle` - all CLEANED on the way out (label-panel.js labelOptsOf), and
+  // `buildId` FIRST when this build has one, so the receiver can refuse a message meant for another build
+  const lo = labelOptsOf(build);
   // buildPlate goes out RESOLVED (a build that never stored one sends the default, 'powder'), and LAST, in the
   // same key order as the planner's post - its echo guard compares the two JSON strings
-  return { closures, lips, variants, removedStoppers: build.removedStoppers || [], wallStagger: !!build.wallStagger, handleStyle: build.handleStyle, faceStyle: build.faceStyle, backCover: !!build.backCover, feet: build.feet === 'adhesive' ? 'adhesive' : 'tpu', buildPlate: plateFinishOf(build) };
+  return { ...(lo.buildId ? { buildId: lo.buildId } : {}), closures, lips, variants, labels: lo.labels, labelBadges: lo.labelBadges, labelStyle: lo.labelStyle,
+    removedStoppers: build.removedStoppers || [], wallStagger: !!build.wallStagger, handleStyle: build.handleStyle, faceStyle: build.faceStyle, backCover: !!build.backCover, feet: build.feet === 'adhesive' ? 'adhesive' : 'tpu', buildPlate: plateFinishOf(build) };
 }
 // The planner window, wherever we live: a popped-out tab talks to its opener,
 // the docked split-view iframe talks to its parent.
@@ -8018,7 +8336,7 @@ let syncBuildToPlanner = () => {
 // pauses under #blocked-overlay with the reason; the old scene stays mounted
 // so the next legal layout regenerates in place. Mount/length changes reload
 // onto the new hash instead (backdrop + parts pool are page-lifetime).
-let booted = false, layoutRetryTimer = 0;
+let booted = false, layoutRetryTimer = 0, optsRetryTimer = 0;
 const showBlocked = r => { $('blocked-reason').textContent = r; $('blocked-overlay').classList.remove('hidden'); };
 const hideBlocked = () => $('blocked-overlay').classList.add('hidden');
 /* The no-op/echo guard for an incoming layout. WARNING: every per-unit field
@@ -8031,7 +8349,10 @@ const hideBlocked = () => $('blocked-overlay').classList.add('hidden');
 const layoutKey = b => JSON.stringify([b.mount, +b.length, (b.placed || []).map(u =>
   [u.id, u.x, u.y, u.w, u.hh, u.fill, u.shelves || 0, u.label || '', JSON.stringify(u.labelBadge ?? null), u.closure || '', u.lip || '', u.variant || '', JSON.stringify(u.interior ?? null)]),
   // the build's label style re-renders every label (the planner's layoutSig carries it as `ls`)
-  JSON.stringify(b.labelStyle ?? null)]);
+  JSON.stringify(b.labelStyle ?? null),
+  // the build's own id (the planner's layoutSig carries it as `id`): without it a layout differing only in the id is dropped,
+  // and a viewer booted from an official kit never learns the id the planner minted - so its relay gate would never engage
+  b.buildId || '']);
 async function applyRemoteLayout(nb) {
   if (!booted || !nb || !Array.isArray(nb.placed) || !nb.placed.length) return;
   if (regenBusy) { // mid-regenerate from an earlier message — retry, never drop the newest state
@@ -8041,6 +8362,20 @@ async function applyRemoteLayout(nb) {
   }
   hideBlocked();
   if (layoutKey(nb) === layoutKey(build)) return; // no-op/echo (e.g. the viewerReady handshake)
+  /* Only the labels (words, badges, style) and/or the build id changed: copy them and refresh the label meshes in place.
+     The manifest does not depend on any of them, and the full path's regenerate() would deselect - closing the card the
+     user has open on every planner keystroke (and on the one-off layout that hands an official kit its id). */
+  if (labelOnlyDiff(nb, build, layoutKey)) {
+    applyingRemote = true;
+    try {
+      const changedUnits = copyLabelFields(nb, build);
+      originalBuild = structuredClone(nb); // the Reset-to-original baseline follows the planner, as on the full path
+      refreshLabelTexts();
+      renderLabelEditorState({ remote: changedUnits });
+      renderOptions();   // the Labels block mirrors labelStyle
+    } finally { applyingRemote = false; }
+    return;
+  }
   if (nb.mount !== build.mount || +nb.length !== +build.length) {
     location.hash = '#build=' + btoa(unescape(encodeURIComponent(JSON.stringify(nb))));
     location.reload(); // hash-only changes don't navigate — force it
@@ -8077,8 +8412,21 @@ addEventListener('message', async (e) => {
     }
     return;
   }
-  if (d.gen2 !== 'buildOptions' || !d.opts || regenBusy) return;
+  if (d.gen2 !== 'buildOptions' || !d.opts) return;
+  if (regenBusy) {
+    // mid-regenerate from an earlier message: RETRY, never drop (the layout channel's rule since 2026-07-19). Until 2026-10-03
+    // this returned, and a planner change to a build-level option (handle style, back cover, plate...) made during that window
+    // was lost for good - the layout that follows does not carry those in its key, so it was dropped as an echo (Sol 01a0fffd, 1).
+    // Newest wins: a later message replaces a pending retry, exactly like layoutRetryTimer.
+    clearTimeout(optsRetryTimer);
+    optsRetryTimer = setTimeout(() => dispatchEvent(new MessageEvent('message', { data: d })), 250);
+    return;
+  }
   const o = d.opts;
+  // a message naming ANOTHER build (both ends have an id and they differ) is dropped whole - a stale popped-out tab must
+  // not write into whichever drawer now carries the same unit number. No id on either side = legacy / official kit = accepted.
+  const lc = labelOptsChanges(build, o);
+  if (lc.mismatch) { noteBuildMismatch(o); return; }
   // ignore a message that matches our current state — this is what breaks the
   // planner↔viewer echo loop (an applied change bounces back identical → dropped)
   let changed = false;
@@ -8096,10 +8444,17 @@ addEventListener('message', async (e) => {
   if (o.variants) for (const u of build.placed)
     if (u.fill === 'decor' && VARIANT_MODES.has(o.variants[u.id]) &&
         o.variants[u.id] !== (u.variant === 'gridfinity' ? 'gridfinity' : 'standard')) changed = true;
-  if (!changed) return;
+  // the three label booleans are kept APART from `changed`: a message whose only differences are label words, badges and/or
+  // the label style refreshes the label meshes in place and never regenerates (regenerate() would deselect, closing the
+  // card the planner user's edit was meant to update)
+  const labelChanged = lc.text || lc.badge || lc.style;
+  if (!changed && !labelChanged) return;
   applyingRemote = true;
   try {
-    if (o.closures) for (const u of build.placed) if (o.closures[u.id]) u.closure = o.closures[u.id];
+    // "none" is stored as ABSENCE, the planner's own rule (it deletes the field; its layouts never carry "none") - storing
+    // the resolved "none" here left layoutKey reading 'none' against the planner's '', so the next layout was never an echo
+    // and the label-only path never taken: one planner keystroke regenerated the build and closed the card (e2e, 2026-10-03)
+    if (o.closures) for (const u of build.placed) { const c = o.closures[u.id]; if (c === 'none') delete u.closure; else if (c) u.closure = c; }
     if (Array.isArray(o.removedStoppers)) build.removedStoppers = o.removedStoppers;
     if (typeof o.wallStagger === 'boolean') build.wallStagger = o.wallStagger;
     if (o.handleStyle) build.handleStyle = o.handleStyle;
@@ -8116,7 +8471,9 @@ addEventListener('message', async (e) => {
       if (u.fill !== 'decor' || !VARIANT_MODES.has(o.variants[u.id])) continue;
       if (o.variants[u.id] === 'gridfinity') u.variant = 'gridfinity'; else delete u.variant;   // absence IS standard
     }
-    await regenerate();
+    if (labelChanged) applyLabelOpts(build, o);
+    if (changed) await regenerate();                                    // attachLabelTexts runs on the mount, labels included
+    else { refreshLabelTexts(); renderLabelEditorState(); renderOptions(); }
   } finally { applyingRemote = false; }
 });
 
@@ -8795,6 +9152,9 @@ if (new URLSearchParams(location.search).get('debug')) {
     // only, so a shadow measurement that does not state the stage means nothing
     applyStageTheme, get stageTheme() { return stageTheme; },
     get build() { return build; }, regenerate, setSelected, get selectedId() { return selectedId; },
+    // the label editor (step 2): its state, the in-place refresh and the relay payload, so an end-to-end check can read what
+    // the card holds and what would be posted without guessing
+    get labelEdit() { return labelEdit; }, refreshLabelTexts, currentOpts, labelFontReady, loadLabelFont, labelCore, labelGeometry,
     // part-preview internals (2026-08-19) — the mode flag, the view state and
     // the resolver, so an embed question is answerable by reading state
     IS_PART, partView, resolvePartPreview, fitPartCamera, PART_PLATE, plateStage,

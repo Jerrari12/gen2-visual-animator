@@ -13,7 +13,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
-import { LABEL_SPEC, cleanLabelBadge, cleanLabelStyle } from '../viewer/js/label-spec.js';
+import { LABEL_SPEC, LABEL_TEXT_MAX, BUILD_ID_RE, cleanLabelBadge, cleanLabelStyle, cleanLabelText, cleanBuildId } from '../viewer/js/label-spec.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const firstDir = (cands, file) => cands.find((d) => existsSync(join(d, file)));
@@ -72,11 +72,46 @@ function plannerCleaners() {
   // data.js needs the two scripts index.html loads before it, in that order
   const ctx = vm.createContext({});
   ctx.window = ctx;
+  const labelMax = app.match(/const LABEL_MAX = (\d+);/);
+  assert.ok(labelMax, 'planner app.js has no LABEL_MAX');
   vm.runInContext([readFileSync(join(PLANNER, 'js', 'requirement-scope.js'), 'utf8'),
-    readFileSync(join(PLANNER, 'js', 'tabletop-completion.js'), 'utf8'), data,
-    `${fnAt('cleanLabelBadge')}\n${fnAt('cleanLabelStyle')}\nthis.out = { GEN2, cleanLabelBadge, cleanLabelStyle };`].join('\n;\n'), ctx);
+    readFileSync(join(PLANNER, 'js', 'tabletop-completion.js'), 'utf8'), data, labelMax[0], (app.match(/const BUILD_ID_RE = [^;]+;/) || [''])[0],
+    `${fnAt('cleanLabelBadge')}\n${fnAt('cleanLabelStyle')}\n${fnAt('cleanLabelText')}\nthis.out = { GEN2, cleanLabelBadge, cleanLabelStyle, cleanLabelText, LABEL_MAX, BUILD_ID_RE };`].join('\n;\n'), ctx);
   return ctx.out;
 }
+
+/* The words (label plan step 2): ONE canonical form on both ends - trim, THEN cut to 40 - so a label that enters either tool
+   by any path (the field, a link, the relay) never leaves the two disagreeing. The planner used to slice without trimming
+   on its restore path while its field trimmed; the ORDER matters too (" ".repeat(3) + 45 x's is 40 x's one way, 37 the other). */
+const TEXTS = ['Torx Bits', '  Torx  ', ' '.repeat(3) + 'x'.repeat(45), ' '.repeat(50) + 'x', 'y'.repeat(41), ' '.repeat(40), '', 7, null, undefined, ['a'], { label: 'a' }];
+
+test('cleanLabelText trims, then cuts to 40, and gives "" for anything that is not words', () => {
+  assert.equal(LABEL_TEXT_MAX, 40);
+  assert.equal(cleanLabelText('  Torx  '), 'Torx');
+  assert.equal(cleanLabelText(' '.repeat(3) + 'x'.repeat(45)), 'x'.repeat(40), 'trim must come BEFORE the cut');
+  assert.equal(cleanLabelText(' '.repeat(50) + 'x'), 'x', 'leading whitespace must not eat the whole allowance');
+  assert.equal(cleanLabelText('y'.repeat(41)), 'y'.repeat(40));
+  assert.equal(cleanLabelText(' '.repeat(40)), '', 'a whitespace-only label is no label');
+  for (const v of [7, null, undefined, ['a'], { label: 'a' }]) assert.equal(cleanLabelText(v), '');
+});
+
+test('cleanBuildId keeps the planner\'s own ids and nothing else', () => {
+  assert.equal(cleanBuildId('k7m2p9q4x1z8'), 'k7m2p9q4x1z8');
+  assert.equal(cleanBuildId('abcdefgh'), 'abcdefgh', '8 is the planner\'s floor');
+  for (const v of ['../../x', 'ABCDEFGHIJKL', 'short', 'z'.repeat(33), '', null, 12, {}]) assert.equal(cleanBuildId(v), null, `${JSON.stringify(v)} passed`);
+  assert.equal(String(BUILD_ID_RE), '/^[a-z0-9]{8,32}$/');
+});
+
+test('the viewer and the planner give the same words for every text, and share the 40 and the id shape', { skip: !PLANNER && 'planner checkout not present' }, () => {
+  const P = plannerCleaners();
+  for (const t of TEXTS) assert.equal(cleanLabelText(t), P.cleanLabelText(t), `label text ${JSON.stringify(t)}`);
+  assert.equal(P.LABEL_MAX, LABEL_TEXT_MAX, 'the planner\'s LABEL_MAX and the viewer\'s LABEL_TEXT_MAX differ');
+  assert.equal(String(P.BUILD_ID_RE), String(BUILD_ID_RE), 'the two BUILD_ID_RE differ');
+  // the three fields that take the words all say 40: the planner's #ut-label, the viewer's card, the constant
+  const maxlength = (html, id) => { const m = html.match(new RegExp(`<input[^>]*id="${id}"[^>]*>`)); assert.ok(m, `no #${id}`); return +m[0].match(/\smaxlength="(\d+)"/)[1]; };
+  assert.equal(maxlength(readFileSync(join(PLANNER, 'index.html'), 'utf8'), 'ut-label'), LABEL_TEXT_MAX);
+  assert.equal(maxlength(readFileSync(join(root, 'viewer', 'index.html'), 'utf8'), 'label-edit-text'), LABEL_TEXT_MAX);
+});
 
 test('the viewer and the planner give the same answer for every badge and style', { skip: !PLANNER && 'planner checkout not present' }, () => {
   const P = plannerCleaners();

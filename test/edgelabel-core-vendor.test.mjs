@@ -71,6 +71,22 @@ test('the core\'s DEFAULTS are the values the generator\'s inputs start at (when
   assert.equal(D.colorText, value('color-text').toLowerCase());
 });
 
+/* The label panel (step 2) leans on the core in two places that must not drift from it. */
+test('the Labels rows\' fallback defaults ARE the core\'s DEFAULTS, and the picker offers exactly ICON_LIBRARY', async () => {
+  const { LABEL_STYLE_FALLBACK, LABEL_STYLE_ROWS, iconChoices } = await import('../viewer/js/label-panel.js');
+  const { LABEL_SPEC } = await import('../viewer/js/label-spec.js');
+  const C = loadCore();
+  for (const k of Object.keys(LABEL_STYLE_FALLBACK)) assert.equal(LABEL_STYLE_FALLBACK[k], C.DEFAULTS[k], `LABEL_STYLE_FALLBACK.${k}`);
+  assert.deepEqual(Object.keys(LABEL_STYLE_FALLBACK).sort(), [...Object.keys(LABEL_SPEC.limits), ...LABEL_SPEC.flags].sort(),
+    'the fallback does not cover exactly the fields the panel edits');
+  assert.deepEqual(LABEL_STYLE_ROWS.map((r) => r.key), Object.keys(LABEL_SPEC.limits), 'a number row per limit, in the spec\'s order');
+  const choices = iconChoices(C);
+  assert.equal(choices.length, 23, 'the picker does not list the core\'s 23 icons');
+  assert.deepEqual(choices.map((c) => c.id), C.ICON_LIBRARY.map((i) => i.id), 'the picker\'s ids are not ICON_LIBRARY\'s, in its order');
+  for (const c of choices) assert.ok(c.svg.startsWith('<svg') && c.name, `${c.id} has no svg/name`);
+  assert.equal(iconChoices(null), null, 'before the core loads there are no choices (the card says Loading icons…)');
+});
+
 test('label-text.js seeds the text colour the core defaults to', () => {
   const src = readFileSync(join(root, 'viewer', 'js', 'label-text.js'), 'utf8');
   const m = src.match(/LABEL_TEXT_DEFAULTS = Object\.freeze\(\{ hex: '(#[0-9a-f]{6})' \}\)/i);

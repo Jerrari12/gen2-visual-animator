@@ -156,9 +156,13 @@ jobs:
           # each drawer's planner label drawn on its EdgeLabel label (2026-10-01) - a main.js import; it loads its vendored
           # opentype.js and font itself, by URL relative to import.meta.url, and only when a build has label text
           sed -i "s|'./label-text.js'|'./label-text.js?v=$V'|" viewer/js/main.js
-          # what a label may carry besides its words (2026-10-02) - imported by label-text.js, NOT main.js, so the sed target
-          # is label-text.js (the filament-profiles.js case above)
+          # what a label may carry besides its words (2026-10-02) - imported by label-text.js, and since the label panel
+          # (step 2) by main.js and label-panel.js as well: three sed targets, one per importer (the filament-profiles.js case)
           sed -i "s|'./label-spec.js'|'./label-spec.js?v=$V'|" viewer/js/label-text.js
+          sed -i "s|'./label-spec.js'|'./label-spec.js?v=$V'|" viewer/js/main.js
+          sed -i "s|'./label-spec.js'|'./label-spec.js?v=$V'|" viewer/js/label-panel.js
+          # the label panel's pure parts (label plan step 2) - a main.js import
+          sed -i "s|'./label-panel.js'|'./label-panel.js?v=$V'|" viewer/js/main.js
           sed -i "s|'./orbit-bench.js'|'./orbit-bench.js?v=$V'|" viewer/js/settle-bench.js
 
       # Fail the deploy rather than ship a half-stamped module graph. A first
