@@ -360,6 +360,15 @@ const shelfEnter = (id, base = [0, 0, 0]) => ({
   from: [0, 0, SHELF_FIT.slide],
 });
 const shelfDrop = (id) => ({ id, by: [0, -SHELF_FIT.rise, 0], hold: SHELF_FIT.hold, ease: 'detent' });
+/* A CASE EXTENDER STARTS FULLY BEHIND THE RING IT ENGAGES (Astra 2026-10-03: "show the BEGINNING of the dovetail
+   engagement accurately"). It first slid on from WALL.coverSlide (60 mm), so on a 185 it appeared already about two
+   thirds overlapped and the start of the engagement was never shown. MEASURED 2026-10-03 off the JSON chunk of all 22
+   shipped CaseExtender GLBs and their 1H cases (test/lib/glb-spans.mjs): both span exactly +-L/2 in Z on every length
+   and width (worst 0.008 mm), so a ring that starts `depth + EXT_CLEAR` behind has its front face EXT_CLEAR behind the
+   back face of the ring below. The slide is ~3x longer, so it is paced EXT_PACE slower (the whole ring phase grows by
+   ~0.3 s) rather than left to cross 200 mm at the cover's 750 ms. */
+const EXT_CLEAR = 15;
+const EXT_PACE = 1.4;
 
 // Amazon affiliate buy links for purchased hardware (Joey's, 2026-07-12) —
 // rendered as extra chips after Printables/Thangs in the BOM checklist +
@@ -652,6 +661,7 @@ export function generateManifest(build) {
   // final volume. 165/185 keep their calibrated values exactly.
   const slideBack = -Math.max(170, depth - 15);       // covers/FR-U/settle-from-behind reach
   const wallFwd = Math.max(WALL.lowerFwd, depth + 40);// wall lower-row slide-in reach
+  const extSlide = depth + EXT_CLEAR;                 // a ring's slide-on: from fully clear behind the ring below (EXT_CLEAR)
   // How far the Drawers step pops the demo drawer forward. The magnet clip
   // rides the drawer's BACK (z −83 + dz), so the pop has to clear the CASE
   // FRONT (depth/2) or you're watching the clip go on inside the case — which
@@ -823,6 +833,11 @@ export function generateManifest(build) {
   const maxTop = Math.max(...units.map(u => u.topIdx));  // top edge, in half-rows
   const colCenter = c => (c + 0.5 - totalW / 2) * PITCH_X;   // center of column c
   const spanCenter = u => (u.col + u.w / 2 - totalW / 2) * PITCH_X;
+  /* The wall top-case BENCH has to leave room behind the case for an extender's full slide-on (EXT_CLEAR above), or a
+     240/270 ring would start behind the wall plane. A ring starting `extSlide` behind a case benched `wallBench` out has
+     its back face exactly where the case back rests on the wall, so wallBench >= extSlide. 185 + 15 = the calibrated
+     200, so 59-185 never move, and a build with no extender keeps WALL.benchFwd byte for byte. */
+  const wallBench = units.some(u => u.fill === 'shelf' && u.hh > 2) ? Math.max(WALL.benchFwd, extSlide) : WALL.benchFwd;
 
   // single-case bottom row: no footrails — the case itself takes the feet
   // (rails exist to LINK cases horizontally; one case has nothing to link).
@@ -1286,7 +1301,7 @@ export function generateManifest(build) {
     // enter+move). Staggered top cases share one bench stage ('wtop') so the
     // whole row hangs together; per-column top cases each get their own.
     const st = hangs ? (isWall && isTop ? (isStaggered ? 'wtop' : `w${i}`) : null) : (isBase ? 'base' : `c${i}`);
-    if (st && !isBase) stages[st] = isWall ? [0, WALL.drop, WALL.benchFwd] : [0, 0, slideBack];
+    if (st && !isBase) stages[st] = isWall ? [0, WALL.drop, wallBench] : [0, 0, slideBack];
     const stg = st ? { stage: st } : {};
     inst.push({ id: `case${i}`, node: caseNode, pos: [cx, bottom, 0], ...stg });
     /* The case IS the unit's enclosure, exactly as the extender above it is -
@@ -1490,6 +1505,22 @@ export function generateManifest(build) {
         stgOff[2] + zBase + (lipIds.length ? lipMidZ : SHELF.z),
       ],
     });
+    /* Frame the WHOLE slide-on of the rings: each starts fully behind the ring below (extSlide), and that start is
+       the point (Astra 2026-10-03). Measured off the frames: at the wall bench's close shot the start sat behind the
+       already-hung neighbours and cut by the frame top, and on the under-table demo the rings played inside the shelf
+       close-up, out of frame. `fitR` is the bounding SPHERE of everything the rings travel through - the ring below,
+       every ring's start and its seat - so main.js's aspect-aware fit keeps the start on screen at any window shape.
+       Viewed from the unit's OUTER side (t sign follows cx), where no neighbour stands between the camera and it, and
+       from above (p 55) so the dovetail travel reads along the case walls. */
+    const ringCam = (zBase = 0) => {
+      const z0 = stgOff[2] + zBase, y0 = bottom + stgOff[1];
+      const lenZ = depth + extSlide, tall = rings * PITCH_HALF_Y * 2 + 3;
+      return {
+        t: cx > 0 ? 35 : -35, p: 55,
+        fitR: Math.hypot(lenZ, tall, u.w * PITCH_X) / 2 * 1.05,
+        target: [cx + stgOff[0], y0 + tall / 2, z0 + depth / 2 - lenZ / 2],
+      };
+    };
     /* Everything a SHELF unit adds to whatever bench assembles it, in PHYSICAL
        order: the insert is lowered into the still-open case, its lip dovetails
        in, and only then do the extender rings stack on top.
@@ -1512,8 +1543,10 @@ export function generateManifest(build) {
           out.push({ enter: lipIds.map(id => lipEnter(id, at || [0, 0, 0])) });
           out.push({ move: lipIds.map(id => lipSlide(id)) });
         }
-        if (restore) out.push({ camera: restore });
+        // with rings to come, the shot goes to ringCam instead and `restore` waits until they are on
+        if (restore && !extIds.length) out.push({ camera: restore });
       }
+      if (extIds.length) out.push({ camera: ringCam(zBase) });
       /* Then the rings. ⚠ AN EXTENDER GOES ON EXACTLY AS A CASE DOES (Joey
          2026-09-21: "it should be exactly the same animation as a case ...
          sliding forward onto the case back to front"; "extenders follow the
@@ -1522,7 +1555,8 @@ export function generateManifest(build) {
          then each ring DROPPED straight on, which no dovetail allows. So it
          slides on from behind over the pair already seated in the ring below,
          pressing those tabs down (dip) and letting them spring into its
-         keyholes at full seat (pop) - the cover's bench slide, same distance.
+         keyholes at full seat (pop). It starts FULLY behind the ring below (extSlide =
+         depth + EXT_CLEAR, Astra 2026-10-03), so the start of the engagement is shown.
          Each ring is then given its own QuickLock pair — every seam locks
          (Joey 2026-08-29), so the pair that belongs to ring k is fitted while
          ring k is still the open top. Doing all the rings first and all the
@@ -1530,13 +1564,15 @@ export function generateManifest(build) {
          capped by the ring above it. `drop` still sets how far the PAIRS fall. */
       extIds.forEach((id, n) => {
         const below = [qlId(n, 'L'), qlId(n, 'R')];
-        out.push({ enter: [{ id, ...off, from: [0, 0, -WALL.coverSlide] }], dip: dipItems(below, WALL.coverSlide) });
+        // from fully clear behind the ring below (extSlide, EXT_CLEAR), paced so the longer slide still reads
+        out.push({ pace: EXT_PACE, enter: [{ id, ...off, from: [0, 0, -extSlide] }], dip: dipItems(below, extSlide) });
         out.push({ pop: popItems(below) });
         out.push({ enter: [
           { id: qlId(n + 1, 'L'), ...off, from: [0, drop, 0] },
           { id: qlId(n + 1, 'R'), ...off, from: [0, drop, 0] },
         ] });
       });
+      if (extIds.length && restore) out.push({ camera: restore });
       return out;
     };
     // the note that explains the rings, said once per shelf that has them
@@ -1563,7 +1599,7 @@ export function generateManifest(build) {
     if (isWall && isTop && isStaggered) {
       // Staggered: each top case is just LINED UP on the shared bench here; the
       // one connected cover + the hang come after the whole row is placed.
-      const benchCam = { ...cam(0, flatTopY - 10, totalW, gridBottom), target: [0, flatTopY - 10, WALL.benchFwd] };
+      const benchCam = { ...cam(0, flatTopY - 10, totalW, gridBottom), target: [0, flatTopY - 10, wallBench] };
       const n = topPlacements.length + 1;
       topPlacements.push({
         title: `Top case ${n} · ${u.w}W-${H}H`,
@@ -1622,7 +1658,7 @@ export function generateManifest(build) {
       // ⚠ HOISTED above the bench array (2026-08-28): the shelf close-up has to
       // restore this shot before the Cover Lower goes on, and `const` in its
       // temporal dead zone threw on every wall shelf build.
-      const benchCam = { t: 30, p: 58, r: caseR(u.w, caseH), target: [cx, bottom + caseH / 2 + WALL.drop, WALL.benchFwd] };
+      const benchCam = { t: 30, p: 58, r: caseR(u.w, caseH), target: [cx, bottom + caseH / 2 + WALL.drop, wallBench] };
       // bench assembly, in physical order (CL → stoppers → CU)
       // the BASE ring's pair, right after the case as always; shelfFit adds each
       // further ring's own pair as that ring goes on
@@ -1641,7 +1677,7 @@ export function generateManifest(build) {
       if (stopIds.length) bench.push({ enter: stopIds.map(id => ({ id, from: [0, 35, 0] })) });
       bench.push({ enter: cuLocal.map(id => ({ id, from: [0, 0, -WALL.coverSlide] })) });
 
-      const back = { move: members.map(id => ({ id, by: [0, 0, -WALL.benchFwd] })) }; // bench → wall (pegs enter the back slots)
+      const back = { move: members.map(id => ({ id, by: [0, 0, -wallBench] })) }; // bench → wall (pegs enter the back slots)
       const drop = { move: members.map(id => ({ id, by: [0, -WALL.drop, 0] })) };     // drop onto the pegs
       const land = { land: st };
       const base = cam(cx, bottom + caseH / 2, totalW, gridBottom, FIT); // frames the hung (final) build
@@ -1692,19 +1728,24 @@ export function generateManifest(build) {
         // case so BOTH outer-wall slots are visible on any size, 1W-05H..4W-2H;
         // r scales with the case width), then glides back to the below view in
         // its own phase BEFORE the slide-in starts.
-        const above = { t: 26, p: 36, r: Math.max(430, u.w * PITCH_X * 2.4), target: [cx, bottom + caseH / 2, UT.fwd] };
+        /* With extenders, the demo stands far enough out that a ring's whole slide-on (extSlide) starts in front of
+           the rail: the rail is front-aligned (its front face at depth/2), so the ring's start back face
+           (F - extSlide - depth/2) clears it by 5 mm when F = depth + extSlide + 5. At UT.fwd a ring would start
+           under the rail plate and emerge from it. Without extenders nothing moves. */
+        const F = extIds.length ? Math.max(UT.fwd, depth + extSlide + 5) : UT.fwd;
+        const above = { t: 26, p: 36, r: Math.max(430, u.w * PITCH_X * 2.4), target: [cx, bottom + caseH / 2, F] };
         step.phases = [
-          { enter: [{ id: `case${i}`, at: [0, 0, UT.fwd], from: [0, 0, 60] }] },
+          { enter: [{ id: `case${i}`, at: [0, 0, F], from: [0, 0, 60] }] },
           { camera: above },                                   // rise above the bench
-          { enter: [{ id: qlId(0, 'L'), at: [0, 0, UT.fwd], from: [0, 45, 0] }, { id: qlId(0, 'R'), at: [0, 0, UT.fwd], from: [0, 45, 0] }] },
-          ...(mcId ? [{ enter: [{ id: mcId, at: [0, 0, UT.fwd], from: [0, 30, 0] }, { id: mgId, at: [0, 0, UT.fwd], from: [0, 0, -30] }] }] : []),
+          { enter: [{ id: qlId(0, 'L'), at: [0, 0, F], from: [0, 45, 0] }, { id: qlId(0, 'R'), at: [0, 0, F], from: [0, 45, 0] }] },
+          ...(mcId ? [{ enter: [{ id: mcId, at: [0, 0, F], from: [0, 30, 0] }, { id: mgId, at: [0, 0, F], from: [0, 0, -30] }] }] : []),
           // the shelf drops in while the camera is still overhead and the case
           // is out front — the `at` is cancelled by the shared move below, so
           // the step's net offset still comes back to zero. Extenders take the
           // same `at`, and ride the same cancelling move via `members`.
-          ...shelfFit({ at: [0, 0, UT.fwd], zBase: UT.fwd }),
+          ...shelfFit({ at: [0, 0, F], zBase: F }),
           { camera: camUp(cx, bottom + caseH / 2, totalW, gridBottom) }, // back below before the slide
-          { move: members.map(id => ({ id, by: [0, 0, -UT.fwd] })), dip: dipItems([`ql${i}L`, `ql${i}R`], UT.fwd) },
+          { move: members.map(id => ({ id, by: [0, 0, -F] })), dip: dipItems([`ql${i}L`, `ql${i}R`], F) },
           { pop: popItems([`ql${i}L`, `ql${i}R`]) },
         ];
         step.note = 'Fit the QuickLocks first (L left, R right)' + (mcId ? ', snap in the magnet clip,' : ',')
@@ -1814,7 +1855,7 @@ export function generateManifest(build) {
     });
     const coverIds = [...clLocal, ...cuLocal];
     const allMembers = [...topMembers, ...coverIds, ...stopIds];
-    const benchCam = { ...cam(0, flatTopY - 10, totalW, gridBottom), target: [0, flatTopY - 10, WALL.benchFwd] };
+    const benchCam = { ...cam(0, flatTopY - 10, totalW, gridBottom), target: [0, flatTopY - 10, wallBench] };
     stagCoverStep = {
       title: 'Cover the top row',
       note: 'Slide the staggered Cover Lower across the whole top row'
@@ -1837,7 +1878,7 @@ export function generateManifest(build) {
     stagHang.note = 'Now hang the whole top row: push it straight back so the bracket pegs enter the case-back slots, then drop it 16 mm to lock. (The cover is ghosted so you can see the pegs.)';
     stagHang.phases = [
       { camera: pegCam, ghost: coverIds.map(id => ({ id })) },
-      { move: allMembers.map(id => ({ id, by: [0, 0, -WALL.benchFwd] })) },
+      { move: allMembers.map(id => ({ id, by: [0, 0, -wallBench] })) },
       { move: allMembers.map(id => ({ id, by: [0, -WALL.drop, 0] })) },
       { camera: base, solid: coverIds.map(id => ({ id })) },
       { land: 'wtop' },

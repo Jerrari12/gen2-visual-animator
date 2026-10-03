@@ -434,6 +434,71 @@ test('an extender slides on from behind exactly as a case does, never drops (Joe
   }
 });
 
+test('an extender starts FULLY behind the ring it engages, clear of the wall and the rail (Astra 2026-10-03)', async () => {
+  /* It first slid on from 60 mm (the cover's bench slide), so on a 185 it appeared already ~2/3 overlapped and the
+     BEGINNING of the dovetail engagement was never shown. Measured from the shipped GLBs, not from COLL: at the first
+     frame of its enter, the ring's front face must sit at least 10 mm behind the back face of the ring below (where that
+     ring really is at that moment: its stage + the enter's `at`), on every collection and mount. A ring must also not
+     start behind the wall plane (wall top bench) or under the rail plate (under-table demo case), or it would appear to
+     come out of them. */
+  const { worldExtents } = await import(new URL('./lib/glb-spans.mjs', import.meta.url).href);
+  const zs = (L, node) => {
+    const e = worldExtents(new URL(`../viewer/parts/${L}/${node}.lib.glb`, import.meta.url));
+    return [e.lo[2], e.hi[2]];
+  };
+  for (const L of LENGTHS) {
+    for (const [mount, wallStagger] of [['tabletop', false], ['wall', false], ['wall', true], ['under-table', false]]) {
+      if (L === 59 && mount === 'tabletop') continue;
+      const tag = `${L} ${mount}${wallStagger ? ' staggered' : ''}`;
+      const m = ok({
+        ...build(L), mount, wallStagger, gridW: 1, gridH: 3, nextId: 2,
+        placed: [{ id: 'u0', x: 0, y: 0, w: 1, hh: 6, fill: 'shelf', lip: 'front' }],
+      }, tag);
+      const byId = new Map(m.instances.map((x) => [x.id, x]));
+      const enters = m.steps.flatMap((s) => s.phases || []).flatMap((p) => p.enter || []);
+      const live = (id, at) => { // z of an instance while the bench is assembled (stage + the enter's own `at`)
+        const x = byId.get(id), st = (x.stage && m.stages[x.stage]) || [0, 0, 0];
+        return x.pos[2] + st[2] + ((at || [0, 0, 0])[2]);
+      };
+      const caseBackAtRest = byId.get('case0').pos[2] + zs(L, byId.get('case0').node)[0];
+      const rail = m.instances.find((x) => /^UnderTableRail_/.test(x.node));
+      for (const k of [1, 2]) {
+        const e = enters.find((x) => x.id === `ext0_${k}`);
+        assert.ok(e, `${tag}: ring ${k} is entered`);
+        const [lo, hi] = zs(L, byId.get(e.id).node);
+        const startZ = live(e.id, e.at) + e.from[2];
+        const below = k === 1 ? 'case0' : `ext0_${k - 1}`;
+        const belowBack = live(below, e.at) + zs(L, byId.get(below).node)[0];
+        const gap = belowBack - (startZ + hi);
+        assert.ok(gap >= 10, `${tag} ring ${k}: starts only ${gap.toFixed(1)} mm clear of the ring below (front face must be >= 10 mm behind its back)`);
+        assert.ok(gap <= 40, `${tag} ring ${k}: starts ${gap.toFixed(1)} mm behind - fully clear, but no further than it needs to`);
+        if (mount === 'wall')
+          assert.ok(startZ + lo >= caseBackAtRest - 0.01,
+            `${tag} ring ${k}: its back face starts at z=${(startZ + lo).toFixed(1)}, behind the wall (case back rests at ${caseBackAtRest.toFixed(1)})`);
+        /* and the shot it plays in must hold that start: the camera in force when the ring enters frames a sphere
+           (fitR, aspect-aware in main.js) that contains the ring's start box, its seat and the ring below. */
+        const step = m.steps.find((s) => (s.phases || []).some((p) => (p.enter || []).includes(e)));
+        const pi = step.phases.findIndex((p) => (p.enter || []).includes(e));
+        const shot = step.phases.slice(0, pi).reverse().find((p) => p.camera)?.camera || step.camera;
+        assert.ok(shot.fitR, `${tag} ring ${k}: the ring plays in a shot sized to its slide (fitR), got ${JSON.stringify(shot)}`);
+        const x = byId.get(e.id), st = (x.stage && m.stages[x.stage]) || [0, 0, 0], at = e.at || [0, 0, 0];
+        const cxw = x.pos[0] + st[0] + at[0], halfW = 44, y0 = x.pos[1] + st[1] + at[1];
+        const corners = [];
+        for (const zc of [startZ, live(e.id, e.at), live(below, e.at)])
+          for (const dx of [-halfW, halfW]) for (const y of [y0 - 56, y0 + 59]) for (const dz of [lo, hi])
+            corners.push([cxw + dx, y, zc + dz]);
+        const worst = Math.max(...corners.map((c) => Math.hypot(c[0] - shot.target[0], c[1] - shot.target[1], c[2] - shot.target[2])));
+        assert.ok(worst <= shot.fitR + 0.01, `${tag} ring ${k}: a corner of its slide lies ${worst.toFixed(1)} mm from the shot's centre, outside fitR ${shot.fitR.toFixed(1)}`);
+        if (rail) {
+          const railFront = rail.pos[2] + zs(L, rail.node)[1];
+          assert.ok(startZ + lo >= railFront,
+            `${tag} ring ${k}: starts at z=${(startZ + lo).toFixed(1)}, under the rail plate (rail front ${railFront.toFixed(1)})`);
+        }
+      }
+    }
+  }
+});
+
 test('every extender is entered by a phase, on every mount', () => {
   /* The staggered wall top row assembled its case and QuickLocks and then
      RETURNED, so from 2026-08-28 a staggered wall shelf placed its insert and
