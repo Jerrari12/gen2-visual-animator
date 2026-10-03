@@ -316,6 +316,8 @@ body.stage-dark .cl-req.enhancement, body.stage-dark .cl-req.core { background: 
   font: inherit; font-size: 11.5px; font-weight: 700;
   border: 1px solid var(--panel-border); border-radius: 999px;
   padding: 3px 10px 3px 4px; background: #fff; cursor: pointer;
+  /* a <button> does not inherit color - without this the dark stage drew black text on its navy chip */
+  color: var(--ink);
 }
 .zone-chip i { width: 18px; height: 18px; border-radius: 50%; border: 1px solid rgba(0,0,0,.15); }
 .zone-chip:hover { border-color: var(--accent); }
