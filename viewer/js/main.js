@@ -18,10 +18,10 @@ import { createDimCoverTest } from './dim-cover.js';
 import { benchBuild, createOrbitBench } from './orbit-bench.js';
 import { createSettleBench } from './settle-bench.js';
 import { parseSeeInto, parseSeeIntoSkip, parseSeeIntoLattice, createSeeInto } from './see-into.js';
-import { LABEL_TEXT_DEFAULTS, LABEL_TEXT_NODES, labelFontReady, loadLabelFont, labelGeometry, labelCore } from './label-text.js';
+import { LABEL_TEXT_DEFAULTS, LABEL_TEXT_NODES, labelFontReady, loadLabelFont, labelGeometry, labelCore, labelIcons } from './label-text.js';
 import { LABEL_SPEC, LABEL_TEXT_MAX, cleanLabelText, cleanLabelBadge, cleanLabelStyle } from './label-spec.js';
 import { LABEL_STYLE_ROWS, labelOrder, effectiveStyle, labelOptsOf, labelOptsChanges, applyLabelOpts, labelOnlyDiff, copyLabelFields,
-  editCommit, styleEdit, iconChoices, badgeStateText, shownBadge, historyKeyOf, labelSnap, labelUndoPatch, rejectionIsMine } from './label-panel.js';
+  editCommit, styleEdit, iconGroups, badgeStateText, shownBadge, historyKeyOf, labelSnap, labelUndoPatch, rejectionIsMine } from './label-panel.js';
 
 /* Every entry-routing boolean below is derived by resolveEntry() in entry.js -
    a pure function of (search, hash) with no DOM or network - so the boot
@@ -7353,18 +7353,18 @@ function renderLabelEditorState(opts = {}) {
   field.classList.toggle('caps', labelCapsOn());
   const text = labelEdit.draft ? cleanLabelText(labelEdit.draft.text) : committed;
   const badge = unit.labelBadge;   // live, never snapshotted into the draft (see refreshLabelText)
-  const core = labelCore();
+  const cat = labelIcons();
   const btn = $('label-edit-badge');
-  const worn = shownBadge(text, badge, build.labelStyle, core);
+  const worn = shownBadge(text, badge, build.labelStyle, cat);
   btn.classList.toggle('predicted', !!worn.predicted);
   btn.classList.toggle('set', !worn.predicted && worn.type !== 'none');
   btn.disabled = !committed;
   btn.title = committed ? 'Icon or letter for this label' : 'Type a label first';
-  if (worn.type === 'icon') { const it = core && core.ICON_LIBRARY.find(i => i.id === worn.value); btn.innerHTML = it ? it.svg : '+'; }   // sha-pinned vendored core, not data
+  if (worn.type === 'icon') { const it = cat && cat.find(worn.value); btn.innerHTML = it ? it.svg : '+'; }   // the sha-pinned vendored icon catalog, not data
   else if (worn.type === 'char') btn.textContent = labelCapsOn() ? worn.value.toUpperCase() : worn.value;
   else btn.textContent = '+';
   // the words beside the button name the state for the words on screen - a draft included, so typing shows what Auto would pick
-  $('label-edit-badge-state').textContent = text ? badgeStateText(text, badge, build.labelStyle, core) : '';
+  $('label-edit-badge-state').textContent = text ? badgeStateText(text, badge, build.labelStyle, cat) : '';
   // the generator's own verdict, read off the meshes it built for THIS label
   let fits = true;
   if (text && labelFontReady()) { const t = labelGeometry(text, badge, build.labelStyle); if (t && t.fits === false) fits = false; }
@@ -7372,7 +7372,7 @@ function renderLabelEditorState(opts = {}) {
   fitEl.textContent = fits ? '' : 'Won\'t fit, even at the 3 mm minimum';
   fitEl.classList.toggle('hidden', fits);
   $('label-edit-note').classList.toggle('hidden', !!plannerWin());
-  for (const b of $('label-pick-icons').children) b.classList.toggle('on', worn.type === 'icon' && b.dataset.icon === worn.value && !worn.predicted);
+  for (const b of $('label-pick-icons').querySelectorAll('.le-icon')) b.classList.toggle('on', worn.type === 'icon' && b.dataset.icon === worn.value && !worn.predicted);
   // no words, no icon (a badge dies with its label): the picker closes with the words instead of offering clicks that do nothing
   if (!committed && labelEdit.picker) toggleIconPicker(false);
   if (labelEdit.picker) renderIconPicker();
@@ -7471,23 +7471,64 @@ $('label-edit-text').addEventListener('beforeinput', e => {
   labelHistoryGuard(e, e.inputType === 'historyUndo' ? 'undo' : 'redo', document.activeElement === e.target);
 });
 // the icon picker: a collapsible section INSIDE the card (never a popover - the generator's positions against a desktop
-// column); Auto / No icon / a letter / the core's icon grid
+// column); Auto / No icon / a letter / a search / the generator's icon groups, each collapsible like the generator's own
+// menu (2026-10-09, Joey: "collapsable groups"). The open groups are remembered for the visit; the current icon's group and
+// every group a search finds something in open by themselves.
+const LABEL_ICON_GROUPS_KEY = 'gen2-label-icon-groups';
+function openLabelIconGroups() {
+  try { const v = JSON.parse(sessionStorage.getItem(LABEL_ICON_GROUPS_KEY) || 'null'); return Array.isArray(v) ? v : null; } catch (e) { return null; }
+}
+function saveLabelIconGroups(ids) {
+  try { sessionStorage.setItem(LABEL_ICON_GROUPS_KEY, JSON.stringify(ids)); } catch (e) { /* storage blocked */ }
+}
 function renderIconPicker() {
   const grid = $('label-pick-icons');
-  const choices = iconChoices(labelCore());
-  if (!choices) { grid.innerHTML = ''; grid.textContent = 'Loading icons…'; return; }
-  if (grid.childElementCount !== choices.length) {
-    grid.textContent = '';
-    for (const c of choices) {
-      const b = document.createElement('button');
-      b.type = 'button'; b.className = 'le-icon'; b.dataset.icon = c.id; b.title = c.name; b.setAttribute('aria-label', c.name);
-      b.innerHTML = c.svg;   // the vendored core's own SVG strings (sha-pinned code, not user data)
-      b.onclick = () => { commitLabelEdit({ labelBadge: { type: 'icon', value: c.id } }, 'label:badge:icon'); };
-      grid.appendChild(b);
-    }
+  const cat = labelIcons();
+  const q = $('label-pick-search').value;
+  const groups = iconGroups(cat, q);
+  if (!groups) { grid.innerHTML = ''; grid.textContent = 'Loading icons…'; return; }
+  const worn = labelEdit ? shownBadge(cleanLabelText(labelEdit.unit.label), labelEdit.unit.labelBadge, build.labelStyle, cat) : null;
+  const current = worn && worn.type === 'icon' && !worn.predicted ? worn.value : null;
+  const curGroup = current && cat.find(current) ? cat.find(current).group : null;
+  const searching = !!q.trim();
+  const saved = openLabelIconGroups();
+  grid.textContent = '';
+  if (!groups.length) {
+    const none = document.createElement('div');
+    none.className = 'le-empty'; none.textContent = 'No icon matches - try another word, or a letter.';
+    grid.appendChild(none);
   }
-  const worn = labelEdit ? shownBadge(cleanLabelText(labelEdit.unit.label), labelEdit.unit.labelBadge, build.labelStyle, labelCore()) : null;
-  for (const b of grid.children) b.classList.toggle('on', !!worn && worn.type === 'icon' && b.dataset.icon === worn.value && !worn.predicted);
+  for (const g of groups) {
+    const open = searching || (saved ? saved.includes(g.id) : false) || g.id === curGroup;
+    const sec = document.createElement('div');
+    sec.className = 'le-group' + (open ? ' open' : '');
+    const head = document.createElement('button');
+    head.type = 'button'; head.className = 'le-ghead'; head.setAttribute('aria-expanded', String(open));
+    const caret = document.createElement('span'); caret.className = 'le-caret'; caret.setAttribute('aria-hidden', 'true'); caret.textContent = '\u25b8';
+    const nm = document.createElement('span'); nm.className = 'le-gname'; nm.textContent = g.name;
+    const ct = document.createElement('span'); ct.className = 'le-gcount'; ct.textContent = String(g.items.length);
+    head.append(caret, nm, ct);
+    head.onclick = () => {
+      const nowOpen = !sec.classList.contains('open');
+      sec.classList.toggle('open', nowOpen); head.setAttribute('aria-expanded', String(nowOpen));
+      if (!searching) {
+        const ids = new Set(openLabelIconGroups() || []);
+        if (nowOpen) ids.add(g.id); else ids.delete(g.id);
+        saveLabelIconGroups([...ids]);
+      }
+    };
+    const cells = document.createElement('div');
+    cells.className = 'le-cells';
+    for (const c of g.items) {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'le-icon' + (c.id === current ? ' on' : ''); b.dataset.icon = c.id; b.title = c.name; b.setAttribute('aria-label', c.name);
+      b.innerHTML = c.svg;   // the vendored icon catalog's own SVG strings (sha-pinned code, not user data)
+      b.onclick = () => { commitLabelEdit({ labelBadge: { type: 'icon', value: c.id } }, 'label:badge:icon'); };
+      cells.appendChild(b);
+    }
+    sec.append(head, cells);
+    grid.appendChild(sec);
+  }
   const ch = $('label-pick-char');
   if (document.activeElement !== ch) ch.value = labelEdit && cleanLabelBadge(labelEdit.unit.labelBadge)?.type === 'char' ? labelEdit.unit.labelBadge.value : '';
 }
@@ -7496,9 +7537,10 @@ function toggleIconPicker(open) {
   labelEdit.picker = open ?? !labelEdit.picker;
   $('label-edit-picker').classList.toggle('hidden', !labelEdit.picker);
   $('label-edit-badge').setAttribute('aria-expanded', String(labelEdit.picker));
-  if (labelEdit.picker) renderIconPicker();
+  if (labelEdit.picker) { $('label-pick-search').value = ''; renderIconPicker(); }
 }
 $('label-edit-badge').onclick = () => toggleIconPicker();
+$('label-pick-search').addEventListener('input', () => renderIconPicker());
 $('label-pick-auto').onclick = () => commitLabelEdit({ labelBadge: null }, 'label:badge:auto');
 $('label-pick-none').onclick = () => commitLabelEdit({ labelBadge: { type: 'none' } }, 'label:badge:none');
 const useLetter = () => { const v = $('label-pick-char').value; if (cleanLabelBadge({ type: 'char', value: v })) commitLabelEdit({ labelBadge: { type: 'char', value: v } }, 'label:badge:char'); };
@@ -9261,7 +9303,7 @@ if (new URLSearchParams(location.search).get('debug')) {
     get build() { return build; }, regenerate, setSelected, get selectedId() { return selectedId; },
     // the label editor (step 2): its state, the in-place refresh and the relay payload, so an end-to-end check can read what
     // the card holds and what would be posted without guessing
-    get labelEdit() { return labelEdit; }, get regenBusy() { return regenBusy; }, refreshLabelTexts, currentOpts, labelFontReady, loadLabelFont, labelCore, labelGeometry,
+    get labelEdit() { return labelEdit; }, get regenBusy() { return regenBusy; }, refreshLabelTexts, currentOpts, labelFontReady, loadLabelFont, labelCore, labelIcons, labelGeometry,
     // part-preview internals (2026-08-19) — the mode flag, the view state and
     // the resolver, so an embed question is answerable by reading state
     IS_PART, partView, resolvePartPreview, fitPartCamera, PART_PLATE, plateStage,

@@ -72,7 +72,7 @@ test('the core\'s DEFAULTS are the values the generator\'s inputs start at (when
 });
 
 /* The label panel (step 2) leans on the core in two places that must not drift from it. */
-test('the Labels rows\' fallback defaults ARE the core\'s DEFAULTS, and the picker offers exactly ICON_LIBRARY', async () => {
+test('the Labels rows\' fallback defaults ARE the core\'s DEFAULTS, and the picker offers exactly the icon catalog (the core\'s 23 included)', async () => {
   const { LABEL_STYLE_FALLBACK, LABEL_STYLE_ROWS, iconChoices } = await import('../viewer/js/label-panel.js');
   const { LABEL_SPEC } = await import('../viewer/js/label-spec.js');
   const C = loadCore();
@@ -80,9 +80,12 @@ test('the Labels rows\' fallback defaults ARE the core\'s DEFAULTS, and the pick
   assert.deepEqual(Object.keys(LABEL_STYLE_FALLBACK).sort(), [...Object.keys(LABEL_SPEC.limits), ...LABEL_SPEC.flags].sort(),
     'the fallback does not cover exactly the fields the panel edits');
   assert.deepEqual(LABEL_STYLE_ROWS.map((r) => r.key), Object.keys(LABEL_SPEC.limits), 'a number row per limit, in the spec\'s order');
-  const choices = iconChoices(C);
-  assert.equal(choices.length, 23, 'the picker does not list the core\'s 23 icons');
-  assert.deepEqual(choices.map((c) => c.id), C.ICON_LIBRARY.map((i) => i.id), 'the picker\'s ids are not ICON_LIBRARY\'s, in its order');
+  // the picker offers the generator's icon catalog (label-icons.js over this core; test/label-icons-vendor.test.mjs pins it)
+  for (const f of ['label-icon-art.js', 'label-icons.js']) (0, eval)(readFileSync(join(root, 'viewer', 'js', 'vendor', f), 'utf8'));
+  const cat = globalThis.GEN2LabelIcons.create({ core: C, art: globalThis.GEN2LabelIconArt });
+  const choices = iconChoices(cat);
+  assert.deepEqual(choices.map((c) => c.id), cat.icons.map((i) => i.id), 'the picker\'s ids are not the catalog\'s, in its order');
+  for (const it of C.ICON_LIBRARY) assert.ok(choices.some((c) => c.id === it.id && c.svg === it.svg), `the core's ${it.id} is offered with its own drawing`);
   for (const c of choices) assert.ok(c.svg.startsWith('<svg') && c.name, `${c.id} has no svg/name`);
   assert.equal(iconChoices(null), null, 'before the core loads there are no choices (the card says Loading icons…)');
 });

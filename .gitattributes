@@ -30,6 +30,9 @@ tabletop-completion.js text eol=lf
 # The EdgeLabel label core is the generator's own label code (its label-core.js), vendored byte-for-byte and
 # hash-pinned by test/edgelabel-core-vendor.test.mjs - fixed LF for the same reason as the two above.
 edgelabel-core.js text eol=lf
+# label-icons.js + label-icon-art.js: the label generator's icon catalog, byte-for-byte (test/label-icons-vendor.test.mjs pins them)
+label-icons.js text eol=lf
+label-icon-art.js text eol=lf
 *.ttf binary
 # the label generators' own opentype.js, kept byte-identical to their vendor/ copy
 viewer/vendor/opentype/** -text

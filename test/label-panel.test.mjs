@@ -1,7 +1,7 @@
 /* THE LABEL PANEL'S PURE PARTS (label plan step 2, 2026-10-02) - what one edit writes into a build, how a badge's state is
  * named, and the two relay helpers in isolation. viewer/js/label-panel.js has no DOM and no three, so it imports under node;
- * the vendored core (the generator's own guessIconId / ICON_LIBRARY / prepareLabel) is evaluated the way
- * edgelabel-core-vendor.test.mjs does it. The relay helpers' behaviour against main.js's REAL layoutKey / currentOpts /
+ * the vendored core (the generator's own prepareLabel) and its icon catalog (label-icons.js: the icons, their names, the guess)
+ * are evaluated the way edgelabel-core-vendor.test.mjs does it. The relay helpers' behaviour against main.js's REAL layoutKey / currentOpts /
  * incoming block is in test/relay-contract.test.mjs; this file pins the parts those run on.
  */
 import { test } from 'node:test';
@@ -10,7 +10,7 @@ import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { LABEL_STYLE_FALLBACK, LABEL_STYLE_ROWS, isLabelUnit, labelOrder, effectiveStyle, labelOptsOf, labelOptsChanges, applyLabelOpts,
-  labelOnlyDiff, copyLabelFields, editCommit, styleEdit, iconChoices, badgeStateText, shownBadge, historyKeyOf } from '../viewer/js/label-panel.js';
+  labelOnlyDiff, copyLabelFields, editCommit, styleEdit, iconChoices, iconGroups, badgeStateText, shownBadge, historyKeyOf } from '../viewer/js/label-panel.js';
 import { LABEL_SPEC } from '../viewer/js/label-spec.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -20,32 +20,40 @@ function loadCore() {
   return globalThis.GEN2EdgeLabelCore.create({ THREE: {} });
 }
 const core = loadCore();
+// the catalog the card reads (label-text.js labelIcons()): the vendored icon art + label-icons.js over the core
+(0, eval)(readFileSync(join(root, 'viewer', 'js', 'vendor', 'label-icon-art.js'), 'utf8'));
+(0, eval)(readFileSync(join(root, 'viewer', 'js', 'vendor', 'label-icons.js'), 'utf8'));
+const cat = globalThis.GEN2LabelIcons.create({ core, art: globalThis.GEN2LabelIconArt });
 
 const unit = (id, extra = {}) => ({ id, x: id - 1, y: 2, w: 1, hh: 2, fill: 'decor', shelves: 0, ...extra });
 const build = (extra = {}) => ({ mount: 'tabletop', length: 185, gridW: 4, gridH: 4, buildId: 'k7m2p9q4x1z8',
   placed: [unit(1, { label: 'Torx Bits' }), unit(2, { label: 'Nuts', labelBadge: { type: 'icon', value: 'nut' } }), unit(3), unit(4, { fill: 'classic', label: 'Washers' })], ...extra });
 
 test('badgeStateText names the three states, and says the letter the way the label prints it', () => {
-  assert.equal(badgeStateText('Torx Bits', undefined, null, core), 'Auto · screw torx head', 'the core\'s own icon NAME, lower-cased');
-  assert.equal(badgeStateText('Zip Ties', undefined, null, core), 'Auto · none matched');
-  assert.equal(badgeStateText('Torx Bits', undefined, { predictIcons: false }, core), 'Auto · off');
+  assert.equal(badgeStateText('Torx Bits', undefined, null, cat), 'Auto · torx screw', 'the catalog\'s icon NAME, lower-cased');
+  assert.equal(badgeStateText('Zip Ties', undefined, null, cat), 'Auto · none matched');
+  assert.equal(badgeStateText('JST connectors', undefined, null, cat), 'Auto · wire connector', 'the wider guess names a new icon');
+  assert.equal(badgeStateText('Torx Bits', undefined, { predictIcons: false }, cat), 'Auto · off');
   assert.equal(badgeStateText('Torx Bits', undefined, null, null), 'Auto', 'before the core loads nothing is predicted yet');
-  assert.equal(badgeStateText('Torx Bits', { type: 'none' }, null, core), 'No icon');
-  assert.equal(badgeStateText('Torx Bits', { type: 'icon', value: 'nut' }, null, core), 'Manual · nut');
-  assert.equal(badgeStateText('Torx Bits', { type: 'icon', value: 'a-newer-icon' }, null, core), 'Manual · a-newer-icon', 'an unknown id reads as itself');
-  assert.equal(badgeStateText('Torx Bits', { type: 'char', value: 'm3' }, null, core), 'Letter · M3', 'ALL CAPS by default, like prepareLabel');
-  assert.equal(badgeStateText('Torx Bits', { type: 'char', value: 'm3' }, { allCaps: false }, core), 'Letter · m3');
-  assert.equal(badgeStateText('Torx Bits', { type: 'svg', value: '<svg/>' }, null, core), 'Auto · screw torx head', 'a badge the cleaner drops reads as Auto');
+  assert.equal(badgeStateText('Torx Bits', { type: 'none' }, null, cat), 'No icon');
+  assert.equal(badgeStateText('Torx Bits', { type: 'icon', value: 'nut' }, null, cat), 'Manual · nut, outline');
+  assert.equal(badgeStateText('Torx Bits', { type: 'icon', value: 'hex-nut' }, null, cat), 'Manual · hex nut, chamfered');
+  assert.equal(badgeStateText('Torx Bits', { type: 'icon', value: 'a-newer-icon' }, null, cat), 'Manual · a-newer-icon', 'an unknown id reads as itself');
+  assert.equal(badgeStateText('Torx Bits', { type: 'char', value: 'm3' }, null, cat), 'Letter · M3', 'ALL CAPS by default, like prepareLabel');
+  assert.equal(badgeStateText('Torx Bits', { type: 'char', value: 'm3' }, { allCaps: false }, cat), 'Letter · m3');
+  assert.equal(badgeStateText('Torx Bits', { type: 'svg', value: '<svg/>' }, null, cat), 'Auto · torx screw', 'a badge the cleaner drops reads as Auto');
 });
 
 test('shownBadge is what the button shows: the manual badge, else the prediction (marked predicted)', () => {
-  assert.deepEqual(shownBadge('Torx Bits', undefined, null, core), { type: 'icon', value: 'screw-torx-head', predicted: true });
-  assert.deepEqual(shownBadge('Zip Ties', undefined, null, core), { type: 'none', predicted: true });
-  assert.deepEqual(shownBadge('Torx Bits', undefined, { predictIcons: false }, core), { type: 'none', predicted: true });
-  assert.deepEqual(shownBadge('Torx Bits', { type: 'char', value: 'T' }, null, core), { type: 'char', value: 'T' });
-  assert.deepEqual(shownBadge('Torx Bits', { type: 'none' }, null, core), { type: 'none' });
-  // the two agree with the geometry's own choice (label-text.js defaultBadge is core.guessIconId under predictIcons)
-  assert.equal(shownBadge('Torx Bits', undefined, null, core).value, core.guessIconId('Torx Bits'));
+  assert.deepEqual(shownBadge('Torx Bits', undefined, null, cat), { type: 'icon', value: 'screw-torx-head', predicted: true });
+  assert.deepEqual(shownBadge('Paper clips', undefined, null, cat), { type: 'icon', value: 'paper-clip', predicted: true });
+  assert.deepEqual(shownBadge('Zip Ties', undefined, null, cat), { type: 'none', predicted: true });
+  assert.deepEqual(shownBadge('Torx Bits', undefined, { predictIcons: false }, cat), { type: 'none', predicted: true });
+  assert.deepEqual(shownBadge('Torx Bits', { type: 'char', value: 'T' }, null, cat), { type: 'char', value: 'T' });
+  assert.deepEqual(shownBadge('Torx Bits', { type: 'none' }, null, cat), { type: 'none' });
+  // the two agree with the geometry's own choice (label-text.js defaultBadge is the catalog's guessIconId under predictIcons)
+  assert.equal(shownBadge('Torx Bits', undefined, null, cat).value, cat.guessIconId('Torx Bits'));
+  assert.equal(shownBadge('Misc', undefined, null, cat).value, cat.guessIconId('Misc'));
 });
 
 test('editCommit: the words cleaned, empty words take the badge with them, a badge only on a unit with words, the previous state returned', () => {
@@ -175,5 +183,14 @@ test('labelOrder is the planner\'s one drawer order (top row first, then left to
   assert.equal(isLabelUnit(unit(1)), true);
   for (const f of ['classic', 'shelf', 'cabinet']) assert.equal(isLabelUnit(unit(1, { fill: f })), false);
   assert.equal(isLabelUnit(null), false);
-  assert.equal(iconChoices(core).length, core.ICON_LIBRARY.length);
+  // the picker offers the catalog: the core's 23 and the MODULITH family (never the staged coffee filter), in groups
+  assert.equal(iconChoices(cat).length, cat.icons.length);
+  assert.equal(iconChoices(cat).length, core.ICON_LIBRARY.length + 9);
+  assert.equal(iconChoices(null), null, 'null until the catalog has loaded');
+  assert.ok(!iconChoices(cat).some((c) => c.id === 'coffee-filter'));
+  const gs = iconGroups(cat);
+  assert.deepEqual(gs.map((g) => g.id), cat.GROUPS.map((g) => g.id));
+  assert.equal(gs.reduce((n, g) => n + g.items.length, 0), cat.icons.length);
+  assert.deepEqual(iconGroups(cat, 'scissors').map((g) => [g.id, g.items.map((i) => i.id)]), [['office', ['scissors']]]);
+  assert.deepEqual(iconGroups(cat, 'zzzz'), []);
 });

@@ -30,6 +30,7 @@ export const LABEL_TEXT_DEFAULTS = Object.freeze({ hex: '#1a1a1a' });
 export const LABEL_TEXT_NODES = new Set(['Label_EdgeLabel']);
 
 let core = null;      // GEN2EdgeLabelCore.create(...), once its script and the font have loaded
+let icons = null;     // GEN2LabelIcons.create({ core }): the generator's icon catalog (groups, the MODULITH icon family, the guess)
 let frame = null;     // generator frame -> the Label_EdgeLabel model's frame
 
 /* Loading: opentype.js (the generators' UMD build) and the core are classic scripts, the font is fetched as bytes. All three
@@ -37,8 +38,11 @@ let frame = null;     // generator frame -> the Label_EdgeLabel model's frame
    never pair a new label-text.js with a cached old core. */
 let loading = null;
 export function labelFontReady() { return !!core; }
-/* The generator's core itself (its ICON_LIBRARY, guessIconId, DEFAULTS ...), for the label tools and for checks; null until loaded. */
+/* The generator's core itself (its DEFAULTS, prepareLabel ...), for the label tools and for checks; null until loaded. */
 export function labelCore() { return core; }
+/* The generator's icon catalog (js/vendor/label-icons.js over the core: the icons a label can carry, their groups, the guess,
+   the drawing a badge prints); null until loaded. The label tools read icons ONLY through it. */
+export function labelIcons() { return icons; }
 export function loadLabelFont() {
   if (core) return Promise.resolve();
   if (loading) return loading;
@@ -53,21 +57,25 @@ export function loadLabelFont() {
   loading = Promise.all([
     script(url('../vendor/opentype/opentype.min.js'), () => !!window.opentype),
     script(url('./vendor/edgelabel-core.js'), () => !!window.GEN2EdgeLabelCore),
+    script(url('./vendor/label-icon-art.js'), () => !!window.GEN2LabelIconArt),
+    script(url('./vendor/label-icons.js'), () => !!window.GEN2LabelIcons),
     fetch(url('../vendor/fonts/LiberationSansNarrow-Bold.ttf')).then((r) => { if (!r.ok) throw new Error('label font ' + r.status); return r.arrayBuffer(); }),
-  ]).then(([, , buf]) => {
+  ]).then(([, , , , buf]) => {
     // the core reads THREE.SVGLoader the way the generator's three global carries it; a module namespace cannot take a new
     // property, so the core gets a plain copy of it with the addon added
     const c = window.GEN2EdgeLabelCore.create({ THREE: { ...THREE, SVGLoader } });
     c.setFont(window.opentype.parse(buf));
     frame = [0, c.LABEL_WID / 2, c.LABEL_HT - c.LABEL_HT / 2];
+    icons = window.GEN2LabelIcons.create({ core: c, art: window.GEN2LabelIconArt });
     core = c;
   }).catch((e) => { loading = null; throw e; });   // a failed load may be retried by the next mount
   return loading;
 }
 
-/* The badge a label wears when nobody has picked one: the generator's own prediction, under the style's switch. */
+/* The badge a label wears when nobody has picked one: the generator's own prediction (its catalog's guess), under the
+   style's switch. */
 function defaultBadge(text, S) {
-  const id = S.predictIcons ? core.guessIconId(text) : null;
+  const id = S.predictIcons ? icons.guessIconId(text) : null;
   return id ? { type: 'icon', value: id } : { type: 'none' };
 }
 
@@ -81,7 +89,9 @@ export function labelGeometry(text, badge, style) {
   const S = { ...core.DEFAULTS, ...(cleanLabelStyle(style) || {}) };
   const raw = String(text || '');
   const chosen = cleanLabelBadge(badge) || defaultBadge(raw, S);
-  const data = core.prepareLabel(raw, chosen, S.allCaps);
+  // the generator's one adapter: an icon its core does not hold reaches the core as the badge's own drawing, chosen for
+  // the style's Badge size exactly as the generator chooses it
+  const data = core.prepareLabel(raw, icons.resolveBadge(chosen, S.badgeSize), S.allCaps);
   if (!data) return null;
   const key = JSON.stringify([data.text, data.badge, S.capMm, S.depth, S.badgeSize, S.bold]);
   if (cache.has(key)) return cache.get(key);

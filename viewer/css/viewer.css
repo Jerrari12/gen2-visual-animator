@@ -356,7 +356,18 @@ body.label-edit-open #identify-card { max-height: 74%; overflow-y: auto; align-i
 }
 .le-pick-row button:hover, #label-edit-undo:hover { border-color: var(--accent); color: var(--accent); }
 #label-pick-char { width: 56px; font: inherit; font-size: 13px; padding: 5px 7px; border: 1px solid var(--panel-border); border-radius: 7px; background: #fff; color: var(--ink); }
-#label-pick-icons { display: grid; grid-template-columns: repeat(5, 36px); gap: 6px; }
+/* the icon groups (the generator's icon catalog): collapsible, in a box that scrolls */
+#label-pick-search { display: block; width: 100%; box-sizing: border-box; margin-bottom: 6px; font: inherit; font-size: 13px; padding: 5px 8px; border: 1px solid var(--panel-border); border-radius: 7px; background: #fff; color: var(--ink); }
+#label-pick-icons { max-height: 260px; overflow-y: auto; }
+.le-group + .le-group { border-top: 1px solid var(--panel-border); }
+.le-ghead { display: flex; align-items: center; gap: 6px; width: 100%; padding: 6px 2px; border: none; background: none; color: var(--ink); font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; text-align: left; }
+.le-ghead:hover { color: var(--accent); }
+.le-caret { display: inline-block; width: 10px; color: var(--ink-soft); transition: transform .12s; }
+.le-group.open .le-caret { transform: rotate(90deg); }
+.le-gcount { margin-left: auto; font-size: 11px; color: var(--ink-soft); }
+.le-cells { display: none; grid-template-columns: repeat(5, 36px); gap: 6px; padding-bottom: 8px; }
+.le-group.open .le-cells { display: grid; }
+.le-empty { font-size: 12px; color: var(--ink-soft); padding: 6px 2px; }
 .le-icon {
   width: 36px; height: 36px; padding: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center;
   border: 1px solid var(--panel-border); border-radius: 7px; background: #fff; color: var(--ink);
@@ -1060,7 +1071,8 @@ body.embed-preview.embed-hint-on #embed-hint {
   #label-edit-text, #label-pick-char, .opt-num-wrap input { font-size: 16px; }
   #label-edit-badge { width: 44px; height: 44px; }
   #label-edit-badge svg { width: 24px; height: 24px; }
-  #label-pick-icons { grid-template-columns: repeat(5, 44px); }
+  .le-cells { grid-template-columns: repeat(5, 44px); }
+  #label-pick-search { font-size: 16px; }
   /* the open label editor is the one sheet on a phone (review D4): the step note and the card met, and with the icon picker
      open none of the model - the label being changed - was left on screen. The note returns when the editor closes, like
      body.fm-open's rule. */
@@ -1157,6 +1169,7 @@ body.stage-dark #identify-variant button,
 body.stage-dark #label-edit-text,
 body.stage-dark #label-edit-badge,
 body.stage-dark #label-pick-char,
+body.stage-dark #label-pick-search,
 body.stage-dark .le-pick-row button,
 body.stage-dark #label-edit-undo,
 body.stage-dark .le-icon,

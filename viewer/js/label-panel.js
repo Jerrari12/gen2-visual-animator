@@ -192,24 +192,34 @@ export function styleEdit(build, key, value) {
 
 /* ---- the badge, in words --------------------------------------------------------------------------------------- */
 
-/* The icon picker's choices: exactly the vendored core's ICON_LIBRARY, so the card can never offer an icon the printed
-   label lacks (test/edgelabel-core-vendor.test.mjs pins it). Null until the core has loaded. */
-export function iconChoices(core) {
-  return core && Array.isArray(core.ICON_LIBRARY) ? core.ICON_LIBRARY.map((i) => ({ id: i.id, name: i.name, svg: i.svg })) : null;
+/* The icon picker's choices: exactly the generator's icon catalog (js/vendor/label-icons.js over the vendored core, both
+   byte-for-byte and pinned), so the card can never offer an icon the printed label lacks. `cat` is labelIcons(); null until
+   it has loaded. `query` narrows them the way the generator's menu search does (name, group, the words that predict them). */
+export function iconChoices(cat, query) {
+  if (!cat || !Array.isArray(cat.icons)) return null;
+  const list = query && String(query).trim() ? cat.search(query) : cat.icons;
+  return list.map((i) => ({ id: i.id, name: i.name, group: i.group, svg: i.svg }));
+}
+/* The picker's groups, in the generator's menu order, each with its choices (empty groups left out). */
+export function iconGroups(cat, query) {
+  const choices = iconChoices(cat, query);
+  if (!choices) return null;
+  return cat.GROUPS.map((g) => ({ id: g.id, name: g.name, items: choices.filter((c) => c.group === g.id) })).filter((g) => g.items.length);
 }
 
 /* The three badge states as the card says them, so the words beside the button can never disagree with the geometry:
-   ABSENT = Auto (the core's own guessIconId, under the style's predictIcons switch), { type: 'none' } = No icon (chosen),
-   icon / letter = manual. A letter reads the way the LABEL prints it (upper-cased under allCaps, like prepareLabel); the
-   picker's own input shows it as typed. `core` may be null before the font has loaded - then Auto names no icon yet. */
-export function badgeStateText(text, badge, style, core) {
+   ABSENT = Auto (the generator's guess - its icon catalog's guessIconId - under the style's predictIcons switch),
+   { type: 'none' } = No icon (chosen), icon / letter = manual. A letter reads the way the LABEL prints it (upper-cased under
+   allCaps, like prepareLabel); the picker's own input shows it as typed. `cat` (labelIcons()) may be null before the font has
+   loaded - then Auto names no icon yet. */
+export function badgeStateText(text, badge, style, cat) {
   const S = effectiveStyle({ labelStyle: style });
-  const name = (id) => { const it = core && core.ICON_LIBRARY && core.ICON_LIBRARY.find((i) => i.id === id); return it ? it.name.toLowerCase() : id; };
+  const name = (id) => { const it = cat && cat.find(id); return it ? it.name.toLowerCase() : id; };
   const b = cleanLabelBadge(badge);
   if (!b) {
     if (!S.predictIcons) return 'Auto · off';
-    if (!core) return 'Auto';
-    const id = core.guessIconId(cleanLabelText(text));
+    if (!cat) return 'Auto';
+    const id = cat.guessIconId(cleanLabelText(text));
     return id ? `Auto · ${name(id)}` : 'Auto · none matched';
   }
   if (b.type === 'none') return 'No icon';
@@ -218,11 +228,11 @@ export function badgeStateText(text, badge, style, core) {
 }
 
 /* The badge the label is actually wearing (for the button's face): the manual one, or the predicted one under Auto. */
-export function shownBadge(text, badge, style, core) {
+export function shownBadge(text, badge, style, cat) {
   const b = cleanLabelBadge(badge);
   if (b) return b;
   const S = effectiveStyle({ labelStyle: style });
-  const id = S.predictIcons && core ? core.guessIconId(cleanLabelText(text)) : null;
+  const id = S.predictIcons && cat ? cat.guessIconId(cleanLabelText(text)) : null;
   return id ? { type: 'icon', value: id, predicted: true } : { type: 'none', predicted: true };
 }
 
