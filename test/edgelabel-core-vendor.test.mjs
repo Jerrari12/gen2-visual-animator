@@ -84,10 +84,11 @@ test('the Labels rows\' fallback defaults ARE the core\'s DEFAULTS, and the pick
   for (const f of ['label-icon-art.js', 'label-icons.js']) (0, eval)(readFileSync(join(root, 'viewer', 'js', 'vendor', f), 'utf8'));
   const cat = globalThis.GEN2LabelIcons.create({ core: C, art: globalThis.GEN2LabelIconArt });
   const choices = iconChoices(cat);
-  // one of each near twin (the catalog's TWINS): the other only while it is the label's own icon
-  for (const [shown, other] of cat.TWINS) {
-    assert.ok(choices.some((c) => c.id === shown) && !choices.some((c) => c.id === other), `${shown} offered, ${other} not`);
-    assert.ok(iconChoices(cat, '', other).some((c) => c.id === other), `${other} offered while current`);
+  // both drawings of each near twin (the catalog's TWINS), side by side and named apart (ChatGPT's second review via Joey)
+  for (const [first, other] of cat.TWINS) {
+    const ids = choices.map((c) => c.id);
+    assert.equal(ids.indexOf(other), ids.indexOf(first) + 1, `${other} offered right after ${first}`);
+    assert.notEqual(choices.find((c) => c.id === first).name, choices.find((c) => c.id === other).name);
   }
   assert.deepEqual(choices.map((c) => c.id), cat.menu().map((i) => i.id), 'the picker\'s ids are not the catalog\'s, in its order');
   for (const it of C.ICON_LIBRARY) assert.ok(choices.some((c) => c.id === it.id && c.svg === it.svg), `the core's ${it.id} is offered with its own drawing`);

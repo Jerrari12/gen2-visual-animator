@@ -113,11 +113,15 @@
             </div>
             <div id="label-edit-picker" class="hidden">
               <div class="le-pick-row">
-                <button id="label-pick-auto" type="button" title="Let the generator predict an icon from the words">Auto</button>
+                <button id="label-pick-auto" type="button" title="Guess an icon from the words">Auto</button>
                 <button id="label-pick-none" type="button" title="No icon on this label">No icon</button>
                 <input id="label-pick-char" type="text" maxlength="4" autocomplete="off" placeholder="A-Z" aria-label="Letter badge, up to 4 characters">
                 <button id="label-pick-use" type="button" title="Use these letters as the badge">Use</button>
               </div>
+              <div id="label-pick-uprow" class="le-pick-row hidden">
+                <button id="label-pick-upload" type="button" title="Put back the icon uploaded for this label">Restore uploaded icon</button>
+              </div>
+              <div id="label-pick-upnote" class="le-upnote hidden">This label wears an uploaded icon. Choosing anything else here replaces it in the planner too.</div>
               <input id="label-pick-search" type="search" autocomplete="off" placeholder="Search icons: nut, scissors, battery…" aria-label="Search icons">
               <div id="label-pick-icons" role="group" aria-label="Icons"></div>
               <div id="label-pick-caption" class="le-caption"></div>

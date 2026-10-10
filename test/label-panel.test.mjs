@@ -11,7 +11,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { LABEL_STYLE_FALLBACK, LABEL_STYLE_ROWS, isLabelUnit, labelOrder, effectiveStyle, labelOptsOf, labelOptsChanges, applyLabelOpts,
   labelOnlyDiff, copyLabelFields, editCommit, styleEdit, iconChoices, iconGroups, badgeStateText, shownBadge, historyKeyOf,
-  labelUploadFor, uploadsKey, isLabelSvg } from '../viewer/js/label-panel.js';
+  labelUploadFor, labelUploadOf, syncLabelList, uploadsKey, isLabelSvg } from '../viewer/js/label-panel.js';
 import { LABEL_SPEC } from '../viewer/js/label-spec.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -37,7 +37,7 @@ test('badgeStateText names the three states, and says the letter the way the lab
   assert.equal(badgeStateText('Torx Bits', undefined, { predictIcons: false }, cat), 'Auto · off');
   assert.equal(badgeStateText('Torx Bits', undefined, null, null), 'Auto', 'before the core loads nothing is predicted yet');
   assert.equal(badgeStateText('Torx Bits', { type: 'none' }, null, cat), 'No icon');
-  assert.equal(badgeStateText('Torx Bits', { type: 'icon', value: 'nut' }, null, cat), 'Manual · hex nut');
+  assert.equal(badgeStateText('Torx Bits', { type: 'icon', value: 'nut' }, null, cat), 'Manual · hex nut, plain');
   assert.equal(badgeStateText('Torx Bits', { type: 'icon', value: 'hex-nut' }, null, cat), 'Manual · hex nut, chamfered');
   assert.equal(badgeStateText('Torx Bits', { type: 'icon', value: 'a-newer-icon' }, null, cat), 'Manual · a-newer-icon', 'an unknown id reads as itself');
   assert.equal(badgeStateText('Torx Bits', { type: 'char', value: 'm3' }, null, cat), 'Letter · M3', 'ALL CAPS by default, like prepareLabel');
@@ -186,7 +186,7 @@ test('labelOrder is the planner\'s one drawer order (top row first, then left to
   assert.equal(isLabelUnit(null), false);
   // the picker offers the catalog: the core's 23 and the MODULITH family (never the staged coffee filter), in groups
   assert.equal(iconChoices(cat).length, cat.menu().length);
-  assert.equal(iconChoices(cat).length, core.ICON_LIBRARY.length + 9 - cat.TWINS.length, 'one of each near twin');
+  assert.equal(iconChoices(cat).length, core.ICON_LIBRARY.length + 9, 'both drawings of each near twin');
   assert.equal(iconChoices(null), null, 'null until the catalog has loaded');
   assert.ok(!iconChoices(cat).some((c) => c.id === 'coffee-filter'));
   const gs = iconGroups(cat);
@@ -254,4 +254,55 @@ test('copyLabelFields carries the build\'s label list (where uploads live) as th
   assert.equal('labelAssign' in cur, false);
   const key = (b) => JSON.stringify([b.placed.map((u) => [u.id, u.x, u.label || '']), b.labelStyle ?? null, b.buildId || '', uploadsKey(b)]);
   assert.equal(labelOnlyDiff(withUpload(), build(), key), true, 'a list-only change takes the cheap path');
+});
+
+/* ---- Auto vs Restore uploaded icon (ChatGPT's second review via Joey, 2026-10-09): Auto always means a guess from the words;
+   putting an upload back is its own button, which needs the upload whether or not the drawer wears it now ---- */
+test('labelUploadOf: the label\'s upload and the drawer badge that wears it, worn or not', () => {
+  const b = withUpload();
+  assert.deepEqual(labelUploadOf(b, b.placed[0]), { svg: SVG, own: null }, 'no id: worn while the drawer has no badge');
+  assert.deepEqual(labelUploadOf(b, b.placed[1]), { svg: SVG, own: { type: 'icon', value: 'nut' } }, 'with an id: worn while the drawer carries it');
+  // a pick in the card: no longer worn, still there to restore
+  const picked = { ...b.placed[0], labelBadge: { type: 'icon', value: 'star' } };
+  assert.equal(labelUploadFor(b, picked), null);
+  assert.deepEqual(labelUploadOf(b, picked), { svg: SVG, own: null });
+  assert.equal(labelUploadFor(b, { ...picked, labelBadge: labelUploadOf(b, picked).own }), SVG, 'restoring `own` wears it again');
+  assert.equal(labelUploadOf(b, b.placed[2]), null, 'no label assigned');
+  assert.equal(labelUploadOf(b, { ...b.placed[0], label: '' }), null, 'no words, no label');
+  const bad = withUpload(); bad.labelList.labels[0].badge.svg = '<script>alert(1)</script>';
+  assert.equal(labelUploadOf(bad, bad.placed[0]), null, 'never anything that is not an SVG');
+  assert.equal(labelUploadOf(null, b.placed[0]), null);
+});
+
+test('syncLabelList: takes the planner\'s label list on a layout that changes nothing else, and says whether it moved', () => {
+  const cur = withUpload();
+  assert.equal(syncLabelList(withUpload(), cur), false, 'same list: nothing to do');
+  // the planner replaced the upload (a pick in the docked card): its list no longer holds it, and Restore must not be offered
+  const nb = withUpload(); nb.labelList.labels[0].badge = { type: 'icon', value: 'star' };
+  assert.equal(syncLabelList(nb, cur), true);
+  assert.deepEqual(cur.labelList, nb.labelList);
+  assert.notEqual(cur.labelList, nb.labelList, 'a copy, not a shared reference');
+  assert.equal(labelUploadOf(cur, cur.placed[0]), null);
+  assert.equal(syncLabelList(build(), cur), true, 'a layout without a list clears it');
+  assert.equal('labelList' in cur, false);
+  assert.equal('labelAssign' in cur, false);
+  assert.equal(syncLabelList(build(), cur), false);
+  assert.equal(syncLabelList(null, build()), false);
+});
+
+test('main.js: Auto always asks for a guess, Restore uploaded icon puts back `own`, and an echo layout still refreshes the list', () => {
+  const src = readFileSync(join(root, 'viewer', 'js', 'main.js'), 'utf8').replace(/\r\n/g, '\n');
+  assert.match(src, /\$\('label-pick-auto'\)\.onclick = \(\) => commitLabelEdit\(\{ labelBadge: null \}, 'label:badge:auto'\);/);
+  assert.ok(!/textContent = autoUp/.test(src), 'Auto is never relabelled as the upload');
+  assert.match(src, /if \(up\) commitLabelEdit\(\{ labelBadge: up\.own \}, 'label:badge:upload'\);/);
+  assert.match(src, /if \(layoutKey\(nb\) === layoutKey\(build\)\) \{[^}]*syncLabelList\(nb, build\)/);
+  const html = readFileSync(join(root, 'viewer', 'index.html'), 'utf8');
+  assert.match(html, /<button id="label-pick-upload"[^>]*>Restore uploaded icon<\/button>/);
+  assert.match(html, /<button id="label-pick-auto"[^>]*>Auto<\/button>/);
+  assert.match(html, /id="label-pick-upnote"[^>]*>This label wears an uploaded icon\. Choosing anything else here replaces it in the planner too\./);
+  // touch screens see each icon's name under it, before choosing
+  const css = readFileSync(join(root, 'viewer', 'css', 'viewer.css'), 'utf8').replace(/\r\n/g, '\n');
+  assert.match(css, /\.le-iname \{ display: none; \}/);
+  assert.match(css, /@media \(hover: none\), \(any-pointer: coarse\) \{[^@]*#label-pick-icons \.le-iname \{ display: block;/);
+  assert.match(src, /nm\.className = 'le-iname'; nm\.textContent = c\.name;/);
 });

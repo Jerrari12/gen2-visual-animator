@@ -130,9 +130,19 @@ export function copyLabelFields(nb, cur) {
   }
   cur.labelStyle = nb.labelStyle ?? null;
   if (typeof nb.buildId === 'string' && nb.buildId) cur.buildId = nb.buildId;
-  // the build's label list rides along as the planner holds it: it is where a drawer's uploaded icon lives (labelUploadFor)
+  syncLabelList(nb, cur);
+  return changed;
+}
+/* The build's label list as the planner holds it - where a drawer's uploaded icon lives (labelUploadFor). Also called for a layout
+   whose key says nothing else changed: after a pick in the card the planner's list no longer holds the upload it replaced, and the
+   card must not go on offering to restore it. Returns whether anything changed. */
+export function syncLabelList(nb, cur) {
+  let changed = false;
   for (const k of ['labelList', 'labelAssign']) {
-    if (nb[k] && typeof nb[k] === 'object') cur[k] = JSON.parse(JSON.stringify(nb[k])); else delete cur[k];
+    const next = nb && nb[k] && typeof nb[k] === 'object' ? nb[k] : null;
+    if (JSON.stringify(next) === JSON.stringify(cur[k] && typeof cur[k] === 'object' ? cur[k] : null)) continue;
+    if (next) cur[k] = JSON.parse(JSON.stringify(next)); else delete cur[k];
+    changed = true;
   }
   return changed;
 }
@@ -149,14 +159,19 @@ export function copyLabelFields(nb, cur) {
 export const LABEL_SVG_MAX = 64 * 1024;   // the label list's own bound (label-list.js SVG_MAX)
 export const isLabelSvg = (s) => typeof s === 'string' && s.length <= LABEL_SVG_MAX && /^\s*<svg[\s>/]/i.test(s);
 export function labelUploadFor(build, unit) {
+  const up = labelUploadOf(build, unit);
+  return up && JSON.stringify(cleanLabelBadge(unit.labelBadge)) === JSON.stringify(up.own) ? up.svg : null;
+}
+/* The drawer's label's uploaded icon whether or not the drawer wears it now: { svg, own }, `own` being the drawer badge that wears
+   it (null - absent - or the icon id the upload carries), or null. The card's "Restore uploaded icon" puts `own` back. */
+export function labelUploadOf(build, unit) {
   const list = build && build.labelList, assign = build && build.labelAssign;
   if (!unit || !cleanLabelText(unit.label) || !list || typeof list !== 'object' || !Array.isArray(list.labels) || !assign || typeof assign !== 'object') return null;
   const id = assign[String(unit.id)];
   const l = typeof id === 'string' ? list.labels.find((x) => x && x.id === id) : null;
   const b = l && l.badge;
   if (!b || b.type !== 'icon' || !isLabelSvg(b.svg)) return null;
-  const own = cleanLabelBadge(b.value ? { type: 'icon', value: b.value } : null);
-  return JSON.stringify(cleanLabelBadge(unit.labelBadge)) === JSON.stringify(own) ? b.svg : null;
+  return { svg: b.svg, own: cleanLabelBadge(b.value ? { type: 'icon', value: b.value } : null) };
 }
 /* Every drawer's upload, for main.js's layoutKey: a layout that changes only an upload must still apply. The SVG text itself,
    not a digest - a 32-bit hash can be matched by a different upload on purpose (Sol 01a1234d). */
@@ -226,16 +241,15 @@ export function styleEdit(build, key, value) {
 /* The icon picker's choices: exactly the generator's icon catalog (js/vendor/label-icons.js over the vendored core, both
    byte-for-byte and pinned), so the card can never offer an icon the printed label lacks. `cat` is labelIcons(); null until
    it has loaded. `query` narrows them the way the generator's menu search does (name, group, the words that predict them).
-   Like the generator's menu it offers ONE of each near-twin icon (the catalog's TWINS), plus `current` - the label's own
-   icon - when that is the other one. */
-export function iconChoices(cat, query, current) {
+   Like the generator's menu it offers both drawings of each near twin (the catalog's TWINS), side by side, named apart. */
+export function iconChoices(cat, query) {
   if (!cat || !Array.isArray(cat.icons)) return null;
-  const list = cat.search(query || '', current);
+  const list = cat.search(query || '');
   return list.map((i) => ({ id: i.id, name: i.name, group: i.group, svg: i.svg }));
 }
 /* The picker's groups, in the generator's menu order, each with its choices (empty groups left out). */
-export function iconGroups(cat, query, current) {
-  const choices = iconChoices(cat, query, current);
+export function iconGroups(cat, query) {
+  const choices = iconChoices(cat, query);
   if (!choices) return null;
   return cat.GROUPS.map((g) => ({ id: g.id, name: g.name, items: choices.filter((c) => c.group === g.id) })).filter((g) => g.items.length);
 }

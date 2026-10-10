@@ -39,15 +39,15 @@ const LEGACY = Object.freeze({
   'screw-phillips-head': ['screws', 'Phillips screw'],
   'screw-slotted-head': ['screws', 'Slotted screw'],
   'screw-torx-head': ['screws', 'Torx screw'],
-  'nut': ['nuts', 'Hex nut'],
-  'washer': ['nuts', 'Washer'],
+  'nut': ['nuts', 'Hex nut, plain'],        // the twins' names say how the two drawings differ (TWINS)
+  'washer': ['nuts', 'Washer, wide ring'],
   'screw-driver': ['tools', 'Screwdriver'],
   'wrench-a': ['tools', 'Wrench'],
   'flush-cutter': ['tools', 'Flush cutter'],
   'drill-bit': ['tools', 'Drill bit'],
   'gear': ['tools', 'Gear'],
   'nozzle': ['tools', 'Nozzle'],
-  'resistor': ['electronics', 'Resistor'],
+  'resistor': ['electronics', 'Resistor, plain'],
   'capacitor': ['electronics', 'Capacitor'],
   'diode': ['electronics', 'Diode / LED'],
   'ic-chip': ['electronics', 'Chip'],
@@ -86,11 +86,12 @@ const CORRECTIONS = Object.freeze([
   [['cookie cutter', 'cookie cutters', 'pizza cutter', 'pizza cutters'], null],  // not the flush cutter
 ]);
 
-/* Near twins: the core's nut, washer and resistor, and the icon family's own drawings of the same parts. A menu shows
-   ONE of each pair (ChatGPT's review via Joey: new users should not have to decipher near-identical choices). The other
-   stays a working icon - a label that carries it still prints it - and appears in a menu only while it is that label's
-   icon. The first of each pair is the one shown and the one the guess predicts: today the core's, so no printed label
-   changes. Swapping a pair's order would move new labels to the family's drawing (Joey's call). */
+/* Near twins: the core's nut, washer and resistor, and the icon family's own drawings of the same parts. Both of each
+   pair are in the menu, side by side, with names that tell them apart (ChatGPT's second review via Joey: "make the new
+   versions selectable now, with names"). The FIRST of each pair is the one the guess predicts - today the core's, so no
+   printed label changes until the comparison print decides. Swapping a pair's order would move NEW guesses to the
+   family's drawing; it must not change a label that already carries the other drawing: a row whose predicted icon is
+   the twin of the new guess keeps the drawing it has (twinOf, used by the Label Studio's auto-assign). */
 const TWINS = Object.freeze([['nut', 'hex-nut'], ['washer', 'flat-washer'], ['resistor', 'resistor-axial']]);
 
 /* The NEW word rules, asked only when the corrections and the core's own rules find nothing. Same matching as the core:
@@ -146,13 +147,17 @@ function create(opts) {
     byId.set(ic.id, ic); list.push(ic);
   }
   const groupOrder = new Map(GROUPS.map((g, i) => [g.id, i]));
-  const icons = list.filter((i) => i.selectable)
+  const sorted = list.filter((i) => i.selectable)
     .sort((a, b) => (groupOrder.get(a.group) ?? 99) - (groupOrder.get(b.group) ?? 99));   // stable: core order, then family order
+  // each twin sits right after the drawing it is a twin of, so the two read as a pair in the menu
+  const partner = new Map(TWINS.filter(([a, b]) => byId.has(a) && byId.has(b)).map(([a, b]) => [b, a]));
+  const icons = sorted.filter((ic) => !partner.has(ic.id));
+  for (const [other, first] of partner) icons.splice(icons.findIndex((ic) => ic.id === first) + 1, 0, byId.get(other));
   const rules = RULES.map(([keys, id]) => [keys, id, keys.map(wordRe)]);
   const fixes = CORRECTIONS.filter(([, id]) => id).map(([keys, id]) => [keys, id, keys.map(wordRe)]);
   const masks = CORRECTIONS.filter(([, id]) => !id).flatMap(([keys]) => keys)
     .map((k) => new RegExp('(^|[^a-z0-9])' + esc(k) + '(?=[^a-z0-9]|$)', 'gi'));
-  const hidden = new Set(TWINS.map(([, other]) => other).filter((id) => byId.has(id)));
+  const notGuessed = new Set(partner.keys());   // the second of each twin pair: offered, never guessed
   const words = new Map();   // icon id -> every phrase that predicts it (search finds an icon by its words too)
   const addWords = (keys, id) => { if (!words.has(id)) words.set(id, []); words.get(id).push(...keys); };
   CORRECTIONS.forEach(([keys, id]) => { if (id) addWords(keys, id); });
@@ -186,8 +191,8 @@ function create(opts) {
   }
 
   // The word -> icon guess: the corrections first, then the core's own rules (unchanged results), then the new rules.
-  // An icon that is not selectable, not to be predicted, or the hidden one of a twin pair is never guessed.
-  const guessable = (id) => { const ic = byId.get(id); return !!(ic && ic.selectable && ic.predict && !hidden.has(id)); };
+  // An icon that is not selectable, not to be predicted, or the second of a twin pair is never guessed.
+  const guessable = (id) => { const ic = byId.get(id); return !!(ic && ic.selectable && ic.predict && !notGuessed.has(id)); };
   function guessIconId(text) {
     if (!text) return null;
     for (const re of masks) text = text.replace(re, '$1 ');
@@ -200,18 +205,22 @@ function create(opts) {
     return null;
   }
 
-  // The icons a menu offers: every selectable icon except the hidden one of a twin pair, which appears only while it is
-  // the current icon of the label being edited.
-  function menu(currentId) {
-    return icons.filter((ic) => !hidden.has(ic.id) || ic.id === currentId);
+  // The icons a menu offers: every selectable icon, each twin beside the drawing it is a twin of.
+  function menu() {
+    return icons.slice();
   }
 
-  // Menu search, over menu(currentId): an icon matches when every typed word appears in its name, its group's name or
-  // one of its phrases.
-  function search(query, currentId) {
-    const offered = menu(currentId);
+  // The other drawing of the same part (TWINS), or null.
+  function twinOf(id) {
+    for (const [a, b] of TWINS) { if (id === a && byId.has(b)) return b; if (id === b && byId.has(a)) return a; }
+    return null;
+  }
+
+  // Menu search: an icon matches when every typed word appears in its name, its group's name or one of its phrases.
+  function search(query) {
+    const offered = icons;
     const q = String(query || '').trim().toLowerCase();
-    if (!q) return offered;
+    if (!q) return offered.slice();
     const terms = q.split(/\s+/);
     const gName = new Map(GROUPS.map((g) => [g.id, g.name.toLowerCase()]));
     return offered.filter((ic) => {
@@ -220,7 +229,7 @@ function create(opts) {
     });
   }
 
-  return { GROUPS, icons, find, svgFor, resolveBadge, guessIconId, menu, search, RULES, CORRECTIONS, TWINS };
+  return { GROUPS, icons, find, svgFor, resolveBadge, guessIconId, menu, search, twinOf, RULES, CORRECTIONS, TWINS };
 }
 
 root.GEN2LabelIcons = { version: 1, create, GROUPS, LEGACY, RULES, CORRECTIONS, TWINS };

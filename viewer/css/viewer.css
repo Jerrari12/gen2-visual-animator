@@ -369,6 +369,17 @@ body.label-edit-open #identify-card { max-height: 74%; overflow-y: auto; align-i
 .le-group.open .le-cells { display: grid; }
 .le-empty { font-size: 12px; color: var(--ink-soft); padding: 6px 2px; }
 .le-caption { min-height: 1.4em; font-size: 12px; color: var(--ink-soft); padding: 4px 2px 0; line-height: 1.4; }
+.le-upnote { font-size: 12px; color: var(--ink-soft); padding: 0 2px 8px; line-height: 1.4; }
+.le-pick-row button:disabled { opacity: .45; cursor: default; }
+.le-iname { display: none; }
+/* A touch screen has no hover: there every icon shows its name under it, so the name is read BEFORE the tap that chooses it
+   (ChatGPT's second review via Joey). Ids outrank the phone sizes further down. */
+@media (hover: none), (any-pointer: coarse) {
+  #label-pick-icons .le-cells { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  #label-pick-icons .le-icon { width: auto; height: auto; flex-direction: column; gap: 3px; padding: 7px 3px 6px; }
+  #label-pick-icons .le-icon svg { width: 24px; height: 24px; flex: none; }
+  #label-pick-icons .le-iname { display: block; font-size: 10.5px; line-height: 1.2; text-align: center; color: var(--ink-soft); }
+}
 /* an uploaded label icon: drawn as a mask over the current colour, never as markup */
 .svg-mask { display: block; width: 18px; height: 18px; background: currentColor; -webkit-mask-size: contain; mask-size: contain;
   -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat; -webkit-mask-position: center; mask-position: center; }

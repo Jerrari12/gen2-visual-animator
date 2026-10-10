@@ -22,7 +22,7 @@ import { LABEL_TEXT_DEFAULTS, LABEL_TEXT_NODES, labelFontReady, loadLabelFont, l
 import { LABEL_SPEC, LABEL_TEXT_MAX, cleanLabelText, cleanLabelBadge, cleanLabelStyle } from './label-spec.js';
 import { LABEL_STYLE_ROWS, labelOrder, effectiveStyle, labelOptsOf, labelOptsChanges, applyLabelOpts, labelOnlyDiff, copyLabelFields,
   editCommit, styleEdit, iconGroups, badgeStateText, shownBadge, historyKeyOf, labelSnap, labelUndoPatch, rejectionIsMine,
-  labelUploadFor, uploadsKey } from './label-panel.js';
+  labelUploadFor, labelUploadOf, syncLabelList, uploadsKey } from './label-panel.js';
 
 /* Every entry-routing boolean below is derived by resolveEntry() in entry.js -
    a pure function of (search, hash) with no DOM or network - so the boot
@@ -7369,10 +7369,20 @@ function renderLabelEditorState(opts = {}) {
   else btn.textContent = '+';
   // the words beside the button name the state for the words on screen - a draft included, so typing shows what Auto would pick
   $('label-edit-badge-state').textContent = text ? badgeStateText(text, badge, build.labelStyle, cat, upload) : '';
-  // Auto on a drawer whose label carries an upload brings the upload back (the label's own badge), so it says so
-  const autoUp = !!labelUploadFor(build, { ...unit, labelBadge: undefined });
-  $('label-pick-auto').textContent = autoUp ? 'Uploaded icon' : 'Auto';
-  $('label-pick-auto').title = autoUp ? 'The icon uploaded for this label in the Label Studio' : 'Let the generator predict an icon from the words';
+  /* Auto ALWAYS means a guess from the words; putting an uploaded icon back is its own button (ChatGPT's second review via
+     Joey). An upload with no icon id is worn while the drawer's badge is ABSENT - the same badge Auto writes - so while
+     the label has one, Auto cannot ask for a guess: it waits until another choice has replaced the upload (docked, the planner
+     then drops the upload from the label; on its own this page keeps it, and Restore brings it back). Restore is offered only
+     on its own: docked, any other choice replaces the upload in the planner too, and the card says so before it happens. */
+  const upl = labelUploadOf(build, unit);
+  const docked = !!plannerWin();
+  const autoBtn = $('label-pick-auto');
+  autoBtn.disabled = !!upl && !upl.own && (!!upload || !docked);
+  autoBtn.title = !autoBtn.disabled ? 'Guess an icon from the words'
+    : upload ? 'This label wears its uploaded icon. Choose an icon, a letter or No icon to replace it; Auto then guesses from the words.'
+    : "Auto can't guess while this label keeps an uploaded icon in this page - Restore uploaded icon puts it back.";
+  $('label-pick-uprow').classList.toggle('hidden', !(upl && !upload && !docked));
+  $('label-pick-upnote').classList.toggle('hidden', !(upload && docked));
   // the generator's own verdict, read off the meshes it built for THIS label
   let fits = true;
   if (text && labelFontReady()) { const t = labelGeometry(text, badge, build.labelStyle, upload); if (t && t.fits === false) fits = false; }
@@ -7514,7 +7524,7 @@ function renderIconPicker() {
   const q = $('label-pick-search').value;
   const worn = labelEdit && cat ? shownBadge(cleanLabelText(labelEdit.unit.label), labelEdit.unit.labelBadge, build.labelStyle, cat, labelUploadFor(build, labelEdit.unit)) : null;
   const current = worn && worn.type === 'icon' && !worn.predicted && !worn.upload ? worn.value : null;
-  const groups = iconGroups(cat, q, current);   // one of each near twin, plus the label's own icon
+  const groups = iconGroups(cat, q);   // every icon; a near twin sits beside the drawing it is a twin of
   resetLabelPickCaption();
   if (!groups) { grid.innerHTML = ''; grid.textContent = 'Loading icons…'; return; }
   const curGroup = current && cat.find(current) ? cat.find(current).group : null;
@@ -7551,6 +7561,8 @@ function renderIconPicker() {
       const b = document.createElement('button');
       b.type = 'button'; b.className = 'le-icon' + (c.id === current ? ' on' : ''); b.dataset.icon = c.id; b.title = c.name; b.setAttribute('aria-label', c.name);
       b.innerHTML = c.svg;   // the vendored icon catalog's own SVG strings (sha-pinned code, not user data)
+      const nm = document.createElement('span'); nm.className = 'le-iname'; nm.textContent = c.name;   // shown on touch screens (viewer.css)
+      b.appendChild(nm);
       const say = () => labelPickCaption(c.id === current ? `${c.name} (this label's icon)` : c.name);
       b.addEventListener('pointerenter', say); b.addEventListener('focus', say);
       b.addEventListener('pointerleave', resetLabelPickCaption); b.addEventListener('blur', resetLabelPickCaption);
@@ -7573,6 +7585,10 @@ function toggleIconPicker(open) {
 $('label-edit-badge').onclick = () => toggleIconPicker();
 $('label-pick-search').addEventListener('input', () => renderIconPicker());
 $('label-pick-auto').onclick = () => commitLabelEdit({ labelBadge: null }, 'label:badge:auto');
+$('label-pick-upload').onclick = () => {
+  const up = labelEdit && labelUploadOf(build, labelEdit.unit);
+  if (up) commitLabelEdit({ labelBadge: up.own }, 'label:badge:upload');
+};
 $('label-pick-none').onclick = () => commitLabelEdit({ labelBadge: { type: 'none' } }, 'label:badge:none');
 const useLetter = () => { const v = $('label-pick-char').value; if (cleanLabelBadge({ type: 'char', value: v })) commitLabelEdit({ labelBadge: { type: 'char', value: v } }, 'label:badge:char'); };
 $('label-pick-use').onclick = useLetter;
@@ -8526,7 +8542,10 @@ async function applyRemoteLayout(nb) {
     return;
   }
   hideBlocked();
-  if (layoutKey(nb) === layoutKey(build)) return; // no-op/echo (e.g. the viewerReady handshake)
+  if (layoutKey(nb) === layoutKey(build)) { // no-op/echo (e.g. the viewerReady handshake)
+    if (syncLabelList(nb, build) && labelEdit) renderLabelEditorState();   // the planner's label list moved on (an upload replaced there)
+    return;
+  }
   /* Only the labels (words, badges, style) and/or the build id changed: copy them and refresh the label meshes in place.
      The manifest does not depend on any of them, and the full path's regenerate() would deselect - closing the card the
      user has open on every planner keystroke (and on the one-off layout that hands an official kit its id). */
