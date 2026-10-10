@@ -163,8 +163,10 @@ jobs:
           sed -i "s|'./label-spec.js'|'./label-spec.js?v=$V'|" viewer/js/label-text.js
           sed -i "s|'./label-spec.js'|'./label-spec.js?v=$V'|" viewer/js/main.js
           sed -i "s|'./label-spec.js'|'./label-spec.js?v=$V'|" viewer/js/label-panel.js
-          # the label panel's pure parts (label plan step 2) - a main.js import
+          # the label panel's pure parts (label plan step 2) - a main.js import, and since the label icons (7a310a8,
+          # isLabelSvg) a label-text.js import too: one sed target per importer
           sed -i "s|'./label-panel.js'|'./label-panel.js?v=$V'|" viewer/js/main.js
+          sed -i "s|'./label-panel.js'|'./label-panel.js?v=$V'|" viewer/js/label-text.js
           sed -i "s|'./orbit-bench.js'|'./orbit-bench.js?v=$V'|" viewer/js/settle-bench.js
 
       # Fail the deploy rather than ship a half-stamped module graph. A first
