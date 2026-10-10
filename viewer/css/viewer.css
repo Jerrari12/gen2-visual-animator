@@ -379,6 +379,8 @@ body.label-edit-open #identify-card { max-height: 74%; overflow-y: auto; align-i
   #label-pick-icons .le-icon { width: auto; height: auto; flex-direction: column; gap: 3px; padding: 7px 3px 6px; }
   #label-pick-icons .le-icon svg { width: 24px; height: 24px; flex: none; }
   #label-pick-icons .le-iname { display: block; font-size: 10.5px; line-height: 1.2; text-align: center; color: var(--ink-soft); }
+  /* the group headers are tap targets too: 44 px tall (they measured 29 px on a phone, readiness review 2026-10-10) */
+  #label-pick-icons .le-ghead { min-height: 44px; }
 }
 /* an uploaded label icon: drawn as a mask over the current colour, never as markup */
 .svg-mask { display: block; width: 18px; height: 18px; background: currentColor; -webkit-mask-size: contain; mask-size: contain;
