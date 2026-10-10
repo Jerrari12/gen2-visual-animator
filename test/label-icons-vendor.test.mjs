@@ -27,8 +27,8 @@ const GEN = process.env.GEN2_EDGELABEL_ROOT
   : [join(root, '..', 'GEN2 EdgeLabel Label Generator'), join(root, '..', '..', 'GEN2 EdgeLabel Label Generator')];
 const GEN_ROOT = GEN.find((d) => existsSync(join(d, 'label-icons.js')));
 const PINS = {
-  'label-icons.js': 'e4a8d9db6aa854dfd4b43671888ff879328275eb7de7514be2de1048d0a8c7e8',
-  'label-icon-art.js': '7862e4984eb281e0f4b2abe0e09976a0436db6e5c13add4de20d3908b6f0a46e',
+  'label-icons.js': '1ed602174d2099f6d3c61a9a7b2122206d83c6a39b29702f4da772ff8871ebea',
+  'label-icon-art.js': 'f2f1fe9c67940fcad366d4b4d9c9eee599a94e2e9dfec093b1430176236a587b',
 };
 const sha = (p) => createHash('sha256').update(readFileSync(p)).digest('hex');
 

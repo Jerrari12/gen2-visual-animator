@@ -10,7 +10,8 @@
    - A unit's `labelBadge` is the left icon or letter; ABSENT means "let the generator predict one from the words".
        { type: 'none' } | { type: 'icon', value: <icon id> } | { type: 'char', value: <up to 4 characters> }
      An icon id is checked for SHAPE, not against the icon list: the generator's code ignores an id it does not know (the
-     label prints without an icon), so a newer icon works without a change here. Custom uploaded SVGs are not build state.
+     label prints without an icon), so a newer icon works without a change here. An uploaded SVG is never
+     unit state: the build keeps it in its label list (labelList), which label-panel.js labelUploadFor reads.
    - A build's `labelStyle` is the generator's set-wide settings; null = its defaults. A value outside the generator's own
      input limits, or of the wrong type, is DROPPED, never clamped - clamping would print something nobody chose.
    - A build's `buildId` names the build the planner is editing (12 random [a-z0-9]; the planner accepts 8-32). The relay

@@ -20,6 +20,7 @@
 import * as THREE from 'three';
 import { SVGLoader } from 'three/addons/loaders/SVGLoader.js';
 import { cleanLabelBadge, cleanLabelStyle } from './label-spec.js';
+import { isLabelSvg } from './label-panel.js';
 
 /* The generator's text colour. Only this one value is needed before the core has loaded (main.js seeds the TEXT zone's
    colour when a build mounts); test/edgelabel-core-vendor.test.mjs pins it to the core's own DEFAULTS.colorText. */
@@ -82,20 +83,29 @@ function defaultBadge(text, S) {
 /* One label as geometry in the Label_EdgeLabel model's own frame, built by the generator's buildLabelMeshes. `badge` is
    the unit's labelBadge (absent or invalid = the generator's prediction), `style` the build's labelStyle (absent or invalid
    values = the generator's defaults). Returns null when there is nothing to print. `fits` is the generator's own verdict:
-   false means even the 3 mm floor overflows the label, exactly where the generator warns. */
+   false means even the 3 mm floor overflows the label, exactly where the generator warns. `upload` is the drawer's uploaded
+   icon (label-panel.js labelUploadFor): it wins, as an upload does in the generator. */
 const cache = new Map();
-export function labelGeometry(text, badge, style) {
+export function labelGeometry(text, badge, style, upload) {
   if (!core) throw new Error('label core not loaded');
   const S = { ...core.DEFAULTS, ...(cleanLabelStyle(style) || {}) };
   const raw = String(text || '');
-  const chosen = cleanLabelBadge(badge) || defaultBadge(raw, S);
+  const up = isLabelSvg(upload) ? { type: 'icon', svg: upload } : null;
+  const chosen = up || cleanLabelBadge(badge) || defaultBadge(raw, S);
   // the generator's one adapter: an icon its core does not hold reaches the core as the badge's own drawing, chosen for
   // the style's Badge size exactly as the generator chooses it
   const data = core.prepareLabel(raw, icons.resolveBadge(chosen, S.badgeSize), S.allCaps);
   if (!data) return null;
   const key = JSON.stringify([data.text, data.badge, S.capMm, S.depth, S.badgeSize, S.bold]);
   if (cache.has(key)) return cache.get(key);
-  const m = core.buildLabelMeshes(data, S.capMm, S.depth, S.badgeSize, S.bold);
+  let m;
+  try { m = core.buildLabelMeshes(data, S.capMm, S.depth, S.badgeSize, S.bold); }
+  catch (e) {
+    if (!up) throw e;
+    // an upload this page cannot draw: the words alone, as the generator refuses an SVG it cannot read
+    console.warn(`[label text] an uploaded icon could not be drawn (${(e && e.message) || e}) - shown without it`);
+    return labelGeometry(text, { type: 'none' }, style);
+  }
   const parts = [];
   if (m.textGeo) parts.push({ part: 'text', geo: m.textGeo });
   if (m.badgeGeo) parts.push({ part: 'badge', geo: m.badgeGeo });

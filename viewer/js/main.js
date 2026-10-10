@@ -21,7 +21,8 @@ import { parseSeeInto, parseSeeIntoSkip, parseSeeIntoLattice, createSeeInto } fr
 import { LABEL_TEXT_DEFAULTS, LABEL_TEXT_NODES, labelFontReady, loadLabelFont, labelGeometry, labelCore, labelIcons } from './label-text.js';
 import { LABEL_SPEC, LABEL_TEXT_MAX, cleanLabelText, cleanLabelBadge, cleanLabelStyle } from './label-spec.js';
 import { LABEL_STYLE_ROWS, labelOrder, effectiveStyle, labelOptsOf, labelOptsChanges, applyLabelOpts, labelOnlyDiff, copyLabelFields,
-  editCommit, styleEdit, iconGroups, badgeStateText, shownBadge, historyKeyOf, labelSnap, labelUndoPatch, rejectionIsMine } from './label-panel.js';
+  editCommit, styleEdit, iconGroups, badgeStateText, shownBadge, historyKeyOf, labelSnap, labelUndoPatch, rejectionIsMine,
+  labelUploadFor, uploadsKey } from './label-panel.js';
 
 /* Every entry-routing boolean below is derived by resolveEntry() in entry.js -
    a pure function of (search, hash) with no DOM or network - so the boot
@@ -3887,13 +3888,13 @@ function attachLabelTexts() {
   }).catch((e) => console.warn(`[label text] ${(e && e.message) || e} - labels left blank`));
 }
 function placeLabelTexts(list) {
-  for (const inst of list) placeLabelText(inst, labelTextFor(inst), labelUnitFor(inst)?.labelBadge);
+  for (const inst of list) { const u = labelUnitFor(inst); placeLabelText(inst, labelTextFor(inst), u?.labelBadge, labelUploadFor(build, u)); }
 }
 /* One label's text + badge meshes from its words, its badge (absent = predicted) and the build's style - label-spec.js checks
    both. Returns labelGeometry's result (its `fits` is the generator's own verdict) or null when there is nothing to print. */
-function placeLabelText(inst, text, badge) {
+function placeLabelText(inst, text, badge, upload) {
   if (!text) return null;
-  const t = labelGeometry(text, badge, build.labelStyle);
+  const t = labelGeometry(text, badge, build.labelStyle, upload);
   if (!t) return null;
   const inner = inst.group.children[0];
   if (!t.fits) console.warn(`[label text] "${t.shown}" overflows the label even at the 3 mm floor (the generator warns too)`);
@@ -3929,7 +3930,8 @@ function refreshLabelText(inst, draft) {
   const text = draft ? cleanLabelText(draft.text) : labelTextFor(inst);
   // the badge is ALWAYS the unit's live one - a draft carries only the words, so a badge the planner changes while the
   // user is mid-word shows at once under the draft instead of the badge the draft was started with (Sol 01a0fffd, 4)
-  const badge = labelUnitFor(inst)?.labelBadge;
+  const unit = labelUnitFor(inst);
+  const badge = unit?.labelBadge, upload = labelUploadFor(build, unit);   // a drawer's uploaded icon lives in the label list
   if (text && !labelFontReady()) {
     // first label on this page: load the core + font once, then come back here (with the card's draft if it still has one)
     const tok = ++labelTextTok;
@@ -3941,7 +3943,7 @@ function refreshLabelText(inst, draft) {
     return null;
   }
   clearLabelText(inst);
-  const t = text ? placeLabelText(inst, text, badge) : null;
+  const t = text ? placeLabelText(inst, text, badge, upload) : null;
   if (selectedId === inst.cfg.id) refreshSelHighlight();
   ao.rev++; markShadowDirty(); invalidateFrame();
   return t;
@@ -7353,26 +7355,32 @@ function renderLabelEditorState(opts = {}) {
   field.classList.toggle('caps', labelCapsOn());
   const text = labelEdit.draft ? cleanLabelText(labelEdit.draft.text) : committed;
   const badge = unit.labelBadge;   // live, never snapshotted into the draft (see refreshLabelText)
+  const upload = labelUploadFor(build, unit);
   const cat = labelIcons();
   const btn = $('label-edit-badge');
-  const worn = shownBadge(text, badge, build.labelStyle, cat);
+  const worn = shownBadge(text, badge, build.labelStyle, cat, upload);
   btn.classList.toggle('predicted', !!worn.predicted);
   btn.classList.toggle('set', !worn.predicted && worn.type !== 'none');
   btn.disabled = !committed;
   btn.title = committed ? 'Icon or letter for this label' : 'Type a label first';
-  if (worn.type === 'icon') { const it = cat && cat.find(worn.value); btn.innerHTML = it ? it.svg : '+'; }   // the sha-pinned vendored icon catalog, not data
+  if (worn.upload) { btn.textContent = ''; btn.appendChild(svgMaskEl(upload)); }   // an upload is data: a mask, never markup
+  else if (worn.type === 'icon') { const it = cat && cat.find(worn.value); btn.innerHTML = it ? it.svg : '+'; }   // the sha-pinned vendored icon catalog, not data
   else if (worn.type === 'char') btn.textContent = labelCapsOn() ? worn.value.toUpperCase() : worn.value;
   else btn.textContent = '+';
   // the words beside the button name the state for the words on screen - a draft included, so typing shows what Auto would pick
-  $('label-edit-badge-state').textContent = text ? badgeStateText(text, badge, build.labelStyle, cat) : '';
+  $('label-edit-badge-state').textContent = text ? badgeStateText(text, badge, build.labelStyle, cat, upload) : '';
+  // Auto on a drawer whose label carries an upload brings the upload back (the label's own badge), so it says so
+  const autoUp = !!labelUploadFor(build, { ...unit, labelBadge: undefined });
+  $('label-pick-auto').textContent = autoUp ? 'Uploaded icon' : 'Auto';
+  $('label-pick-auto').title = autoUp ? 'The icon uploaded for this label in the Label Studio' : 'Let the generator predict an icon from the words';
   // the generator's own verdict, read off the meshes it built for THIS label
   let fits = true;
-  if (text && labelFontReady()) { const t = labelGeometry(text, badge, build.labelStyle); if (t && t.fits === false) fits = false; }
+  if (text && labelFontReady()) { const t = labelGeometry(text, badge, build.labelStyle, upload); if (t && t.fits === false) fits = false; }
   const fitEl = $('label-edit-fit');
   fitEl.textContent = fits ? '' : 'Won\'t fit, even at the 3 mm minimum';
   fitEl.classList.toggle('hidden', fits);
   $('label-edit-note').classList.toggle('hidden', !!plannerWin());
-  for (const b of $('label-pick-icons').querySelectorAll('.le-icon')) b.classList.toggle('on', worn.type === 'icon' && b.dataset.icon === worn.value && !worn.predicted);
+  for (const b of $('label-pick-icons').querySelectorAll('.le-icon')) b.classList.toggle('on', worn.type === 'icon' && b.dataset.icon === worn.value && !worn.predicted && !worn.upload);
   // no words, no icon (a badge dies with its label): the picker closes with the words instead of offering clicks that do nothing
   if (!committed && labelEdit.picker) toggleIconPicker(false);
   if (labelEdit.picker) renderIconPicker();
@@ -7481,14 +7489,34 @@ function openLabelIconGroups() {
 function saveLabelIconGroups(ids) {
   try { sessionStorage.setItem(LABEL_ICON_GROUPS_KEY, JSON.stringify(ids)); } catch (e) { /* storage blocked */ }
 }
+// An uploaded SVG on screen: a CSS mask over the current colour, so nothing in it is ever parsed into the page or run.
+function svgMaskEl(svg) {
+  const el = document.createElement('span');
+  el.className = 'svg-mask';
+  // a lone surrogate (valid JSON, so possible in a build link) would make encodeURIComponent throw (Sol 01a1234d)
+  let enc = '';
+  try { enc = encodeURIComponent(typeof svg.toWellFormed === 'function' ? svg.toWellFormed() : svg); } catch (e) { /* drawn empty */ }
+  const url = `url("data:image/svg+xml;charset=utf-8,${enc}")`;
+  el.style.webkitMaskImage = url; el.style.maskImage = url;
+  return el;
+}
+/* The line under the icons: the name of the icon under the pointer or keyboard focus, else what the label wears now (a touch
+   screen has no hover: the caption and the state line beside the button name it). */
+function labelPickCaption(text) { $('label-pick-caption').textContent = text; }
+function resetLabelPickCaption() {
+  if (!labelEdit) return labelPickCaption('');
+  const st = $('label-edit-badge-state').textContent;
+  labelPickCaption(st ? `This label: ${st}` : '');
+}
 function renderIconPicker() {
   const grid = $('label-pick-icons');
   const cat = labelIcons();
   const q = $('label-pick-search').value;
-  const groups = iconGroups(cat, q);
+  const worn = labelEdit && cat ? shownBadge(cleanLabelText(labelEdit.unit.label), labelEdit.unit.labelBadge, build.labelStyle, cat, labelUploadFor(build, labelEdit.unit)) : null;
+  const current = worn && worn.type === 'icon' && !worn.predicted && !worn.upload ? worn.value : null;
+  const groups = iconGroups(cat, q, current);   // one of each near twin, plus the label's own icon
+  resetLabelPickCaption();
   if (!groups) { grid.innerHTML = ''; grid.textContent = 'Loading icons…'; return; }
-  const worn = labelEdit ? shownBadge(cleanLabelText(labelEdit.unit.label), labelEdit.unit.labelBadge, build.labelStyle, cat) : null;
-  const current = worn && worn.type === 'icon' && !worn.predicted ? worn.value : null;
   const curGroup = current && cat.find(current) ? cat.find(current).group : null;
   const searching = !!q.trim();
   const saved = openLabelIconGroups();
@@ -7523,6 +7551,9 @@ function renderIconPicker() {
       const b = document.createElement('button');
       b.type = 'button'; b.className = 'le-icon' + (c.id === current ? ' on' : ''); b.dataset.icon = c.id; b.title = c.name; b.setAttribute('aria-label', c.name);
       b.innerHTML = c.svg;   // the vendored icon catalog's own SVG strings (sha-pinned code, not user data)
+      const say = () => labelPickCaption(c.id === current ? `${c.name} (this label's icon)` : c.name);
+      b.addEventListener('pointerenter', say); b.addEventListener('focus', say);
+      b.addEventListener('pointerleave', resetLabelPickCaption); b.addEventListener('blur', resetLabelPickCaption);
       b.onclick = () => { commitLabelEdit({ labelBadge: { type: 'icon', value: c.id } }, 'label:badge:icon'); };
       cells.appendChild(b);
     }
@@ -8484,7 +8515,9 @@ const layoutKey = b => JSON.stringify([b.mount, +b.length, (b.placed || []).map(
   JSON.stringify(b.labelStyle ?? null),
   // the build's own id (the planner's layoutSig carries it as `id`): without it a layout differing only in the id is dropped,
   // and a viewer booted from an official kit never learns the id the planner minted - so its relay gate would never engage
-  b.buildId || '']);
+  b.buildId || '',
+  // the drawers' uploaded icons (the planner's layoutSig carries them as `up`): they live in the label list, not the units
+  uploadsKey(b)]);
 async function applyRemoteLayout(nb) {
   if (!booted || !nb || !Array.isArray(nb.placed) || !nb.placed.length) return;
   if (regenBusy) { // mid-regenerate from an earlier message — retry, never drop the newest state

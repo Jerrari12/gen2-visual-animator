@@ -10,7 +10,8 @@ import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { LABEL_STYLE_FALLBACK, LABEL_STYLE_ROWS, isLabelUnit, labelOrder, effectiveStyle, labelOptsOf, labelOptsChanges, applyLabelOpts,
-  labelOnlyDiff, copyLabelFields, editCommit, styleEdit, iconChoices, iconGroups, badgeStateText, shownBadge, historyKeyOf } from '../viewer/js/label-panel.js';
+  labelOnlyDiff, copyLabelFields, editCommit, styleEdit, iconChoices, iconGroups, badgeStateText, shownBadge, historyKeyOf,
+  labelUploadFor, uploadsKey, isLabelSvg } from '../viewer/js/label-panel.js';
 import { LABEL_SPEC } from '../viewer/js/label-spec.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -36,7 +37,7 @@ test('badgeStateText names the three states, and says the letter the way the lab
   assert.equal(badgeStateText('Torx Bits', undefined, { predictIcons: false }, cat), 'Auto · off');
   assert.equal(badgeStateText('Torx Bits', undefined, null, null), 'Auto', 'before the core loads nothing is predicted yet');
   assert.equal(badgeStateText('Torx Bits', { type: 'none' }, null, cat), 'No icon');
-  assert.equal(badgeStateText('Torx Bits', { type: 'icon', value: 'nut' }, null, cat), 'Manual · nut, outline');
+  assert.equal(badgeStateText('Torx Bits', { type: 'icon', value: 'nut' }, null, cat), 'Manual · hex nut');
   assert.equal(badgeStateText('Torx Bits', { type: 'icon', value: 'hex-nut' }, null, cat), 'Manual · hex nut, chamfered');
   assert.equal(badgeStateText('Torx Bits', { type: 'icon', value: 'a-newer-icon' }, null, cat), 'Manual · a-newer-icon', 'an unknown id reads as itself');
   assert.equal(badgeStateText('Torx Bits', { type: 'char', value: 'm3' }, null, cat), 'Letter · M3', 'ALL CAPS by default, like prepareLabel');
@@ -184,13 +185,73 @@ test('labelOrder is the planner\'s one drawer order (top row first, then left to
   for (const f of ['classic', 'shelf', 'cabinet']) assert.equal(isLabelUnit(unit(1, { fill: f })), false);
   assert.equal(isLabelUnit(null), false);
   // the picker offers the catalog: the core's 23 and the MODULITH family (never the staged coffee filter), in groups
-  assert.equal(iconChoices(cat).length, cat.icons.length);
-  assert.equal(iconChoices(cat).length, core.ICON_LIBRARY.length + 9);
+  assert.equal(iconChoices(cat).length, cat.menu().length);
+  assert.equal(iconChoices(cat).length, core.ICON_LIBRARY.length + 9 - cat.TWINS.length, 'one of each near twin');
   assert.equal(iconChoices(null), null, 'null until the catalog has loaded');
   assert.ok(!iconChoices(cat).some((c) => c.id === 'coffee-filter'));
   const gs = iconGroups(cat);
   assert.deepEqual(gs.map((g) => g.id), cat.GROUPS.map((g) => g.id));
-  assert.equal(gs.reduce((n, g) => n + g.items.length, 0), cat.icons.length);
+  assert.equal(gs.reduce((n, g) => n + g.items.length, 0), cat.menu().length);
   assert.deepEqual(iconGroups(cat, 'scissors').map((g) => [g.id, g.items.map((i) => i.id)]), [['office', ['scissors']]]);
   assert.deepEqual(iconGroups(cat, 'zzzz'), []);
+});
+
+/* ---- a drawer's uploaded icon (2026-10-09; ChatGPT's review via Joey) ---- */
+const SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><path d="M0 0H10V10H0Z"/></svg>';
+const withUpload = (over = {}) => build({
+  labelList: { format: 'modulith-labels', version: 1, labels: [
+    { id: 'lbltorx00001', text: 'Torx Bits', badge: { type: 'icon', svg: SVG } },
+    { id: 'lblnuts00002', text: 'Nuts', badge: { type: 'icon', value: 'nut', svg: SVG } }] },
+  labelAssign: { 1: 'lbltorx00001', 2: 'lblnuts00002' }, ...over });
+
+test('labelUploadFor: a drawer wears its label\'s upload while its mirror badge is still the label\'s own; never anything that is not an SVG', () => {
+  const b = withUpload();
+  assert.equal(labelUploadFor(b, b.placed[0]), SVG, 'no id: the mirror carries no badge');
+  assert.equal(labelUploadFor(b, b.placed[1]), SVG, 'uploaded with an id: the mirror carries that id');
+  assert.equal(labelUploadFor(b, b.placed[2]), null, 'no label assigned');
+  // a pick in the card changes the mirror: the pick shows (and the planner makes it the label's badge)
+  assert.equal(labelUploadFor(b, { ...b.placed[0], labelBadge: { type: 'icon', value: 'star' } }), null);
+  assert.equal(labelUploadFor(b, { ...b.placed[0], labelBadge: { type: 'none' } }), null);
+  assert.equal(labelUploadFor(b, { ...b.placed[1], labelBadge: undefined }), null, 'the id was removed from the mirror: not the label\'s own any more');
+  assert.equal(labelUploadFor(b, { ...b.placed[0], label: '' }), null, 'no words, no label');
+  // the build's data is untrusted: only an SVG within the label list's bound
+  for (const svg of ['<script>alert(1)</script>', '<img src=x onerror=alert(1)>', 'x', 7, null, '<svg>' + 'x'.repeat(64 * 1024) + '</svg>']) {
+    const bad = withUpload(); bad.labelList.labels[0].badge.svg = svg;
+    assert.equal(labelUploadFor(bad, bad.placed[0]), null, String(svg).slice(0, 30));
+  }
+  assert.equal(isLabelSvg('  <svg viewBox="0 0 1 1"/>'), true);
+  for (const junk of [{}, { labelList: {} }, { labelList: { labels: 'x' }, labelAssign: { 1: 'a' } }, { labelAssign: null }]) {
+    const j = build(junk);
+    assert.equal(labelUploadFor(j, j.placed[0]), null);
+  }
+  assert.equal(labelUploadFor(null, b.placed[0]), null);
+});
+
+test('uploadsKey: every drawer\'s upload - it moves when an upload changes and only then', () => {
+  const k = uploadsKey(withUpload());
+  assert.deepEqual(JSON.parse(k), [[1, SVG], [2, SVG]], 'the SVG text itself, not a digest (a 32-bit hash can be matched on purpose: Sol 01a1234d)');
+  assert.equal(uploadsKey(withUpload()), k, 'deterministic');
+  const changed = withUpload(); changed.labelList.labels[0].badge.svg = SVG.replace('H10', 'H9');
+  assert.notEqual(uploadsKey(changed), k);
+  assert.equal(uploadsKey(build()), '[]', 'no label list: nothing');
+});
+
+test('the card names an upload: shownBadge says the button shows it, badgeStateText says "Uploaded icon"', () => {
+  assert.deepEqual(shownBadge('Torx Bits', undefined, null, cat, SVG), { type: 'icon', upload: true });
+  assert.equal(badgeStateText('Torx Bits', undefined, null, cat, SVG), 'Uploaded icon');
+  assert.equal(badgeStateText('Torx Bits', undefined, null, cat, null), 'Auto · torx screw', 'without one, as before');
+});
+
+test('copyLabelFields carries the build\'s label list (where uploads live) as the planner holds it; labelOnlyDiff counts a list-only change as label-only', () => {
+  const cur = build();
+  const nb = withUpload();
+  copyLabelFields(nb, cur);
+  assert.deepEqual(cur.labelList, nb.labelList);
+  assert.deepEqual(cur.labelAssign, nb.labelAssign);
+  assert.notEqual(cur.labelList, nb.labelList, 'a copy, not a shared reference');
+  copyLabelFields(build(), cur);
+  assert.equal('labelList' in cur, false, 'a layout without a list clears it');
+  assert.equal('labelAssign' in cur, false);
+  const key = (b) => JSON.stringify([b.placed.map((u) => [u.id, u.x, u.label || '']), b.labelStyle ?? null, b.buildId || '', uploadsKey(b)]);
+  assert.equal(labelOnlyDiff(withUpload(), build(), key), true, 'a list-only change takes the cheap path');
 });

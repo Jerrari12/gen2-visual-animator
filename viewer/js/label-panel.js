@@ -107,7 +107,7 @@ export function labelOnlyDiff(nb, cur, layoutKey) {
   if (!nb || !cur || !Array.isArray(nb.placed) || !Array.isArray(cur.placed)) return false;
   const strip = (b) => {
     const s = { ...b, placed: b.placed.map((u) => { const c = { ...u }; delete c.label; delete c.labelBadge; return c; }) };
-    delete s.labelStyle; delete s.buildId;
+    delete s.labelStyle; delete s.buildId; delete s.labelList; delete s.labelAssign;
     return s;
   };
   return layoutKey(nb) !== layoutKey(cur) && layoutKey(strip(nb)) === layoutKey(strip(cur));
@@ -130,7 +130,38 @@ export function copyLabelFields(nb, cur) {
   }
   cur.labelStyle = nb.labelStyle ?? null;
   if (typeof nb.buildId === 'string' && nb.buildId) cur.buildId = nb.buildId;
+  // the build's label list rides along as the planner holds it: it is where a drawer's uploaded icon lives (labelUploadFor)
+  for (const k of ['labelList', 'labelAssign']) {
+    if (nb[k] && typeof nb[k] === 'object') cur[k] = JSON.parse(JSON.stringify(nb[k])); else delete cur[k];
+  }
   return changed;
+}
+
+/* ---- an uploaded icon ------------------------------------------------------------------------------------------- */
+
+/* A drawer's UPLOADED label icon (2026-10-09; ChatGPT's review, relayed by Joey: an uploaded icon must survive the trip into
+   the 3D Build Studio). The planner keeps it in the build's label list (labelList + labelAssign, the label tool's format);
+   the drawer's mirror (label / labelBadge), which is all this viewer otherwise reads, cannot hold one. A drawer wears its
+   label's upload while its mirror badge is still the label's own (none, or the icon id it was uploaded with): a pick in the
+   card changes the mirror, so the pick shows - and the planner then makes that pick the label's badge (an older tool's pick
+   wins over an upload it could not see). Returns the SVG text, or null. Never markup in the page: the 3D label builds it
+   through SVGLoader (DOMParser, nothing runs) and the card shows it as a CSS mask. */
+export const LABEL_SVG_MAX = 64 * 1024;   // the label list's own bound (label-list.js SVG_MAX)
+export const isLabelSvg = (s) => typeof s === 'string' && s.length <= LABEL_SVG_MAX && /^\s*<svg[\s>/]/i.test(s);
+export function labelUploadFor(build, unit) {
+  const list = build && build.labelList, assign = build && build.labelAssign;
+  if (!unit || !cleanLabelText(unit.label) || !list || typeof list !== 'object' || !Array.isArray(list.labels) || !assign || typeof assign !== 'object') return null;
+  const id = assign[String(unit.id)];
+  const l = typeof id === 'string' ? list.labels.find((x) => x && x.id === id) : null;
+  const b = l && l.badge;
+  if (!b || b.type !== 'icon' || !isLabelSvg(b.svg)) return null;
+  const own = cleanLabelBadge(b.value ? { type: 'icon', value: b.value } : null);
+  return JSON.stringify(cleanLabelBadge(unit.labelBadge)) === JSON.stringify(own) ? b.svg : null;
+}
+/* Every drawer's upload, for main.js's layoutKey: a layout that changes only an upload must still apply. The SVG text itself,
+   not a digest - a 32-bit hash can be matched by a different upload on purpose (Sol 01a1234d). */
+export function uploadsKey(build) {
+  return JSON.stringify(((build && build.placed) || []).map((u) => [u.id, labelUploadFor(build, u)]).filter(([, s]) => s));
 }
 
 /* ---- the card's edits ------------------------------------------------------------------------------------------ */
@@ -194,15 +225,17 @@ export function styleEdit(build, key, value) {
 
 /* The icon picker's choices: exactly the generator's icon catalog (js/vendor/label-icons.js over the vendored core, both
    byte-for-byte and pinned), so the card can never offer an icon the printed label lacks. `cat` is labelIcons(); null until
-   it has loaded. `query` narrows them the way the generator's menu search does (name, group, the words that predict them). */
-export function iconChoices(cat, query) {
+   it has loaded. `query` narrows them the way the generator's menu search does (name, group, the words that predict them).
+   Like the generator's menu it offers ONE of each near-twin icon (the catalog's TWINS), plus `current` - the label's own
+   icon - when that is the other one. */
+export function iconChoices(cat, query, current) {
   if (!cat || !Array.isArray(cat.icons)) return null;
-  const list = query && String(query).trim() ? cat.search(query) : cat.icons;
+  const list = cat.search(query || '', current);
   return list.map((i) => ({ id: i.id, name: i.name, group: i.group, svg: i.svg }));
 }
 /* The picker's groups, in the generator's menu order, each with its choices (empty groups left out). */
-export function iconGroups(cat, query) {
-  const choices = iconChoices(cat, query);
+export function iconGroups(cat, query, current) {
+  const choices = iconChoices(cat, query, current);
   if (!choices) return null;
   return cat.GROUPS.map((g) => ({ id: g.id, name: g.name, items: choices.filter((c) => c.group === g.id) })).filter((g) => g.items.length);
 }
@@ -211,8 +244,9 @@ export function iconGroups(cat, query) {
    ABSENT = Auto (the generator's guess - its icon catalog's guessIconId - under the style's predictIcons switch),
    { type: 'none' } = No icon (chosen), icon / letter = manual. A letter reads the way the LABEL prints it (upper-cased under
    allCaps, like prepareLabel); the picker's own input shows it as typed. `cat` (labelIcons()) may be null before the font has
-   loaded - then Auto names no icon yet. */
-export function badgeStateText(text, badge, style, cat) {
+   loaded - then Auto names no icon yet. `upload` (labelUploadFor) = the drawer wears its label's uploaded icon. */
+export function badgeStateText(text, badge, style, cat, upload) {
+  if (upload) return 'Uploaded icon';
   const S = effectiveStyle({ labelStyle: style });
   const name = (id) => { const it = cat && cat.find(id); return it ? it.name.toLowerCase() : id; };
   const b = cleanLabelBadge(badge);
@@ -228,7 +262,8 @@ export function badgeStateText(text, badge, style, cat) {
 }
 
 /* The badge the label is actually wearing (for the button's face): the manual one, or the predicted one under Auto. */
-export function shownBadge(text, badge, style, cat) {
+export function shownBadge(text, badge, style, cat, upload) {
+  if (upload) return { type: 'icon', upload: true };
   const b = cleanLabelBadge(badge);
   if (b) return b;
   const S = effectiveStyle({ labelStyle: style });

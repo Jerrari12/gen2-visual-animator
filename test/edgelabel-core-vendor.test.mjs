@@ -84,7 +84,12 @@ test('the Labels rows\' fallback defaults ARE the core\'s DEFAULTS, and the pick
   for (const f of ['label-icon-art.js', 'label-icons.js']) (0, eval)(readFileSync(join(root, 'viewer', 'js', 'vendor', f), 'utf8'));
   const cat = globalThis.GEN2LabelIcons.create({ core: C, art: globalThis.GEN2LabelIconArt });
   const choices = iconChoices(cat);
-  assert.deepEqual(choices.map((c) => c.id), cat.icons.map((i) => i.id), 'the picker\'s ids are not the catalog\'s, in its order');
+  // one of each near twin (the catalog's TWINS): the other only while it is the label's own icon
+  for (const [shown, other] of cat.TWINS) {
+    assert.ok(choices.some((c) => c.id === shown) && !choices.some((c) => c.id === other), `${shown} offered, ${other} not`);
+    assert.ok(iconChoices(cat, '', other).some((c) => c.id === other), `${other} offered while current`);
+  }
+  assert.deepEqual(choices.map((c) => c.id), cat.menu().map((i) => i.id), 'the picker\'s ids are not the catalog\'s, in its order');
   for (const it of C.ICON_LIBRARY) assert.ok(choices.some((c) => c.id === it.id && c.svg === it.svg), `the core's ${it.id} is offered with its own drawing`);
   for (const c of choices) assert.ok(c.svg.startsWith('<svg') && c.name, `${c.id} has no svg/name`);
   assert.equal(iconChoices(null), null, 'before the core loads there are no choices (the card says Loading icons…)');

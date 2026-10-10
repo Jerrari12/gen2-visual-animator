@@ -63,8 +63,9 @@ const LIP_MODES = (() => {
   return [...m[1].matchAll(/'([^']*)'/g)].map((x) => x[1]);
 })();
 
-// the real layoutKey, executable
-const layoutKey = new Function(`${declAt(viewerSrc, 'const layoutKey =')} return layoutKey;`)();
+// the real layoutKey, executable; the drawers' uploaded-icon digest it reads is label-panel.js's own (main.js imports it)
+const { uploadsKey } = await import(new URL('../viewer/js/label-panel.js', import.meta.url).href);
+const layoutKey = new Function('uploadsKey', `${declAt(viewerSrc, 'const layoutKey =')} return layoutKey;`)(uploadsKey);
 // the real currentOpts - it reads the module-level `build`, and the build plate through the
 // resolver main.js imports, which is handed in here as the same real function
 const { plateFinishOf, PLATE_FINISHES } = await import(new URL('../viewer/js/bed-finish.js', import.meta.url).href);
@@ -401,6 +402,18 @@ test('labelOnlyDiff, against the REAL layoutKey: label words / badge / style / b
   const b2 = labelledBuild();
   assert.deepEqual(copyLabelFields(nb, b2), [3], 'copyLabelFields must name exactly the units whose WORDS changed');
   assert.equal(layoutKey(b2), layoutKey(nb), 'after copyLabelFields the keys still differ - the next echo would not be dropped');
+});
+
+test('layoutKey DISTINGUISHES a change to a drawer\'s uploaded icon alone (it lives in the label list, not the units), and it is label-only', () => {
+  const SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><path d="M0 0H10V10H0Z"/></svg>';
+  const up = (svg) => labelledBuild({ labelList: { format: 'modulith-labels', version: 1, labels: [{ id: 'lbltorx00001', text: 'Torx Bits', badge: { type: 'icon', svg } }] }, labelAssign: { 1: 'lbltorx00001' } });
+  const a = layoutKey(up(SVG)), b = layoutKey(up(SVG.replace('H10', 'H9')));
+  assert.equal(layoutKey(up(SVG)), a, 'layoutKey is not deterministic');
+  assert.notEqual(a, layoutKey(labelledBuild()), 'an upload appearing is dropped as an echo');
+  assert.notEqual(a, b, 'a changed upload is dropped as an echo');
+  assert.equal(labelOnlyDiff(up(SVG), labelledBuild(), layoutKey), true, 'an upload change must not regenerate (it would close the card)');
+  const cur = labelledBuild(); copyLabelFields(up(SVG), cur);
+  assert.equal(layoutKey(cur), a, 'after copyLabelFields the keys still differ - the next echo would not be dropped');
 });
 
 test('incoming: a buildId that names ANOTHER build drops the message WHOLE (a closure in the same message is not applied)', async () => {
