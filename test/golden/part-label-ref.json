@@ -1,0 +1,497 @@
+{
+ "source": "The MODULITH Label Studio test/fixtures/hardware-bands-ref.json at ls-next 4227a8a (the Python print engine's layouts): four of its items with their bottom-band layout and the end-band record, copied so the 3D Build Studio can check that its own font and vendored files lay a part label out exactly as the Label Studio does.",
+ "items": [
+  {
+   "item": {
+    "schema": "part-picker-label-item/1",
+    "id": "t1",
+    "family": "screw",
+    "head": "socket-cap",
+    "units": "mm",
+    "fields": [
+     "M5",
+     "× 20"
+    ],
+    "value_missing": [],
+    "attributes": [
+     {
+      "path": "head",
+      "text": "SHCS",
+      "meaning": "Socket head cap"
+     },
+     {
+      "path": "material.base",
+      "text": "A2",
+      "meaning": "stainless"
+     }
+    ],
+    "pinned": [
+     "head",
+     "material.base"
+    ],
+    "pinned_by_priority": [
+     "head",
+     "material.base"
+    ],
+    "optional": [],
+    "pinned_unprinted": [],
+    "pins_explicit": false,
+    "colours": {
+     "band": {
+      "colour": "sky-blue",
+      "hex": "#56B4E9",
+      "label": "Metric",
+      "pattern": "solid",
+      "source": "rule"
+     },
+     "band_accent": {
+      "colour": "white",
+      "hex": "#F4F4F2",
+      "label": "Stainless",
+      "source": "rule"
+     }
+    }
+   },
+   "bottom": {
+    "record": {
+     "layout": "v5",
+     "kind": "screw",
+     "head": "shcs",
+     "head_as_drawing": "SHCS",
+     "main": "M5 × 20",
+     "main_cap": 8.4,
+     "H": 5.8,
+     "secondary": "A2",
+     "sec_cap": 4.7,
+     "sec_track": 0.3,
+     "shown": [
+      "A2"
+     ],
+     "not_shown": []
+    },
+    "elements": {
+     "main spec": {
+      "bbox": [
+       -26.7,
+       3.053895,
+       8.683784,
+       11.7
+      ],
+      "area": 121.992837
+     },
+     "head-on view": {
+      "bbox": [
+       -26.7,
+       -4.246105,
+       -20.9,
+       1.553895
+      ],
+      "area": 17.922939
+     },
+     "side profile": {
+      "bbox": [
+       -19.5,
+       -4.246105,
+       8.166,
+       1.553895
+      ],
+      "area": 85.871177
+     },
+     "secondary": {
+      "bbox": [
+       -26.7,
+       -10.316557,
+       -19.604588,
+       -5.546105
+      ],
+      "area": 14.675121
+     }
+    }
+   },
+   "end": {
+    "record": {
+     "layout": "v5",
+     "kind": "screw",
+     "head": "shcs",
+     "head_as_drawing": "SHCS",
+     "main": "M5 × 20",
+     "main_cap": 8.2,
+     "H": 5.8,
+     "secondary": "A2",
+     "sec_cap": 4.7,
+     "sec_track": 0.3,
+     "shown": [
+      "A2"
+     ],
+     "not_shown": []
+    }
+   }
+  },
+  {
+   "item": {
+    "schema": "part-picker-label-item/1",
+    "id": "sae-1/4-20x3/4-shcs-a2",
+    "family": "screw",
+    "head": "socket-cap",
+    "units": "mm",
+    "fields": [
+     "1/4-20",
+     "× 3/4\""
+    ],
+    "value_missing": [],
+    "attributes": [
+     {
+      "path": "head",
+      "text": "SHCS"
+     },
+     {
+      "path": "material.base",
+      "text": "A2"
+     }
+    ],
+    "pinned": [
+     "head",
+     "material.base"
+    ],
+    "pinned_by_priority": [
+     "head",
+     "material.base"
+    ],
+    "optional": [],
+    "pinned_unprinted": [],
+    "colours": {
+     "band": {
+      "colour": "red",
+      "hex": "#D55E00",
+      "label": "Inch (SAE)",
+      "pattern": "solid",
+      "source": "rule"
+     },
+     "band_accent": {
+      "colour": "white",
+      "hex": "#F4F4F2",
+      "label": "Stainless",
+      "source": "rule"
+     }
+    }
+   },
+   "bottom": {
+    "record": {
+     "layout": "v5",
+     "kind": "screw",
+     "head": "shcs",
+     "head_as_drawing": "SHCS",
+     "main": "1/4-20 × 3/4\"",
+     "main_cap": 6.8,
+     "H": 5.8,
+     "secondary": "A2",
+     "sec_cap": 4.7,
+     "sec_track": 0.3,
+     "shown": [
+      "A2"
+     ],
+     "not_shown": []
+    },
+    "elements": {
+     "main spec": {
+      "bbox": [
+       -26.7,
+       4.339382,
+       19.594981,
+       11.7
+      ],
+      "area": 115.132122
+     },
+     "head-on view": {
+      "bbox": [
+       -26.7,
+       -2.960618,
+       -20.9,
+       2.839382
+      ],
+      "area": 17.922939
+     },
+     "side profile": {
+      "bbox": [
+       -19.5,
+       -2.960618,
+       8.166,
+       2.839382
+      ],
+      "area": 85.871177
+     },
+     "secondary": {
+      "bbox": [
+       -26.7,
+       -9.03107,
+       -19.604588,
+       -4.260618
+      ],
+      "area": 14.675121
+     }
+    }
+   },
+   "end": {
+    "record": {
+     "layout": "v5",
+     "kind": "screw",
+     "head": "shcs",
+     "head_as_drawing": "SHCS",
+     "main": "1/4-20 × 3/4\"",
+     "main_cap": 6.7,
+     "H": 5.8,
+     "secondary": "A2",
+     "sec_cap": 4.7,
+     "sec_track": 0.3,
+     "shown": [
+      "A2"
+     ],
+     "not_shown": []
+    }
+   }
+  },
+  {
+   "item": {
+    "schema": "part-picker-label-item/1",
+    "id": "v5-m5-nut-zinc",
+    "family": "nut",
+    "head": "hex",
+    "units": "mm",
+    "fields": [
+     "M5"
+    ],
+    "value_missing": [],
+    "attributes": [
+     {
+      "path": "head",
+      "text": "NUT"
+     },
+     {
+      "path": "finish",
+      "text": "ZINC"
+     }
+    ],
+    "pinned": [
+     "head",
+     "finish"
+    ],
+    "pinned_by_priority": [
+     "head",
+     "finish"
+    ],
+    "optional": [],
+    "pinned_unprinted": [],
+    "colours": {
+     "band": {
+      "colour": "sky-blue",
+      "hex": "#56B4E9",
+      "label": "Metric",
+      "pattern": "solid",
+      "source": "rule"
+     },
+     "band_accent": {
+      "colour": "green",
+      "hex": "#009E73",
+      "label": "Zinc-plated steel",
+      "source": "rule"
+     }
+    }
+   },
+   "bottom": {
+    "record": {
+     "layout": "v5",
+     "kind": "nut",
+     "lock": false,
+     "main": "M5",
+     "word": "NUT",
+     "main_cap": 9.5,
+     "word_cap": 5.89,
+     "H": 4.6,
+     "secondary": "ZINC",
+     "sec_cap": 4.7,
+     "sec_track": 0.1,
+     "shown": [
+      "ZINC"
+     ],
+     "not_shown": []
+    },
+    "elements": {
+     "main spec": {
+      "bbox": [
+       -26.7,
+       2.06407,
+       -12.041131,
+       11.7
+      ],
+      "area": 78.978833
+     },
+     "family word": {
+      "bbox": [
+       -8.462131,
+       2.06407,
+       5.418096,
+       8.038347
+      ],
+      "area": 37.075951
+     },
+     "head-on view": {
+      "bbox": [
+       -26.7,
+       -3.727788,
+       -22.1,
+       0.255928
+      ],
+      "area": 12.248378
+     },
+     "side profile": {
+      "bbox": [
+       -20.7,
+       -4.03593,
+       -18.308,
+       0.56407
+      ],
+      "area": 8.963155
+     },
+     "secondary": {
+      "bbox": [
+       -26.7,
+       -10.173632,
+       -13.653532,
+       -5.33593
+      ],
+      "area": 28.188684
+     }
+    }
+   },
+   "end": {
+    "record": {
+     "layout": "v5",
+     "kind": "nut",
+     "lock": false,
+     "main": "M5",
+     "word": "NUT",
+     "main_cap": 9.5,
+     "word_cap": 5.89,
+     "H": 5,
+     "secondary": "ZINC",
+     "sec_cap": 4.7,
+     "sec_track": 0.1,
+     "shown": [
+      "ZINC"
+     ],
+     "not_shown": []
+    }
+   }
+  },
+  {
+   "item": {
+    "schema": "part-picker-label-item/1",
+    "id": "t6",
+    "family": "washer",
+    "head": "plain",
+    "units": "mm",
+    "fields": [
+     "M5"
+    ],
+    "value_missing": [],
+    "attributes": [
+     {
+      "path": "head",
+      "text": "WASHER",
+      "meaning": "Plain washer (ISO 7089)"
+     }
+    ],
+    "pinned": [
+     "head"
+    ],
+    "pinned_by_priority": [
+     "head"
+    ],
+    "optional": [],
+    "pinned_unprinted": [
+     {
+      "path": "material.base",
+      "why": "not recorded"
+     }
+    ],
+    "pins_explicit": false,
+    "colours": {
+     "band": {
+      "colour": "sky-blue",
+      "hex": "#56B4E9",
+      "label": "Metric",
+      "pattern": "solid",
+      "source": "rule"
+     },
+     "band_accent": {
+      "colour": null,
+      "unassigned": "material not recorded"
+     }
+    }
+   },
+   "bottom": {
+    "record": {
+     "main_lines": [
+      "M5"
+     ],
+     "main_cap": 12,
+     "attributes": [
+      "WASHER"
+     ],
+     "attribute_places": {
+      "WASHER": "below"
+     },
+     "not_shown": [],
+     "icon": "washer",
+     "nonfit": null
+    },
+    "elements": {
+     "main1": {
+      "bbox": [
+       -26.7,
+       -0.471701,
+       -8.183534,
+       11.7
+      ],
+      "area": 126.016088
+     },
+     "icon": {
+      "bbox": [
+       11.350033,
+       4.950033,
+       17.649967,
+       11.249967
+      ],
+      "area": 22.41393
+     },
+     "secondary1": {
+      "bbox": [
+       -26.7,
+       -6.609403,
+       -1.987156,
+       -1.771701
+      ],
+      "area": 56.234709
+     }
+    }
+   },
+   "end": {
+    "record": {
+     "main_lines": [
+      "M5"
+     ],
+     "main_cap": 12,
+     "attributes": [
+      "WASHER"
+     ],
+     "attribute_places": {
+      "WASHER": "below"
+     },
+     "not_shown": [],
+     "icon": "washer",
+     "nonfit": null
+    }
+   }
+  }
+ ]
+}

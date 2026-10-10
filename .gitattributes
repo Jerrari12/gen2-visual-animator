@@ -36,3 +36,10 @@ label-icon-art.js text eol=lf
 *.ttf binary
 # the label generators' own opentype.js, kept byte-identical to their vendor/ copy
 viewer/vendor/opentype/** -text
+# the Label Studio's part labels in 3D (label-hardware.js) and the four files it lays a part label out with - the hardware
+# layout, the EdgeLabel face data, the screw/nut drawings and the colour-band pieces - byte-for-byte (test/label-hardware-vendor.test.mjs)
+label-hardware.js text eol=lf
+hardware-layout.js text eol=lf
+hardware-data.js text eol=lf
+hardware-v5-data.js text eol=lf
+hardware-band-data.js text eol=lf

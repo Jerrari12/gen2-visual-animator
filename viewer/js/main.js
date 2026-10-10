@@ -18,7 +18,9 @@ import { createDimCoverTest } from './dim-cover.js';
 import { benchBuild, createOrbitBench } from './orbit-bench.js';
 import { createSettleBench } from './settle-bench.js';
 import { parseSeeInto, parseSeeIntoSkip, parseSeeIntoLattice, createSeeInto } from './see-into.js';
-import { LABEL_TEXT_DEFAULTS, LABEL_TEXT_NODES, labelFontReady, loadLabelFont, labelGeometry, labelCore, labelIcons } from './label-text.js';
+import { LABEL_TEXT_DEFAULTS, LABEL_TEXT_NODES, labelFontReady, loadLabelFont, labelGeometry, labelCore, labelIcons,
+  labelPartsReady, loadLabelParts, partLabelGeometry, stripeGeometry } from './label-text.js';
+import { labelLookOf, labelLooksKey, labelLookNeeds, stripeZone, isStripeZone, stripeHexOfKey } from './label-look.js';
 import { LABEL_SPEC, LABEL_TEXT_MAX, cleanLabelText, cleanLabelBadge, cleanLabelStyle } from './label-spec.js';
 import { LABEL_STYLE_ROWS, labelOrder, effectiveStyle, labelOptsOf, labelOptsChanges, applyLabelOpts, labelOnlyDiff, copyLabelFields,
   editCommit, styleEdit, iconGroups, badgeStateText, shownBadge, historyKeyOf, labelSnap, labelUndoPatch, rejectionIsMine,
@@ -3863,6 +3865,7 @@ function buildInstances() {
    colour zone (TEXT): applyState and every fade paint it through materialFor like any zoned part, and the identify card
    offers Body and Text chips for free. Static kits (no `build`) and the ?part= previews show none. */
 const LABEL_TEXT_ZONE = 'TEXT';
+const LABEL_MESH_NAMES = new Set(['LabelText', 'LabelBadge', 'LabelPiece']);   // what clearLabelText takes off a label
 let labelTextTok = 0;
 // the planner unit a label instance belongs to: label -> rides -> drawer -> owner -> build.placed
 function labelUnitFor(inst) {
@@ -3874,13 +3877,38 @@ function labelTextFor(inst) {
   const u = labelUnitFor(inst);
   return (u && typeof u.label === 'string') ? u.label.trim() : '';
 }
+/* ---- part labels and colour stripes (2026-10-10, Joey: part labels in 3D must match the Label Studio, stripes included,
+   and any custom label can carry a stripe). label-look.js reads which drawer wears what off the build's label list;
+   label-text.js loads the Label Studio's own part-label files (only when a build has a part label or a stripe) and builds:
+   - a PART label's ink - the words and the screw / nut drawing the Label Studio lays out - on the TEXT zone, in place of the
+     words label-core.js would lay out from the drawer's mirror;
+   - a STRIPE: the label body cut into base / band / accent pieces. The base piece is the label's Body (the plain zone, so it
+     keeps every finish the Body material has); the band and accent pieces are zones of their own whose colour is the
+     stripe's (label-look.js stripeZone; activeHex reads it off the key - never a filament, no identify-card chip). The GLB's
+     own body mesh is hidden while the pieces stand in for it (two coincident skins would z-fight) and shown again when the
+     stripe goes (clearLabelText). A label with neither draws exactly what it drew before: no file loads, no mesh changes. */
+let labelPartsBroken = false;   // the part-label files failed to load once: the words stand in for the rest of the page's life
+const lookNeedOf = (look) => !look ? null : look.kind === 'part' ? { layout: true, bands: true } : { layout: false, bands: true };
+const needsLoad = (need) => !!need && (need.layout || need.bands) && !labelPartsBroken && !labelPartsReady(need);
+// the part-label files, loaded once; a failure is said once and leaves the words on screen
+function loadLabelPartsOnce(need) {
+  return loadLabelParts(need).catch((e) => {
+    labelPartsBroken = true;
+    console.warn(`[label text] ${(e && e.message) || e} - part labels and colour stripes are shown as plain labels`);
+  });
+}
+function labelLookFor(inst, words) {
+  const u = labelUnitFor(inst);
+  return u ? labelLookOf(build, u, words) : null;
+}
 function attachLabelTexts() {
   const tok = ++labelTextTok;   // a later mount supersedes a font load still in flight for this one
   if (IS_PART || !build) return;
   const list = [...instances.values()].filter((i) => LABEL_TEXT_NODES.has(i.cfg.node) && labelTextFor(i));
   if (!list.length) return;
-  if (labelFontReady()) { placeLabelTexts(list); return; }
-  loadLabelFont().then(() => {
+  const need = labelLookNeeds(build);
+  if (labelFontReady() && !needsLoad(need)) { placeLabelTexts(list); return; }
+  Promise.all([loadLabelFont(), needsLoad(need) ? loadLabelPartsOnce(need) : null]).then(() => {
     if (tok !== labelTextTok) return;
     placeLabelTexts(list);
     // the parts were already on screen: shade, shadow and settle again with the text in place
@@ -3888,14 +3916,25 @@ function attachLabelTexts() {
   }).catch((e) => console.warn(`[label text] ${(e && e.message) || e} - labels left blank`));
 }
 function placeLabelTexts(list) {
-  for (const inst of list) { const u = labelUnitFor(inst); placeLabelText(inst, labelTextFor(inst), u?.labelBadge, labelUploadFor(build, u)); }
+  for (const inst of list) { const u = labelUnitFor(inst); placeLabelText(inst, labelTextFor(inst), u?.labelBadge, labelUploadFor(build, u), labelLookFor(inst)); }
 }
-/* One label's text + badge meshes from its words, its badge (absent = predicted) and the build's style - label-spec.js checks
-   both. Returns labelGeometry's result (its `fits` is the generator's own verdict) or null when there is nothing to print. */
-function placeLabelText(inst, text, badge, upload) {
+/* One label's meshes: its text + badge from its words, its badge (absent = predicted) and the build's style - label-spec.js
+   checks both - or, for a PART label (`look`, label-look.js), the Label Studio's part-label ink; plus a stripe's body pieces.
+   Returns labelGeometry's result (its `fits` is the generator's own verdict), the part label's ({ part: true, fits: true }),
+   or null when there is nothing to print. Clears the label first, so placing twice never doubles it. */
+function placeLabelText(inst, text, badge, upload, look) {
+  clearLabelText(inst);
   if (!text) return null;
-  const t = labelGeometry(text, badge, build.labelStyle, upload);
-  if (!t) return null;
+  let t = null, pieces = null;
+  if (look && look.kind === 'part') {
+    const p = partLabelGeometry(look.item, look.position);   // null: not loaded, or the part item cannot print - the words stand in
+    if (p) { t = { parts: p.parts, fits: true, shown: p.shown, badge: null, part: true }; pieces = p.pieces; }
+  }
+  if (!t) {
+    t = labelGeometry(text, badge, build.labelStyle, upload);
+    if (!t) return null;
+    if (look && look.kind === 'stripe') pieces = stripeGeometry(look.colours, look.position);
+  }
   const inner = inst.group.children[0];
   if (!t.fits) console.warn(`[label text] "${t.shown}" overflows the label even at the 3 mm floor (the generator warns too)`);
   // shadows follow the label's own meshes (the tier decides those flags; this copies them)
@@ -3907,18 +3946,54 @@ function placeLabelText(inst, text, badge, upload) {
     mesh.userData.zone = LABEL_TEXT_ZONE;
     mesh.userData.labelText = t.shown;
     if (p.part === 'badge') mesh.userData.labelBadge = t.badge;
+    if (p.part === 'ink') mesh.userData.partLabel = true;
     mesh.castShadow = cast; mesh.receiveShadow = cast;
     inner.add(mesh);
   }
+  if (pieces) placeLabelPieces(inst, inner, pieces, cast);
   return t;
 }
-/* Take a label's text meshes off. ⚠ Their geometries are NOT disposed: labelGeometry caches them by key and two drawers
-   named the same share one BufferGeometry - disposing it here would free the other label's buffers (and the cache's) for
-   three to re-upload on the next draw. The cache owns the geometries; this only owns the meshes. */
+/* A stripe's body pieces onto the label, in place of the GLB's own body mesh (hidden, and marked so clearLabelText shows it
+   again). The base piece wears the Body zone; a band or accent piece the stripe's own colour, or the Body when its slot is
+   unassigned (hex null - printed in the base colour, as the Label Studio prints it). */
+function placeLabelPieces(inst, inner, pieces, cast) {
+  stampPieceBedFaces(inst, pieces.map((p) => p.geo));
+  for (const o of inner.children) if (o.isMesh && !LABEL_MESH_NAMES.has(o.name) && o.visible) { o.visible = false; o.userData.stripeHidden = true; }
+  for (const p of pieces) {
+    const zone = p.hex ? stripeZone(p.hex) : '';
+    const mesh = new THREE.Mesh(p.geo, materialFor(inst, false, zone));
+    mesh.name = 'LabelPiece';
+    if (zone) mesh.userData.zone = zone;
+    mesh.userData.labelPiece = p.piece;
+    mesh.castShadow = cast; mesh.receiveShadow = cast;
+    inner.add(mesh);
+  }
+}
+/* The build-plate finish's attributes on the stripe pieces, computed as stampBedFaces computes them for the label's own GLB
+   (the three pieces together ARE the label body, so they share its bed plane and its pattern scale). Per geometry - the
+   pieces are shared by every label with the same stripe position and pattern - and again only when the build axis moves. */
+function stampPieceBedFaces(inst, geos) {
+  const type = typeByNode[inst.cfg.node], node = inst.cfg.node;
+  const axis = type ? buildAxisForType(type, faceFamilyOfNode(node) || faceStyleNow(), handleFamilyOfNode(node) || handleFamilyNow()) : null;
+  if (!axis || geos.every((g) => g.userData.bedAxis && g.userData.bedAxis.every((v, i) => v === axis[i]))) return;
+  try {
+    const { mm, uv } = bedFaceAttributes(geos.map((g) => g.attributes.position.array), axis);
+    geos.forEach((g, i) => {
+      g.setAttribute('aBfMm', new THREE.BufferAttribute(mm[i], 3));
+      g.setAttribute('aBfUv', new THREE.BufferAttribute(uv[i], 2));
+      g.userData.bedAxis = axis;
+    });
+  } catch (e) { console.warn(`[bed finish] label stripe: ${(e && e.message) || e} - left plain`); }
+}
+/* Take a label's text, badge and stripe meshes off, and show its own body again. ⚠ Their geometries are NOT disposed:
+   labelGeometry / partLabelGeometry / the stripe pieces are cached by key and shared - two drawers named the same share one
+   BufferGeometry - so disposing one here would free the other label's buffers (and the cache's) for three to re-upload on
+   the next draw. The caches own the geometries; this only owns the meshes. */
 function clearLabelText(inst) {
   const inner = inst.group.children[0];
   if (!inner) return;
-  for (const o of [...inner.children]) if (o.name === 'LabelText' || o.name === 'LabelBadge') inner.remove(o);
+  for (const o of [...inner.children]) if (LABEL_MESH_NAMES.has(o.name)) inner.remove(o);
+  for (const o of inner.children) if (o.userData.stripeHidden) { o.visible = true; delete o.userData.stripeHidden; }
 }
 /* Rebuild ONE label's text in place - a keystroke in the card, a badge pick, a relayed edit. `draft` ({ text, badge }) shows
    words the card is still typing without writing them into `build` (that happens at commit); without it the unit's stored
@@ -3932,18 +4007,24 @@ function refreshLabelText(inst, draft) {
   // user is mid-word shows at once under the draft instead of the badge the draft was started with (Sol 01a0fffd, 4)
   const unit = labelUnitFor(inst);
   const badge = unit?.labelBadge, upload = labelUploadFor(build, unit);   // a drawer's uploaded icon lives in the label list
-  if (text && !labelFontReady()) {
-    // first label on this page: load the core + font once, then come back here (with the card's draft if it still has one)
-    const tok = ++labelTextTok;
-    loadLabelFont().then(() => {
-      if (tok !== labelTextTok || !instances.has(inst.cfg.id)) return;
-      refreshLabelText(inst, labelEdit && labelEdit.inst === inst ? labelEdit.draft : undefined);
+  // a part label or a stripe (label-look.js), for the words on screen: a draft that is no longer the part label's own words
+  // shows as an ordinary label, as the planner would make it
+  const look = text ? labelLookFor(inst, text) : null;
+  const need = lookNeedOf(look);
+  if (text && (!labelFontReady() || needsLoad(need))) {
+    // first label (or first part label / stripe) on this page: load once, then redraw EVERY label - not only this one, as a
+    // second label waiting on the same load would otherwise never be drawn - the card's draft included. Only a remount
+    // (attachLabelTexts) supersedes it.
+    const tok = labelTextTok;
+    Promise.all([loadLabelFont(), needsLoad(need) ? loadLabelPartsOnce(need) : null]).then(() => {
+      if (tok !== labelTextTok) return;
+      refreshLabelTexts();
       renderLabelEditorState();
     }).catch((e) => console.warn(`[label text] ${(e && e.message) || e} - labels left blank`));
     return null;
   }
   clearLabelText(inst);
-  const t = text ? placeLabelText(inst, text, badge, upload) : null;
+  const t = text ? placeLabelText(inst, text, badge, upload, look) : null;
   if (selectedId === inst.cfg.id) refreshSelHighlight();
   ao.rev++; markShadowDirty(); invalidateFrame();
   return t;
@@ -5769,7 +5850,8 @@ function renderZoneChips(inst) {
   box.innerHTML = '';
   const type = typeByNode[inst.cfg.node];
   const zones = new Set();
-  inst.group.traverse(o => { if (o.isMesh && o.userData.zone) zones.add(o.userData.zone); });
+  // a label's colour stripe is not a filament the user picks (label-look.js stripeZone), so it gets no chip
+  inst.group.traverse(o => { if (o.isMesh && o.userData.zone && !isStripeZone(o.userData.zone)) zones.add(o.userData.zone); });
   const show = zones.size > 0 && !colorLocked(type);
   box.classList.toggle('hidden', !show);
   if (!show) return;
@@ -6462,6 +6544,9 @@ const colorLocked = type => {
 // actually print, and must never be second-guessed by the stage they're viewing on.
 const DARK_STAGE_PALETTE = { Case: '#dfe3ec' };
 const activeHex = key => {
+  // a label's colour STRIPE is the label's own colour, never a filament pick (label-look.js stripeZone): the key carries it
+  const stripe = stripeHexOfKey(key);
+  if (stripe) return stripe;
   if (useCustom && customColors[key] && !colorLocked(key)) return customColors[key].hex;
   if (stageTheme !== 'light' && DARK_STAGE_PALETTE[key]) return DARK_STAGE_PALETTE[key];
   if (manifest.colors[key]) return manifest.colors[key];
@@ -6490,6 +6575,7 @@ const activeHex = key => {
  * the decision of 2026-09-07, and it is enforced here rather than anywhere else.
  */
 const activeLabel = key => {
+  if (stripeHexOfKey(key)) return null;   // a stripe wears its label's colour, not a filament (activeHex)
   if (useCustom && customColors[key] && !colorLocked(key)) return customColors[key].name || null;
   if (stageTheme !== 'light' && DARK_STAGE_PALETTE[key]) return null;
   if (manifest.colors[key]) return null;
@@ -7367,8 +7453,11 @@ function renderLabelEditorState(opts = {}) {
   else if (worn.type === 'icon') { const it = cat && cat.find(worn.value); btn.innerHTML = it ? it.svg : '+'; }   // the sha-pinned vendored icon catalog, not data
   else if (worn.type === 'char') btn.textContent = labelCapsOn() ? worn.value.toUpperCase() : worn.value;
   else btn.textContent = '+';
+  // a PART label (label-look.js) draws the Label Studio's layout of its part, not these words and this icon: the card says so
+  const partLook = !!text && labelLookOf(build, unit, text)?.kind === 'part';
+  $('label-edit-part').classList.toggle('hidden', !partLook);
   // the words beside the button name the state for the words on screen - a draft included, so typing shows what Auto would pick
-  $('label-edit-badge-state').textContent = text ? badgeStateText(text, badge, build.labelStyle, cat, upload) : '';
+  $('label-edit-badge-state').textContent = !text ? '' : partLook ? 'From the part' : badgeStateText(text, badge, build.labelStyle, cat, upload);
   /* Auto ALWAYS means a guess from the words; putting an uploaded icon back is its own button (ChatGPT's second review via
      Joey). An upload with no icon id is worn while the drawer's badge is ABSENT - the same badge Auto writes - so while
      the label has one, Auto cannot ask for a guess: it waits until another choice has replaced the upload (docked, the planner
@@ -7384,8 +7473,8 @@ function renderLabelEditorState(opts = {}) {
   $('label-pick-uprow').classList.toggle('hidden', !(upl && !upload && !docked));
   $('label-pick-upnote').classList.toggle('hidden', !(upload && docked));
   // the generator's own verdict, read off the meshes it built for THIS label
-  let fits = true;
-  if (text && labelFontReady()) { const t = labelGeometry(text, badge, build.labelStyle, upload); if (t && t.fits === false) fits = false; }
+  let fits = true;   // (a part label's own layout decides its fit; its words never print through label-core)
+  if (text && !partLook && labelFontReady()) { const t = labelGeometry(text, badge, build.labelStyle, upload); if (t && t.fits === false) fits = false; }
   const fitEl = $('label-edit-fit');
   fitEl.textContent = fits ? '' : 'Won\'t fit, even at the 3 mm minimum';
   fitEl.classList.toggle('hidden', fits);
@@ -8533,7 +8622,12 @@ const layoutKey = b => JSON.stringify([b.mount, +b.length, (b.placed || []).map(
   // and a viewer booted from an official kit never learns the id the planner minted - so its relay gate would never engage
   b.buildId || '',
   // the drawers' uploaded icons (the planner's layoutSig carries them as `up`): they live in the label list, not the units
-  uploadsKey(b)]);
+  uploadsKey(b),
+  // the drawers' part labels and colour stripes (label-look.js): they live in the label list too, so a layout that changes only
+  // a part item, a stripe or its position must still apply. ⚠ The planner's layoutSig carries no such field (2026-10-10): it
+  // posts a layout when a drawer's WORDS change - which a different part label nearly always brings - but not for a change to
+  // a label's item or stripe alone.
+  labelLooksKey(b)]);
 async function applyRemoteLayout(nb) {
   if (!booted || !nb || !Array.isArray(nb.placed) || !nb.placed.length) return;
   if (regenBusy) { // mid-regenerate from an earlier message — retry, never drop the newest state

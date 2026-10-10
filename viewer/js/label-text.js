@@ -33,6 +33,7 @@ export const LABEL_TEXT_NODES = new Set(['Label_EdgeLabel']);
 let core = null;      // GEN2EdgeLabelCore.create(...), once its script and the font have loaded
 let icons = null;     // GEN2LabelIcons.create({ core }): the generator's icon catalog (groups, the MODULITH icon family, the guess)
 let frame = null;     // generator frame -> the Label_EdgeLabel model's frame
+let font = null;      // the parsed label font (opentype), kept for the part-label layout (loadLabelParts)
 
 /* Loading: opentype.js (the generators' UMD build) and the core are classic scripts, the font is fetched as bytes. All three
    load ONCE, and only when a build has label text to show. Each URL carries this module's own ?v= stamp, so a deploy can
@@ -65,7 +66,8 @@ export function loadLabelFont() {
     // the core reads THREE.SVGLoader the way the generator's three global carries it; a module namespace cannot take a new
     // property, so the core gets a plain copy of it with the addon added
     const c = window.GEN2EdgeLabelCore.create({ THREE: { ...THREE, SVGLoader } });
-    c.setFont(window.opentype.parse(buf));
+    font = window.opentype.parse(buf);
+    c.setFont(font);
     frame = [0, c.LABEL_WID / 2, c.LABEL_HT - c.LABEL_HT / 2];
     icons = window.GEN2LabelIcons.create({ core: c, art: window.GEN2LabelIconArt });
     core = c;
@@ -112,5 +114,109 @@ export function labelGeometry(text, badge, style, upload) {
   for (const p of parts) { p.geo.translate(...frame); p.geo.computeBoundingBox(); }
   const out = { parts, fits: m.textFits, shown: data.text.trim(), badge: data.badge };
   cache.set(key, out);
+  return out;
+}
+
+/* ---- part labels and colour stripes, as the Label Studio draws them (2026-10-10) -----------------------------------------
+   A PART label (a Part Picker item in the build's label list) is laid out by the Label Studio's own part-label code, and a
+   colour STRIPE (a part item's metric / SAE band, or any label's own stripe) is the Label Studio's own label body cut into
+   base / band / accent pieces: js/vendor/label-hardware.js over hardware-layout.js, hardware-data.js, hardware-v5-data.js and
+   hardware-band-data.js, all five byte-for-byte copies of the Label Studio's (test/label-hardware-vendor.test.mjs pins them).
+   label-look.js decides which drawer wears what; this half loads the files and builds the geometry.
+
+   ⚠ LAZY, AND ONLY WHAT IS NEEDED: the five are ~0.75 MB together. A build with no part label and no stripe loads none of
+   them; a stripe alone loads label-hardware.js + hardware-band-data.js; a part label loads all five. Each URL carries this
+   module's own ?v= stamp, like the core's.
+
+   THE FRAME: label-hardware.js builds in the generator frame (the label body z 0..4.5 with its top face at LABEL_HT, the ink
+   z 0..depth, placed AT the top face), the same frame label-core.js builds in, so the measured shift to the Label_EdgeLabel
+   model applies unchanged: the ink moves by `frame` exactly like label-core's text, the body pieces by `frame` less LABEL_HT
+   (they start at the bed, not at the top face). */
+let parts = null, partsHave = { layout: false, bands: false }, partsLoading = null;
+const vendorUrl = (rel) => new URL(rel + new URL(import.meta.url).search, import.meta.url).href;
+const loadScript = (src, ready) => (ready() ? Promise.resolve() : new Promise((res, rej) => {
+  const s = document.createElement('script');
+  s.src = src; s.async = false;
+  s.onload = () => res(); s.onerror = () => rej(new Error(src.split('/').pop().split('?')[0] + ' did not load'));
+  document.head.appendChild(s);
+}));
+/* Whether the files a build needs (label-look.js labelLookNeeds) have loaded. */
+export function labelPartsReady(need) {
+  return !!parts && (!need || ((!need.layout || partsHave.layout) && (!need.bands || partsHave.bands)));
+}
+/* The Label Studio's part-label module itself (its colour(), treatments ...), for checks; null until loaded. */
+export function labelParts() { return parts; }
+export function loadLabelParts(need) {
+  const want = { layout: !!(need && need.layout), bands: !!(need && need.bands) };
+  if (labelPartsReady(want)) return Promise.resolve();
+  if (partsLoading) return partsLoading.then(() => loadLabelParts(want));   // one load at a time; then whatever is still missing
+  const list = [loadLabelFont(), loadScript(vendorUrl('./vendor/label-hardware.js'), () => !!window.GEN2LabelHardware)];
+  if (want.bands) list.push(loadScript(vendorUrl('./vendor/hardware-band-data.js'), () => !!window.GEN2HardwareBandData));
+  if (want.layout) list.push(
+    loadScript(vendorUrl('./vendor/hardware-layout.js'), () => !!window.GEN2HardwareLayout),
+    loadScript(vendorUrl('./vendor/hardware-data.js'), () => !!window.GEN2HardwareData),
+    loadScript(vendorUrl('./vendor/hardware-v5-data.js'), () => !!window.GEN2HardwareV5Data));
+  partsLoading = Promise.all(list).then(() => {
+    // created again whenever more data arrives (the layout instances are made by create); the caches below are keyed by what
+    // the data gives, so a re-create changes no geometry already built
+    const lh = window.GEN2LabelHardware.create({
+      THREE, layout: window.GEN2HardwareLayout || null, data: window.GEN2HardwareData || null, v5: window.GEN2HardwareV5Data || null,
+      bands: window.GEN2HardwareBandData || null, mergeGeoms: (g) => core.mergeGeoms(g),
+    });
+    lh.setFont(font);
+    partsHave = { layout: !!lh.layouts.edgelabel, bands: lh.treatments.length > 0 };
+    parts = lh;
+    // loaded but unusable (data of another format): say so, so no caller waits on it again
+    if (!labelPartsReady(want)) throw new Error('the part-label data did not load as expected');
+  }).finally(() => { partsLoading = null; });
+  return partsLoading;
+}
+
+/* The body pieces of a stripe, in the model's frame: [{ piece: 'base'|'band'|'accent', geo, hex }] (hex null = the label's
+   base colour, i.e. its Body), or null (no band data, an unknown position). `colours` = a CLEANED { band, band_accent }
+   (parts.colours). The geometries are translated COPIES of label-hardware.js's own (it hands out one shared geometry per
+   piece and would be the one to dispose it), cached here for the page's life: 3 positions x 2 patterns x 3 pieces at most. */
+const pieceCache = new Map();
+function stripePieces(position, colours) {
+  const bp = parts.bandParts(position, colours);
+  if (!bp) return null;
+  const kind = colours.band && colours.band.pattern === 'dashed' ? 'dashed' : 'solid';
+  return bp.map((p) => {
+    const key = position + '/' + kind + '/' + p.piece;
+    if (!pieceCache.has(key)) {
+      const g = p.geo.clone();
+      g.translate(frame[0], frame[1], frame[2] - core.LABEL_HT);
+      g.computeBoundingBox();
+      pieceCache.set(key, g);
+    }
+    return { piece: p.piece, geo: pieceCache.get(key), hex: p.colour ? p.colour.hex.toLowerCase() : null };
+  });
+}
+/* An ordinary label's stripe (label-look.js kind 'stripe'): its body pieces, or null when the band data has not loaded. */
+export function stripeGeometry(colours, position) {
+  if (!parts || !partsHave.bands || !core) return null;
+  return stripePieces(position, parts.colours(colours || {}));
+}
+
+/* A PART label as the Label Studio prints it: { parts: [{ part: 'ink', geo }], pieces | null, record, shown }, or null when the
+   layout cannot print it (the Label Studio's red row note: not ready, or it does not fit) - the caller then shows the drawer's
+   words instead. Laid out on EdgeLabel with the screw and nut drawings on (the Label Studio's default), the stripe at
+   `position` (null: none); the ink stands 0.45 mm proud (the part label's own depth, not the build's text depth). */
+const partCache = new Map();
+export function partLabelGeometry(item, position) {
+  if (!parts || !partsHave.layout || !core) return null;
+  const key = JSON.stringify([item, position || 'off']);
+  if (partCache.has(key)) return partCache.get(key);
+  const r = parts.layOut(item, { type: 'edgelabel', profile: true, band: position || 'off' });
+  let out = null;
+  if (r.elements) {
+    const ink = parts.inkGeometry(r.elements, r.inkDepth);
+    const list = [];
+    if (ink) { ink.translate(...frame); ink.computeBoundingBox(); list.push({ part: 'ink', geo: ink }); }
+    out = { parts: list, pieces: r.band ? stripePieces(r.band, r.colours) : null, record: r.record,
+            shown: (r.record.main_lines || [r.record.main || '']).join(' ') };
+  }
+  else console.warn(`[label text] a part label could not be laid out (${r.record.not_ready || r.record.nonfit}) - its words are shown`);
+  partCache.set(key, out);
   return out;
 }

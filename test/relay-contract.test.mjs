@@ -65,7 +65,9 @@ const LIP_MODES = (() => {
 
 // the real layoutKey, executable; the drawers' uploaded-icon digest it reads is label-panel.js's own (main.js imports it)
 const { uploadsKey } = await import(new URL('../viewer/js/label-panel.js', import.meta.url).href);
-const layoutKey = new Function('uploadsKey', `${declAt(viewerSrc, 'const layoutKey =')} return layoutKey;`)(uploadsKey);
+// ...and the drawers' part labels / colour stripes (label-look.js labelLooksKey, imported by main.js too)
+const { labelLooksKey } = await import(new URL('../viewer/js/label-look.js', import.meta.url).href);
+const layoutKey = new Function('uploadsKey', 'labelLooksKey', `${declAt(viewerSrc, 'const layoutKey =')} return layoutKey;`)(uploadsKey, labelLooksKey);
 // the real currentOpts - it reads the module-level `build`, and the build plate through the
 // resolver main.js imports, which is handed in here as the same real function
 const { plateFinishOf, PLATE_FINISHES } = await import(new URL('../viewer/js/bed-finish.js', import.meta.url).href);
@@ -414,6 +416,25 @@ test('layoutKey DISTINGUISHES a change to a drawer\'s uploaded icon alone (it li
   assert.equal(labelOnlyDiff(up(SVG), labelledBuild(), layoutKey), true, 'an upload change must not regenerate (it would close the card)');
   const cur = labelledBuild(); copyLabelFields(up(SVG), cur);
   assert.equal(layoutKey(cur), a, 'after copyLabelFields the keys still differ - the next echo would not be dropped');
+});
+
+test('layoutKey DISTINGUISHES a change to a drawer\'s part item, stripe or stripe position alone (the label list), and it is label-only', () => {
+  const PART = { schema: 'part-picker-label-item/1', id: 'p1', fields: ['M5'], attributes: [{ path: 'head', text: 'SHCS' }], pinned: ['head'], optional: [],
+    colours: { band: { colour: 'sky-blue', hex: '#56B4E9', label: 'Metric' } } };
+  const withList = (labels, assign) => labelledBuild({ labelList: { format: 'modulith-labels', version: 1, labels }, labelAssign: assign });
+  const striped = (hex) => withList([{ id: 'lbltorx00001', text: 'Torx Bits', colours: { band: { colour: 'red', hex, label: 'Red' } } }], { 1: 'lbltorx00001' });
+  const part = (hex, pos) => withList([{ id: 'lblnuts00001', text: 'Nuts', badge: { type: 'icon', value: 'nut' }, hardware: { ...PART, colours: { band: { ...PART.colours.band, hex } } }, ...(pos ? { bandPosition: pos } : {}) }], { 2: 'lblnuts00001' });
+  const plain = layoutKey(labelledBuild());
+  const keys = [layoutKey(striped('#D55E00')), layoutKey(striped('#56B4E9')), layoutKey(part('#56B4E9', 'wedge')), layoutKey(part('#56B4E9')), layoutKey(part('#D55E00'))];
+  assert.equal(layoutKey(striped('#D55E00')), keys[0], 'layoutKey is not deterministic');
+  assert.equal(new Set([plain, ...keys]).size, 6, 'a stripe, its colour, its position or a part item\'s colours alone is dropped as an echo');
+  for (const nb of [striped('#D55E00'), part('#56B4E9')]) {
+    assert.equal(labelOnlyDiff(nb, labelledBuild(), layoutKey), true, 'a part label / stripe change must not regenerate (it would close the card)');
+    const cur = labelledBuild(); copyLabelFields(nb, cur);
+    assert.equal(layoutKey(cur), layoutKey(nb), 'after copyLabelFields the keys still differ - the next echo would not be dropped');
+  }
+  // the control: a label list whose labels no drawer wears (an unassigned stripe) changes nothing the viewer draws
+  assert.equal(layoutKey(withList([{ id: 'lbltorx00001', text: 'Torx Bits', colours: { band: { colour: 'red', hex: '#D55E00' } } }], {})), plain);
 });
 
 test('incoming: a buildId that names ANOTHER build drops the message WHOLE (a closure in the same message is not applied)', async () => {

@@ -167,6 +167,14 @@ jobs:
           # isLabelSvg) a label-text.js import too: one sed target per importer
           sed -i "s|'./label-panel.js'|'./label-panel.js?v=$V'|" viewer/js/main.js
           sed -i "s|'./label-panel.js'|'./label-panel.js?v=$V'|" viewer/js/label-text.js
+          # which drawer wears a part label or a colour stripe (2026-10-10) - a main.js import, and it imports label-spec.js
+          sed -i "s|'./label-look.js'|'./label-look.js?v=$V'|" viewer/js/main.js
+          sed -i "s|'./label-spec.js'|'./label-spec.js?v=$V'|" viewer/js/label-look.js
+          # ⚠ The Label Studio's part-label files (js/vendor/label-hardware.js, hardware-layout.js, hardware-data.js,
+          # hardware-v5-data.js, hardware-band-data.js) need NO line here: like the core and the icon catalog they are CLASSIC
+          # scripts label-text.js loads itself (vendorUrl), by URL relative to its import.meta.url and carrying ITS OWN ?v=
+          # stamp - so the line stamping './label-text.js' in main.js above stamps all five, loaded only when a build has a
+          # part label or a colour stripe.
           sed -i "s|'./orbit-bench.js'|'./orbit-bench.js?v=$V'|" viewer/js/settle-bench.js
 
       # Fail the deploy rather than ship a half-stamped module graph. A first
