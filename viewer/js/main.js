@@ -502,6 +502,19 @@ function applyStageTheme(name) {
 // NB plain getElementById here — this runs at module eval, BEFORE the `$`
 // helper below is initialized (a `$(...)` call here dies on the TDZ and takes
 // the whole boot with it)
+/* Feedback & support (Astra 2026-10-10): the shared MODULITH dialog (js/vendor/modulith-feedback.js, the planner's file). The
+   standalone viewer only: #topbar is hidden in the embed, where the planner has its own. The optional build link is this
+   page's own address when it shows a build (a #build= link or an official kit); the dialog leaves it out unless ticked. */
+function openFeedback(e) {
+  if (e) e.preventDefault();
+  const F = window.MODULITHFeedback;
+  if (!F) { location.href = 'mailto:support@jerrari3d.com?subject=' + encodeURIComponent('[MODULITH 3D Build Studio]'); return; }
+  const hasBuild = /^#build=/.test(location.hash) || new URLSearchParams(location.search).has('build');
+  F.open({ tool: '3D Build Studio', buildLink: hasBuild ? () => location.href : null,
+    attachHint: 'Your build is too big to put in an email link. Open it in the Planner, use Save the build file there and attach that file.',
+    track: (n) => track(n) });
+}
+for (const id of ['btn-feedback', 'outro-feedback']) { const el = document.getElementById(id); if (el) el.addEventListener('click', openFeedback); }
 const btnTheme = document.getElementById('btn-theme');
 function labelThemeBtn() {
   if (!btnTheme) return;

@@ -68,6 +68,12 @@ body {
 #btn-quality[data-q="veryhigh"], #btn-quality[data-q="high"] { color: var(--accent); }
 #btn-quality[data-q="fast"] { opacity: 0.75; }
 @media (max-width: 560px) { #btn-quality { display: none; } }
+/* Feedback & support: the quality pill's look; it stays on a phone, where the quality pill hides */
+#btn-feedback {
+  flex: none; margin-left: 8px; padding: 4px 11px; font: inherit; font-size: 12px; font-weight: 700;
+  color: var(--ink-soft); background: #fff; border: 1px solid var(--panel-border); border-radius: 999px; cursor: pointer;
+}
+#btn-feedback:hover { color: var(--accent); border-color: var(--accent); }
 
 /* the picker's honesty line — only when the showcase (dark) stage is up */
 .fm-accuracy { display: none; font-size: 11.5px; color: var(--ink-soft); margin: 6px 2px 2px; }
@@ -1175,6 +1181,7 @@ body.stage-dark {
 body.stage-dark #topbar,
 body.stage-dark #btn-theme,
 body.stage-dark #btn-quality,
+body.stage-dark #btn-feedback,
 body.stage-dark .opt-seg button,
 body.stage-dark #identify-style button,
 body.stage-dark #identify-lip button,

@@ -38,6 +38,9 @@
            light/dark switch because both are "how the stage looks" settings.
            An explicit pick here also locks out the silent auto-downgrade. -->
       <button id="btn-quality" type="button" title="Render quality">High</button>
+      <!-- Feedback & support: the shared MODULITH dialog (js/vendor/modulith-feedback.js); standalone only - the docked
+           view sits inside the planner, which has its own -->
+      <button id="btn-feedback" type="button" aria-haspopup="dialog" title="Get help, report a problem or suggest an improvement">Feedback</button>
     </header>
 
     <div id="stage-wrap">
@@ -200,6 +203,7 @@
             <a id="outro-site" href="https://www.jerrari3d.com" target="_blank" rel="noopener">jerrari3d.com</a>
             <a id="outro-yt" class="hidden" href="#" target="_blank" rel="noopener">YouTube</a>
             <a id="outro-x" class="hidden" href="#" target="_blank" rel="noopener">Follow on X</a>
+            <a id="outro-feedback" href="mailto:support@jerrari3d.com">Feedback &amp; support</a>
           </div>
         </div>
       </div>
@@ -299,6 +303,8 @@
        scripts run before deferred modules, so GEN2_REQ exists by the time
        generate.js evaluates. -->
   <script src="js/vendor/requirement-scope.js"></script>
+  <!-- Feedback & support: the planner's js/modulith-feedback.js byte for byte (test/modulith-feedback-vendor.test.mjs) -->
+  <script src="js/vendor/modulith-feedback.js"></script>
   <!-- The shared tabletop-completion contract (2026-08-23): which cells an
        in-progress tabletop run still needs before its top is level. Vendored
        byte-for-byte from the planner (gen2-planner-main/js/tabletop-completion.js),

@@ -123,6 +123,7 @@ jobs:
           # stale-asset bug in a different shape.
           sed -i "s|js/vendor/requirement-scope.js|js/vendor/requirement-scope.js?v=$V|" viewer/index.html
           sed -i "s|js/vendor/tabletop-completion.js|js/vendor/tabletop-completion.js?v=$V|" viewer/index.html
+          sed -i "s|js/vendor/modulith-feedback.js|js/vendor/modulith-feedback.js?v=$V|" viewer/index.html
           sed -i "s|'./generate.js'|'./generate.js?v=$V'|" viewer/js/main.js
           sed -i "s|'./entry.js'|'./entry.js?v=$V'|" viewer/js/main.js
           # relay authentication (2026-10-03): who may drive the viewer, and the planner origin its posts target
