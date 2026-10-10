@@ -4989,7 +4989,7 @@ function renderLabelStyleRows(box) {
   /* ⚠ The VERIFIED claim only (Astra, release check 2026-10-03): the settings and limits are the generator's, and the preview
      is laid out by its own vendored label-core.js. Nothing made from these settings has been exported, sliced or printed yet -
      the send-back to the generator is step 3 - so the note must not promise what prints. */
-  note.textContent = 'The label generator\'s own settings and limits - the preview uses its layout code.';
+  note.textContent = 'The Label Studio\'s own settings and limits - the preview uses its layout code.';
   note.dataset.base = note.textContent;
   box.appendChild(note);
 }
