@@ -695,12 +695,9 @@ body.fm-open #note-panel { display: none; }
   filter: blur(8px);
 }
 #cover-logo { width: 100%; height: auto; }
-/* dark-mode cover (Joey 2026-08-08): NO halo - the "Bright" logo variant +
-   white lockup text carry the contrast instead */
-#cover-logo-bright { display: none; width: 100%; height: auto; }
+/* dark-mode cover (Joey 2026-08-08): NO halo - the MODULITH wordmark carries its own charcoal and orange blocks, and the
+   white lockup text carries the contrast */
 body.stage-dark .cover-right::before { display: none; }
-body.stage-dark #cover-logo { display: none; }
-body.stage-dark #cover-logo-bright { display: block; }
 body.stage-dark .cover-dynamic { text-shadow: none; }
 body.stage-dark .cover-manual { color: #f2f4ff; text-shadow: none; }
 /* one-line lockup: italic blue "3D" + black all-caps "BUILD STUDIO" */
