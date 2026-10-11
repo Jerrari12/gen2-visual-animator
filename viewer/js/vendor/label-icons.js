@@ -1,6 +1,6 @@
 /* label-icons.js - the label icon catalog: groups, the icons a label can carry, which drawing a badge prints, and the
-   word -> icon guess (2026-10-09; Joey: the new icons in the label icon menu, in collapsible groups, and a much wider
-   icon prediction; design reviewed by Sol 01a122f1).
+   word -> icon guess (2026-10-09; Jerrari: the new icons in the label icon menu, in collapsible groups, and a much wider
+   icon prediction; design reviewed).
 
    Shared byte for byte with the 3D Build Studio (viewer/js/vendor/label-icons.js, sha-pinned there), so a drawer in 3D
    shows the icon its printed label carries. A fixed LF keeps every copy the same bytes (.gitattributes).
@@ -59,7 +59,7 @@ const LEGACY = Object.freeze({
   'plus': ['general', 'Plus'],
 });
 
-/* CORRECTIONS (2026-10-09; ChatGPT's review, relayed by Joey: "Fix known wrong predictions rather than preserving them
+/* CORRECTIONS (2026-10-09; a design review: "Fix known wrong predictions rather than preserving them
    indefinitely ... Recognize specific phrases before ambiguous single words"). Asked BEFORE the core's own rules, so
    these phrases are the only labels whose guess differs from the deployed generator's, and each change is deliberate
    (decisions.md lists them). Same matching as the core: whole words, case-insensitive.
@@ -87,7 +87,7 @@ const CORRECTIONS = Object.freeze([
 ]);
 
 /* Near twins: the core's nut, washer and resistor, and the icon family's own drawings of the same parts. Both of each
-   pair are in the menu, side by side, with names that tell them apart (ChatGPT's second review via Joey: "make the new
+   pair are in the menu, side by side, with names that tell them apart (a second design review: "make the new
    versions selectable now, with names"). The FIRST of each pair is the one the guess predicts - today the core's, so no
    printed label changes until the comparison print decides. Swapping a pair's order would move NEW guesses to the
    family's drawing; it must not change a label that already carries the other drawing: a row whose predicted icon is
@@ -140,7 +140,7 @@ function create(opts) {
     if (byId.has(a.id)) continue;   // a core id always means the core's drawing
     // An icon the art carries but marks not selectable (the coffee filter, until a blind test identifies it) is not in
     // the catalog at all: not in the menu, never guessed, and its id resolves to nothing, so no label prints it
-    // (Sol 01a122f1, finding 1).
+    // (a code review, finding 1).
     if (!a.selectable) continue;
     const ic = { id: a.id, name: a.name, group: a.group, svg: a.std.svg, svgCompact: a.compact.svg, stdFrom: a.std.from,
       core: false, selectable: true, predict: !!a.predict, status: a.status };

@@ -1,6 +1,6 @@
 /* GEN2 hardware-label layout - one hardware label item (part-picker-label-item/1, the Part Picker's saved-record export)
    laid out on the measured EdgeLabel face. This is the browser port of the Python print engine that laid out every
-   printed hardware plate (D:/MODULITH/handoffs/hardware-library/icons-v1: label_from_items.lay_out ->
+   printed hardware plate (MODULITH/handoffs/hardware-library/icons-v1: label_from_items.lay_out ->
    printtest_v1.fields_value), ported rule for rule so the browser and the printed plates agree:
      - the value (its fields, e.g. "M12" "× 25") top-left at the largest cap from 12.0 down to the 6.0 mm minimum, wrapping
        only BETWEEN fields, never inside one;
@@ -20,13 +20,13 @@
      const r = hw.layOut(item);   // { elements: {main1: rings, icon: rings, ...} | null, record: {...} }
    Element rings are in the generator label frame (mm, y up, the label centred at the origin; extrude from z 4.5).
 
-   PROFILE LABELS (v5, label tool 2026-10-07; Joey: "I'd really like them to default to have the side and top profile of
+   PROFILE LABELS (v5, label tool 2026-10-07; Jerrari: "I'd really like them to default to have the side and top profile of
    the bolt like this", holding his printed v5 M5 x 20 SHCS label). With hardware-v5-data.js loaded -
      GEN2HardwareLayout.create({ data: GEN2HardwareData, v5: GEN2HardwareV5Data })
    - a socket-cap or button-head screw, a hex nut or a regular nylon-insert nut is laid out as a PROFILE label first: the
    value on top, the head-on view and the side profile under it, the attributes on a 4.7 mm line below - the port of
-   D:/MODULITH/handoffs/hardware-library/v5/v5_items.lay_out (on labels_v5.py), checked against it in
-   test/hardware-v5.test.mjs. The drawing shows the head, so a screw's head word (SHCS, BHCS) is not printed (Joey
+   MODULITH/handoffs/hardware-library/v5/v5_items.lay_out (on labels_v5.py), checked against it in
+   test/hardware-v5.test.mjs. The drawing shows the head, so a screw's head word (SHCS, BHCS) is not printed (Jerrari
    2026-10-07); a nut keeps its word beside the size. An item with no drawing, or whose pinned words do not fit the profile
    layout, gets the text layout above, and its record says why (profile_why). layOut(item, { profile: false }) asks for the
    text layout. */
@@ -39,7 +39,7 @@ function create(deps) {
   const RU = D.rules;
   const MAIN_MIN = RU.mainMin, MAIN_MAX = RU.mainMax, SEC_CAP = RU.secCap, GAP_TEXT = RU.gapText, GAP_ICON = RU.gapIcon;
   const ATTR_BESIDE_GAP = RU.attrBesideGap, GLYPH_GAP = RU.glyphGap, TRACK_STEP = RU.trackStep, CAP_RATIO = D.capRatio;
-  // no screw icon (Joey 2026-10-09: it "reads more like a 'T' out of place"); nuts and washers keep theirs. A screw's profile
+  // no screw icon (Jerrari 2026-10-09: it "reads more like a 'T' out of place"); nuts and washers keep theirs. A screw's profile
   // drawing (v5) is a separate thing and stays.
   const FAMILY_ICON = { nut: 'nut', washer: 'washer' };
   const FONT_SUBS = [['\u2300', '\u00D8']];      // the font has no DIAMETER SIGN; Ø is in it (label_sheet_v1.FONT_SUBS)
@@ -71,7 +71,7 @@ function create(deps) {
              miny: Math.min(...P.map(p => p[1])), maxy: Math.max(...P.map(p => p[1])) };
   });
   // ----- ALIGNMENT: 'left' (EdgeLabel: everything from the usable area's top-left, as the printed plates) or 'centre' (Classic
-  // Pro, Joey 2026-10-09: centred, as its plain labels - each row centred across the area, the label in the middle of it)
+  // Pro, Jerrari 2026-10-09: centred, as its plain labels - each row centred across the area, the label in the middle of it)
   const ALIGN = D.align === 'centre' ? 'centre' : 'left';
   const ICON_LEFT = ALIGN === 'centre' && D.iconSide === 'left';   // centred rows only: the icon before the value line
   const ICON_MIDDLE = ALIGN === 'centre' && D.iconAlign === 'middle';   // centred rows only: the icon on the value's mid-height
@@ -470,7 +470,7 @@ function create(deps) {
       for (const k of words) { minx = Math.min(minx, els[k].minx); maxx = Math.max(maxx, els[k].maxx); }
       const row = {};
       for (const k of words) row[k] = els[k];
-      if (keys.includes('icon')) {            // after the row's words, or before them (iconSide 'left': Classic Pro, Joey 2026-10-09 -
+      if (keys.includes('icon')) {            // after the row's words, or before them (iconSide 'left': Classic Pro, Jerrari 2026-10-09 -
         const g = els.icon;                   // right after the value a washer ring read as a degree sign, "M5°")
         row.icon = !words.length ? g : ICON_LEFT ? shift(g, minx - GAP_ICON - g.maxx, 0) : shift(g, maxx + GAP_ICON - g.minx, 0);
         if (ICON_MIDDLE && els.main1) {      // centred on the value line's height, not top-aligned (top-aligned beside a tall value
@@ -504,7 +504,7 @@ function create(deps) {
     for (const k of ks) {
       const a = outsideArea(els[k]);
       if (a > 1e-4) return [false, `${k} leaves the usable face by ${a.toFixed(3)} mm²`];
-      // the slits' margin is kept exactly, without the area test's 1e-4 mm² (which let ink reach 7 µm into it; Joey: "avoid the
+      // the slits' margin is kept exactly, without the area test's 1e-4 mm² (which let ink reach 7 µm into it; Jerrari: "avoid the
       // compliant mechanisms at all cost")
       if (CUTS.length && inCutouts(els[k]) > 1e-9) return [false, `${k} comes inside the margin around a slit`];
     }
@@ -621,7 +621,7 @@ function create(deps) {
             attributes: attrs, attribute_places: where, pinned: [...required], not_shown: optional.slice(nOpt),
             secondary_cap: attrs.length ? SEC_CAP : null, icon: withIcon ? iid : null,
             icon_version: withIcon ? (RU.iconVersion || 'compact') : null,
-            // the family has an icon and this label has no room for it (Astra 2026-10-09: an icon left off is shown, never silent)
+            // the family has an icon and this label has no room for it (design review 2026-10-09: an icon left off is shown, never silent)
             icon_left_off: iid && !withIcon ? iid : null, tried_before: tried }];
         }
         tried.push(`attributes ${JSON.stringify(attrs)} ${withIcon ? 'with' : 'without'} the icon: no split fits at >= ${MAIN_MIN} mm caps`);
@@ -677,7 +677,7 @@ function create(deps) {
       value_missing: it.value_missing || [], pinned_unprinted: it.pinned_unprinted || [], not_shown: [], attributes: [] } };
   }
   // a NON-FIT with pins: the layout leaving off the FEWEST lowest-priority pins (never the first, the type). A PROPOSAL only:
-  // the label stays a non-fit until the person unpins (label_from_items.propose, Astra 2026-10-06)
+  // the label stays a non-fit until the person unpins (label_from_items.propose, design review 2026-10-06)
   function propose(it, opts) {
     const order = it.pinned_by_priority || it.pinned || [];
     for (let k = 1; k < order.length; k++) {
@@ -735,7 +735,7 @@ function create(deps) {
     return els;
   }
   function nutTexts5(main, word, cap) {           // the size and the word for one cap (labels_v5.layout_nut_v5's first half)
-    const key = JSON.stringify([main, word, cap]);   // unambiguous for any strings (Sol 01a117f6: a NUL inside main or word made two items one key)
+    const key = JSON.stringify([main, word, cap]);   // unambiguous for any strings (a code review: a NUL inside main or word made two items one key)
     if (nutTextCache.has(key)) return nutTextCache.get(key);
     let m5 = place(tg(main, cap), X0, YTOP);
     for (let i = 0; i < 20; i++) {

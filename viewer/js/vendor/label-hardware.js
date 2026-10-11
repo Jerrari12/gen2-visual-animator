@@ -250,13 +250,13 @@ function create(deps) {
       const p = r.proposal;
       return `Doesn't fit: ${rec.nonfit}.` + (p && p.omit ? ` It fits without ${p.omit.join(', ')} - unpin ${p.omit_paths.join(', ')} to print it.` : '');
     }
-    // a person's line (Astra: the old "Hardware label · value at 9.8 mm caps · screw icon" read like debug text); the layout
+    // a person's line (design review: the old "Hardware label · value at 9.8 mm caps · screw icon" read like debug text); the layout
     // numbers are in the note's tooltip (noteDetail)
     const fellBack = r.covered && profile && rec.layout !== 'v5' ? ' No drawing: its pinned words do not fit beside it.' : '';
     return (rec.layout === 'v5' ? `Part label with the ${rec.kind} drawing, laid out from the part record.` : 'Part label, laid out from the part record.' + fellBack) +
       bandNote(r) +
       (r.typeSkips ? ` Its ${r.typeSkips.join(' and ')} print${r.typeSkips.length === 1 ? 's' : ''} on EdgeLabel only, for now.` : '') +
-      (rec.icon_left_off ? ` No room for the ${rec.icon_left_off} icon beside the words.` : '') +   // never left off silently (Astra 2026-10-09)
+      (rec.icon_left_off ? ` No room for the ${rec.icon_left_off} icon beside the words.` : '') +   // never left off silently (design review 2026-10-09)
       (rec.not_shown.length ? ` Left off to fit: ${rec.not_shown.join(', ')}.` : '') +
       (rec.value_missing.length ? ` ${rec.value_missing.map(m => m.why).join('; ').replace(/^./, c => c.toUpperCase())}.` : '');   // each why already says it ("length not recorded")
   }

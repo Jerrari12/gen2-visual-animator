@@ -25,11 +25,11 @@ const STUDIO = process.env.GEN2_LABELSTUDIO_ROOT
   : [join(root, '..', 'ls-next'), join(root, '..', 'GEN2 EdgeLabel Label Generator'), join(root, '..', '..', 'GEN2 EdgeLabel Label Generator')];
 const STUDIO_ROOT = STUDIO.find((d) => existsSync(join(d, 'label-hardware.js')));
 const PINS = {
-  'label-hardware.js': 'be221a7764fbb36cf60c628ef1464c30412b5941cdd827114e3056b3af8169e5',
-  'hardware-layout.js': 'e496ddf07a53d705e39d3cc01e54a4fb48a152c198d1f521bf8f2e98c5a33db3',
-  'hardware-data.js': '147507eb881237141d26fd6b1f8e53b082835b7610367ce99948c397552245e6',
-  'hardware-v5-data.js': '3c7283b462a8293aeda6d596d5e6f500c94c153a84e103a49f4b9a8671b689a6',
-  'hardware-band-data.js': '0ed77c4b9782b92b6e643d5b009909b0055b09c391ddd3887e6575e7b892be49',
+  'label-hardware.js': 'd1c0eb6b96d791f628fc56d1ce66d22f50f4738da11f4108b486d656ed0d9df0',
+  'hardware-layout.js': 'd807991cc8d012399084b072db750b72744f723aa1cf183812a2bed6060946e2',
+  'hardware-data.js': 'b97c422e90699c1e9dafc610292f44bf1341cbd3a4d1e12fbedd2a5be1c75d2d',
+  'hardware-v5-data.js': '73b3895d8865dfc2c91a215405e78d597dc6dd9f7dda9cfaf4ee6034dc3224e8',
+  'hardware-band-data.js': '865744a360b3816b2f8b28a69ae6fc907e6d8306edaf0abca4091f47184b3a78',
 };
 const sha = (p) => createHash('sha256').update(readFileSync(p)).digest('hex');
 

@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 
-const PIN = 'b5e41b406e55cfde4b688a5fa2dea2e73c59bb954d78a98c1aedb09ff2907c32';
+const PIN = 'c90fd913acbcb688f230addc8c61ff3a7142f34abcac2a69b80029ac0e4b2539';
 const read = (p) => readFileSync(new URL('../' + p, import.meta.url));
 const sha = (b) => createHash('sha256').update(b).digest('hex');
 
