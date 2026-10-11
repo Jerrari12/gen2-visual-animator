@@ -7133,8 +7133,9 @@ const availableFaceplateStyles = () => FACEPLATE_STYLES.filter(s => s.collection
 // label-bearing families link out to their label generator, carrying the
 // build's typed drawer labels so they pre-fill there — the SAME
 // `#labels=<base64 JSON array>` handoff the planner's own button uses
-// (updateLabelGenLink in planner app.js; URLs from its faceplateStyles data)
-const LABEL_GEN_URLS = { edgelabel: 'https://edgelabel.jerrari3d.com/', classicpro: 'https://classic.jerrari3d.com/' };
+// (updateLabelGenLink in planner app.js; URLs from its faceplateStyles data).
+// EdgeLabel's is the Label Studio's new home; Classic Pro keeps its own address until it moves too.
+const LABEL_GEN_URLS = { edgelabel: 'https://labels.modulith.systems/', classicpro: 'https://classic.jerrari3d.com/' };
 // The label-gen pill and the filament menu's Buy button are STATIC anchors (the
 // markup owns them, only the href is swapped), so they miss linkEl's tracking —
 // one listener each, wired once at module level.
