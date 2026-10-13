@@ -2,6 +2,20 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<!-- CUTOVER: the 3D Build Studio is the Assemble workspace of the merged MODULITH planner at planner.modulith.systems
+     (2026-10). This page forwards a kit (?build=) and a planner hand-off (#build=) there, and keeps serving two things that
+     other pages embed: the part preview (?part=) and the old planner's dock (?embed=1). Only on this host. -->
+<script>
+(function () {
+  if (location.hostname !== 'gen2build.jerrari3d.com') return;
+  var q = new URLSearchParams(location.search);
+  if (q.has('part') || q.get('embed') === '1' || q.has('bench')) return;
+  var dest = new URL('https://planner.modulith.systems/');
+  dest.searchParams.set('ws', 'assemble');
+  if (q.get('build')) dest.searchParams.set('build', q.get('build'));
+  location.replace(dest.href + (location.hash || ''));
+})();
+</script>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>GEN2 Assembly Instructions</title>
 <!-- Site icon: the Jerrari J on a dark tile. The mark's core is WHITE, so a
