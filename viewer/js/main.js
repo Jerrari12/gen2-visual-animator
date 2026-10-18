@@ -2823,6 +2823,10 @@ async function loadStaticKit() {
 const decodeBuild = h => { const raw = JSON.parse(decodeURIComponent(escape(atob(decodeURIComponent(h))))); return raw.data || raw; };
 // boot failure → the loading overlay becomes the message and the module halts
 // (the throw is deliberate: nothing below can run without a manifest)
+// THE MESSAGE IS TEXT. A share link's own fields reach the generator's errors (`"${build.mount}" mounts aren't supported`).
+// Written into innerHTML raw, a crafted #build= link ran script on this origin (found 2026-10-15 in the planner's copy of
+// this code, shown on loopback; the same fix as modulith-planner e49f7a5)
+const escHtml = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 function bootFail(html, log) {
   const box = document.getElementById('loading-overlay');
   box.querySelector('.spinner')?.remove();
@@ -2850,7 +2854,7 @@ if (IS_PART) {
   if (res.fail) {
     postToEmbedder({ gen2: 'partError', reason: res.fail.reason, message: res.fail.message });
     track('error:part-' + (res.fail.reason === 'unknown-part' ? 'unknown' : 'unsupported'));
-    bootFail('<strong>No 3D preview for this part</strong><br><br>• ' + res.fail.message,
+    bootFail('<strong>No 3D preview for this part</strong><br><br>• ' + escHtml(res.fail.message),
       'part preview "' + PART_SLUG + '": ' + res.fail.message);
   }
   manifest = res.manifest;
@@ -2861,7 +2865,7 @@ if (IS_PART) {
   originalBuild = structuredClone(build);
   let gen = null;
   try { gen = generateManifest(build); } catch (e) { gen = { manifest: null, errors: [String((e && e.message) || e)] }; }
-  if (!gen.manifest) bootFail('<strong>The benchmark build can’t be shown</strong><br><br>' + gen.errors.map(e => '• ' + e).join('<br>'),
+  if (!gen.manifest) bootFail('<strong>The benchmark build can’t be shown</strong><br><br>' + gen.errors.map(e => '• ' + escHtml(e)).join('<br>'),
     'benchmark build: ' + gen.errors.join('; '));
   manifest = gen.manifest;
   PARTS_BASE = 'parts/' + (manifest.collection || '185') + '/';
@@ -2889,7 +2893,7 @@ if (IS_PART) {
   }
   if (!gen.manifest) {
     track('error:' + fail);
-    bootFail('<strong>Can’t show this build yet</strong><br><br>' + gen.errors.map(e => '• ' + e).join('<br>'),
+    bootFail('<strong>Can’t show this build yet</strong><br><br>' + gen.errors.map(e => '• ' + escHtml(e)).join('<br>'),
       'unsupported build: ' + gen.errors.join('; '));
   }
   manifest = gen.manifest;
@@ -2935,7 +2939,7 @@ if (IS_PART) {
     try { mGen = generateManifest(mBuild); } catch (e) { console.error(e); mGen = null; }
     if (!mGen) kitFail('This kit can’t be shown right now - please report it.', 'kit-crash');
     else if (!mGen.manifest) // a committed kit failing to generate is OUR bug, not the user's — say so plainly
-      kitFail('This kit can’t be shown right now (' + mGen.errors.join(' · ') + ') - please report it.', 'kit-generate');
+      kitFail('This kit can’t be shown right now (' + escHtml(mGen.errors.join(' · ')) + ') - please report it.', 'kit-generate');
     else {
       build = mBuild;
       originalBuild = structuredClone(mBuild);
@@ -9196,7 +9200,7 @@ try {
   // stays); bootFail's throw halts the module either way.
   partView.failed = true;
   postToEmbedder({ gen2: 'partError', reason: 'load-failed', message: (e && e.message) || String(e) });
-  bootFail('<strong>Can’t load this build</strong><br><br>• ' + ((e && e.message) || e) +
+  bootFail('<strong>Can’t load this build</strong><br><br>• ' + escHtml((e && e.message) || e) +
     '<br><br>Please report it - this is a library gap on our side, not your build.',
     'mount failed: ' + ((e && e.message) || e));
 }
