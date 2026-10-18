@@ -243,6 +243,10 @@ const FILAMENT_DB = [
     { name: 'Safety Orange',    hex: '#F04000', url: 'https://www.printedsolid.com/products/jessie-pla-1-75mm-x-1kg-safety-orange' },
     { name: 'Yellow Bird',      hex: '#FDC230', url: 'https://www.printedsolid.com/products/jessie-pla-1-75mm-x-1kg-yellow-bird' },
     { name: 'Neon Green',       hex: '#B1DA00', url: 'https://www.printedsolid.com/products/jessie-pla-1-75mm-x-1kg-neon-green' },
+    // Joey asked for it 2026-10-18 ("Can we add Jessie neon yellow"). The hex is the median of the centre third of the
+    // maker's own swatch photo (a printed sample, white interlayer highlights excluded by the median); the page gives no
+    // colour code and says the colour is "more saturated than a screen can show"
+    { name: 'Neon Yellow',      hex: '#E4E202', url: 'https://www.printedsolid.com/products/jessie-pla-1-75mm-x-1kg-neon-yellow' },
     { name: 'Bold Blue',        hex: '#0251A7', url: 'https://www.printedsolid.com/products/jessie-pla-1-75mm-x-1kg-bold-blue' },
     { name: 'Blue Ice',         hex: '#201E8A', url: 'https://www.printedsolid.com/products/jessie-pla-1-75mm-x-1kg-blue-ice' },
     { name: 'Blue Moon',        hex: '#022679', url: 'https://www.printedsolid.com/products/jessie-pla-1-75mm-x-1kg-blue-moon' },
