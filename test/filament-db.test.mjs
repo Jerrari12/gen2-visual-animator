@@ -26,6 +26,8 @@ const LABEL_PREFIX = {
   'Panchroma™ PLA': 'Panchroma ',
   'Panchroma™ Silk PLA': 'Panchroma ',
   'Panchroma™ Translucent PLA': 'Panchroma ',
+  'PolyFlex™ TPU95': 'Polymaker ',   // the feet's TPU (2026-10-21)
+  'PolyFlex™ TPU90': 'Polymaker ',
   PETG: 'Polymaker ',
   'PLA / PETG': null,                 // Elegoo, explicit per row
   PLA: 'Printed Solid ',
@@ -34,7 +36,7 @@ const LABEL_PREFIX = {
 
 test('the catalog is the shape main.js and the Lab both read', () => {
   assert.ok(Array.isArray(FILAMENT_DB), 'FILAMENT_DB is an array');
-  assert.equal(FILAMENT_DB.length, 7, 'seven brand entries');
+  assert.equal(FILAMENT_DB.length, 9, 'nine brand entries (the two PolyFlex TPU lines joined 2026-10-21)');
 
   for (const b of FILAMENT_DB) {
     const where = `${b.brand} / ${b.line}`;
@@ -65,7 +67,7 @@ test('every colour carries the four fields a consumer may rely on', () => {
       if ('pickNote' in c) assert.ok(c.pick === true, `${where}: pickNote without pick`);
     }
   }
-  assert.equal(n, 111, 'one hundred and eleven colours');
+  assert.equal(n, 122, 'one hundred and twenty-two colours (Jessie Neon Yellow joined 2026-10-18, ten PolyFlex TPU 2026-10-21)');
 });
 
 test('⚔ every label is unique across every brand', () => {
@@ -78,7 +80,7 @@ test('⚔ every label is unique across every brand', () => {
     }
   }
   assert.deepEqual(clashes, [], 'labels collide, and customColors keys on them');
-  assert.equal(seen.size, 111, 'every colour contributed a distinct label');
+  assert.equal(seen.size, 122, 'every colour contributed a distinct label');
 });
 
 test('⚔ each brand builds its labels the way its block says it does', () => {
@@ -104,5 +106,6 @@ test('the labels the presets and the Classic faceplate hard-code still resolve',
     'Printed Solid Mystery Orange',
     'Panchroma Silk Silver',
     'ERYONE Burnt Titanium',
+    'Polymaker PolyFlex TPU95 Black',   // the feet's default (main.js FEET_TPU)
   ]) assert.ok(all.has(label), `no catalog colour labelled "${label}"`);
 });

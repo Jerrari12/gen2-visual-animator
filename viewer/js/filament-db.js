@@ -72,6 +72,9 @@ const PM_SILK = POLY_LINK('silk-pla');
    /products/translucent-pla carrying utm_campaign=JERRARI and ref=superfiliate-JERRARI, so attribution
    attaches. ⚠ Only portal-minted handles route; an unknown one fails soft to the store root. */
 const PM_TRANS = POLY_LINK('translucent-pla');
+/* Joey's minted TPU handles (2026-10-21, sent as https://shop.polymaker.com/JERRARI?q=polyflex-tpu95 and ?q=polyflex-tpu90) */
+const PM_TPU95 = POLY_LINK('polyflex-tpu95');
+const PM_TPU90 = POLY_LINK('polyflex-tpu90');
 const POLYMAKER_URL = PM(44863271895097);
 const FILAMENT_DB = [
   { brand: 'Polymaker', line: 'Panchroma™ PLA', url: POLYMAKER_URL, colors: [
@@ -201,6 +204,28 @@ const FILAMENT_DB = [
      The viewer reads it to decide which filaments a SUPPORTED component previews as translucent (main.js
      SEE_INTO_COMPONENTS). A transmission distance is a Lab measurement and does not live here. */
   ].map(f => ({ ...f, translucent: 'extra', label: `Panchroma ${f.name}`, url: PM_TRANS })) },
+  /* Polymaker PolyFlex™ TPU — THE FEET'S FILAMENT (Joey, 2026-10-21: "when selecting the feet, i feel like we should only
+     list TPU filaments as an option ... default for feet should always be TPU black"; "you can use any TPU, so polymakers
+     TPU lineup would be fine to add"). The printed foot is the flexible part (parts catalogue: "Printed in TPU, or bought as
+     adhesive rubber feet"); the planner lists these for the feet and nowhere else, and TPU95 Black is the feet's default.
+     ⚠ HEXES ARE THE SHOP'S OWN PUBLISHED SWATCH VALUES (`--custom-swatch-hex` on each product page, read 2026-10-21 in the
+     pages' colour order), and ids are the 1.75 mm variants from the same pages' product JSON.
+     ⚠ TPU90 CLEAR IS DELIBERATELY ABSENT, for the Translucent PLA reason above: nothing here can say how it prints
+     translucent. PolyFlex™ TPU95-HF (Black, White, Clear, Translucent Red) waits for a minted handle. */
+  { brand: 'Polymaker', line: 'PolyFlex™ TPU95', url: PM_TPU95, colors: [
+    { name: 'PolyFlex TPU95 Black',  hex: '#16161A', id: 39574341681209, pick: true, pickNote: ' · the default for printed feet' },
+    { name: 'PolyFlex TPU95 White',  hex: '#F0EBE8', id: 39574341648441 },
+    { name: 'PolyFlex TPU95 Blue',   hex: '#338CC7', id: 39574341484601 },
+    { name: 'PolyFlex TPU95 Red',    hex: '#F3442B', id: 39574341615673 },
+    { name: 'PolyFlex TPU95 Yellow', hex: '#EDA900', id: 39574341550137 },
+    { name: 'PolyFlex TPU95 Orange', hex: '#F57517', id: 39574341386297 },
+  ].map(f => ({ ...f, label: `Polymaker ${f.name}`, url: PM_TPU95 })) },
+  { brand: 'Polymaker', line: 'PolyFlex™ TPU90', url: PM_TPU90, colors: [
+    { name: 'PolyFlex TPU90 Black',          hex: '#16161A', id: 39574341320761 },
+    { name: 'PolyFlex TPU90 White',          hex: '#F0EBE8', id: 39574341287993 },
+    { name: 'PolyFlex TPU90 Grey',           hex: '#80837C', id: 39574341255225 },
+    { name: 'PolyFlex TPU90 Polymaker Teal', hex: '#01ACBA', id: 39574341189689 },
+  ].map(f => ({ ...f, label: `Polymaker ${f.name}`, url: PM_TPU90 })) },
   { brand: 'Elegoo', line: 'PLA / PETG', url: 'https://amzn.to/3QWCdV6', colors: [
     { name: 'PETG Black', label: 'Elegoo PETG Black', hex: '#232427', url: 'https://amzn.to/3QWCdV6', pick: true },
     // PLA Black is the Classic faceplate BODY default (Joey 2026-07-25)
