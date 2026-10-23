@@ -12,10 +12,41 @@
   },
   "jobs": [
     {
-      "name": "185 Decor Drawers",
-      "blend": "D:\\Code Projects\\GEN2 Visual Animator\\Blender Files\\185\\GEN2 GLB Exporter - 185 Decor Drawers.blend",
+      "name": "59 Decor Drawers (v2609)",
+      "_note": "Standard Decor drawers, the v2609 release (Thangs + Printables 2026-10-19). Objects 'Decor Drawer <L>-<W>W-<H>H' in collection Decor_<L>, built from the release STLs by build_decor_drawer_blend.py (identity import: the STLs' low-y end is the drawer FRONT, which the glTF exporter lands at +Z like the July 2026 DecorDrawer GLBs they replace; the build fails closed on span, closed shells, right-side-up and tear-away-front-at-the-front, and cuts the 1.2 mm bed flange off the eleven sizes that carry one). Same outer envelope as the July GLBs (88W-13 x L-5.7 x 22/50/78/106/162). No materials, no decimation: 0.9k-2.9k triangles. Run 2026-10-19 from a six-job run file (D:\\Claude - Output\\decor-drawers-v2609-2026-10-19\\run-jobs.json) with Blender 5.1.",
+      "blend": "D:\\Code Projects\\GEN2 Visual Animator\\Blender Files\\Decor Drawers v2609\\GEN2 GLB Exporter - Decor Drawers v2609.blend",
+      "out": "D:\\Code Projects\\GEN2 Visual Animator\\GLB Library\\59",
+      "select": "collection:Decor_59",
+      "code_regex": "59-\\d+W-\\d+H",
+      "name_template": "DecorDrawer_{code}",
+      "depth_mode": "center"
+    },
+    {
+      "name": "115 Decor Drawers (v2609)",
+      "_note": "Standard Decor drawers, the v2609 release (Thangs + Printables 2026-10-19). Objects 'Decor Drawer <L>-<W>W-<H>H' in collection Decor_<L>, built from the release STLs by build_decor_drawer_blend.py (identity import: the STLs' low-y end is the drawer FRONT, which the glTF exporter lands at +Z like the July 2026 DecorDrawer GLBs they replace; the build fails closed on span, closed shells, right-side-up and tear-away-front-at-the-front, and cuts the 1.2 mm bed flange off the eleven sizes that carry one). Same outer envelope as the July GLBs (88W-13 x L-5.7 x 22/50/78/106/162). No materials, no decimation: 0.9k-2.9k triangles. Run 2026-10-19 from a six-job run file (D:\\Claude - Output\\decor-drawers-v2609-2026-10-19\\run-jobs.json) with Blender 5.1.",
+      "blend": "D:\\Code Projects\\GEN2 Visual Animator\\Blender Files\\Decor Drawers v2609\\GEN2 GLB Exporter - Decor Drawers v2609.blend",
+      "out": "D:\\Code Projects\\GEN2 Visual Animator\\GLB Library\\115",
+      "select": "collection:Decor_115",
+      "code_regex": "115-\\d+W-\\d+H",
+      "name_template": "DecorDrawer_{code}",
+      "depth_mode": "center"
+    },
+    {
+      "name": "165 Decor Drawers (v2609)",
+      "_note": "Standard Decor drawers, the v2609 release (Thangs + Printables 2026-10-19). Objects 'Decor Drawer <L>-<W>W-<H>H' in collection Decor_<L>, built from the release STLs by build_decor_drawer_blend.py (identity import: the STLs' low-y end is the drawer FRONT, which the glTF exporter lands at +Z like the July 2026 DecorDrawer GLBs they replace; the build fails closed on span, closed shells, right-side-up and tear-away-front-at-the-front, and cuts the 1.2 mm bed flange off the eleven sizes that carry one). Same outer envelope as the July GLBs (88W-13 x L-5.7 x 22/50/78/106/162). No materials, no decimation: 0.9k-2.9k triangles. Run 2026-10-19 from a six-job run file (D:\\Claude - Output\\decor-drawers-v2609-2026-10-19\\run-jobs.json) with Blender 5.1.",
+      "blend": "D:\\Code Projects\\GEN2 Visual Animator\\Blender Files\\Decor Drawers v2609\\GEN2 GLB Exporter - Decor Drawers v2609.blend",
+      "out": "D:\\Code Projects\\GEN2 Visual Animator\\GLB Library\\165",
+      "select": "collection:Decor_165",
+      "code_regex": "165-\\d+W-\\d+H",
+      "name_template": "DecorDrawer_{code}",
+      "depth_mode": "center"
+    },
+    {
+      "name": "185 Decor Drawers (v2609)",
+      "_note": "Standard Decor drawers, the v2609 release (Thangs + Printables 2026-10-19). Objects 'Decor Drawer <L>-<W>W-<H>H' in collection Decor_<L>, built from the release STLs by build_decor_drawer_blend.py (identity import: the STLs' low-y end is the drawer FRONT, which the glTF exporter lands at +Z like the July 2026 DecorDrawer GLBs they replace; the build fails closed on span, closed shells, right-side-up and tear-away-front-at-the-front, and cuts the 1.2 mm bed flange off the eleven sizes that carry one). Same outer envelope as the July GLBs (88W-13 x L-5.7 x 22/50/78/106/162). No materials, no decimation: 0.9k-2.9k triangles. Run 2026-10-19 from a six-job run file (D:\\Claude - Output\\decor-drawers-v2609-2026-10-19\\run-jobs.json) with Blender 5.1.",
+      "blend": "D:\\Code Projects\\GEN2 Visual Animator\\Blender Files\\Decor Drawers v2609\\GEN2 GLB Exporter - Decor Drawers v2609.blend",
       "out": "D:\\Code Projects\\GEN2 Visual Animator\\GLB Library\\185",
-      "select": "prefix:Decor Drawer",
+      "select": "collection:Decor_185",
       "code_regex": "185-\\d+W-\\d+H",
       "name_template": "DecorDrawer_{code}",
       "depth_mode": "center"
@@ -145,12 +176,22 @@
       "drop_islands_max_thick": 2.0
     },
     {
-      "name": "165 Decor Drawers",
-      "_note": "165 collection decor drawers, 1W-4W. Mirror of the 185 Decor Drawers job with 165 depth (159.3mm).",
-      "blend": "D:\\Code Projects\\GEN2 Visual Animator\\Blender Files\\165\\GEN2 GLB Exporter - 165 Decor Drawers.blend",
-      "out": "D:\\Code Projects\\GEN2 Visual Animator\\GLB Library\\165",
-      "select": "prefix:Decor Drawer",
-      "code_regex": "165-\\d+W-\\d+H",
+      "name": "240 Decor Drawers (v2609)",
+      "_note": "Standard Decor drawers, the v2609 release (Thangs + Printables 2026-10-19). Objects 'Decor Drawer <L>-<W>W-<H>H' in collection Decor_<L>, built from the release STLs by build_decor_drawer_blend.py (identity import: the STLs' low-y end is the drawer FRONT, which the glTF exporter lands at +Z like the July 2026 DecorDrawer GLBs they replace; the build fails closed on span, closed shells, right-side-up and tear-away-front-at-the-front, and cuts the 1.2 mm bed flange off the eleven sizes that carry one). Same outer envelope as the July GLBs (88W-13 x L-5.7 x 22/50/78/106/162). No materials, no decimation: 0.9k-2.9k triangles. Run 2026-10-19 from a six-job run file (D:\\Claude - Output\\decor-drawers-v2609-2026-10-19\\run-jobs.json) with Blender 5.1.",
+      "blend": "D:\\Code Projects\\GEN2 Visual Animator\\Blender Files\\Decor Drawers v2609\\GEN2 GLB Exporter - Decor Drawers v2609.blend",
+      "out": "D:\\Code Projects\\GEN2 Visual Animator\\GLB Library\\240",
+      "select": "collection:Decor_240",
+      "code_regex": "240-\\d+W-\\d+H",
+      "name_template": "DecorDrawer_{code}",
+      "depth_mode": "center"
+    },
+    {
+      "name": "270 Decor Drawers (v2609)",
+      "_note": "Standard Decor drawers, the v2609 release (Thangs + Printables 2026-10-19). Objects 'Decor Drawer <L>-<W>W-<H>H' in collection Decor_<L>, built from the release STLs by build_decor_drawer_blend.py (identity import: the STLs' low-y end is the drawer FRONT, which the glTF exporter lands at +Z like the July 2026 DecorDrawer GLBs they replace; the build fails closed on span, closed shells, right-side-up and tear-away-front-at-the-front, and cuts the 1.2 mm bed flange off the eleven sizes that carry one). Same outer envelope as the July GLBs (88W-13 x L-5.7 x 22/50/78/106/162). No materials, no decimation: 0.9k-2.9k triangles. Run 2026-10-19 from a six-job run file (D:\\Claude - Output\\decor-drawers-v2609-2026-10-19\\run-jobs.json) with Blender 5.1.",
+      "blend": "D:\\Code Projects\\GEN2 Visual Animator\\Blender Files\\Decor Drawers v2609\\GEN2 GLB Exporter - Decor Drawers v2609.blend",
+      "out": "D:\\Code Projects\\GEN2 Visual Animator\\GLB Library\\270",
+      "select": "collection:Decor_270",
+      "code_regex": "270-\\d+W-\\d+H",
       "name_template": "DecorDrawer_{code}",
       "depth_mode": "center"
     },
